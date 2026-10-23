@@ -114,20 +114,20 @@
 }
 
 /* Screen identity: one spot colour per section, used only for its rubric and its section marks. */
-.rts-screen[data-route="dashboard"] { --rubric: var(--ink); --rubric-ink: #ffffff; }
-.rts-screen[data-route="busing"] { --rubric: var(--spot-teal); --rubric-ink: #ffffff; }
-.rts-screen[data-route="rentals"] { --rubric: var(--spot-ochre); --rubric-ink: var(--ink); }
-.rts-screen[data-route="logistics"] { --rubric: var(--spot-green); --rubric-ink: #ffffff; }
-.rts-screen[data-route="vehicles"],
-.rts-screen[data-route="drivers"],
-.rts-screen[data-route="clients"] { --rubric: var(--spot-blue); --rubric-ink: #ffffff; }
-.rts-screen[data-route="compliance"] { --rubric: var(--spot-red); --rubric-ink: #ffffff; }
-.rts-screen[data-route="fleetReadiness"] { --rubric: var(--spot-ochre); --rubric-ink: var(--ink); }
-.rts-screen[data-route="driver_portal"],
-.rts-screen[data-route="client_portal"] { --rubric: var(--spot-teal); --rubric-ink: #ffffff; }
-.rts-screen[data-route="users"],
-.rts-screen[data-route="settings"],
-.rts-screen[data-route="audit"] { --rubric: var(--ink); --rubric-ink: #ffffff; }
+[data-route="dashboard"] { --rubric: var(--ink); --rubric-ink: #ffffff; }
+[data-route="busing"] { --rubric: var(--spot-teal); --rubric-ink: #ffffff; }
+[data-route="rentals"] { --rubric: var(--spot-ochre); --rubric-ink: var(--ink); }
+[data-route="logistics"] { --rubric: var(--spot-green); --rubric-ink: #ffffff; }
+[data-route="vehicles"],
+[data-route="drivers"],
+[data-route="clients"] { --rubric: var(--spot-blue); --rubric-ink: #ffffff; }
+[data-route="compliance"] { --rubric: var(--spot-red); --rubric-ink: #ffffff; }
+[data-route="fleetReadiness"] { --rubric: var(--spot-ochre); --rubric-ink: var(--ink); }
+[data-route="driver_portal"],
+[data-route="client_portal"] { --rubric: var(--spot-teal); --rubric-ink: #ffffff; }
+[data-route="users"],
+[data-route="settings"],
+[data-route="audit"] { --rubric: var(--ink); --rubric-ink: #ffffff; }
 
 * { box-sizing: border-box; }
 
@@ -179,47 +179,49 @@ button { color: inherit; }
 
 .rts-skip:focus { transform: translateY(0); }
 
-/* ---------- masthead -------------------------------------------------------------------------- */
+/* ---------- the spine: a printed section index down the left edge ------------------------------ */
 
 .rts-shell {
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
   background: var(--paper);
 }
 
-.rts-topnav {
+.rts-spine {
   position: sticky;
   top: 0;
   z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  height: 100vh;
+  padding: 22px 0 18px;
+  border-right: 1px solid var(--ink);
   background: var(--paper);
+}
+
+.rts-spine-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 18px 18px;
   border-bottom: 3px solid var(--ink);
 }
 
-.rts-topnav-primary {
-  display: flex;
-  align-items: flex-end;
-  gap: 20px;
-  padding: 14px var(--gutter) 10px;
-}
-
-.rts-brand {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  min-width: 0;
-}
+.rts-brand { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
 
 .rts-mark {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   flex: 0 0 auto;
   background: var(--ink);
   color: var(--paper);
   font-family: var(--display);
-  font-size: 23px;
+  font-size: 21px;
   line-height: 1;
   padding-bottom: 2px;
 }
@@ -227,117 +229,81 @@ button { color: inherit; }
 .rts-wordmark {
   margin: 0;
   font-family: var(--display);
-  font-size: 27px;
+  font-size: 26px;
   font-weight: 400;
   letter-spacing: -0.01em;
-  line-height: 0.95;
+  line-height: 0.9;
   color: var(--ink);
 }
 
 .rts-wordmark span {
   display: block;
-  margin-top: 5px;
+  margin-top: 6px;
+  max-width: 20ch;
+  overflow: hidden;
   color: var(--muted);
   font-family: var(--body);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-}
-
-.rts-top-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-left: auto;
-}
-
-.rts-clock {
-  font-family: var(--display);
-  font-size: 24px;
-  line-height: 1;
-  letter-spacing: 0.01em;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.rts-date {
-  padding-left: 12px;
-  border-left: 1px solid var(--rule);
-  color: var(--muted);
-  font-family: var(--body);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  line-height: 1.4;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rts-kbd {
-  padding: 1px 5px;
-  border: 1px solid var(--rule);
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 9.5px;
-}
-
-.rts-menu { display: none; }
-
-/* contents strip: a newspaper contents line, not a sidebar and not a tab bar */
-.rts-topnav-tabs {
-  display: flex;
-  align-items: stretch;
-  padding: 0 var(--gutter);
-  border-top: 1px solid var(--ink);
-  overflow-x: auto;
+/* the index itself */
+.rts-spine-nav {
+  flex: 1;
+  min-height: 0;
+  padding: 14px 0 10px;
+  overflow-y: auto;
   scrollbar-width: thin;
 }
 
-.rts-nav-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 16px 0 0;
-  margin-right: 16px;
-  border-right: 1px solid var(--rule);
-}
-
-.rts-nav-group:last-child { border-right: 0; }
+.rts-nav-group { padding: 0 0 12px; }
 
 .rts-nav-label {
-  margin: 0 8px 0 0;
+  margin: 0 0 4px;
+  padding: 0 18px;
   color: var(--muted);
   font-family: var(--body);
-  font-size: 8.5px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  white-space: nowrap;
 }
 
-.rts-nav-group .rts-nav { display: flex; align-items: stretch; }
+.rts-nav { display: flex; flex-direction: column; }
 
 .rts-nav-item {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
   align-items: baseline;
-  gap: 5px;
-  padding: 10px 8px;
+  width: 100%;
+  padding: 5px 18px 5px 16px;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-left: 2px solid transparent;
   background: transparent;
   color: var(--ink-2);
-  font-family: var(--body);
-  font-size: 12.5px;
-  font-weight: 500;
-  white-space: nowrap;
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+  text-align: left;
   cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
 }
 
-.rts-nav-item:hover { background: #f3eee2; }
+.rts-nav-item:hover { background: #f4efe3; color: var(--ink); }
 
 .rts-nav-item[aria-current="page"] {
-  border-bottom-color: var(--ink);
-  font-weight: 700;
+  border-left-color: var(--rubric);
+  background: #f7f3e9;
+  color: var(--ink);
+  font-weight: 400;
 }
 
 .rts-nav-index {
@@ -347,8 +313,48 @@ button { color: inherit; }
   letter-spacing: 0.02em;
 }
 
+.rts-nav-item[aria-current="page"] .rts-nav-index { color: var(--ink); }
+
 .rts-nav-icon { display: none; }
-.rts-nav-copy { display: none; }
+.rts-nav-name { display: block; }
+
+/* the desk's own instruments, at the foot of the spine */
+.rts-spine-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px 0;
+  border-top: 1px solid var(--ink);
+}
+
+.rts-spine-clock { display: flex; align-items: baseline; gap: 8px; }
+
+.rts-clock {
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.rts-date {
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rts-kbd {
+  padding: 1px 4px;
+  border: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+}
 
 .rts-scrim-mobile {
   position: fixed;
@@ -359,16 +365,39 @@ button { color: inherit; }
   cursor: pointer;
 }
 
-.rts-rail { display: none; }
+.rts-menu { display: none; }
+.rts-signout { align-self: flex-start; }
+
+.rts-user { display: flex; align-items: center; gap: 9px; min-width: 0; }
+
+.rts-avatar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.rts-user strong { display: block; font-size: 11px; font-weight: 600; line-height: 1.25; }
+.rts-user small { display: block; color: var(--muted); font-size: 8px; font-weight: 700; letter-spacing: 0.12em; }
 
 /* ---------- page frame -------------------------------------------------------------------------- */
 
-.rts-main-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rts-main-wrap { min-width: 0; display: flex; flex-direction: column; }
 .rts-topbar { display: none; }
 .rts-main { flex: 1; min-width: 0; }
 
+/* A notice or flash sits above the masthead; give it a margin so it never touches the top edge. */
+.rts-main-inner > .rts-notice:first-child { margin-top: 14px; }
+
 .rts-main-inner {
-  max-width: 1400px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 0 var(--gutter) 64px;
 }
@@ -389,8 +418,8 @@ button { color: inherit; }
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
   align-items: end;
-  margin: 0 0 30px;
-  padding: clamp(22px, 3vw, 38px) clamp(20px, 2.6vw, 36px) clamp(20px, 2.4vw, 32px);
+  margin: 0 calc(var(--gutter) * -1) 34px;
+  padding: clamp(26px, 3.4vw, 46px) var(--gutter) clamp(24px, 3vw, 40px);
   background: var(--rubric);
   color: var(--rubric-ink);
 }
@@ -417,14 +446,14 @@ button { color: inherit; }
 }
 
 .rts-title {
-  max-width: 24ch;
+  max-width: 20ch;
   margin: 0;
   color: currentColor;
   font-family: var(--display);
-  font-size: clamp(34px, 4.6vw, 60px);
+  font-size: clamp(42px, 5.2vw, 82px);
   font-weight: 400;
-  line-height: 0.94;
-  letter-spacing: -0.015em;
+  line-height: 0.88;
+  letter-spacing: -0.02em;
 }
 
 .rts-page-desc {
@@ -450,8 +479,8 @@ button { color: inherit; }
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
   align-items: end;
-  margin: 0 0 30px;
-  padding: clamp(22px, 3vw, 38px) clamp(20px, 2.6vw, 36px) clamp(20px, 2.4vw, 32px);
+  margin: 0 calc(var(--gutter) * -1) 34px;
+  padding: clamp(26px, 3.4vw, 46px) var(--gutter) clamp(24px, 3vw, 40px);
   background: var(--rubric);
   color: var(--rubric-ink);
 }
@@ -843,6 +872,14 @@ button { color: inherit; }
 
 .rts-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 
+/* The first cell is the record's name: set it in the display face, the way a ledger names an entry
+   and then lists its figures. Nothing else in the row is allowed to compete with it. */
+.rts-table tbody td:first-child {
+  font-family: var(--display);
+  font-size: 17px;
+  letter-spacing: -0.005em;
+}
+
 .rts-table thead th {
   position: sticky;
   top: 0;
@@ -861,7 +898,7 @@ button { color: inherit; }
 }
 
 .rts-table tbody td {
-  padding: 10px 12px 10px 0;
+  padding: 11px 12px 11px 0;
   border-bottom: 1px solid var(--rule);
   color: var(--ink-2);
   vertical-align: top;
@@ -950,10 +987,10 @@ button { color: inherit; }
   margin-top: 2px;
   color: var(--ink);
   font-family: var(--display);
-  font-size: 40px;
+  font-size: clamp(38px, 3.6vw, 54px);
   font-weight: 400;
-  line-height: 0.95;
-  letter-spacing: -0.02em;
+  line-height: 0.92;
+  letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1736,6 +1773,15 @@ select.rts-input option { background: var(--surface); color: var(--ink); }
 .rts-run-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 
 /* the desk beside a list: one figure, the state line, and what is waiting */
+/* The margin column: a tinted gutter beside the work, the way a printed page carries its notes. */
+.rts-desk {
+  background: #f8f4e9;
+  padding: 18px 18px 22px !important;
+  border-left: 1px solid var(--rule);
+}
+
+.rts-spread > .rts-desk + * { padding-left: 40px; }
+
 .rts-desk-figure {
   margin: 0;
   color: var(--ink);
@@ -1863,6 +1909,14 @@ select.rts-input option { background: var(--surface); color: var(--ink); }
    Responsive
    ========================================================================================================== */
 
+@media (max-width: 1280px) {
+  .rts-shell { grid-template-columns: 232px minmax(0, 1fr); }
+  .rts-nav-item { font-size: 16.5px; padding-left: 14px; padding-right: 14px; }
+  .rts-nav-label { padding: 0 14px; }
+  .rts-spine-top { padding: 0 14px 14px; }
+  .rts-spine-foot { padding: 12px 14px 0; }
+}
+
 @media (max-width: 1180px) {
   .rts-board-head,
   .rts-board-row { grid-template-columns: 92px minmax(0, 2fr) minmax(0, 1fr) 116px; }
@@ -1873,43 +1927,59 @@ select.rts-input option { background: var(--surface); color: var(--ink); }
   .rts-run { grid-template-columns: 64px minmax(0, 1fr) 150px; gap: 14px; }
 }
 
+/* Under 980px the spine turns on its side: identity and the desk's instruments on one bar, the
+   index itself behind the Menu button. */
 @media (max-width: 980px) {
+  .rts-shell { grid-template-columns: minmax(0, 1fr); }
+
+  .rts-spine {
+    position: sticky;
+    top: 0;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+    border-right: 0;
+    border-bottom: 3px solid var(--ink);
+  }
+
+  .rts-spine-top {
+    flex: 1;
+    align-items: center;
+    padding: 0;
+    border-bottom: 0;
+  }
+
   .rts-menu { display: inline-flex; }
 
-  .rts-topnav-tabs {
+  .rts-spine-nav {
     display: none;
     position: fixed;
     top: 0;
     bottom: 0;
     left: 0;
     z-index: 60;
-    width: min(340px, 88vw);
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding: 18px 16px;
-    border-top: 0;
+    width: min(320px, 88vw);
+    padding: 20px 0;
     border-right: 1px solid var(--ink);
     background: var(--paper);
     overflow-y: auto;
   }
 
-  .rts-topnav.is-open .rts-topnav-tabs { display: flex; }
+  .rts-spine.is-open .rts-spine-nav { display: block; }
 
-  .rts-nav-group {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding: 10px 0;
-    margin-right: 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--rule);
+  .rts-spine-foot {
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    border-top: 0;
+    margin-left: auto;
   }
 
-  .rts-nav-label { margin: 0 0 6px; }
-  .rts-nav-group .rts-nav { flex-direction: column; align-items: stretch; }
-  .rts-nav-item { padding: 9px 0; border-bottom: 1px solid transparent; font-size: 15px; }
-  .rts-nav-item[aria-current="page"] { border-bottom-color: var(--ink); }
+  .rts-palette-trigger { display: none; }
+  .rts-date { display: none; }
+  .rts-user strong, .rts-user small { display: none; }
 
   .rts-page-head,
   .rts-sheet-head { grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
@@ -1917,21 +1987,18 @@ select.rts-input option { background: var(--surface); color: var(--ink); }
   .rts-spread { grid-template-columns: minmax(0, 1fr); }
   .rts-spread > * + * { padding-left: 0; border-left: 0; border-top: 1px solid var(--rule); margin-top: 16px; }
   .rts-lead { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-  .rts-palette-trigger-text { display: none; }
-  .rts-date { display: none; }
   .rts-auth { grid-template-columns: minmax(0, 1fr); }
   .rts-auth-poster { padding: 28px; }
   .rts-auth-headline { font-size: clamp(38px, 8vw, 56px); }
 }
 
 @media (max-width: 700px) {
-  .rts-topnav-primary { gap: 12px; padding: 10px 16px 8px; }
   .rts-wordmark { font-size: 21px; }
   .rts-wordmark span { display: none; }
-  .rts-clock { font-size: 19px; }
-  .rts-user strong, .rts-user small { display: none; }
-  .rts-page-head, .rts-sheet-head { padding: 20px 16px; margin-bottom: 22px; }
-  .rts-title { font-size: clamp(30px, 9vw, 40px); }
+  .rts-clock { font-size: 20px; }
+  .rts-signout { padding-left: 4px; padding-right: 4px; }
+  .rts-page-head, .rts-sheet-head { padding: 22px 16px; margin-bottom: 22px; }
+  .rts-title { font-size: clamp(32px, 9.4vw, 46px); }
   .rts-band-label { flex-direction: column; align-items: flex-start; gap: 4px; }
   .rts-band-note { text-align: left; }
   .rts-band-title { font-size: 23px; }

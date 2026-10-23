@@ -203,24 +203,25 @@ function Shell() {
   );
 
   return (
-    <div className="rts-shell">
+    <div className="rts-shell" data-route={route}>
       <a className="rts-skip" href="#main-content">Skip to content</a>
 
       {navOpen && (
         <button type="button" className="rts-scrim-mobile" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
       )}
 
-      {/* The board's header. Identity and the clock sit on one row; every destination sits on the
-          next, grouped, because a dispatcher switches between busing, rentals and logistics all
-          afternoon and should not open a menu to do it. */}
-      <header className={cn("rts-topnav", navOpen && "is-open")}>
-        <div className="rts-topnav-primary">
+      {/* The spine: a printed section index down the left edge of the sheet. It carries the
+          wordmark, every destination with its number, and the desk's own instruments (search,
+          clock, who is signed in) at the foot. The spine replaces the earlier top strip because
+          fourteen destinations read as a list, and a list belongs down a margin. */}
+      <header className={cn("rts-spine", navOpen && "is-open")}>
+        <div className="rts-spine-top">
           <div className="rts-brand">
             <div className="rts-mark" aria-hidden="true">R</div>
             <p className="rts-wordmark">
               Richie
               <span title={db.settings.companyName ?? "Richie Transport Services"}>
-                {(db.settings.companyName ?? "Richie Transport Services").toUpperCase()} · OPERATIONS
+                {(db.settings.companyName ?? "Richie Transport Services").toUpperCase()}
               </span>
             </p>
           </div>
@@ -228,33 +229,9 @@ function Shell() {
           <Button className="rts-menu" onClick={() => setNavOpen(true)} aria-label="Open navigation" aria-expanded={navOpen}>
             Menu
           </Button>
-
-          <div className="rts-top-right">
-            <button type="button" className="rts-palette-trigger" onClick={openPalette} aria-keyshortcuts="Control+K Meta+K">
-              <Icon name="search" className="rts-palette-trigger-icon" />
-              <span className="rts-palette-trigger-text">Jump to a screen</span>
-              <kbd className="rts-kbd">Ctrl K</kbd>
-            </button>
-            {busy && (
-              <span className="rts-busy" role="status">
-                <span className="rts-busy-bar" aria-hidden="true" />
-                Saving
-              </span>
-            )}
-            <span className="rts-clock" aria-label={clock ? `Current time ${clock}` : undefined}>{clock ?? "--:--"}</span>
-            <span className="rts-date">{today}</span>
-            <div className="rts-user">
-              <div className="rts-avatar" aria-hidden="true">{initialsOf(actor?.fullName)}</div>
-              <div className="min-w-0">
-                <strong className="truncate">{actor?.fullName}</strong>
-                <small>{actor ? (ROLE_LABELS[actor.role] ?? "UNKNOWN ROLE").toUpperCase() : ""}</small>
-              </div>
-            </div>
-            <Button variant="ghost" onClick={() => void signOut()}>Sign out</Button>
-          </div>
         </div>
 
-        <nav className="rts-topnav-tabs" aria-label="Main">
+        <nav className="rts-spine-nav" aria-label="Main">
           {numberedGroups.map((group) => (
             <div className="rts-nav-group" key={group.label}>
               <p className="rts-nav-label">{group.label}</p>
@@ -272,7 +249,7 @@ function Shell() {
                     >
                       <span className="rts-nav-index" aria-hidden="true">{String(index).padStart(2, "0")}</span>
                       <Icon name={ROUTE_ICONS[item.route]} className="rts-nav-icon" />
-                      <span>{item.label}</span>
+                      <span className="rts-nav-name">{item.label}</span>
                     </button>
                   );
                 })}
@@ -280,6 +257,32 @@ function Shell() {
             </div>
           ))}
         </nav>
+
+        <div className="rts-spine-foot">
+          <button type="button" className="rts-palette-trigger" onClick={openPalette} aria-keyshortcuts="Control+K Meta+K">
+            <Icon name="search" className="rts-palette-trigger-icon" />
+            <span className="rts-palette-trigger-text">Jump to a screen</span>
+            <kbd className="rts-kbd">Ctrl K</kbd>
+          </button>
+          {busy && (
+            <span className="rts-busy" role="status">
+              <span className="rts-busy-bar" aria-hidden="true" />
+              Saving
+            </span>
+          )}
+          <div className="rts-spine-clock">
+            <span className="rts-clock" aria-label={clock ? `Current time ${clock}` : undefined}>{clock ?? "--:--"}</span>
+            <span className="rts-date">{today}</span>
+          </div>
+          <div className="rts-user">
+            <div className="rts-avatar" aria-hidden="true">{initialsOf(actor?.fullName)}</div>
+            <div className="min-w-0">
+              <strong className="truncate">{actor?.fullName}</strong>
+              <small>{actor ? (ROLE_LABELS[actor.role] ?? "UNKNOWN ROLE").toUpperCase() : ""}</small>
+            </div>
+          </div>
+          <Button variant="ghost" className="rts-signout" onClick={() => void signOut()}>Sign out</Button>
+        </div>
       </header>
 
       <div className="rts-main-wrap">
@@ -293,7 +296,7 @@ function Shell() {
                 <Button variant="ghost" onClick={() => setFlash(null)} aria-label="Dismiss">Dismiss</Button>
               </div>
             )}
-            <div className="rts-screen" data-route={route}>
+            <div className="rts-screen">
               {page}
             </div>
             <footer className="rts-provenance">
