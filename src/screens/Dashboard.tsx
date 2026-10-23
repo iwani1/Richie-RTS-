@@ -291,22 +291,35 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
               <div className="rts-band-label">
                 <h2 id="fleet-heading" className="rts-band-title">Fleet</h2>
                 <p className="rts-band-note">
-                  {db.vehicles.filter((v) => v.status !== "retired").length} in service · {readiness.asOf}
+                  {db.vehicles.length === 0
+                    ? "Nothing registered yet."
+                    : `${db.vehicles.filter((v) => v.status !== "retired").length} in service · ${readiness.asOf}`}
                 </p>
               </div>
               <div className="rts-band-body">
-                <div className="rts-fleet-status">
-                  {VEHICLE_STATUSES.map((status) => {
-                    const count = db.vehicles.filter((v) => v.status === status).length;
-                    return (
-                      <div key={status} className="rts-fleet-cell">
-                        <span className="rts-figure">{count}</span>
-                        <span className="rts-fleet-label">{VEHICLE_STATUS_LABELS[status]}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {readiness.status === "not_configured" ? (
+                {db.vehicles.length === 0 ? (
+                  // Four zeroed status cells would read as "four empty states of a fleet"; there is no
+                  // fleet yet. Say that once, and point at the register.
+                  <p className="rts-band-empty">
+                    No vehicles are registered, so there is no readiness to report.{" "}
+                    <button type="button" className="rts-link" onClick={() => navigate("vehicles")}>
+                      Register the first vehicle <Icon name="chevron" className="rts-link-icon" />
+                    </button>
+                  </p>
+                ) : (
+                  <div className="rts-fleet-status">
+                    {VEHICLE_STATUSES.map((status) => {
+                      const count = db.vehicles.filter((v) => v.status === status).length;
+                      return (
+                        <div key={status} className="rts-fleet-cell">
+                          <span className="rts-figure">{count}</span>
+                          <span className="rts-fleet-label">{VEHICLE_STATUS_LABELS[status]}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {db.vehicles.length > 0 && readiness.status === "not_configured" ? (
                   <p className="rts-band-empty">
                     Service intervals are not configured, so readiness cannot be computed.{" "}
                     <button type="button" className="rts-link" onClick={() => navigate("fleetReadiness")}>
@@ -334,7 +347,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
                     })}
                   </div>
                 )}
-                {readiness.status !== "not_configured" && (
+                {db.vehicles.length > 0 && readiness.status !== "not_configured" && (
                   <p className="rts-meter-legend">
                     <span><i className="rts-dot rts-dot--error" /> {readiness.counts.overdue} overdue</span>
                     <span><i className="rts-dot rts-dot--warning" /> {readiness.counts.due} due</span>
@@ -387,6 +400,16 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
             <p className="rts-band-note">Money figures sum recorded amounts only. Not a margin.</p>
           </div>
           <div className="rts-band-body">
+            {db.rentals.length === 0 ? (
+              <p className="rts-band-empty">
+                No rental requests yet. Money appears here only once an amount is recorded against a
+                request.{" "}
+                <button type="button" className="rts-link" onClick={() => navigate("rentals")}>
+                  Open rentals <Icon name="chevron" className="rts-link-icon" />
+                </button>
+              </p>
+            ) : (
+              <>
             <div className="rts-fleet-status">
               <div className="rts-fleet-cell">
                 <span className="rts-figure rts-figure--money">{money(billed, s.currencyCode)}</span>
@@ -411,8 +434,10 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
                 );
               })}
             </div>
-            {!s.currencyCode && db.rentals.length > 0 && (
+            {!s.currencyCode && (
               <p className="rts-band-empty">Billing currency is not set, so amounts are shown without a currency symbol.</p>
+            )}
+              </>
             )}
           </div>
         </section>
