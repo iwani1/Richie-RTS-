@@ -80,6 +80,36 @@ to start with a volume on the older `/var/lib/postgresql/data`.
 
 **Hosted PostgreSQL:** create a database and paste its connection string into `DATABASE_URL`.
 
+### Check which server you are actually talking to
+
+`DATABASE_URL` names a host and a port, not a container. If the machine already runs another
+PostgreSQL — a second project's container, or a package — that server answers for the port, and its
+users and passwords are the ones that apply. The symptom is a login failure for a user you are sure
+you created:
+
+```bash
+podman ps --format '{{.Names}}  {{.Ports}}'     # or: docker ps
+ss -ltnp | grep 5432                            # who is listening
+```
+
+If something else owns 5432, either stop it, or publish this database somewhere private and say so
+in `DATABASE_URL`:
+
+```bash
+podman run -d --name richie-db \
+  -e POSTGRES_USER=richie -e POSTGRES_PASSWORD='your-password' -e POSTGRES_DB=richie_tms \
+  -p 127.0.0.1:5433:5432 -v richie_pgdata:/var/lib/postgresql \
+  docker.io/library/postgres:18-alpine
+```
+
+```ini
+DATABASE_URL="postgresql://richie:your-password@127.0.0.1:5433/richie_tms"
+```
+
+The port in `DATABASE_URL` must be the port the database is published on; the password must be the
+one that database was created with. Editing `.env` never changes a password already stored in a
+volume — use `alter user` (above) or start a fresh volume.
+
 ### If it does not start
 
 The application refuses to run on an invalid configuration rather than misbehaving later, and now
