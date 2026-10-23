@@ -6,6 +6,7 @@
 // silently locked the account out). These tests pin the boundary.
 
 import { describe, expect, it } from "vitest";
+import { can } from "./permissions";
 import { hashPassword } from "./crypto";
 import { execute, type Actor, type Credential } from "./service";
 import { emptyDatabase, type Database } from "./types";
@@ -54,5 +55,44 @@ describe("credential policy at the service boundary", () => {
 
   it("hashPassword refuses a password shorter than the policy", async () => {
     await expect(hashPassword("x")).rejects.toThrow(/at least 10 characters/);
+  });
+});
+
+// Regression tests for the backup-import fix (audit finding H-02).
+describe("backup import validation", () => {
+  it("rejects a backup containing an unknown role instead of crashing later", () => {
+    const { db, admin } = adminDb();
+    const poisoned = JSON.parse(JSON.stringify(db)) as Database;
+    poisoned.users.push({ ...poisoned.users[0], id: "evil", email: "evil@example.com", role: "superuser" as never });
+    const res = execute(db, admin, { type: "import_backup", database: poisoned }, NOW);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.message).toMatch(/Unknown role/);
+  });
+
+  it("rejects records whose fields have the wrong type", () => {
+    const { db, admin } = adminDb();
+    const bad = JSON.parse(JSON.stringify(db)) as Database;
+    (bad.vehicles as unknown as Record<string, unknown>[]).push({ id: null, registration: 42 });
+    const res = execute(db, admin, { type: "import_backup", database: bad }, NOW);
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects an empty credential in a restored user", () => {
+    const { db, admin } = adminDb();
+    const bad = JSON.parse(JSON.stringify(db)) as Database;
+    bad.users[0].passwordHash = "";
+    bad.users[0].passwordSalt = "";
+    const res = execute(db, admin, { type: "import_backup", database: bad }, NOW);
+    expect(res.ok).toBe(false);
+  });
+
+  it("still accepts a clean round-trip of its own backup", () => {
+    const { db, admin } = adminDb();
+    const res = execute(db, admin, { type: "import_backup", database: JSON.parse(JSON.stringify(db)) as Database }, NOW);
+    expect(res.ok).toBe(true);
+  });
+
+  it("does not throw on a role the matrix does not know", () => {
+    expect(can("superuser" as never, "users:read")).toBe(false);
   });
 });

@@ -186,5 +186,8 @@ export const PERMISSION_SCOPE: Record<Permission, Scope> = Object.fromEntries(
 
 export function can(role: Role | null | undefined, permission: Permission): boolean {
   if (!role) return false;
-  return ROLE_PERMISSIONS[role].includes(permission);
+  // Fail closed on a role the matrix does not know (for example a user record restored from
+  // a hand-edited backup). This used to throw and take the whole screen down.
+  const granted = ROLE_PERMISSIONS[role];
+  return Array.isArray(granted) && granted.includes(permission);
 }

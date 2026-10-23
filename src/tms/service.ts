@@ -3,6 +3,7 @@
 // unchanged. In this environment it runs in the browser (see docs/DECISIONS.md D-01).
 
 import { can, type Permission } from "./permissions";
+import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
 import { confinedClientId } from "./scope";
 import {
@@ -988,8 +989,10 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
     case "import_backup": {
       const denied = authorise(actor, "backup:import");
       if (denied) return denied;
-      const imported = migrate(command.database);
-      if (!imported) return fail("The file is not a valid Richie TMS backup (schema version 1 or 2).");
+      // A backup is untrusted input: validate every record the app later trusts, not just
+      // the top-level shape (see backupGuard.ts).
+      const { database: imported, problems } = inspectBackup(command.database);
+      if (!imported) return fail(`This file cannot be imported. ${describeProblems(problems)}`, { database: "Rejected by the backup validator." });
       const stillAdmin = imported.users.some((u) => u.id === actor!.id && u.active && u.role === "administrator");
       if (!stillAdmin) return fail("Import refused: your administrator account is not present in the backup, which would lock you out.");
       const next = audit(imported, actor, {

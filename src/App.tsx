@@ -163,7 +163,7 @@ function Shell() {
             <div className="rts-avatar" aria-hidden="true">{initialsOf(actor?.fullName)}</div>
             <div className="min-w-0">
               <strong className="truncate">{actor?.fullName}</strong>
-              <small>{actor ? ROLE_LABELS[actor.role].toUpperCase() : ""}</small>
+              <small>{actor ? (ROLE_LABELS[actor.role] ?? "UNKNOWN ROLE").toUpperCase() : ""}</small>
             </div>
           </div>
           <button type="button" className="rts-btn rts-btn--rail" onClick={signOut}>
