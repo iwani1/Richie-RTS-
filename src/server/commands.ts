@@ -44,6 +44,36 @@ export function describeDatabaseError(error: unknown): ServerFailure {
   const pg = error as { code?: string; constraint?: string; message?: string };
   const conflict = (message: string): ServerFailure => ({ ok: false, status: 409, message, errors: {} });
   switch (pg.code) {
+    // Connection-level failures. These are the operator's to fix, so they are reported as a
+    // deployment problem (503) with the value at fault, never as "the change could not be saved".
+    case "28P01":
+      return {
+        ok: false,
+        status: 503,
+        message:
+          "The database rejected the password in DATABASE_URL. Set the same password in .env and the " +
+          "database, then restart the server (docs/SETUP_AND_DEPLOYMENT.md §5).",
+        errors: {},
+      };
+    case "28000":
+      return {
+        ok: false,
+        status: 503,
+        message: "The database refused this connection: check the user in DATABASE_URL and pg_hba.conf.",
+        errors: {},
+      };
+    case "3D000":
+      return {
+        ok: false,
+        status: 503,
+        message: "The database named in DATABASE_URL does not exist. Create it, then run npm run db:migrate.",
+        errors: {},
+      };
+    case "42P01":
+      if (typeof pg.message === "string" && pg.message.includes("schema_migrations")) {
+        return { ok: false, status: 503, message: "The schema has not been created. Run: npm run db:migrate", errors: {} };
+      }
+      return { ok: false, status: 500, message: "The database schema is incomplete. Run: npm run db:migrate", errors: {} };
     case "23P01":
       return conflict("That vehicle or driver already has a booking overlapping those dates.");
     case "23505":
@@ -162,6 +192,12 @@ export async function readSnapshot(): Promise<{ ok: true; database: Database; ac
       return { ok: false, status: 503, message: error.message.replace(/\n/g, " ") };
     }
     const described = describeDatabaseError(error);
-    return { ok: false, status: described.status === 500 ? 503 : described.status, message: described.status === 500 ? "The database is not reachable. Check docs/SETUP_AND_DEPLOYMENT.md." : described.message };
+    if (described.status >= 500) {
+      // Its own message when it has one (a rejected password, a missing database); the generic
+      // "cannot reach the database" only when it does not.
+      const generic = "The database is not reachable. Check docs/SETUP_AND_DEPLOYMENT.md §5.";
+      return { ok: false, status: 503, message: described.message && described.message !== "The change could not be saved. The server log has the detail." ? described.message : generic };
+    }
+    return { ok: false, status: described.status, message: described.message };
   }
 }
