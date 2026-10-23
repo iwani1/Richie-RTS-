@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the test toolchain, one for the rest, instead of a dozen.
+      test-tooling:
+        patterns: ["vitest", "@vitest/*", "jsdom", "@testing-library/*"]
+      build-tooling:
+        patterns: ["vite", "@vitejs/*", "typescript", "eslint*", "@eslint/*", "typescript-eslint"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

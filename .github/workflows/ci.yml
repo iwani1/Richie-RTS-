@@ -1,18 +1,21 @@
 # Quality gates on every push and pull request.
 #
 # These are the same four gates the standing brief (AGENTS.md §14) requires before any
-# change, run in the same order as `npm run check`. Nothing here depends on a database,
-# a server or a secret: the application is a static single-file build in this phase.
-#
-# HONEST LIMIT: this file was authored in an environment with no git remote and no CI
-# runner, so its execution has NOT been observed. The gates it invokes have each been run
-# locally and pass. Treat the first green run on the real repository as the verification.
+# change, run in the same order as `npm run check`, plus a coverage ratchet and a full
+# dependency audit. Nothing here depends on a database, a server or a secret: the
+# application is a static single-file build in this phase.
 
 name: ci
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+# Superseded runs on the same ref are cancelled; only the newest one matters.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -23,10 +26,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The job never pushes; do not leave the token in .git/config.
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.19
           cache: npm
 
       - name: Install (exact lockfile)
@@ -38,11 +44,27 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test
+      - name: Test with coverage thresholds
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build
 
+      # Production dependencies gate the deployable artifact.
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+      # Dev dependencies run on the runner and in every contributor's shell, so they are
+      # audited too. Today this fails until vitest/vite are upgraded (see audit M-01);
+      # remove continue-on-error once that upgrade lands.
+      - name: Audit all dependencies (informational until upgraded)
+        run: npm run audit:dev
+        continue-on-error: true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/index.html
+          if-no-files-found: error
+          retention-days: 14

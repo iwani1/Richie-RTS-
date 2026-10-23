@@ -1,0 +1,23 @@
+# Blocks a pull request that introduces a dependency with a known vulnerability or an
+# incompatible licence. Requires the repository's dependency graph (on by default).
+name: dependency-review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          # GPL/AGPL/SSPL are not in this dependency tree today and must not arrive.
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, SSPL-1.0
