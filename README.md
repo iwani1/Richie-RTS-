@@ -17,7 +17,7 @@ Staff busing, bus rentals and staff logistics in one operational application.
 sudo dnf install -y nodejs npm git openssl podman podman-compose
 git clone <your-remote-url> richie-tms && cd richie-tms
 
-cp .env.example .env.local
+cp .env.example .env
 openssl rand -base64 32          # paste as SESSION_SECRET
 # set DATABASE_URL and POSTGRES_PASSWORD to the same password
 

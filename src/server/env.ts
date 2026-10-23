@@ -5,7 +5,7 @@ import { z } from "zod";
 const schema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required (see .env.example)"),
   // iron-session seals cookies with this. 32 characters is its minimum; generate with
-  // `openssl rand -base64 32`. Never commit a real value: .env.local is git-ignored.
+  // `openssl rand -base64 32`. Never commit a real value: .env is git-ignored.
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters (openssl rand -base64 32)"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   // Demo data is opt-in and refuses to load in production (brief integrity rule 9).
@@ -28,7 +28,7 @@ export function env(): Env {
   if (cached) return cached;
   const missing = Object.entries(REQUIRED).filter(([key]) => !process.env[key]);
   if (missing.length) {
-    throw new Error(`Invalid server configuration:\n${missing.map(([, message]) => `  - ${message}`).join("\n")}\nCopy .env.example to .env.local and fill it in.`);
+    throw new Error(`Invalid server configuration:\n${missing.map(([, message]) => `  - ${message}`).join("\n")}\nCopy .env.example to .env and fill it in.`);
   }
   const parsed = schema.safeParse({
     DATABASE_URL: process.env.DATABASE_URL,
@@ -38,7 +38,7 @@ export function env(): Env {
   });
   if (!parsed.success) {
     const detail = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
-    throw new Error(`Invalid server configuration:\n${detail}\nCopy .env.example to .env.local and fill it in.`);
+    throw new Error(`Invalid server configuration:\n${detail}\nCopy .env.example to .env and fill it in.`);
   }
   if (parsed.data.NODE_ENV === "production" && !process.env.DATABASE_URL?.startsWith("postgres")) {
     throw new Error("DATABASE_URL must be a postgres:// connection string.");

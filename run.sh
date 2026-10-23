@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Richie TMS — one entry point for the things you actually do on a workstation.
 #
-#   ./run.sh setup     first-time: check tools, create .env.local, start the database, migrate, build
+#   ./run.sh setup     first-time: check tools, create .env, start the database, migrate, build
 #   ./run.sh start     run the production build on http://localhost:3000
 #   ./run.sh dev       run the development server with hot reload
 #   ./run.sh check     typecheck, lint, tests, production build
@@ -28,7 +28,7 @@ require_node() {
 }
 
 require_env() {
-  [ -f .env.local ] || fail ".env.local is missing. Run: cp .env.example .env.local — then fill it in (see docs/SETUP_AND_DEPLOYMENT.md §3.2)."
+  [ -f .env ] || fail ".env is missing. Run: cp .env.example .env — then fill it in (see docs/SETUP_AND_DEPLOYMENT.md §3.2)."
 }
 
 require_deps() {
@@ -39,14 +39,14 @@ require_db() {
   require_env
   if ! node -e '
     const { readFileSync } = require("node:fs");
-    const text = readFileSync(".env.local", "utf8");
+    const text = readFileSync(".env", "utf8");
     const match = text.match(/^\s*DATABASE_URL\s*=\s*"?([^"\n]+)"?/m);
     if (!match) process.exit(2);
     const { Client } = require("pg");
     const client = new Client({ connectionString: match[1], connectionTimeoutMillis: 3000 });
     client.connect().then(() => client.end()).catch(() => process.exit(1));
   '; then
-    fail "PostgreSQL is not reachable with DATABASE_URL from .env.local. Is the database running? (docker compose up -d db)"
+    fail "PostgreSQL is not reachable with DATABASE_URL from .env. Is the database running? (docker compose up -d db)"
   fi
 }
 
@@ -64,19 +64,19 @@ compose_up() {
 case "${1:-help}" in
   setup)
     require_node
-    if [ ! -f .env.local ]; then
-      cp .env.example .env.local
-      say "Created .env.local. Generating a session secret..."
+    if [ ! -f .env ]; then
+      cp .env.example .env
+      say "Created .env. Generating a session secret..."
       secret=$(openssl rand -base64 32)
       # Portable in-place edit: BSD sed and GNU sed disagree about -i.
       node -e '
         const { readFileSync, writeFileSync } = require("node:fs");
-        const file = ".env.local";
+        const file = ".env";
         const text = readFileSync(file, "utf8").replace(/SESSION_SECRET=.*/, `SESSION_SECRET="${process.argv[1]}"`);
         writeFileSync(file, text);
       ' "$secret"
       say "A SESSION_SECRET was written for you."
-      say "Now set DATABASE_URL and POSTGRES_PASSWORD in .env.local to the same password, then re-run: ./run.sh setup"
+      say "Now set DATABASE_URL and POSTGRES_PASSWORD in .env to the same password, then re-run: ./run.sh setup"
       exit 0
     fi
     compose_up

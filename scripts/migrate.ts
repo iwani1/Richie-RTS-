@@ -51,7 +51,7 @@ if (process.argv[1]?.endsWith("migrate.ts") || process.argv[1]?.endsWith("migrat
   loadEnvFile();
   const url = process.env.DATABASE_URL;
   if (!url) {
-    console.error("DATABASE_URL is not set. Copy .env.example to .env.local (or export it) first.");
+    console.error("DATABASE_URL is not set. Copy .env.example to .env (or export it) first.");
     process.exit(1);
   }
   console.log("Applying migrations to", url.replace(/:\/\/[^@]+@/, "://***@"));

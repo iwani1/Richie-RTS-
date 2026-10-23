@@ -16,8 +16,10 @@ services:
     environment:
       POSTGRES_DB: richie_tms
       POSTGRES_USER: richie
-      # Change this before first start, and keep it in step with DATABASE_URL in .env.local.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-before-first-start}
+      # Read from .env, the same file the application uses (compose substitutes ${...} from the
+      # project's .env). Set it before the first start and keep DATABASE_URL in step. Changing it
+      # after the volume exists does not change the password already stored there.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       # Deterministic collation/encoding: mixed locales are a classic source of "works on my machine".
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:

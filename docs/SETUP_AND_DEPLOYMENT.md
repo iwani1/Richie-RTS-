@@ -77,11 +77,11 @@ cd richie-tms
 ### 3.2 Create the environment file
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 openssl rand -base64 32          # copy the output into SESSION_SECRET
 ```
 
-Edit `.env.local` and set:
+Edit `.env` and set:
 
 | Variable | What it must be |
 |---|---|
@@ -91,7 +91,7 @@ Edit `.env.local` and set:
 | `NODE_ENV` | `development` while you are trying it, `production` once you serve staff |
 | `ALLOW_DEMO_SEED` | leave `false` unless you want the demo records |
 
-`.env.local` is git-ignored. Never commit it: it contains the database password and the key that
+`.env` is git-ignored. Never commit it: it contains the database password and the key that
 seals session cookies.
 
 ### 3.3 Start PostgreSQL
@@ -140,7 +140,7 @@ For development (hot reload, slower first page):
 npm run dev                      # http://localhost:3000
 ```
 
-Both load `.env.local` automatically. `npm start` must be preceded by `npm run build`.
+Both load `.env` automatically. `npm start` must be preceded by `npm run build`.
 
 > Do not run `npm run build` while `npm run dev` is running. They share the `.next` directory and
 > the dev server will start throwing `Cannot find module './chunks/vendor-chunks/next.js'` until
@@ -166,7 +166,7 @@ category exists.**
 ### 3.7 Optional: demo records
 
 ```bash
-# in .env.local
+# in .env
 ALLOW_DEMO_SEED=true
 DEMO_ADMIN_EMAIL=admin@richie.test
 DEMO_ADMIN_PASSWORD=<choose one, 10+ characters>
@@ -330,8 +330,8 @@ sudo systemctl --user restart richie-tms     # or Ctrl-C and `npm start`
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Invalid server configuration: DATABASE_URL is required` | `.env.local` missing or not loaded | `cp .env.example .env.local`, fill it in, restart the process (env is read at start-up) |
-| `SESSION_SECRET must be at least 32 characters` | placeholder still in `.env.local` | `openssl rand -base64 32`, paste, restart |
+| `Invalid server configuration: DATABASE_URL is required` | `.env` missing or not loaded | `cp .env.example .env`, fill it in, restart the process (env is read at start-up) |
+| `SESSION_SECRET must be at least 32 characters` | placeholder still in `.env` | `openssl rand -base64 32`, paste, restart |
 | Browser: *"Cannot reach the ledger"* | server not running, or wrong port | `curl localhost:3000/api/health`; check `journalctl --user -u richie-tms` |
 | `/api/health` returns 503 | PostgreSQL down or unreachable | `docker compose ps`; `docker compose logs db` |
 | `password authentication failed for user "richie"` | password in `DATABASE_URL` and `POSTGRES_PASSWORD` disagree, or the volume was created with the old password | make them match; if the volume was created with a different password, either change it in SQL (`ALTER USER richie PASSWORD '...'`) or remove the volume (destroys data) |

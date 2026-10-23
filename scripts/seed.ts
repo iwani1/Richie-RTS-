@@ -23,7 +23,7 @@ loadEnvFile();
 
 async function main() {
   if (process.env.ALLOW_DEMO_SEED !== "true") {
-    console.error("Refusing to seed: set ALLOW_DEMO_SEED=true in .env.local to load demo records.");
+    console.error("Refusing to seed: set ALLOW_DEMO_SEED=true in .env to load demo records.");
     process.exit(1);
   }
   if (process.env.NODE_ENV === "production") {
@@ -33,7 +33,7 @@ async function main() {
   const email = (process.env.DEMO_ADMIN_EMAIL ?? "admin@richie.test").trim().toLowerCase();
   const password = process.env.DEMO_ADMIN_PASSWORD;
   if (!password || password.length < PASSWORD_MIN_LENGTH) {
-    console.error(`Refusing to seed: set DEMO_ADMIN_PASSWORD (at least ${PASSWORD_MIN_LENGTH} characters) in .env.local.`);
+    console.error(`Refusing to seed: set DEMO_ADMIN_PASSWORD (at least ${PASSWORD_MIN_LENGTH} characters) in .env.`);
     process.exit(1);
   }
 
