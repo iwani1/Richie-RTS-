@@ -55,6 +55,18 @@ export function documentStatus(expiryDate: string, leadDays: number | null, toda
   return expiryDate <= leadCutoff ? "expiring_soon" : "valid";
 }
 
+/**
+ * Whole days from `today` to `date`; negative when the date has passed. Both sides are read as
+ * UTC calendar days, so a document that expires today returns 0 regardless of the workstation's
+ * timezone. Returns null for an unparseable date rather than guessing.
+ */
+export function daysUntil(date: string, today: string): number | null {
+  if (!isValidDate(date) || !isValidDate(today)) return null;
+  const from = Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8, 10)));
+  const to = Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
+  return Math.round((to - from) / 86400000);
+}
+
 function validateDocumentCore(db: Database, ownerType: "vehicle" | "driver", ownerId: string, documentTypeId: string): Errors {
   const errors: Errors = {};
   if (!DOCUMENT_OWNER_TYPES.includes(ownerType)) errors.ownerType = "Invalid owner type.";

@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { CommandResult } from "../tms/service";
-import { documentStatus, type CreateDocumentInput, type DocumentStatus, type UpdateDocumentInput } from "../tms/compliance";
+import { daysUntil, documentStatus, type CreateDocumentInput, type DocumentStatus, type UpdateDocumentInput } from "../tms/compliance";
 import type { ComplianceDocument } from "../tms/types";
 import { useTms } from "../tms/useTms";
 import {
@@ -127,6 +127,16 @@ export function CompliancePage() {
           { key: "number", header: "Number", render: (r) => (r.doc.documentNumber || <span className="text-stone-400">-</span>) },
           { key: "issued", header: "Issued", render: (r) => (r.doc.issuedDate ? formatDate(r.doc.issuedDate) : <span className="text-stone-400">-</span>) },
           { key: "expiry", header: "Expires", render: (r) => formatDate(r.doc.expiryDate) },
+          {
+            key: "days",
+            header: "Timing",
+            render: (r) => {
+              const days = daysUntil(r.doc.expiryDate, today);
+              if (days === null) return <span className="text-stone-500">unreadable date</span>;
+              const label = days === 0 ? "expires today" : days > 0 ? `in ${days} day${days === 1 ? "" : "s"}` : `${Math.abs(days)} day${days === -1 ? "" : "s"} overdue`;
+              return <span className={`rts-mono ${days < 0 ? "text-red-700" : "text-stone-600"}`}>{label}</span>;
+            },
+          },
           { key: "status", header: "Status", render: (r) => <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Badge> },
           {
             key: "actions",

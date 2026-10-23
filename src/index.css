@@ -1,5 +1,43 @@
 @import "tailwindcss";
 
+/* Tailwind's default palette is cool (stone/gray/slate) and its default red is bright. Screens that
+   were written before the system existed still use a few of those utilities; rather than rewriting
+   thousands of className strings, the palette itself is remapped onto the ledger tokens. Any future
+   `text-stone-500` then lands on the same muted ink as `.rts-hint`. */
+@theme {
+  --font-sans: "Archivo Variable", "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Fraunces Variable", "Fraunces", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-stone-50: #fbf7ec;
+  --color-stone-100: #f6f0e2;
+  --color-stone-200: #e9e1cf;
+  --color-stone-300: #cfc5ae;
+  --color-stone-400: #5e6659;
+  --color-stone-500: #5e6659;
+  --color-stone-600: #4c5549;
+  --color-stone-700: #2b463a;
+  --color-stone-800: #20372d;
+  --color-stone-900: #14231d;
+
+  /* lime was the earlier accent; screens that still name it now draw brass rules */
+  --color-lime-50: #fbf3dd;
+  --color-lime-300: #e0a43c;
+  --color-lime-600: #b5791f;
+  --color-lime-900: #14231d;
+
+  --color-red-700: #a24a30;
+  --color-red-600: #a24a30;
+  --color-emerald-700: #4f7345;
+  --color-amber-700: #8a5f1c;
+
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+}
+
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #202926;
@@ -135,7 +173,7 @@ input:focus-visible {
 
 .brand-caption {
   color: #99a59d;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 650;
   letter-spacing: 0.14em;
 }
@@ -151,7 +189,7 @@ input:focus-visible {
 .callout-label {
   margin: 0;
   color: #819088;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 750;
   letter-spacing: 0.14em;
 }
@@ -233,7 +271,7 @@ input:focus-visible {
 
 .nav-copy small {
   color: #87948b;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .nav-item > svg:last-child {
@@ -259,7 +297,7 @@ input:focus-visible {
   align-items: center;
   gap: 7px;
   color: #b4c0b6;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
 }
@@ -278,13 +316,13 @@ input:focus-visible {
 .sidebar-bottom p {
   margin: 11px 0 19px;
   color: #9ca89f;
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 1.65;
 }
 
 .sidebar-version {
   color: #718078;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 650;
   letter-spacing: 0.12em;
 }
@@ -331,7 +369,7 @@ input:focus-visible {
 .breadcrumb {
   gap: 11px;
   color: #8b948d;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.11em;
 }
@@ -342,7 +380,7 @@ input:focus-visible {
 
 .breadcrumb strong {
   color: #3a4741;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 650;
   letter-spacing: 0.01em;
 }
@@ -428,7 +466,7 @@ input:focus-visible {
   gap: 9px;
   margin-bottom: 14px;
   color: #6f7c73;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 760;
   letter-spacing: 0.13em;
 }
@@ -483,7 +521,7 @@ input:focus-visible {
   border-radius: 3px;
   color: #536057;
   background: #fbfcfa;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 620;
   white-space: nowrap;
   cursor: pointer;
@@ -551,7 +589,7 @@ input:focus-visible {
 .callout-label {
   padding-top: 3px;
   color: #617057;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .document-callout p {
@@ -597,7 +635,7 @@ input:focus-visible {
   min-height: 14px;
   margin-bottom: 24px;
   color: #8b968e;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
 }
@@ -630,7 +668,7 @@ input:focus-visible {
 .section-number {
   color: #87986d;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 650;
   letter-spacing: 0.03em;
 }
@@ -719,7 +757,7 @@ input:focus-visible {
   color: #94a27e;
   content: counter(integrity, decimal-leading-zero);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .integrity-list strong {
@@ -776,7 +814,7 @@ input:focus-visible {
   border: 1px solid #c2ccc0;
   border-radius: 50%;
   color: #718366;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   line-height: 1;
 }
@@ -846,7 +884,7 @@ input:focus-visible {
   color: #687b57;
   content: counter(phase);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .phase-steps h3 {
@@ -879,7 +917,7 @@ input:focus-visible {
 .artifact-list li code {
   align-self: start;
   width: fit-content;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .artifact-list li span {
@@ -991,7 +1029,7 @@ input:focus-visible {
 .search-results-line {
   margin: -6px 0 24px;
   color: #748077;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .empty-search {
@@ -1041,7 +1079,7 @@ input:focus-visible {
   gap: 15px;
   padding-top: 16px;
   color: #98a199;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 650;
   letter-spacing: 0.1em;
 }
@@ -1066,7 +1104,7 @@ input:focus-visible {
 .rail-heading {
   margin-bottom: 12px;
   color: #7d8980;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .outline-nav {
@@ -1084,7 +1122,7 @@ input:focus-visible {
   border: 0;
   color: #69756d;
   background: transparent;
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 1.5;
   text-align: left;
   cursor: pointer;
@@ -1099,7 +1137,7 @@ input:focus-visible {
 .outline-link span {
   color: #9aa59b;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .rail-status {
@@ -1112,7 +1150,7 @@ input:focus-visible {
   align-items: center;
   gap: 7px;
   color: #59655d;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .status-dot {
@@ -1129,7 +1167,7 @@ input:focus-visible {
 .rail-caption {
   margin: 9px 0 0;
   color: #89938c;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.65;
 }
 
@@ -1141,7 +1179,7 @@ input:focus-visible {
 .rail-source-note p:last-child {
   margin: 0;
   color: #6c786f;
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 1.65;
 }
 
@@ -1163,7 +1201,7 @@ input:focus-visible {
 .rail-bottom-note p {
   margin: 0;
   color: #929c94;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.6;
 }
 
@@ -1307,7 +1345,7 @@ input:focus-visible {
 
   .breadcrumb {
     gap: 7px;
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .breadcrumb strong {
@@ -1388,7 +1426,7 @@ input:focus-visible {
   }
 
   .callout-label {
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .document-layout {
@@ -1399,7 +1437,7 @@ input:focus-visible {
     flex-wrap: wrap;
     gap: 6px;
     margin-bottom: 19px;
-    font-size: 7px;
+    font-size: 10px;
   }
 
   .section-heading {
@@ -1488,7 +1526,7 @@ input:focus-visible {
   --rts-brass: #b08b3e;
   --rts-rust: #a24a30;
   --rts-green: #4f7345;
-  --rts-muted: #6f7568;
+  --rts-muted: #5e6659;
   --rts-focus: #2f6e4f;
   /* Type: self-hosted (src/app/layout.tsx imports the font files) -------------------------- */
   --rts-font-body: "Archivo Variable", "Archivo", "Helvetica Neue", Arial, sans-serif;
@@ -1597,7 +1635,7 @@ textarea:focus-visible,
   margin-top: 6px;
   color: #98a596;
   font-family: var(--rts-font-mono);
-  font-size: 7.5px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.16em;
   line-height: 1.4;
@@ -1622,7 +1660,7 @@ textarea:focus-visible,
   padding: 0 8px 7px;
   color: #86937f;
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.17em;
 }
@@ -1674,7 +1712,7 @@ textarea:focus-visible,
 .rts-nav-index {
   color: #7e8d82;
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.06em;
 }
@@ -1695,7 +1733,7 @@ textarea:focus-visible,
   display: block;
   margin-top: 2px;
   color: #8b988c;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.35;
 }
 
@@ -1725,7 +1763,7 @@ textarea:focus-visible,
   color: #14231d;
   border: 1px solid #08110d;
   font-family: var(--rts-font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -1742,7 +1780,7 @@ textarea:focus-visible,
   margin-top: 2px;
   color: #93a094;
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.1em;
 }
 
@@ -1755,7 +1793,7 @@ textarea:focus-visible,
   border: 1px dashed rgba(242, 236, 223, 0.22);
   color: #87957f;
   font-family: var(--rts-font-mono);
-  font-size: 7.5px;
+  font-size: 10px;
   letter-spacing: 0.1em;
   line-height: 1.5;
 }
@@ -1799,7 +1837,7 @@ textarea:focus-visible,
   min-width: 0;
   color: #6d7568;
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1828,7 +1866,7 @@ textarea:focus-visible,
 .rts-date {
   color: #6d7568;
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1844,7 +1882,7 @@ textarea:focus-visible,
   background: #ece4d2;
   color: #3f4a40;
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1916,9 +1954,9 @@ textarea:focus-visible,
   align-items: center;
   gap: 9px;
   margin-bottom: 9px;
-  color: #6f7a6c;
+  color: var(--rts-muted);
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.17em;
   text-transform: uppercase;
@@ -1927,7 +1965,7 @@ textarea:focus-visible,
 .rts-eyebrow::before {
   content: "///";
   color: var(--rts-brass);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: -0.12em;
 }
 
@@ -1945,7 +1983,7 @@ textarea:focus-visible,
 .rts-page-desc {
   max-width: 70ch;
   margin-top: 9px;
-  color: #5d695d;
+  color: var(--rts-muted);
   font-size: 12.5px;
   line-height: 1.68;
 }
@@ -1972,7 +2010,7 @@ textarea:focus-visible,
   background: var(--rts-paper-2);
   color: var(--rts-ink);
   font-family: var(--rts-font-body);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: 0.085em;
@@ -2057,9 +2095,9 @@ textarea:focus-visible,
   align-items: center;
   gap: 6px;
   margin-bottom: 5px;
-  color: #68735f;
+  color: var(--rts-muted);
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.1em;
   line-height: 1.5;
@@ -2127,7 +2165,7 @@ select.rts-input {
 .rts-hint {
   display: block;
   margin-top: 4px;
-  color: #646b5f;
+  color: var(--rts-muted);
   font-size: 10.5px;
   line-height: 1.5;
 }
@@ -2157,7 +2195,7 @@ select.rts-input {
   margin-bottom: 3px;
   color: #2c3a2a;
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2179,7 +2217,7 @@ select.rts-input {
   background: #eef0e2;
   color: #3a4a33;
   font-family: var(--rts-font-mono);
-  font-size: 7.5px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.09em;
   line-height: 1.5;
@@ -2218,7 +2256,7 @@ select.rts-input {
   gap: 7px;
   color: #2a382d;
   font-family: var(--rts-font-mono);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   line-height: 1.5;
@@ -2268,7 +2306,7 @@ select.rts-input {
   background: #e9e1cf;
   color: #4b5648;
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -2316,7 +2354,7 @@ select.rts-input {
   border: 1px solid var(--rts-line-strong);
   color: #85795f;
   font-family: var(--rts-font-mono);
-  font-size: 7.5px;
+  font-size: 10px;
   letter-spacing: 0.17em;
 }
 
@@ -2331,7 +2369,7 @@ select.rts-input {
 .rts-empty p {
   max-width: 48ch;
   margin: 5px auto 0;
-  color: #646c60;
+  color: var(--rts-muted);
   font-size: 11px;
   line-height: 1.65;
 }
@@ -2402,7 +2440,7 @@ select.rts-input {
   background: transparent;
   color: #f5f0e2;
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2441,7 +2479,7 @@ select.rts-input {
 .rts-stat-label {
   color: #6c7566;
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   line-height: 1.5;
@@ -2461,8 +2499,8 @@ select.rts-input {
 
 .rts-stat-caption {
   margin-top: 5px;
-  color: #646b5f;
-  font-size: 10px;
+  color: var(--rts-muted);
+  font-size: 10.5px;
   line-height: 1.45;
 }
 
@@ -2562,7 +2600,7 @@ select.rts-input {
   border-top: 1px solid rgba(242, 236, 223, 0.18);
   color: #8f9d8f;
   font-family: var(--rts-font-mono);
-  font-size: 7.5px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.13em;
 }
@@ -2590,7 +2628,7 @@ select.rts-input {
   margin-bottom: 9px;
   color: #7b8374;
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -2628,7 +2666,7 @@ select.rts-input {
 .rts-auth-foot {
   margin-top: 14px;
   color: #858b7c;
-  font-size: 9.5px;
+  font-size: 10px;
   line-height: 1.6;
 }
 
@@ -2647,7 +2685,7 @@ select.rts-input {
   color: var(--rts-ink);
   background: transparent;
   font-family: var(--rts-font-mono);
-  font-size: 7.5px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2724,7 +2762,7 @@ select.rts-input {
     min-height: 54px;
   }
   .rts-crumbs {
-    font-size: 7.5px;
+    font-size: 10px;
     letter-spacing: 0.1em;
   }
   .rts-chip {
@@ -2803,7 +2841,7 @@ select.rts-input {
 }
 
 .rts-main .text-stone-600 {
-  color: #5d695d;
+  color: var(--rts-muted);
 }
 
 .rts-main .text-stone-500 {
@@ -2843,7 +2881,7 @@ select.rts-input {
   border-bottom: 1px solid var(--rts-ink);
   color: #4b5648;
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-align: left;
@@ -2970,7 +3008,7 @@ select.rts-input {
   background: none;
   color: #97a397;
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
@@ -3076,7 +3114,7 @@ select.rts-input {
 
 .rts-nav-label {
   padding: 0 6px 6px;
-  font-size: 7.5px;
+  font-size: 10px;
   letter-spacing: 0.16em;
 }
 
@@ -3103,7 +3141,7 @@ select.rts-input {
 }
 
 .rts-nav-index {
-  font-size: 8px;
+  font-size: 10px;
   text-align: right;
 }
 
@@ -3114,7 +3152,7 @@ select.rts-input {
 
 .rts-nav-copy small {
   margin-top: 1px;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .rts-rail-note {
@@ -3122,7 +3160,7 @@ select.rts-input {
   border-style: solid;
   border-color: rgba(242, 236, 223, 0.14);
   color: #93a094;
-  font-size: 7.5px;
+  font-size: 10px;
 }
 
 .rts-rail-note i {
@@ -3152,7 +3190,7 @@ select.rts-input {
 
 .rts-date {
   font-family: var(--rts-font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--rts-muted);
@@ -3196,7 +3234,7 @@ select.rts-input {
   background: var(--rts-paper);
   color: var(--rts-muted);
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   letter-spacing: 0.06em;
   line-height: 1.6;
 }
@@ -3315,7 +3353,7 @@ select.rts-input {
   padding: 8px 14px;
   border-top: 1px solid var(--rts-line);
   color: var(--rts-muted);
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 /* ---- sheet head -------------------------------------------------------------------------- */
@@ -3350,7 +3388,7 @@ select.rts-input {
   background: var(--rts-paper-3);
   color: var(--rts-ink-2);
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -3484,7 +3522,7 @@ select.rts-input {
 
 .rts-attention-noaction {
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--rts-muted);
@@ -3530,7 +3568,7 @@ select.rts-input {
 
 .rts-board-head span {
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--rts-muted);
@@ -3555,7 +3593,7 @@ select.rts-input {
   display: block;
   margin-top: 1px;
   font-family: var(--rts-font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.04em;
   color: var(--rts-muted);
 }
@@ -3567,7 +3605,7 @@ select.rts-input {
 
 .rts-unset {
   font-family: var(--rts-font-mono);
-  font-size: 9.5px;
+  font-size: 10px;
   font-style: normal;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -3583,7 +3621,7 @@ select.rts-input {
   border-left-width: 3px;
   background: var(--rts-paper-2);
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--rts-ink-2);
@@ -3644,7 +3682,7 @@ select.rts-input {
 
 .rts-fleet-label {
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--rts-muted);
@@ -3685,7 +3723,7 @@ select.rts-input {
   gap: var(--rts-space-3);
   margin: var(--rts-space-2) 0 0;
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--rts-muted);
@@ -3735,7 +3773,7 @@ select.rts-input {
   padding: 3px 8px;
   border: 1px solid var(--rts-line);
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--rts-ink-2);
@@ -3769,7 +3807,7 @@ select.rts-input {
 .rts-progress-caption {
   margin: 6px 0 var(--rts-space-3);
   font-family: var(--rts-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--rts-muted);
@@ -3812,7 +3850,7 @@ select.rts-input {
 
 .rts-footnote-ref {
   font-family: var(--rts-font-mono);
-  font-size: 9.5px;
+  font-size: 10px;
 }
 
 .rts-provenance {
@@ -3824,7 +3862,7 @@ select.rts-input {
   padding-top: var(--rts-space-3);
   border-top: 1px solid var(--rts-line);
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--rts-muted);
@@ -3967,6 +4005,7 @@ select.rts-input {
 .rts-card-head {
   padding: 8px 0 10px;
   border-bottom: 1px solid var(--rts-line);
+  background: transparent;
 }
 
 .rts-card-title {
@@ -4004,7 +4043,7 @@ select.rts-input {
 
 .rts-stat-label {
   font-family: var(--rts-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--rts-muted);
@@ -4022,7 +4061,7 @@ select.rts-input {
 
 .rts-stat-caption {
   margin-top: 2px;
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--rts-muted);
 }
 
@@ -4030,7 +4069,7 @@ select.rts-input {
   border-width: 1px;
   border-left-width: 3px;
   background: var(--rts-paper-2);
-  font-size: 7.5px;
+  font-size: 10px;
 }
 
 .rts-notice {
@@ -4056,7 +4095,7 @@ select.rts-input {
 }
 
 .rts-eyebrow {
-  font-size: 8.5px;
+  font-size: 10px;
   letter-spacing: 0.16em;
 }
 
@@ -4088,4 +4127,87 @@ select.rts-input {
 .rts-rail .rts-nav-item:focus-visible,
 .rts-rail .rts-rail-toggle:focus-visible {
   outline-color: var(--rts-amber);
+}
+
+/* ---- rental state machine: a strip of stamps, not a progress bar -------------------------
+   The five states are a sequence of decisions, so they read as a row of numbered stamps on the
+   sheet. Completed stamps are stamped (green tick), the current stamp carries the amber bar,
+   future stamps stay muted. Colour is never the only signal: the index/ticks stay visible. */
+
+.rts-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--rts-line-strong);
+  background: var(--rts-paper-2);
+}
+
+.rts-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 8px 10px 8px 9px;
+  border-left: 3px solid var(--rts-line);
+  color: var(--rts-muted);
+  font-family: var(--rts-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rts-step + .rts-step {
+  border-top: 0;
+}
+
+.rts-step-index {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1px solid currentColor;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.rts-step.is-done {
+  border-left-color: var(--rts-green);
+  color: var(--rts-ink-2);
+}
+
+.rts-step.is-current {
+  border-left-color: var(--rts-amber);
+  color: var(--rts-ink);
+  background: rgba(224, 164, 60, 0.1);
+}
+
+.rts-step.is-current .rts-step-index {
+  background: var(--rts-amber);
+  border-color: var(--rts-amber);
+  color: var(--rts-ink);
+}
+
+@media (max-width: 640px) {
+  .rts-step {
+    flex: 1 1 100%;
+    border-left-width: 3px;
+    border-top: 1px solid var(--rts-line);
+  }
+  .rts-step:first-child {
+    border-top: 0;
+  }
+}
+
+/* Machine-readable data: references, times, registrations, money, durations. Tabular so columns
+   line up when a dispatcher scans thirty rows; 11px so it stays legible on a 1366px office screen. */
+.rts-mono {
+  font-family: var(--rts-font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }

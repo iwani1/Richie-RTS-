@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { executeCommand, type AnyCommand } from "./commands";
-import { documentStatus, type CreateDocumentInput } from "./compliance";
+import { daysUntil, documentStatus, type CreateDocumentInput } from "./compliance";
 import type { Actor, Credential } from "./service";
 import { SCHEMA_VERSION, emptyDatabase, emptyRentalSettings, type Database } from "./types";
 
@@ -273,5 +273,19 @@ describe("schema migration", () => {
       expect(result.db.settings.documentReminderLeadDays).toBeNull();
       expect(result.db.schemaVersion).toBe(SCHEMA_VERSION);
     }
+  });
+});
+
+describe("daysUntil", () => {
+  it("counts forward, zero and backward days without a timezone shift", () => {
+    expect(daysUntil("2026-11-02", "2026-10-23")).toBe(10);
+    expect(daysUntil("2026-10-23", "2026-10-23")).toBe(0);
+    expect(daysUntil("2026-10-01", "2026-10-23")).toBe(-22);
+    expect(daysUntil("2027-01-01", "2026-12-31")).toBe(1);
+  });
+
+  it("returns null for dates it cannot read instead of inventing a number", () => {
+    expect(daysUntil("not-a-date", "2026-10-23")).toBeNull();
+    expect(daysUntil("2026-10-23", "")).toBeNull();
   });
 });

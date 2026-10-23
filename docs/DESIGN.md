@@ -64,6 +64,7 @@ What the research therefore changed, concretely:
 | Forms | Modal for everything (A) | Side panel for edits, inline for single fields, full page only for the long settings form (B) | **B (existing pattern kept)** | The app already uses a side panel (`Panel`) with focus management and a scrim; it preserves context behind the form. Settings stays a page because it is long and rarely used. |
 | Density | Comfortable, large type (A) | Compact, 13–14px body, hairline rules (B) | **B** | A dispatcher scans 30 rows. Compact rows with generous *horizontal* space, not vertical padding. |
 | Type | System stack only (A) | Self-hosted variable serif + grotesque + mono (B) | **B, bundled locally** | The original build fetched Google Fonts at runtime — a network dependency on a possibly-offline workstation. The same three families are now installed from npm and served by the app itself. |
+| Accent | Signal lime `#C9E265` (A) | Stamp amber `#E0A43C` on warm paper (B) | **B** | Lime is the SaaS default and it cannot be used as text on paper (1.4:1); it only works as a fill, which pushed it towards decoration. Amber reads as a rubber-stamp and a highlighted column on a waybill, still carries "act here" or "due soon", and takes ink text at 8:1. Lime survives only as an idea in the doc's §4 history, not in the build. |
 | Theme | Light only (A) | Light + dark (B) | **A for now** | The paper metaphor *is* the identity; a dark variant would be a different product. Recorded as a deliberate limit, not an oversight. |
 
 ## 4. The direction: "waybill paper"
@@ -75,8 +76,9 @@ parts (references, times, registrations, money) set in mono so columns line up.
 
 - **Paper, not white.** Surfaces are warm (#F5F0E4 family). Cards are not floating boxes; sections
   are separated by hairlines and small-caps labels, like a pre-printed form.
-- **Forest and signal.** The rail is deep forest; the single accent is signal lime (#C9E265) used
-  *only* for live markers, the primary action and selected nav. Nothing else is lime.
+- **Forest and stamp ink.** The rail is deep forest; the accent is a warm stamp amber, used *only*
+  for the primary action, the selected nav item, the rule under a page title and "needs attention".
+  Nothing else takes the accent, so it still means "act here".
 - **Three voices.** Fraunces (serif) for page titles, sheet headings and headline figures; Archivo
   for interface text; IBM Plex Mono for references, times, registrations, quantities and money —
   always with tabular numerals so columns align.
@@ -100,25 +102,33 @@ messages. `prefers-reduced-motion` removes all of it. Nothing animates while som
 
 **Colour tokens**
 
-| Token | Value | Use |
-|---|---|---|
-| `--ink` | `#18211B` | Body text, headings |
-| `--ink-2` | `#2C3A31` | Secondary text |
-| `--muted` | `#6B7268` | Captions, labels, metadata |
-| `--paper` | `#F5F0E4` | Page |
-| `--paper-2` | `#FFFDF7` | Raised sheet, inputs |
-| `--paper-3` | `#EDE6D6` | Sunken strip, table head |
-| `--line` | `#D5CCB8` | Hairlines |
-| `--line-strong` | `#B3A88F` | Section rules, table borders |
-| `--forest` | `#12251D` | Rail, primary ink surfaces |
-| `--signal` | `#C9E265` | Live marker, primary action, selection |
-| `--amber` | `#B5791F` | Due soon, needs attention |
-| `--rust` | `#A03B2A` | Overdue, destructive, error |
-| `--green` | `#3F6A46` | Confirmed, healthy |
-| `--focus` | `#2F6E4F` | Focus ring (3px, offset 2px) |
+| Token | Value | Contrast (WCAG, measured) | Use |
+|---|---|---|---|
+| `--rts-ink` | `#14231D` | 13.85:1 on paper | Body text, headings, table values |
+| `--rts-ink-2` | `#20372D` | 10.84:1 on paper | Secondary text, row titles |
+| `--rts-muted` | `#5E6659` | 5.07 paper · 5.57 paper-2 · 4.58 paper-3 | Captions, labels, metadata |
+| `--rts-paper` | `#F2ECDF` | — | Page |
+| `--rts-paper-2` | `#FBF7EC` | — | Raised sheet, inputs, sticky table head |
+| `--rts-paper-3` | `#E9E1CF` | — | Sunken strip, table head, inset field |
+| `--rts-line` | `#CFC5AE` | 1.46:1 — decorative | Hairlines |
+| `--rts-line-strong` | `#A99E86` | 2.25:1 — decorative | Section rules, table borders |
+| rail | `#14231D` | paper text on it 13.85:1 | Navigation column |
+| `--rts-amber` | `#E0A43C` | ink on amber 7.41:1 | Primary fill under ink text, due soon, title rule |
+| `--rts-brass` | `#B08B3E` | 2.7:1 — mark only, never text | Accent hairlines and the eyebrow mark |
+| `--rts-rust` | `#A24A30` | 5.01:1 | Overdue, destructive, error |
+| `--rts-green` | `#4F7345` | 4.61:1 | Confirmed, healthy, dispatched |
+| `--rts-focus` | `#2F6E4F` | 5.15:1 | Focus ring, 3px with 2px offset (amber on the dark rail) |
 
-Contrast: body text on paper ≥ 12:1; muted captions ≥ 4.6:1; signal lime is never used for text on
-paper (it fails), only as a fill behind forest text.
+Table heads ink `#4B5648` on paper-3 measure 5.92:1. The muted step was darkened from an earlier
+`#6F7568` (4.04:1, which failed AA) after measuring every caption against all three paper surfaces;
+brass and the two line tokens are deliberately below 4.5:1 because they are never text.
+
+Status chips carry a 1px box plus a 3px left bar in the state colour and set their label in ink, so the
+state is never signalled by colour alone: the word is there, and the bar is a second cue.
+
+Every ratio above comes from the token values with the WCAG relative-luminance formula, and every
+text colour clears 4.5:1 on all three paper surfaces. Amber and brass are never used as text on paper:
+amber is a fill behind ink, brass is a mark.
 
 **Type scale** (rem, 16px root)
 
@@ -128,9 +138,14 @@ paper (it fails), only as a fill behind forest text.
 | H2 | 1.25 / 1.2 | Fraunces 500 | Section headings inside a screen |
 | Body | 0.875 / 1.55 | Archivo 400 | Default |
 | Body strong | 0.875 / 1.4 | Archivo 600 | Row titles, labels |
-| Micro label | 0.6875 / 1.2, tracking .12em | Archivo 600 uppercase | Band labels, table heads |
+| Micro label | 0.625 / 1.2, tracking .12em | Archivo 600 uppercase | Band labels, table heads |
+| Chip | 0.625 / 1.4, tracking .09em | Plex Mono 600 uppercase | Status flags, counts |
 | Figure | 1.75 / 1 | Fraunces 500, tabular | Headline numbers |
 | Mono data | 0.75 / 1.3 | Plex Mono 500, tabular | Ref, times, money, registrations |
+
+**Minimum size** Nothing in the product sets type below 10px; the smallest step is a 10px uppercase
+mono label with wide tracking, and every caption sits at 10.5–11px. Dense is achieved with rules,
+horizontal space and tabular figures, never with miniature text.
 
 **Spacing** 4px base: 4, 8, 12, 16, 24, 32, 48, 64. Page gutter 32px desktop / 20px tablet / 16px phone.
 
@@ -138,6 +153,20 @@ paper (it fails), only as a fill behind forest text.
 
 **Elevation** None on content. One shadow for overlays (panel, palette) and a 2px inset for the rail.
 No drop shadows on cards, because there are no cards.
+
+**Shared grammar across the product.** Three primitives carry the system, so screens written before
+the redesign inherit it rather than being restyled one by one: `Card` became a ruled section (2px ink
+rule on top, heading, no box, no shadow), `Stat` became an unboxed figure with a 2px left rule, and
+`PageHeader` became the masthead with a heavy rule under it. Screens still written with Tailwind
+utilities keep working because the cool `stone`/`gray` scale and the stray `red`/`lime` steps are
+remapped in a Tailwind `@theme` block to the ledger tokens — `text-stone-500` is now the same muted
+ink as `.rts-hint`, `border-lime-600` is brass. That is a deliberate decision: remapping 12 utilities
+is honest and reversible, whereas rewriting 4,600 lines of working screen code to say the same thing
+would risk behaviour for appearance.
+
+**Type floor.** Nothing in the product is set below 10px. An earlier pass used 7.5–9px tracked mono
+labels; they were raised to 10/10.5/11px after reading them at 100% zoom on a 1366px screen, and the
+density was recovered with rules and horizontal space instead of miniature type.
 
 **Icons** A single 16px stroke family drawn as inline SVG (1.5px stroke, 20×20 viewBox, `currentColor`):
 departure, rental, maintenance, readiness, document, vehicle, driver, client, user, settings, audit,
@@ -151,14 +180,22 @@ archive. Meaning first; they sit left of the nav label, never instead of it.
 | Operations board (dashboard) | Decide what to do next | Today's exceptions, then today's departures | Sheet masthead, attention band, departures table, readiness meter, setup band |
 | Registers (vehicles, drivers, clients) | Find and change one record | The record, and what is wrong with it | Masthead + search + ruled table + side panel form |
 | Rentals / Busing / Logistics | Move a record through its states | The state machine of the selected record | Two-pane: list/tabs + detail with next actions |
-| Compliance / Readiness | Prevent an unroadworthy dispatch | Expiry and overdue, soonest first | Band summary + table sorted by urgency |
+| Compliance / Readiness | Prevent an unroadworthy dispatch | Expiry and overdue, soonest first | Band summary + urgency-sorted table with a plain-language Timing column ("14 days overdue", "expires today") |
+| A rental's state | Know what happens next and who must act | The current state and the blocked next step | Five-stamp strip (done = tick, current = amber bar with `aria-current="step"`), then request/quotation detail, then the action for that state |
 | Settings | Supply the company's real rules | Nothing prefilled; what is still missing | Long form, grouped by rule, saved once |
 | Audit | Prove who changed what | Chronology and the actor | Dense reverse-chronological table |
 | Command palette | Jump without the mouse | Destinations and their captions | Overlay, keyboard-driven, role/label aware |
 
 ## 7. What was verified
 
-- `tsc --noEmit`, `eslint`, the full unit suite and `next build` pass after the redesign.
+- `tsc --noEmit` and `eslint src` are clean; `npm test` is **166 passed, 5 skipped** across 22 test
+  files (one file skipped by design); `next build` completes (First Load JS 168 kB, fonts self-hosted).
+- Every text colour was measured against all three paper surfaces with the WCAG formula; the muted
+  step was darkened from `#6F7568` (4.04:1) to `#5E6659` (4.58–5.57:1) because it failed AA. See §5.
+- No colour is the only carrier of meaning: status chips have a word plus a bar, the rental strip has
+  numbers and ticks, the compliance Timing column says the unit in words.
+- The build was served from `next start` on `0.0.0.0` and signed in against a seeded database, so the
+  CSS and font files load from the app itself, with no external request.
 - Layout behaviour at 1440 / 1024 / 390 px was reasoned from the CSS and checked against the
   rendered DOM (server output and jsdom), **not** from screenshots: this environment has no browser
   binary and no network access to fetch one. That is a real gap — the first thing to do on a
@@ -175,6 +212,9 @@ archive. Meaning first; they sit left of the nav label, never instead of it.
    ("create rental…"), which would need a wider action model on the server.
 4. Charts are absent by design; if RPT-02/RPT-03 are later agreed, they need history this
    installation does not yet collect.
-5. The driver and client portals keep their existing compact layout; they were re-skinned with the
+5. The rental strip is the only place that shows sequence; busing and logistics still express state
+   through chips and next-action buttons, which is correct for those flows (a trip is dispatched,
+   completed or cancelled — it does not pass through five ordered gates).
+6. The driver and client portals keep their existing compact layout; they were re-skinned with the
    same tokens but not restructured, because their tasks (one run, one account) are already single-
    purpose.

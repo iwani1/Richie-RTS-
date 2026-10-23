@@ -207,11 +207,15 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
       {rental.status === "declined" || rental.status === "cancelled" ? (
         <Notice tone="error" title={`This rental was ${RENTAL_STATUS_LABELS[rental.status].toLowerCase()}`} className="mb-4">{rental.resolutionReason}</Notice>
       ) : (
-        <ol className="mb-5 flex flex-wrap gap-2">
+        <ol className="rts-steps" aria-label="Rental progress">
           {steps.map((step, i) => (
-            <li key={step.key} className={`flex items-center gap-2 rounded-sm border px-3 py-1.5 text-xs ${i <= currentIndex ? "border-lime-300 bg-lime-50 text-lime-900" : "border-stone-200 bg-white text-stone-400"}`}>
-              <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${i <= currentIndex ? "bg-lime-600 text-white" : "bg-stone-200 text-stone-500"}`}>{i < currentIndex ? "\u2713" : i + 1}</span>
-              {step.label}
+            <li
+              key={step.key}
+              className={`rts-step${i < currentIndex ? " is-done" : ""}${i === currentIndex ? " is-current" : ""}`}
+              aria-current={i === currentIndex ? "step" : undefined}
+            >
+              <span className="rts-step-index" aria-hidden="true">{i < currentIndex ? "\u2713" : i + 1}</span>
+              <span>{step.label}</span>
             </li>
           ))}
         </ol>
