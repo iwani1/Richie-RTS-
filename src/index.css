@@ -32,6 +32,19 @@
   --color-stone-800: #1d1c19;
   --color-stone-900: #111110;
 
+  /* `stone` is the palette the register and form screens were written against; re-point it at the
+     newsprint scale so a stray `border-stone-200` is the same hairline as `--rule`. */
+  --color-stone-50: #f7f3e9;
+  --color-stone-100: #f1ead9;
+  --color-stone-200: #e2dcce;
+  --color-stone-300: #cfc7b6;
+  --color-stone-400: #b3ab99;
+  --color-stone-500: #6b675f;
+  --color-stone-600: #55524b;
+  --color-stone-700: #33312c;
+  --color-stone-800: #1f1e1a;
+  --color-stone-900: #111110;
+
   --color-red-700: #a5301f;
   --color-red-600: #a5301f;
   --color-emerald-700: #2c6e49;

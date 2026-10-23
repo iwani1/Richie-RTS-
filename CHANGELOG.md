@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — a new interface, and no demo data
+
+**Changed — the whole interface.** The previous dark "departure board" was discarded at the owner's
+instruction ("i want to change the whole ui. dont use anything from the demo app"). The replacement is
+an editorial direction: off-white newsprint, a flat spot colour per section, Instrument Serif for
+display, Archivo for text and IBM Plex Mono for figures, hairline rules and no rounded corners,
+shadows or gradients anywhere.
+
+- `src/index.css` was rewritten around semantic tokens (`--paper`, `--ink`, `--rule`, `--spot-*`) with
+  contrast measured against the page before the first screen was drawn; `@theme` re-points the
+  Tailwind `stone`/`red`/`emerald`/`lime` scales at the same palette, so no screen renders an
+  off-palette grey.
+- Navigation is a numbered contents strip (01–14) in five named groups under the masthead, with a
+  drawer below 980px. Every screen opens with a rubric block in its section's colour.
+- The dashboard was rebuilt as a front page: masthead, a lead story taken from the first real
+  exception, a numbered brief for the rest, then a spread of departures · fleet · setup with rentals
+  across the foot. It is still permission-filtered and still shows no figure it cannot trace.
+- Sign-in and first-run share a cover layout: a full-height poster carrying the wordmark and one
+  statement, the form on paper beside it.
+- `@fontsource/instrument-serif` added; `@fontsource-variable/fraunces` removed.
+
+**Removed — demo seeding.** The application now starts empty, as chosen ("Visuals + layout, no demo
+data"):
+
+- `scripts/seed.ts` and the `db:seed` npm script.
+- The `ALLOW_DEMO_SEED` environment flag and the `DEMO_ADMIN_*` variables, with their test and the
+  optional "demo records" section of `docs/SETUP_AND_DEPLOYMENT.md`.
+- Nothing else: every route, permission, command and business rule is unchanged. A fresh database
+  reports `setupRequired` and the first screen asks for the company's own administrator; Settings
+  then asks for its real rules.
+
 ## Unreleased — removed the local-run scaffolding
 
 The application is unchanged. What went away is the tooling that grew around getting it started on

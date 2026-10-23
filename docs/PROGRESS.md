@@ -331,3 +331,21 @@ Gates run at the end of this phase:
 - Document-expiry **notifications**: expiry status is now computed (Phase 6) but no reminder is
   sent, because no notification provider is configured. Notifications generally remain blocked.
 - Data retention jobs and the Act 843 subject-request workflow.
+
+## Phase 14 - Interface redesign and empty start (unreleased)
+
+| Item | Status | Notes |
+|---|---|---|
+| Fourth design direction, "bright editorial" | Done (verified) | Three earlier templates were rejected by the owner; the replacement is described in `docs/DESIGN.md` §3-§8 and built in `src/index.css`. |
+| Navigation as a numbered contents strip | Done (verified) | 14 destinations in five groups, drawer under 980px; `aria-current` on the active one. |
+| Dashboard rebuilt as a front page | Done (verified) | Lead story from the first real exception, numbered brief, then departures / fleet / setup spread. `Dashboard.test.tsx` unchanged and green. |
+| Section colour per route | Done (verified) | `data-route` sets `--rubric`; ochre is block-only because it measures 2.19:1 on paper. |
+| Demo seeding removed | Done (verified) | `scripts/seed.ts`, `db:seed`, `ALLOW_DEMO_SEED`, `DEMO_ADMIN_*` and setup-guide §8 are gone; a fresh database reports `setupRequired` and asks for real rules. |
+| Screens restructured one by one | Partial | The stylesheet, masthead, contents strip, rubric, dashboard and sign-in are new; the register, rentals, busing, logistics, compliance and portal bodies keep their existing markup restyled by the new system. |
+
+Gates run at the end of this phase:
+
+- `npm run typecheck` - clean.
+- `npm run lint` - clean.
+- `npm test` - **169 passed, 5 skipped** (one test fewer: the `ALLOW_DEMO_SEED` case went with the flag).
+- `npm run build` - production build compiles.
