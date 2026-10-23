@@ -26,6 +26,9 @@ npm run db:migrate       # creates the schema
 npm run build && npm start
 ```
 
+There is no seed step. The database starts empty on purpose: the first screen asks for the
+administrator account, and Settings asks for the company's own rules.
+
 Open <http://localhost:3000>. The first page asks you to create the administrator account. Then open
 **Settings** and supply the business rules — nothing is pre-filled, and dependent features stay
 blocked until you do.
@@ -66,7 +69,7 @@ npm run db:backup -- ./backups/today.json    # full export, contains password ha
 | Driver and client portals (own-record scope) | Works |
 | Contracts, bookings, CSV import, notifications, payments, offline | **Not built** — see `docs/PROGRESS.md` |
 
-147 unit/UI tests plus 5 integration tests against a real PostgreSQL; coverage thresholds are
+169 unit/UI tests plus 5 integration tests against a real PostgreSQL; coverage thresholds are
 enforced in CI. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.
 

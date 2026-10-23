@@ -1,6 +1,9 @@
 # Setup and deployment
 
-Exact commands to install, migrate, seed, build and run. Nothing else.
+Exact commands to install, migrate, build and run. Nothing else.
+
+There is no seeding step: a new installation starts with no records, no users and no business
+rules, and asks for them on screen.
 
 ## 1. What runs where
 
