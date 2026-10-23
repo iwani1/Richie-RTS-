@@ -8,11 +8,6 @@ const schema = z.object({
   // `openssl rand -base64 32`. Never commit a real value: .env is git-ignored.
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters (openssl rand -base64 32)"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  // Demo data is opt-in and refuses to load in production (brief integrity rule 9).
-  ALLOW_DEMO_SEED: z
-    .string()
-    .optional()
-    .transform((v) => v === "true"),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -34,7 +29,6 @@ export function env(): Env {
     DATABASE_URL: process.env.DATABASE_URL,
     SESSION_SECRET: process.env.SESSION_SECRET,
     NODE_ENV: process.env.NODE_ENV ?? "development",
-    ALLOW_DEMO_SEED: process.env.ALLOW_DEMO_SEED,
   });
   if (!parsed.success) {
     const detail = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");

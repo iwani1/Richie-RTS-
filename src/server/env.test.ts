@@ -30,16 +30,6 @@ describe("server configuration", () => {
     delete (process.env as Record<string, string | undefined>).NODE_ENV;
     const parsed = env();
     expect(parsed.NODE_ENV).toBe("development");
-    expect(parsed.ALLOW_DEMO_SEED).toBe(false);
   });
 
-  it("only treats the literal string 'true' as enabling the demo seed", () => {
-    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
-    process.env.SESSION_SECRET = "x".repeat(32);
-    process.env.ALLOW_DEMO_SEED = "1";
-    expect(env().ALLOW_DEMO_SEED).toBe(false);
-    resetEnvCache();
-    process.env.ALLOW_DEMO_SEED = "true";
-    expect(env().ALLOW_DEMO_SEED).toBe(true);
-  });
 });

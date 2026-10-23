@@ -559,7 +559,7 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 ## D-53 (Phase 13) `server-only` is not used; the boundary is enforced by lint and by layout
 
 - **Context.** `server-only` throws when the module is loaded outside the Next bundler — including
-  from CLI scripts (`db:migrate`, `db:seed`) and from the integration tests, both of which must
+  from CLI scripts (`db:migrate`) and from the integration tests, both of which must
   import the database layer.
 - **Decision.** No `server-only` marker. Instead: server modules live under `src/server/` and
   `src/app/api/`, and ESLint forbids browser code (`src/tms/**`, `src/screens/**`, `src/ui/**`,

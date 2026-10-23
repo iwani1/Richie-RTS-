@@ -293,7 +293,9 @@ function Shell() {
                 <Button variant="ghost" onClick={() => setFlash(null)} aria-label="Dismiss">Dismiss</Button>
               </div>
             )}
-            {page}
+            <div className="rts-screen" data-route={route}>
+              {page}
+            </div>
             <footer className="rts-provenance">
               <span>Richie Transport Services · Operations ledger</span>
               <span>Every change is attributed and audit-logged</span>

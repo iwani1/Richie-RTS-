@@ -49,7 +49,6 @@ Then set four values in `.env`:
 | `DATABASE_URL` | `postgresql://user:password@host:5432/richie_tms` |
 | `SESSION_SECRET` | 32+ characters: `openssl rand -base64 32` |
 | `NODE_ENV` | `development` while evaluating, `production` when serving staff |
-| `ALLOW_DEMO_SEED` | leave `false` unless you are loading demo records |
 
 `.env` is git-ignored. It contains the database password and the cookie-sealing key; never commit it.
 
@@ -158,39 +157,7 @@ stay blocked until you do.
 
 For development with hot reload: `npm run dev`.
 
-## 8. Optional: demo records
-
-Demo data loads **only into a database with no accounts**. If first-run setup has already been
-completed, empty it first — this deletes the records and accounts that are there:
-
-```bash
-npm run db:reset        # empties every table, keeps the schema
-npm run db:seed         # needs the two values below in .env
-```
-
-In `.env`:
-
-```ini
-ALLOW_DEMO_SEED="true"
-DEMO_ADMIN_PASSWORD="pick-one-at-least-10-characters"
-```
-
-Expected:
-
-```
-Demo data loaded: 8 records written. Sign in as admin@richie.test.
-```
-
-What it creates: one administrator, two vehicle categories, one client, two vehicles, two drivers
-and one staff route with three stops, plus the audit entries that both say. Business settings
-(currency, on-time threshold, document types, service intervals, rental terms) stay empty by design —
-the demo does not invent them either.
-
-Refuses when `NODE_ENV=production`, refuses without `ALLOW_DEMO_SEED`, and has no default password.
-Never load demo records into a database that holds real data. To remove them: `npm run db:reset`,
-then create the real administrator from the first page.
-
-## 9. Backups
+## 8. Backups
 
 ```bash
 npm run db:backup -- ./backups/2026-10-23.json     # full export, contains password hashes
@@ -200,7 +167,7 @@ npm run db:restore -- ./backups/2026-10-23.json    # replaces the current conten
 The export is unencrypted and includes Argon2 hashes: store it encrypted and treat it as personal
 data. A PostgreSQL-native alternative is `pg_dump --format=custom`.
 
-## 10. Checks
+## 9. Checks
 
 ```bash
 npm run typecheck        # tsc --noEmit
@@ -212,7 +179,7 @@ npm run build            # production build
 
 `npm run check` runs typecheck, lint, tests with coverage thresholds and the build in one go.
 
-## 11. Deploying beyond one machine
+## 10. Deploying beyond one machine
 
 - Run a single application process. Writes are serialised with a PostgreSQL advisory lock, but the
   sign-in throttle is per-process memory.
