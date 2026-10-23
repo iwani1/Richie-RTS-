@@ -32,13 +32,6 @@ const TABS: { id: Tab; label: string; permission: Permission }[] = [
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const isoDaysFromToday = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
-const TRIP_TONE: Record<TripStatus, "info" | "warning" | "success" | "error"> = {
-  planned: "info",
-  dispatched: "warning",
-  in_progress: "warning",
-  completed: "success",
-  cancelled: "error",
-};
 const pct = (x: number | null) => (x === null ? "-" : `${Math.round(x * 100)}%`);
 const dayList = (days: number[]) => [...days].sort((a, b) => a - b).map((d) => DAY_LABELS[d]).join(" ");
 
@@ -544,11 +537,6 @@ function TripsTab() {
   const routeOf = (routeId: string) => db.routes.find((r) => r.id === routeId);
   const vehicleReg = (id: string | null) => db.vehicles.find((v) => v.id === id)?.registration ?? "-";
   const driverName = (id: string | null) => db.drivers.find((d) => d.id === id)?.fullName ?? "-";
-  const windowOf = (t: Trip) => {
-    const r = routeOf(t.routeId);
-    return r ? `${r.stops[0].scheduledTime} - ${r.stops[r.stops.length - 1].scheduledTime}` : "-";
-  };
-
   const report = async (pending: Promise<CommandResult> | CommandResult) => {
     const result = await pending;
     setFlash({ tone: result.ok ? "success" : "error", message: result.message });
@@ -580,31 +568,115 @@ function TripsTab() {
   const panelRoute = panel ? routeOf(panel.trip.routeId) : undefined;
   const roster = panel ? db.passengers.filter((p) => p.routeId === panel.trip.routeId && p.status === "active") : [];
 
+  // The day at a glance, derived from the runs actually on the sheet — no stored counters.
+  const byStatus = (status: TripStatus) => trips.filter((t) => t.status === status).length;
+  const unassigned = trips.filter((t) => !t.vehicleId || !t.driverId);
+  const nextToLeave = trips.find((t) => t.status === "planned" || t.status === "dispatched");
+  const startOf = (t: Trip) => routeOf(t.routeId)?.stops[0]?.scheduledTime ?? "";
+
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-end gap-3">
+      <div className="rts-toolbar">
         <Field label="Service date">
           <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
         <Button onClick={() => setDate(todayYmd())}>Today</Button>
-        <p className="pb-2 text-xs text-stone-500">{trips.length} trip(s) on {formatDate(date)}.</p>
+        <p className="rts-toolbar-note">
+          {trips.length} run{trips.length === 1 ? "" : "s"} on {formatDate(date)}
+          {trips.length > 0 && ` · first at ${startOf(trips[0]) || "—"}`}
+        </p>
       </div>
 
-      <DataTable
-        rows={trips}
-        rowKey={(t) => t.id}
-        emptyState={<EmptyState title="No trips on this date" body="Generate trips from a route on the Routes tab." />}
-        columns={[
-          { key: "ref", header: "Trip", render: (t) => <span className="font-mono text-xs font-semibold text-stone-900">{t.reference}</span> },
-          { key: "route", header: "Route", render: (t) => <span className="font-semibold text-stone-900">{routeOf(t.routeId)?.name ?? "Unknown route"}</span> },
-          { key: "window", header: "Window", render: (t) => <span className="whitespace-nowrap text-xs">{windowOf(t)}</span> },
-          { key: "progress", header: "Stops", render: (t) => { const route = routeOf(t.routeId); return route ? `${t.stopLogs.length}/${route.stops.length}` : "-"; } },
-          { key: "vehicle", header: "Vehicle", render: (t) => vehicleReg(t.vehicleId) },
-          { key: "driver", header: "Driver", render: (t) => driverName(t.driverId) },
-          { key: "status", header: "Status", render: (t) => <Badge tone={TRIP_TONE[t.status]}>{TRIP_STATUS_LABELS[t.status]}</Badge> },
-          { key: "actions", header: "", className: "text-right", render: actions },
-        ]}
-      />
+      <div className="rts-spread">
+        <div>
+          <div className="rts-band-label" style={{ marginBottom: 0 }}>
+            <h3 className="rts-band-title">Run sheet</h3>
+            <p className="rts-band-note">In departure order. The next action on each run sits beside it.</p>
+          </div>
+
+          {trips.length === 0 ? (
+            <EmptyState title="No trips on this date" body="Generate trips from a route on the Routes tab. Nothing is scheduled automatically." />
+          ) : (
+            <div className="rts-runs">
+              {trips.map((t) => {
+                const route = routeOf(t.routeId);
+                return (
+                  <article className="rts-run" key={t.id}>
+                    <div className="rts-run-time">
+                      <b>{startOf(t) || "—"}</b>
+                      <span>{route ? route.stops[route.stops.length - 1]?.scheduledTime : ""}</span>
+                    </div>
+                    <div>
+                      <p className="rts-run-route">
+                        {route?.name ?? "Unknown route"} <span className="rts-run-ref">{t.reference}</span>
+                      </p>
+                      <p className="rts-run-meta">
+                        {route?.reference ?? "—"} · {route ? `${t.stopLogs.length}/${route.stops.length} stops recorded` : "route missing"}
+                      </p>
+                      <p className="rts-run-crew">
+                        <span>{t.vehicleId ? vehicleReg(t.vehicleId) : <em className="rts-unset">no vehicle</em>}</span>
+                        <span>{t.driverId ? driverName(t.driverId) : <em className="rts-unset">no driver</em>}</span>
+                      </p>
+                    </div>
+                    <div className="rts-run-state">
+                      <span className={`rts-flag rts-flag--${t.status}`}>{TRIP_STATUS_LABELS[t.status]}</span>
+                      <div className="rts-run-actions">{actions(t)}</div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <aside className="rts-desk" aria-label="Dispatch desk">
+          <p className="rts-kicker">Dispatch desk</p>
+          <p className="rts-desk-figure">
+            {nextToLeave ? startOf(nextToLeave) || "—" : "—"}
+            <span>{nextToLeave ? "next to leave" : "nothing left to run"}</span>
+          </p>
+
+          <div className="rts-statusline" style={{ marginTop: 14 }}>
+            <span className="rts-statusline-cell">
+              <b>{byStatus("planned")}</b>
+              <span>planned</span>
+            </span>
+            <span className="rts-statusline-cell">
+              <b>{byStatus("dispatched")}</b>
+              <span>on the road</span>
+            </span>
+            <span className="rts-statusline-cell">
+              <b>{byStatus("in_progress")}</b>
+              <span>running</span>
+            </span>
+            <span className="rts-statusline-cell">
+              <b>{byStatus("completed")}</b>
+              <span>finished</span>
+            </span>
+          </div>
+
+          <p className="rts-desk-head">Waiting on a crew</p>
+          {unassigned.length === 0 ? (
+            <p className="rts-band-empty">Every run on this date has a vehicle and a driver.</p>
+          ) : (
+            <ul className="rts-desk-list">
+              {unassigned.map((t) => (
+                // Times and the missing part only: the run sheet already carries the reference, and
+                // repeating it here would make an operator read the same line twice.
+                <li key={t.id}>
+                  <span>{startOf(t) || "No time"}</span>
+                  <span>{t.vehicleId ? "no driver" : t.driverId ? "no vehicle" : "no vehicle, no driver"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <p className="rts-desk-note">
+            A run can only be dispatched once a vehicle and a driver are assigned. Both lists come from
+            the registers — nothing is assumed by the system.
+          </p>
+        </aside>
+      </div>
 
       {panel && panelRoute && panel.mode === "assign" && (
         <AssignForm

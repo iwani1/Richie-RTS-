@@ -1647,6 +1647,218 @@ select.rts-input option { background: var(--surface); color: var(--ink); }
 
 .rts-contents li span:first-child { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 
+/* ---------- toolbars and run sheets ---------------------------------------------------------------- */
+
+.rts-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin: 0 0 20px;
+}
+
+.rts-toolbar > .rts-field { width: 168px; }
+
+.rts-toolbar-note {
+  margin: 0 0 9px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.rts-runs { border-top: 1px solid var(--ink); }
+
+.rts-run {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) minmax(150px, 210px);
+  gap: 18px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: start;
+}
+
+.rts-run-time b {
+  display: block;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.rts-run-time span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.rts-run-route {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.rts-run-ref {
+  margin-left: 6px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.rts-run-meta { margin: 2px 0 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+.rts-run-crew {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font-size: 11.5px;
+}
+
+.rts-run-crew .rts-unset { color: var(--muted); }
+
+.rts-run-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.rts-run-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+
+/* the desk beside a list: one figure, the state line, and what is waiting */
+.rts-desk-figure {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+
+.rts-desk-figure span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.rts-desk-head {
+  margin: 22px 0 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ink);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.rts-desk-list { margin: 0; padding: 0; list-style: none; }
+
+.rts-desk-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 11.5px;
+}
+
+.rts-desk-list b { font-family: var(--mono); font-size: 10.5px; font-weight: 500; }
+.rts-desk-list span { color: var(--muted); text-align: right; }
+
+.rts-desk-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+/* ---------- the cost report: a ruled statement ------------------------------------------------------ */
+
+.rts-report-total {
+  margin: 18px 0 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: clamp(38px, 5vw, 56px);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rts-report-total span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.rts-report { border-top: 1px solid var(--ink); }
+
+.rts-report-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 160px;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 12.5px;
+}
+
+.rts-report-row > span:nth-child(2),
+.rts-report-row > span:nth-child(3) {
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rts-report-row--head {
+  border-bottom: 1px solid var(--ink);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.rts-report-row--head > span:nth-child(2),
+.rts-report-row--head > span:nth-child(3) {
+  font-family: var(--body);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.rts-report-row--total {
+  border-bottom: 0;
+  border-top: 3px solid var(--ink);
+  margin-top: 4px;
+  padding-top: 10px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
 /* ==========================================================================================================
    Responsive
    ========================================================================================================== */
@@ -1658,6 +1870,7 @@ select.rts-input option { background: var(--surface); color: var(--ink); }
   .rts-board-row > *:nth-child(3) { display: none; }
   .rts-spread { grid-template-columns: minmax(0, 1fr) 300px; gap: 0 28px; }
   .rts-spread > * + * { padding-left: 28px; }
+  .rts-run { grid-template-columns: 64px minmax(0, 1fr) 150px; gap: 14px; }
 }
 
 @media (max-width: 980px) {
@@ -1727,6 +1940,10 @@ select.rts-input option { background: var(--surface); color: var(--ink); }
   .rts-board-row { grid-template-columns: 84px minmax(0, 1fr); row-gap: 6px; }
   .rts-board-row > *:nth-child(4),
   .rts-board-row > *:nth-child(5) { grid-column: 2; }
+
+  /* the run sheet stacks: time beside the route, state and actions underneath */
+  .rts-run { grid-template-columns: 62px minmax(0, 1fr); row-gap: 8px; }
+  .rts-run-state { grid-column: 2; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
 
   .rts-attention-text strong, .rts-attention-text b { font-size: 19px; }
   .rts-figure { font-size: 38px; }

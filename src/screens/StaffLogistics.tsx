@@ -30,7 +30,6 @@ import {
   PageHeader,
   Panel,
   Select,
-  Stat,
   TextArea,
   TextInput,
   formatDate,
@@ -192,22 +191,32 @@ function IncidentsTab({ onRaiseWorkOrder }: { onRaiseWorkOrder: () => void }) {
   );
   const vehicleReg = (id: string | null) => db.vehicles.find((v) => v.id === id)?.registration ?? "-";
 
+  // The other half of the response: what is already in the workshop, and which vehicles the
+  // incident register has taken off the road. Both are read from the same snapshot as the table.
+  const openOrders = db.workOrders.filter((w) => w.status === "open" || w.status === "in_progress" || w.status === "on_hold");
+  const offRoad = db.vehicles.filter((v) => v.status === "maintenance" || v.status === "out_of_service");
+
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <Select className="max-w-[190px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} aria-label="Filter by status">
+      <div className="rts-toolbar">
+        <Select className="max-w-[210px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} aria-label="Filter by status">
           <option value="all">All statuses</option>
           {(["reported", "acknowledged", "responding", "resolved", "closed"] as IncidentStatus[]).map((s) => (
             <option key={s} value={s}>{INCIDENT_STATUS_LABELS[s]}</option>
           ))}
         </Select>
         {allowed("incidents:create") && <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Report incident</Button>}
+        <p className="rts-toolbar-note">
+          {rows.length} of {db.incidents.length} incident{db.incidents.length === 1 ? "" : "s"} shown
+        </p>
       </div>
 
-      <Notice tone="info" className="mb-3">
+      <Notice tone="info" className="mb-4">
         Taking a vehicle out of service here changes its status immediately, which blocks it from being assigned to trips and rentals. Record only what happened; do not infer a cause.
       </Notice>
 
+      <div className="rts-spread">
+        <div>
       <DataTable
         rows={rows}
         rowKey={(i) => i.id}
@@ -235,6 +244,55 @@ function IncidentsTab({ onRaiseWorkOrder }: { onRaiseWorkOrder: () => void }) {
           },
         ]}
       />
+        </div>
+
+        <aside aria-label="Work orders and vehicles off the road">
+          <p className="rts-kicker">Work orders</p>
+          <p className="rts-desk-figure">
+            {openOrders.length}
+            <span>still open</span>
+          </p>
+          <div className="rts-statusline" style={{ marginTop: 12 }}>
+            {(["open", "in_progress", "on_hold", "completed"] as WorkOrderStatus[]).map((status) => (
+              <span className="rts-statusline-cell" key={status}>
+                <b>{db.workOrders.filter((w) => w.status === status).length}</b>
+                <span>{WORK_ORDER_STATUS_LABELS[status]}</span>
+              </span>
+            ))}
+          </div>
+
+          <p className="rts-desk-head">Latest raised</p>
+          {openOrders.length === 0 ? (
+            <p className="rts-band-empty">
+              No work order is open. A breakdown that needs workshop time is raised from the incident it
+              came from, so the cost keeps its source.
+            </p>
+          ) : (
+            <ul className="rts-desk-list">
+              {openOrders.slice(0, 5).map((w) => (
+                <li key={w.id}>
+                  <b>{w.reference}</b>
+                  <span>{WORK_ORDER_STATUS_LABELS[w.status]}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <p className="rts-desk-head">Off the road</p>
+          {offRoad.length === 0 ? (
+            <p className="rts-band-empty">Every registered vehicle is available.</p>
+          ) : (
+            <ul className="rts-desk-list">
+              {offRoad.map((v) => (
+                <li key={v.id}>
+                  <b>{v.registration}</b>
+                  <span>{VEHICLE_STATUS_LABELS[v.status]}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </aside>
+      </div>
 
       {panel?.mode === "create" && <IncidentForm incident={null} onClose={() => setPanel(null)} />}
       {panel?.mode === "edit" && <IncidentForm incident={panel.incident} onClose={() => setPanel(null)} />}
@@ -510,18 +568,27 @@ function MaintenanceTab() {
   );
   const vehicleReg = (id: string) => db.vehicles.find((v) => v.id === id)?.registration ?? "-";
 
+  // The incidents these orders came from, so the workshop column and the incident column answer
+  // each other's question without switching tabs.
+  const openIncidents = db.incidents.filter((i) => i.status !== "closed" && i.status !== "resolved");
+
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <Select className="max-w-[190px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} aria-label="Filter by status">
+      <div className="rts-toolbar">
+        <Select className="max-w-[210px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} aria-label="Filter by status">
           <option value="all">All statuses</option>
           {(["open", "in_progress", "on_hold", "completed", "closed"] as WorkOrderStatus[]).map((s) => (
             <option key={s} value={s}>{WORK_ORDER_STATUS_LABELS[s]}</option>
           ))}
         </Select>
         {allowed("maintenance:create") && <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Raise work order</Button>}
+        <p className="rts-toolbar-note">
+          {rows.length} of {db.workOrders.length} work order{db.workOrders.length === 1 ? "" : "s"} shown
+        </p>
       </div>
 
+      <div className="rts-spread">
+        <div>
       <DataTable
         rows={rows}
         rowKey={(w) => w.id}
@@ -548,6 +615,46 @@ function MaintenanceTab() {
           },
         ]}
       />
+        </div>
+
+        <aside aria-label="Open incidents">
+          <p className="rts-kicker">Incidents still open</p>
+          <p className="rts-desk-figure">
+            {openIncidents.length}
+            <span>awaiting resolution</span>
+          </p>
+          <div className="rts-statusline" style={{ marginTop: 12 }}>
+            {(["reported", "acknowledged", "responding"] as IncidentStatus[]).map((status) => (
+              <span className="rts-statusline-cell" key={status}>
+                <b>{db.incidents.filter((i) => i.status === status).length}</b>
+                <span>{INCIDENT_STATUS_LABELS[status]}</span>
+              </span>
+            ))}
+          </div>
+
+          <p className="rts-desk-head">Oldest first</p>
+          {openIncidents.length === 0 ? (
+            <p className="rts-band-empty">No incident is waiting on a repair.</p>
+          ) : (
+            <ul className="rts-desk-list">
+              {[...openIncidents]
+                .sort((a, b) => (a.reportedDate < b.reportedDate ? -1 : 1))
+                .slice(0, 6)
+                .map((i) => (
+                  <li key={i.id}>
+                    <b>{i.reference}</b>
+                    <span>{INCIDENT_TYPE_LABELS[i.type]} · {formatDate(i.reportedDate)}</span>
+                  </li>
+                ))}
+            </ul>
+          )}
+
+          <p className="rts-desk-note">
+            A work order raised from an incident keeps that link: the cost is reported against the
+            incident it came from, and the vehicle stays off the road until an operator says otherwise.
+          </p>
+        </aside>
+      </div>
 
       {panel?.mode === "create" && <WorkOrderForm defaults={{ vehicleId: "", incidentId: "" }} onClose={() => setPanel(null)} />}
       {panel?.mode === "edit" && <WorkOrderForm defaults={{ vehicleId: panel.order.vehicleId, incidentId: panel.order.incidentId ?? "" }} order={panel.order} onClose={() => setPanel(null)} />}
@@ -783,6 +890,14 @@ function CostsTab() {
   const validRange = from <= to;
   const report = validRange ? costReport(db, from, to) : null;
 
+  // Grouping is presentation only: every line is still listed in full below this summary.
+  const byCategory = (report?.lines ?? []).reduce<Map<string, { count: number; amount: number }>>((acc, line) => {
+    const key = line.category?.trim() || "Uncategorised";
+    const current = acc.get(key) ?? { count: 0, amount: 0 };
+    acc.set(key, { count: current.count + 1, amount: current.amount + line.amount });
+    return acc;
+  }, new Map());
+
   if (!allowed("costs:read")) {
     return <Notice tone="warning" title="Not permitted">Your role does not include costs:read.</Notice>;
   }
@@ -802,16 +917,63 @@ function CostsTab() {
           <Band label="Recorded maintenance and incident costs" note="These are amounts entered by your team. They are not prices the system calculated, and they are not a complete cost of operations.">
             {report.status !== "ok" && <Notice tone="warning" title={report.status === "currency_not_set" ? "Currency not set" : "No costs recorded"}>{report.message}</Notice>}
             {report.status === "ok" && <Notice tone="info" className="mb-3">{report.message}</Notice>}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <Stat
-                label="Total recorded"
-                value={report.status === "ok" ? money(report.total, report.currencyCode) : "Not computed"}
-                caption={`${report.lines.length} ${report.lines.length === 1 ? "entry" : "entries"} recorded`}
-              />
-              <Stat label="Data coverage" value={report.coverage === null ? "No records" : `${Math.round(report.coverage * 100)}%`} caption="Records with at least one recorded cost" />
-              <Stat label="Work orders with no cost" value={report.workOrdersWithoutCosts} caption={`${report.workOrdersCostsConfirmed} confirmed complete (including zero)`} />
-              <Stat label="Incidents with no cost" value={report.incidentsWithoutCosts} caption={`${report.incidentsWithCosts} with at least one entry`} />
+            {/* A ruled total, not four cards: the number that matters is the sum, and the three
+                coverage figures belong under it as a line of evidence, not beside it as equals. */}
+            <p className="rts-report-total">
+              {report.status === "ok" ? money(report.total, report.currencyCode) : "Not computed"}
+              <span>
+                total recorded · {report.lines.length} {report.lines.length === 1 ? "entry" : "entries"}
+              </span>
+            </p>
+            <div className="rts-statusline" style={{ marginTop: 18 }}>
+              <span className="rts-statusline-cell">
+                <b>{report.coverage === null ? "—" : `${Math.round(report.coverage * 100)}%`}</b>
+                <span>records with a cost</span>
+              </span>
+              <span className="rts-statusline-cell">
+                <b>{report.workOrdersWithoutCosts}</b>
+                <span>work orders with no cost</span>
+              </span>
+              <span className="rts-statusline-cell">
+                <b>{report.incidentsWithoutCosts}</b>
+                <span>incidents with no cost</span>
+              </span>
+              <span className="rts-statusline-cell">
+                <b>{report.incidentsWithCosts}</b>
+                <span>incidents with an entry</span>
+              </span>
             </div>
+            <p className="rts-footnote" style={{ marginTop: 10 }}>
+              {report.workOrdersCostsConfirmed} work order(s) confirmed complete, including zero.
+            </p>
+          </Band>
+
+          <Band label="By category" note="Categories are whatever the operator typed. Uncategorised entries are shown as their own line, not folded into another.">
+            {report.lines.length === 0 ? (
+              <p className="rts-band-empty">Nothing recorded in this period.</p>
+            ) : (
+              <div className="rts-report">
+                <div className="rts-report-row rts-report-row--head">
+                  <span>Category</span>
+                  <span>Entries</span>
+                  <span>Amount</span>
+                </div>
+                {[...byCategory.entries()]
+                  .sort((a, b) => b[1].amount - a[1].amount || a[0].localeCompare(b[0]))
+                  .map(([category, line]) => (
+                    <div className="rts-report-row" key={category}>
+                      <span>{category}</span>
+                      <span>{line.count}</span>
+                      <span>{money(line.amount, report.currencyCode)}</span>
+                    </div>
+                  ))}
+                <div className="rts-report-row rts-report-row--total">
+                  <span>Total recorded</span>
+                  <span>{report.lines.length}</span>
+                  <span>{money(report.total, report.currencyCode)}</span>
+                </div>
+              </div>
+            )}
           </Band>
 
           <Band label="Cost entries" note="Every entry is an audited, editable record until the incident or work order is closed.">
