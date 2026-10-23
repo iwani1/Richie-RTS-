@@ -160,12 +160,35 @@ For development with hot reload: `npm run dev`.
 
 ## 8. Optional: demo records
 
+Demo data loads **only into a database with no accounts**. If first-run setup has already been
+completed, empty it first — this deletes the records and accounts that are there:
+
 ```bash
-ALLOW_DEMO_SEED=true DEMO_ADMIN_PASSWORD='pick-one' npm run db:seed
+npm run db:reset        # empties every table, keeps the schema
+npm run db:seed         # needs the two values below in .env
 ```
 
+In `.env`:
+
+```ini
+ALLOW_DEMO_SEED="true"
+DEMO_ADMIN_PASSWORD="pick-one-at-least-10-characters"
+```
+
+Expected:
+
+```
+Demo data loaded: 8 records written. Sign in as admin@richie.test.
+```
+
+What it creates: one administrator, two vehicle categories, one client, two vehicles, two drivers
+and one staff route with three stops, plus the audit entries that both say. Business settings
+(currency, on-time threshold, document types, service intervals, rental terms) stay empty by design —
+the demo does not invent them either.
+
 Refuses when `NODE_ENV=production`, refuses without `ALLOW_DEMO_SEED`, and has no default password.
-Never load demo records into a database that holds real data.
+Never load demo records into a database that holds real data. To remove them: `npm run db:reset`,
+then create the real administrator from the first page.
 
 ## 9. Backups
 

@@ -51,7 +51,13 @@ async function main() {
   await pool.transaction().execute(async (trx) => {
     await sql`select pg_advisory_xact_lock(728411)`.execute(trx);
     const existing = await loadDatabase(trx);
-    if (existing.users.length > 0) throw new Error("This installation already has accounts; seeding is only for an empty database.");
+    if (existing.users.length > 0) {
+      throw new Error(
+        "This installation already has accounts; demo data is only loaded into an empty database.\n" +
+          "To replace what is there: npm run db:reset   (empties every table, keeps the schema)\n" +
+          "then run npm run db:seed again. This deletes the records and accounts already present.",
+      );
+    }
     await truncateAll(trx);
 
     const seeded = await loadDatabase(trx);
