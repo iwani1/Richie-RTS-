@@ -21,6 +21,9 @@ The application now runs as the brief specifies: Next.js + PostgreSQL, with auth
 - `./run.sh nuke`: one confirmed command to start over — compose down -v, the container, its
   volume, the postgres image, a stale rootlessport, `.env`, `node_modules` and `.next`. The git
   checkout and source files are untouched. Run book §9 documents it, with the by-hand equivalent.
+- `npm run doctor` no longer mislabels one failure as another: a running app that reports an
+  authentication failure is called out on its own, with the fact that a server started before
+  `.env` was written keeps the old credentials until it is restarted.
 - `npm run doctor` reports a missing schema once, with the two commands that fix it, instead of
   also flagging the application's health check as a second, unrelated problem.
 - `npm run doctor` / `./run.sh doctor`: reads the configuration, the container state, who holds

@@ -227,11 +227,17 @@ if (connected) {
 const health = run("curl", ["-sS", "--max-time", "3", "http://localhost:3000/api/health"]);
 if (health === null) add("info", "The application is not running on port 3000", ["Start it: ./run.sh start"]);
 else if (health.includes('"ok":true')) add("ok", "The application answers /api/health with ok:true");
-else if (schemaMissing || /schema_migrations|relation .* does not exist/.test(health)) {
-  // Expected while the schema is missing: same cause as the row above, not a second problem.
-  add("info", "The running app reports the missing schema (it will recover once migrated)", [
+else if (schemaMissing && /schema_migrations|does not exist/.test(health)) {
+  // Same cause as the schema row above, not a second problem.
+  add("info", "The running app reports the missing schema (it recovers once migrated)", [
     "Its own answer: " + health.slice(0, 160),
-    "No restart is needed; the health check reads the database on every request.",
+  ]);
+} else if (/authentication failed|password/i.test(health)) {
+  // Distinct from the schema: the process holds credentials from before .env was regenerated.
+  add("fail", "The running app cannot sign in to the database", [
+    "Its own answer: " + health.slice(0, 160),
+    "A server started before .env was written (or regenerated) keeps the old values in memory.",
+    "Stop it — Ctrl-C in the terminal running it — and start it again: ./run.sh start",
   ]);
 } else add("fail", `The application is running but unhealthy: ${health.slice(0, 200)}`);
 
