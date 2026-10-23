@@ -151,8 +151,11 @@ horizontal space and tabular figures, never with miniature text.
 
 **Radii** 0 for sheets, inputs and tables (paper has corners, not bubbles); 2px for chips.
 
-**Elevation** None on content. One shadow for overlays (panel, palette) and a 2px inset for the rail.
-No drop shadows on cards, because there are no cards.
+**Elevation** None on content: tables, bands and stat figures sit flat on the paper. Blurred shadow is
+spent only on overlays (side panel, palette scrim) and the collapsed rail drawer while it is open.
+Three things carry a *hard, un-blurred* offset — the sign-in sheet, the wordmark block and the standing
+rule on a selected nav item — because a printed shadow is a register of paper on paper, not elevation.
+No content card casts a shadow, because there are no content cards.
 
 **Shared grammar across the product.** Three primitives carry the system, so screens written before
 the redesign inherit it rather than being restyled one by one: `Card` became a ruled section (2px ink

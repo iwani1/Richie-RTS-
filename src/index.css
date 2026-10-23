@@ -2289,7 +2289,6 @@ select.rts-input {
   overflow-x: auto;
   border: 1px solid var(--rts-line-strong);
   background: var(--rts-paper-2);
-  box-shadow: 4px 4px 0 rgba(20, 35, 29, 0.06);
 }
 
 .rts-table {
