@@ -302,6 +302,7 @@ function Shell() {
             <footer className="rts-provenance">
               <span>Richie Transport Services · Operations ledger</span>
               <span>Every change is attributed and audit-logged</span>
+              <span className="rts-build">build {process.env.NEXT_PUBLIC_BUILD ?? "unknown"}</span>
             </footer>
           </div>
         </main>
