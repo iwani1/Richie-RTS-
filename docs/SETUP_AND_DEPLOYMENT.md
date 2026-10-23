@@ -104,6 +104,11 @@ docker compose up -d db          # or: podman-compose up -d db
 docker compose ps                # wait until STATUS says "healthy"
 ```
 
+The container publishes the database on `127.0.0.1:${POSTGRES_PORT:-5432}`. If something already
+listens there — on Fedora it is often the distribution's own `postgresql.service` — the container
+fails with `bind: address already in use`. Either stop the host service, or set
+`POSTGRES_PORT="5433"` in `.env` and use the same port in `DATABASE_URL`.
+
 The first start creates the `richie_pgdata` volume. Changing `POSTGRES_PASSWORD` afterwards does
 **not** change the password already stored in the volume; see
 [Troubleshooting](#9-troubleshooting).
@@ -339,7 +344,8 @@ sudo systemctl --user restart richie-tms     # or Ctrl-C and `npm start`
 | `/api/health` returns 503 | PostgreSQL down or unreachable | `docker compose ps`; `docker compose logs db` |
 | `password authentication failed for user "richie"` | password in `DATABASE_URL` and `POSTGRES_PASSWORD` disagree, or the volume was created with the old password | make them match; if the volume was created with a different password, either change it in SQL (`ALTER USER richie PASSWORD '...'`) or remove the volume (destroys data) |
 | Podman asks *"Please select an image"* | the compose file used a short image name, or a local `~/.config/containers/registries.conf` has no default | pick `docker.io/library/postgres:18-alpine`; or `git pull` (the file now names the registry) |
-| `port is already allocated` on `compose up` | something else uses 5432 (often a host PostgreSQL) | stop it (`sudo systemctl stop postgresql`) or change the published port and `DATABASE_URL` together |
+| `rootlessport listen tcp 127.0.0.1:5432: bind: address already in use` (or `port is already allocated`) | Fedora ships a PostgreSQL service that is already listening on 5432, so the container never started | `sudo systemctl disable --now postgresql` then `podman-compose up -d db`. Or keep it and set `POSTGRES_PORT="5433"` in `.env` **and** the same port in `DATABASE_URL`, then `podman-compose up -d db` |
+| `password authentication failed for user "richie"` while 5432 is taken | the migration connected to the **host** PostgreSQL, which has no `richie` role | that is the symptom of the row above, not a password problem: free or move the port first, then `npm run db:migrate` |
 | `Cannot find module './chunks/vendor-chunks/next.js'` | `npm run build` ran while `npm run dev` was running | stop dev, `rm -rf .next`, start again |
 | `EADDRINUSE :3000` | another process on 3000 | `ss -ltnp \| grep 3000`, stop it, or `npm start -- -p 3100` |
 | Sign-in succeeds then bounces back | `NODE_ENV=production` over plain HTTP: the cookie is `Secure` | use HTTPS (§5) or `NODE_ENV=development` while evaluating |

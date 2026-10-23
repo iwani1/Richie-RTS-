@@ -50,14 +50,36 @@ require_db() {
   fi
 }
 
+# Explains the two failures a first run actually hits on Fedora: the port taken by the distro's
+# own PostgreSQL, and the container coming up with a password that does not match DATABASE_URL.
+port_hint() {
+  local port
+  port=$(sed -n 's/^POSTGRES_PORT="\{0,1\}\([0-9]*\)"\{0,1\}.*/\1/p' .env 2>/dev/null | tail -1)
+  [ -n "$port" ] || port=5432
+  say "The database container could not start."
+  if ss -ltn 2>/dev/null | grep -q ":$port "; then
+    say "Port $port is already in use. On Fedora this is usually the distribution's PostgreSQL:"
+    say "    sudo systemctl disable --now postgresql"
+    say "or keep the host database and move the container instead: set POSTGRES_PORT=\"5433\" in .env,"
+    say "put the same port in DATABASE_URL, then re-run: ./run.sh setup"
+  fi
+}
+
 compose_up() {
+  local up=""
   if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then
-    docker compose up -d db
+    up="docker compose"
   elif command -v podman-compose >/dev/null; then
-    podman-compose up -d db
+    up="podman-compose"
+  elif command -v podman >/dev/null && podman compose version >/dev/null 2>&1; then
+    up="podman compose"
   else
     say "No docker/podman compose found. If PostgreSQL is already running on this machine, that is fine."
     return 0
+  fi
+  if ! $up up -d db; then
+    port_hint
+    return 1
   fi
 }
 
@@ -79,7 +101,7 @@ case "${1:-help}" in
       say "Now set DATABASE_URL and POSTGRES_PASSWORD in .env to the same password, then re-run: ./run.sh setup"
       exit 0
     fi
-    compose_up
+    compose_up || fail "Database start failed. Read the hint above, or docs/SETUP_AND_DEPLOYMENT.md §9."
     say "Waiting for PostgreSQL..."
     for _ in $(seq 1 30); do require_db && break; sleep 1; done
     require_db

@@ -26,7 +26,9 @@ services:
       # Deterministic collation/encoding: mixed locales are a classic source of "works on my machine".
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
-      - "127.0.0.1:5432:5432"
+      # Host port, overridable from .env. Fedora often already runs its own PostgreSQL on 5432,
+      # in which case set POSTGRES_PORT=5433 (and the same port in DATABASE_URL).
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - richie_pgdata:/var/lib/postgresql/data
     healthcheck:
