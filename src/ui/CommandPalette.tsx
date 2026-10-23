@@ -4,7 +4,7 @@ import type { Permission } from "../tms/permissions";
 import { Icon } from "./icons";
 
 /**
- * Keyboard navigation for the whole ledger: ⌘K / Ctrl-K, type a few letters, Enter.
+ * Keyboard navigation for the whole workspace: Ctrl-K / ⌘K, type a few letters, Enter.
  *
  * Scope is deliberate. It navigates and it tells you what each destination is for; it does not
  * invent actions. An action palette would need a server-side action model ("create rental for

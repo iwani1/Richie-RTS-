@@ -16,6 +16,9 @@ import { SettingsPage } from "./screens/Settings";
 import { UsersPage } from "./screens/Users";
 import { VehiclesPage } from "./screens/Vehicles";
 import { NAV_ITEMS, type Route } from "./routes";
+import { readinessReport } from "./tms/maintenance";
+import { setupProgress } from "./tms/setup";
+import { todayYmd } from "./ui/primitives";
 import { ROLE_LABELS } from "./tms/types";
 import { TmsContext, useTms, useTmsState } from "./tms/useTms";
 import { Button, Notice } from "./ui/primitives";
@@ -90,10 +93,10 @@ function BootScreen({ message, error, onRetry }: { message: string; error?: bool
   const title = /Invalid server configuration|must be at least|is required/i.test(message)
     ? "The server needs configuration"
     : error
-      ? "Cannot reach the ledger"
-      : "Opening the ledger";
+      ? "Cannot reach the server"
+      : "Opening the workspace";
   return (
-    <main className="rts-auth">
+    <main className="rts-auth rts-auth--solo">
       <section className="rts-auth-side">
         <div className="rts-auth-card" role="status" aria-live="polite">
           <p className="rts-auth-eyebrow">Richie Transport Services</p>
@@ -190,17 +193,25 @@ function Shell() {
       .filter((item): item is (typeof items)[number] => Boolean(item)),
   })).filter((group) => group.items.length > 0);
 
-  const today = new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+  const todayLabel = new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 
-  // Running index numerals per visible group, computed without mutating during render: the rail
-  // reads as a ledger tab index (01…14) rather than a list of links.
-  const numberedGroups = visibleGroups.reduce<{ label: string; items: { item: (typeof items)[number]; index: number }[] }[]>(
-    (acc, group) => {
-      const start = acc.reduce((total, prior) => total + prior.items.length, 0);
-      return [...acc, { label: group.label, items: group.items.map((item, offset) => ({ item, index: start + offset + 1 })) }];
-    },
-    [],
-  );
+  // Counts beside the destinations. Each one is a number the section can back up: rentals waiting
+  // on us, runs not yet dispatched today, vehicles past their service interval, warnings on
+  // compliance. A zero is not shown, because a badge that says 0 is noise.
+  const today = todayYmd();
+  const readiness = readinessReport(db, today);
+  const setup = setupProgress(db.settings);
+  const counts: Partial<Record<Route, number>> = {
+    rentals: db.rentals.filter((r) => r.status === "draft" || r.status === "quoted").length,
+    busing: db.trips.filter((t) => t.serviceDate === today && t.status === "planned").length,
+    fleetReadiness: readiness.status === "not_configured" ? 0 : readiness.counts.overdue,
+    logistics: db.incidents.filter((i) => i.status !== "closed" && i.status !== "resolved").length,
+    compliance: db.drivers.filter((d) => d.status === "active" && d.licenceExpiry < today).length,
+    settings: setup.outstanding,
+  };
+
+  const currentLabel = items.find((item) => item.route === route)?.label ?? "Dashboard";
+  const currentGroup = visibleGroups.find((group) => group.items.some((item) => item.route === route))?.label ?? "Operations";
 
   return (
     <div className="rts-shell" data-route={route}>
@@ -210,34 +221,38 @@ function Shell() {
         <button type="button" className="rts-scrim-mobile" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
       )}
 
-      {/* The spine: a printed section index down the left edge of the sheet. It carries the
-          wordmark, every destination with its number, and the desk's own instruments (search,
-          clock, who is signed in) at the foot. The spine replaces the earlier top strip because
-          fourteen destinations read as a list, and a list belongs down a margin. */}
-      <header className={cn("rts-spine", navOpen && "is-open")}>
-        <div className="rts-spine-top">
+      {/* The sidebar: identity, the installation you are looking at, every destination grouped with
+          its outstanding count, then the desk's instruments at the foot. */}
+      <aside className={cn("rts-side", navOpen && "is-open")} aria-label="Main">
+        <div className="rts-side-top">
           <div className="rts-brand">
             <div className="rts-mark" aria-hidden="true">R</div>
             <p className="rts-wordmark">
-              Richie
+              Richie TMS
               <span title={db.settings.companyName ?? "Richie Transport Services"}>
-                {(db.settings.companyName ?? "Richie Transport Services").toUpperCase()}
+                {db.settings.companyName ?? "Richie Transport Services"}
               </span>
             </p>
           </div>
-
-          <Button className="rts-menu" onClick={() => setNavOpen(true)} aria-label="Open navigation" aria-expanded={navOpen}>
-            Menu
+          <Button className="rts-menu" variant="ghost" onClick={() => setNavOpen(false)} aria-label="Close navigation">
+            Close
           </Button>
         </div>
 
-        <nav className="rts-spine-nav" aria-label="Main">
-          {numberedGroups.map((group) => (
+        <div className="rts-workspace">
+          <i aria-hidden="true" />
+          {actor ? ROLE_LABELS[actor.role] : "Signed in"}
+          <small>live</small>
+        </div>
+
+        <nav className="rts-spine-nav" aria-label="Sections">
+          {visibleGroups.map((group) => (
             <div className="rts-nav-group" key={group.label}>
               <p className="rts-nav-label">{group.label}</p>
               <div className="rts-nav">
-                {group.items.map(({ item, index }) => {
+                {group.items.map((item) => {
                   const active = route === item.route;
+                  const count = counts[item.route] ?? 0;
                   return (
                     <button
                       key={item.route}
@@ -247,9 +262,13 @@ function Shell() {
                       className="rts-nav-item"
                       title={`${item.label} — ${item.caption}`}
                     >
-                      <span className="rts-nav-index" aria-hidden="true">{String(index).padStart(2, "0")}</span>
                       <Icon name={ROUTE_ICONS[item.route]} className="rts-nav-icon" />
                       <span className="rts-nav-name">{item.label}</span>
+                      {count > 0 && (
+                        <span className={cn("rts-nav-badge", item.route === "compliance" && "rts-nav-badge--alert", item.route !== "compliance" && "rts-nav-badge--warn")}>
+                          {count}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -258,34 +277,51 @@ function Shell() {
           ))}
         </nav>
 
-        <div className="rts-spine-foot">
-          <button type="button" className="rts-palette-trigger" onClick={openPalette} aria-keyshortcuts="Control+K Meta+K">
-            <Icon name="search" className="rts-palette-trigger-icon" />
-            <span className="rts-palette-trigger-text">Jump to a screen</span>
-            <kbd className="rts-kbd">Ctrl K</kbd>
+        <div className="rts-side-foot">
+          <button type="button" className="rts-nav-item" onClick={openPalette} aria-keyshortcuts="Control+K Meta+K">
+            <Icon name="search" className="rts-nav-icon" />
+            <span className="rts-nav-name">Jump to a screen</span>
+            <span className="rts-kbd">Ctrl K</span>
           </button>
-          {busy && (
-            <span className="rts-busy" role="status">
-              <span className="rts-busy-bar" aria-hidden="true" />
-              Saving
-            </span>
-          )}
           <div className="rts-spine-clock">
             <span className="rts-clock" aria-label={clock ? `Current time ${clock}` : undefined}>{clock ?? "--:--"}</span>
-            <span className="rts-date">{today}</span>
+            <span className="rts-date">{todayLabel}</span>
           </div>
           <div className="rts-user">
             <div className="rts-avatar" aria-hidden="true">{initialsOf(actor?.fullName)}</div>
             <div className="min-w-0">
               <strong className="truncate">{actor?.fullName}</strong>
-              <small>{actor ? (ROLE_LABELS[actor.role] ?? "UNKNOWN ROLE").toUpperCase() : ""}</small>
+              <small>{actor ? ROLE_LABELS[actor.role] : "Unknown role"}</small>
             </div>
           </div>
           <Button variant="ghost" className="rts-signout" onClick={() => void signOut()}>Sign out</Button>
         </div>
-      </header>
+      </aside>
 
       <div className="rts-main-wrap">
+        <header className="rts-topbar">
+          <Button className="rts-menu" onClick={() => setNavOpen(true)} aria-label="Open navigation" aria-expanded={navOpen}>
+            Menu
+          </Button>
+          <div className="rts-crumbs">
+            {currentGroup}
+            <Icon name="chevron" />
+            <b>{currentLabel}</b>
+          </div>
+          <div className="rts-top-right">
+            {busy && (
+              <span className="rts-busy" role="status">
+                <span className="rts-busy-bar" aria-hidden="true" />
+                Saving
+              </span>
+            )}
+            <button type="button" className="rts-palette-trigger" onClick={openPalette} aria-keyshortcuts="Control+K Meta+K">
+              <Icon name="search" className="rts-palette-trigger-icon" />
+              <span className="rts-palette-trigger-text">Search or jump to a screen</span>
+              <kbd className="rts-kbd">Ctrl K</kbd>
+            </button>
+          </div>
+        </header>
 
         <main className="rts-main" id="main-content">
           <div className="rts-main-inner">
@@ -300,7 +336,7 @@ function Shell() {
               {page}
             </div>
             <footer className="rts-provenance">
-              <span>Richie Transport Services · Operations ledger</span>
+              <span>Richie Transport Services · Operations workspace</span>
               <span>Every change is attributed and audit-logged</span>
               <span className="rts-build">build {process.env.NEXT_PUBLIC_BUILD ?? "unknown"}</span>
             </footer>

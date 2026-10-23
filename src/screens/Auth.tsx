@@ -19,13 +19,13 @@ function AuthFrame({ eyebrow, title, intro, children }: { eyebrow: string; title
 
         <div>
           <h2 className="rts-auth-headline">
-            Every route,
+            Run the fleet
             <br />
-            <em>accounted for.</em>
+            <em>from one screen.</em>
           </h2>
           <p className="rts-auth-sub">
-            One ledger for staff busing, vehicle hire and fleet logistics — from the request at the desk to the
-            trip on the road.
+            Staff busing, vehicle hire and fleet logistics — from the request at the desk to the trip on the road,
+            with every change attributed.
           </p>
         </div>
 
@@ -131,7 +131,7 @@ export function SignInPage() {
         <Button type="submit" variant="primary" className="rts-btn--block py-2" disabled={busy}>
           {busy ? "Checking..." : "Sign in"}
         </Button>
-        <p className="text-[11px] leading-relaxed text-[#747c6c]">Forgotten passwords are reset by an administrator from the Users screen. Self-service reset is not available.</p>
+        <p className="rts-auth-foot">Forgotten passwords are reset by an administrator from the Users screen. Self-service reset is not available.</p>
       </form>
     </AuthFrame>
   );

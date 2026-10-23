@@ -72,7 +72,7 @@ export function Card({ title, description, actions, children, className }: { tit
     <section className={cn("rts-card", className)}>
       {(title || actions) && (
         <header className="rts-card-head">
-          <div className="min-w-0">
+          <div className="rts-head-text">
             {title && <h2 className="rts-card-title">{title}</h2>}
             {description && <p className="rts-card-desc">{description}</p>}
           </div>
@@ -94,8 +94,10 @@ export function Band({ label, note, actions, id, className, children }: { label:
   return (
     <section className={cn("rts-band", className)} aria-labelledby={headingId}>
       <div className="rts-band-label">
-        <h2 id={headingId} className="rts-band-title">{label}</h2>
-        {note && <p className="rts-band-note">{note}</p>}
+        <div className="rts-head-text">
+          <h2 id={headingId} className="rts-band-title">{label}</h2>
+          {note && <p className="rts-band-note">{note}</p>}
+        </div>
         {actions && <div className="rts-band-actions">{actions}</div>}
       </div>
       <div className="rts-band-body">{children}</div>
