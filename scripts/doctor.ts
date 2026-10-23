@@ -99,12 +99,13 @@ if (container !== null) {
       // A container that was created and then died explains itself in its own log, so read it.
       const logs = run("podman", ["logs", "--tail", "40", "richie-tms-db"]) ?? run("docker", ["logs", "--tail", "40", "richie-tms-db"]) ?? "";
       const detail = [`Container status: ${status}`];
-      if (/unused mount\/volume|PG_VERSION|pg_ctlcluster/i.test(logs)) {
+      if (/there appears to be PostgreSQL data|unused mount\/volume|PG_VERSION|pg_ctlcluster/i.test(logs)) {
         detail.push(
           "The image refused to start because of the volume path.",
           "PostgreSQL 18+ keeps its data in /var/lib/postgresql/18/docker and wants the volume at",
           "/var/lib/postgresql — not the old /var/lib/postgresql/data that earlier versions used.",
-          "Your docker-compose.yml is out of date: git pull, then ./run.sh db-reset-container",
+          "Two causes: an out-of-date docker-compose.yml (git pull), or a volume left by an earlier",
+          "layout. Either way: ./run.sh nuke, then ./run.sh setup",
         );
       } else if (/database files are incompatible|upgrade the underlying database/i.test(logs)) {
         detail.push("The volume holds data from another PostgreSQL major version.", "Start clean: ./run.sh db-reset-container (destroys the database)");

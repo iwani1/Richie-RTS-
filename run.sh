@@ -47,9 +47,12 @@ require_deps_install() {
   npm ci || fail "npm ci failed. Check your network, then run it again."
 }
 
-require_db() {
-  require_env
-  if ! node -e '
+# Is the database reachable? A predicate: it returns 1 instead of exiting, so callers can retry.
+# It used to call fail() here, which meant the first probe of a container that was still
+# initialising killed the whole run, with the message thrown away by callers that silenced stderr.
+db_reachable() {
+  [ -f .env ] || return 1
+  node -e '
     const { readFileSync } = require("node:fs");
     const text = readFileSync(".env", "utf8");
     const match = text.match(/^\s*DATABASE_URL\s*=\s*"?([^"\n]+)"?/m);
@@ -57,17 +60,30 @@ require_db() {
     const { Client } = require("pg");
     const client = new Client({ connectionString: match[1], connectionTimeoutMillis: 3000 });
     client.connect().then(() => client.end()).catch(() => process.exit(1));
-  '; then
-    fail "PostgreSQL is not reachable with DATABASE_URL from .env. Is the database running? (docker compose up -d db)"
+  ' 2>/dev/null
+}
+
+require_db() {
+  require_env
+  db_reachable || fail "PostgreSQL is not reachable with DATABASE_URL from .env. Is the database running? (podman-compose up -d db)"
+}
+
+# The compose command available here, empty if there is none.
+compose_cmd() {
+  if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then
+    printf 'docker compose'
+  elif command -v podman-compose >/dev/null; then
+    printf 'podman-compose'
+  elif command -v podman >/dev/null && podman compose version >/dev/null 2>&1; then
+    printf 'podman compose'
   fi
 }
 
-# Explains the two failures a first run actually hits on Fedora: the port taken by the distro's
-# own PostgreSQL, and the container coming up with a password that does not match DATABASE_URL.
 # The published database port from .env, defaulting to 5433.
 env_port() {
   local port
-  port=$(env_port)
+  port=$(sed -n 's/^POSTGRES_PORT="\{0,1\}\([0-9]*\)"\{0,1\}.*/\1/p' .env 2>/dev/null | tail -1)
+  [ -n "$port" ] || port=5433
   printf '%s' "$port"
 }
 
@@ -103,14 +119,32 @@ port_hint() {
 }
 
 # The compose command available here, empty if there is none.
-compose_cmd() {
-  if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then
-    printf 'docker compose'
-  elif command -v podman-compose >/dev/null; then
-    printf 'podman-compose'
-  elif command -v podman >/dev/null && podman compose version >/dev/null 2>&1; then
-    printf 'podman compose'
+
+# The status line of our container, empty when there is no such container.
+container_state() {
+  if command -v podman >/dev/null; then
+    podman ps -a --filter name=^richie-tms-db$ --format '{{.Status}}' 2>/dev/null | head -1
+  elif command -v docker >/dev/null; then
+    docker ps -a --filter name=^richie-tms-db$ --format '{{.Status}}' 2>/dev/null | head -1
   fi
+}
+
+# Waits up to $1 seconds for the database to accept connections. Returns as soon as it does, and
+# returns at once if the container has exited: a dead container never starts answering, and a
+# silent minute is what turns that into a mystery.
+wait_for_db() {
+  local limit=${1:-60} waited=0 state
+  while [ "$waited" -lt "$limit" ]; do
+    db_reachable && return 0
+    state=$(container_state)
+    case "$state" in
+      Exited*|Dead*|Restarting*) return 1 ;;
+    esac
+    sleep 1
+    waited=$((waited + 1))
+    if [ $((waited % 15)) -eq 0 ]; then say "  still waiting for the database (${waited}s)..."; fi
+  done
+  return 1
 }
 
 # Why a database container is not answering, in the operator's language. Prints the container's
@@ -127,8 +161,13 @@ database_diagnosis() {
   elif command -v docker >/dev/null; then
     docker logs --tail 25 richie-tms-db 2>&1 | sed 's/^/    /' || true
   fi
-  if command -v podman >/dev/null; then
-    podman ps -a --filter name=richie-tms-db --format '    status: {{.Status}}' || true
+  say "    status: $(container_state)"
+  if [ -n "$up" ] && $up logs --tail 40 db 2>&1 | grep -qi "there appears to be PostgreSQL data"; then
+    say ""
+    say "The volume holds data from an earlier layout (or from PostgreSQL before 18), and the 18+"
+    say "image refuses to start on it. Start from nothing:"
+    say "    ./run.sh nuke      (deletes the container, its volume, .env and build output)"
+    say "    ./run.sh setup"
   fi
   port_hint
 }
@@ -165,10 +204,9 @@ or edit it by hand (docs/SETUP_AND_DEPLOYMENT.md §3.2)."
     require_deps_install
     compose_up || fail "Database start failed. Read the hint above, or docs/SETUP_AND_DEPLOYMENT.md §9."
     say "Waiting for PostgreSQL to accept connections..."
-    for _ in $(seq 1 60); do require_db 2>/dev/null && break; sleep 1; done
-    if ! require_db 2>/dev/null; then
+    if ! wait_for_db 60; then
       database_diagnosis
-      fail "The database never became reachable after 60 seconds. See the log lines above."
+      fail "The database never became reachable. The reason is above."
     fi
     npm run db:migrate
     npm run build
@@ -231,8 +269,10 @@ or edit it by hand (docs/SETUP_AND_DEPLOYMENT.md §3.2)."
     fi
     $up up -d db || { port_hint; fail "The database still will not start."; }
     say "Waiting for PostgreSQL to become healthy..."
-    for _ in $(seq 1 60); do require_db 2>/dev/null && break; sleep 1; done
-    require_db || fail "The container is up but the database is not answering. Check: podman-compose logs db"
+    if ! wait_for_db 60; then
+      database_diagnosis
+      fail "The container is up but the database is not answering."
+    fi
     say "Database is up. Now create the schema and start the app:"
     say "    npm run db:migrate && ./run.sh start"
     ;;
@@ -251,12 +291,16 @@ or edit it by hand (docs/SETUP_AND_DEPLOYMENT.md §3.2)."
     fi
     if command -v podman >/dev/null; then
       podman rm -f -v richie-tms-db >/dev/null 2>&1 || true
-      podman volume rm -f richie-tms_richie_pgdata >/dev/null 2>&1 || true
+      for vol in $(podman volume ls --format '{{.Name}}' 2>/dev/null | grep -E 'richie[-_]pgdata' || true); do
+        podman volume rm -f "$vol" >/dev/null 2>&1 || true
+      done
       podman image rm -f docker.io/library/postgres:18-alpine >/dev/null 2>&1 || true
       say "Container, volume and image removed."
     elif command -v docker >/dev/null; then
       docker rm -f -v richie-tms-db >/dev/null 2>&1 || true
-      docker volume rm -f richie-tms_richie_pgdata >/dev/null 2>&1 || true
+      for vol in $(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E 'richie[-_]pgdata' || true); do
+        docker volume rm -f "$vol" >/dev/null 2>&1 || true
+      done
       docker image rm -f docker.io/library/postgres:18-alpine >/dev/null 2>&1 || true
       say "Container, volume and image removed."
     fi
