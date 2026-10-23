@@ -49,7 +49,6 @@ const ROUTE_ICONS: Record<Route, IconName> = {
   client_portal: "client",
 };
 
-const COLLAPSE_KEY = "rts.rail.collapsed";
 
 function initialsOf(name: string | undefined): string {
   if (!name) return "RT";
@@ -120,18 +119,10 @@ function Shell() {
   const bound = actor ? isRecordBound(actor.role) : false;
   const [requestedRoute, setRoute] = useState<Route>(portalRoute ?? "dashboard");
   const [navOpen, setNavOpen] = useState(false);
+  // The board carries a clock because a dispatcher reads this screen against the wall clock. It is
+  // rendered only after mount, so the server and the first client render cannot disagree.
+  const [clock, setClock] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  // The rail starts expanded: names beat icons for someone who opens this twice a week. It collapses
-  // to an icon strip when a wide table needs the width, and that choice is remembered.
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(COLLAPSE_KEY) === "true";
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem(COLLAPSE_KEY, String(collapsed));
-  }, [collapsed]);
-
   const items =
     bound && portalRoute
       ? NAV_ITEMS.filter((item) => item.route === portalRoute || item.route === "documents")
@@ -148,6 +139,13 @@ function Shell() {
   };
 
   const openPalette = useCallback(() => setPaletteOpen(true), []);
+
+  useEffect(() => {
+    const tick = () => setClock(new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }));
+    tick();
+    const timer = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // ⌘K on a Mac, Ctrl-K everywhere else. Ignored while typing in a field so a stray shortcut never
   // steals a keystroke from a form.
@@ -192,8 +190,6 @@ function Shell() {
       .filter((item): item is (typeof items)[number] => Boolean(item)),
   })).filter((group) => group.items.length > 0);
 
-  const activeItem = items.find((i) => i.route === route);
-  const activeLabel = activeItem?.label ?? "Operations board";
   const today = new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 
   // Running index numerals per visible group, computed without mutating during render: the rail
@@ -207,94 +203,32 @@ function Shell() {
   );
 
   return (
-    <div className={cn("rts-shell", collapsed && "is-collapsed")}>
+    <div className="rts-shell">
       <a className="rts-skip" href="#main-content">Skip to content</a>
 
-      {navOpen && <button type="button" className="rts-scrim-mobile" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
+      {navOpen && (
+        <button type="button" className="rts-scrim-mobile" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
+      )}
 
-      <aside className={cn("rts-rail", navOpen && "is-open")} aria-label="Workspace navigation">
-        <div className="rts-brand">
-          <div className="rts-mark" aria-hidden="true">R</div>
-          <div className="min-w-0">
+      {/* The board's header. Identity and the clock sit on one row; every destination sits on the
+          next, grouped, because a dispatcher switches between busing, rentals and logistics all
+          afternoon and should not open a menu to do it. */}
+      <header className={cn("rts-topnav", navOpen && "is-open")}>
+        <div className="rts-topnav-primary">
+          <div className="rts-brand">
+            <div className="rts-mark" aria-hidden="true">R</div>
             <p className="rts-wordmark">
               Richie
-              <span className="truncate" title={db.settings.companyName ?? "Richie Transport Services"}>
-                {(db.settings.companyName ?? "Richie Transport Services").toUpperCase()} · LEDGER
+              <span title={db.settings.companyName ?? "Richie Transport Services"}>
+                {(db.settings.companyName ?? "Richie Transport Services").toUpperCase()} · OPERATIONS
               </span>
             </p>
           </div>
-        </div>
 
-        <div className="rts-rail-tools">
-          <button
-            type="button"
-            className="rts-rail-toggle"
-            onClick={() => setCollapsed((value) => !value)}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
-            title={collapsed ? "Expand navigation" : "Collapse navigation (more room for tables)"}
-          >
-            <Icon name="chevron" className={cn("rts-rail-toggle-icon", !collapsed && "is-flipped")} />
-            <span className="rts-rail-toggle-text">Collapse</span>
-          </button>
-        </div>
+          <Button className="rts-menu" onClick={() => setNavOpen(true)} aria-label="Open navigation" aria-expanded={navOpen}>
+            Menu
+          </Button>
 
-        <nav className="rts-nav" aria-label="Main">
-          {numberedGroups.map((group) => (
-            <div className="rts-nav-group" key={group.label}>
-              <p className="rts-nav-label">{group.label}</p>
-              {group.items.map(({ item, index }) => {
-                const active = route === item.route;
-                return (
-                  <button
-                    key={item.route}
-                    type="button"
-                    onClick={() => navigate(item.route)}
-                    aria-current={active ? "page" : undefined}
-                    className="rts-nav-item"
-                    title={collapsed ? `${item.label} — ${item.caption}` : undefined}
-                  >
-                    <span className="rts-nav-index" aria-hidden="true">{String(index).padStart(2, "0")}</span>
-                    <Icon name={ROUTE_ICONS[item.route]} className="rts-nav-icon" />
-                    <span className="rts-nav-copy">
-                      <strong>{item.label}</strong>
-                      <small>{item.caption}</small>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        <div className="rts-rail-foot">
-          <div className="rts-rail-note" title="Records live in PostgreSQL on the application server. The browser holds a redacted copy of what your role may see.">
-            <i aria-hidden="true" /> Server ledger · PostgreSQL
-          </div>
-          <div className="rts-user">
-            <div className="rts-avatar" aria-hidden="true">{initialsOf(actor?.fullName)}</div>
-            <div className="min-w-0">
-              <strong className="truncate">{actor?.fullName}</strong>
-              <small>{actor ? (ROLE_LABELS[actor.role] ?? "UNKNOWN ROLE").toUpperCase() : ""}</small>
-            </div>
-          </div>
-          <button type="button" className="rts-btn rts-btn--rail" onClick={() => void signOut()}>
-            <span>Sign out</span>
-            <span aria-hidden="true">→</span>
-          </button>
-        </div>
-      </aside>
-
-      <div className="rts-main-wrap">
-        <header className="rts-topbar">
-          <div className="rts-topbar-start">
-            <Button className="rts-menu" onClick={() => setNavOpen(true)} aria-label="Open navigation">Menu</Button>
-            <div className="rts-crumbs">
-              <span>RTS</span>
-              <span className="rts-crumb-dash" aria-hidden="true" />
-              <b>{activeLabel}</b>
-            </div>
-          </div>
           <div className="rts-top-right">
             <button type="button" className="rts-palette-trigger" onClick={openPalette} aria-keyshortcuts="Control+K Meta+K">
               <Icon name="search" className="rts-palette-trigger-icon" />
@@ -307,9 +241,48 @@ function Shell() {
                 Saving
               </span>
             )}
+            <span className="rts-clock" aria-label={clock ? `Current time ${clock}` : undefined}>{clock ?? "--:--"}</span>
             <span className="rts-date">{today}</span>
+            <div className="rts-user">
+              <div className="rts-avatar" aria-hidden="true">{initialsOf(actor?.fullName)}</div>
+              <div className="min-w-0">
+                <strong className="truncate">{actor?.fullName}</strong>
+                <small>{actor ? (ROLE_LABELS[actor.role] ?? "UNKNOWN ROLE").toUpperCase() : ""}</small>
+              </div>
+            </div>
+            <Button variant="ghost" onClick={() => void signOut()}>Sign out</Button>
           </div>
-        </header>
+        </div>
+
+        <nav className="rts-topnav-tabs" aria-label="Main">
+          {numberedGroups.map((group) => (
+            <div className="rts-nav-group" key={group.label}>
+              <p className="rts-nav-label">{group.label}</p>
+              <div className="rts-nav">
+                {group.items.map(({ item, index }) => {
+                  const active = route === item.route;
+                  return (
+                    <button
+                      key={item.route}
+                      type="button"
+                      onClick={() => navigate(item.route)}
+                      aria-current={active ? "page" : undefined}
+                      className="rts-nav-item"
+                      title={`${item.label} — ${item.caption}`}
+                    >
+                      <span className="rts-nav-index" aria-hidden="true">{String(index).padStart(2, "0")}</span>
+                      <Icon name={ROUTE_ICONS[item.route]} className="rts-nav-icon" />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+      </header>
+
+      <div className="rts-main-wrap">
 
         <main className="rts-main" id="main-content">
           <div className="rts-main-inner">

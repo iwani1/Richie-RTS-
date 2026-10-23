@@ -125,7 +125,7 @@ describe("Driver portal (jsdom)", () => {
     // Internal screens are not offered to a record-bound role.
     expect(screen.queryByRole("button", { name: /Accounts and roles/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Audit log/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Business rules/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Settings/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Staff logistics/i })).toBeNull();
 
     // A driver can report a problem on its own vehicle.

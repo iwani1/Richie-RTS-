@@ -84,7 +84,7 @@ describe("Expired quotation policy end-to-end (jsdom)", () => {
     expect(screen.getByText(/policy in Settings/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Renew quotation/i })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /Business rules/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Settings/i }));
     const policy = screen.getByLabelText(/Expired quotation policy/i);
     fireEvent.change(policy, { target: { value: "revise_in_place" } });
     fireEvent.click(screen.getByRole("button", { name: /Save settings/i }));

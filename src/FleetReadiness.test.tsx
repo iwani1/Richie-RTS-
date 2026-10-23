@@ -66,7 +66,7 @@ describe("Fleet readiness end-to-end (jsdom)", () => {
     expect(screen.getAllByText(/No service schedule is configured for this vehicle category/i).length).toBeGreaterThan(0);
 
     // Administrator configures a schedule per category (no defaults anywhere).
-    fireEvent.click(screen.getByRole("button", { name: /Business rules/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Settings/i }));
     fireEvent.click(screen.getByRole("button", { name: /^Add schedule$/i }));
     fireEvent.change(screen.getByLabelText(/Interval \(days\)/), { target: { value: "90" } });
     fireEvent.change(screen.getByLabelText(/Interval \(km\)/), { target: { value: "1000" } });
@@ -92,7 +92,7 @@ describe("Fleet readiness end-to-end (jsdom)", () => {
 
     // The dashboard surfaces the overdue condition. The 2026 redesign replaced the old notice
     // with an exception row on the operations board; the promise is the same, the wording is new.
-    fireEvent.click(screen.getByRole("button", { name: /Setup and overview/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Dashboard/i }));
     expect(await screen.findByText(/vehicle past service interval/i)).toBeTruthy();
   }, 30000);
 });

@@ -87,7 +87,7 @@ describe("Staff logistics end-to-end (jsdom)", () => {
     expect(screen.getAllByText(/out of service/i).length).toBeGreaterThan(0);
 
     // The vehicle register reflects the change immediately.
-    fireEvent.click(screen.getByRole("button", { name: /Fleet register/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Vehicles/i }));
     expect((await screen.findAllByText(/Out of service/i)).length).toBeGreaterThan(0);
 
     // Acknowledge, respond (a breakdown needs someone named), then resolve.
