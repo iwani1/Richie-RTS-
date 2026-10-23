@@ -69,7 +69,7 @@ export function StaffLogisticsPage() {
         title="Staff logistics"
         description="Breakdown response, maintenance coordination and recorded costs. Vehicle status follows what an operator records here; nothing is assumed."
       />
-      <div role="tablist" aria-label="Staff logistics sections" className="mb-5 flex flex-wrap gap-1 border-b border-stone-200">
+      <div role="tablist" aria-label="Staff logistics sections" className="rts-tabs">
         {(["incidents", "maintenance", "costs"] as Tab[]).map((id) => (
           <button
             key={id}
@@ -77,7 +77,7 @@ export function StaffLogisticsPage() {
             role="tab"
             aria-selected={tab === id}
             onClick={() => setTab(id)}
-            className={`-mb-px border-b-2 px-3 py-2 text-xs font-semibold ${tab === id ? "border-lime-600 text-stone-900" : "border-transparent text-stone-500 hover:text-stone-800"}`}
+            className="rts-tab"
           >
             {id === "incidents" ? "Incidents & breakdowns" : id === "maintenance" ? "Work orders" : "Cost report"}
           </button>

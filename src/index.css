@@ -469,6 +469,39 @@ button { color: inherit; }
   text-transform: uppercase;
 }
 
+/* ---------- section tabs: labels in a contents line, not pills ------------------------------- */
+
+.rts-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0 0 22px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.rts-tab {
+  appearance: none;
+  margin: 0 22px -1px 0;
+  padding: 8px 0 9px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.rts-tab:hover { color: var(--ink); }
+
+.rts-tab[aria-selected="true"] {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+}
+
 /* ---------- editorial sections ------------------------------------------------------------------ */
 
 .rts-band {
