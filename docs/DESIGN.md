@@ -138,10 +138,14 @@ software, not of a document.
   sentence of qualification and — where trips are recorded — a seven-day bar series. Below them a
   1.55fr/1fr spread: needs-attention list, today's run sheet and rentals on the left; readiness ring,
   setup checklist and quick actions in the right rail.
-- **Everywhere else.** Registers are tables with a sticky header, toolbars above and a side panel for
-  one record; rentals keep their five-step state strip; busing keeps the run sheet; logistics keeps
-  incidents beside work orders and the cost statement; readiness keeps interval bars; settings keeps
-  one card per rule.
+- **Registers are one card each.** A register card carries its title and the sentence that counts its
+  rows, a filter row inside the card (search and, where it exists, a status filter, with the
+  supporting count at the right), then the table flush to the card's edges with a sticky header. A
+  table that is not already inside a card gets the same edge from the stylesheet, so no screen shows
+  a table dropped on the canvas.
+- **Everywhere else.** Rentals keep their five-step state strip and list in a register card; busing
+  keeps the run sheet as a card with the dispatch desk beside it; logistics keeps incidents beside
+  work orders and the cost statement; readiness keeps interval bars; settings keeps one card per rule.
 - **Width.** Content is capped at 1440px with a 28px gutter; the spread collapses at 1180px and the
   sidebar becomes a drawer at 980px.
 
@@ -197,8 +201,8 @@ from its own button, the scrim and Escape.
 |---|---|---|---|
 | Sign in / first run | Establish identity, once | One statement, one form, one action | Two panels: a brand half on a soft canvas wash (headline, purpose, the three things the desk does) and the form on a card at the right; one column under 980px |
 | Overview (dashboard) | Decide what to do next | Wrong today, then what leaves | Page head, four stat cards, then attention · run sheet · rentals beside a rail of readiness ring, setup checklist and quick actions |
-| Registers (vehicles, drivers, clients) | Find and change one record | The record and what is wrong with it | Page head, toolbar, count line, table with a sticky header, side panel for the form |
-| Rentals | Move a request through its states | The state machine of the selected record | Five-step strip, request and quote side by side, actions for that state |
+| Registers (vehicles, drivers, clients) | Find and change one record | The record and what is wrong with it | Page head, then a register card: title and count, filters inside the card, sticky table header, side panel for the form |
+| Rentals | Move a request through its states | The state machine of the selected record | Request list in a register card; then a five-step strip, request and quote side by side, actions for that state |
 | Busing | Run the day | Today's runs and the next action on each | Tabs, run sheet (departure in the gutter, route and crew in the middle, next action at the right), dispatch desk beside it |
 | Logistics | Close the response to a breakdown | What is open and what it costs | Incidents beside the work orders they raise; the cost report as a statement with coverage figures |
 | Compliance / Readiness | Prevent an unroadworthy dispatch | Expiry and overdue, soonest first | Summary cards, urgency-sorted table, timing in words, interval bars per basis |

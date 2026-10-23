@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { rentalQuotingReady, type AssignmentInput, type DepositInput, type QuoteInput, type QuoteLineInput, type RentalRequestInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, type Rental, type RentalStatus } from "../tms/types";
-import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 import type { Route } from "../routes";
 
 type Errors = Record<string, string>;
@@ -97,15 +97,23 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
         </Notice>
       )}
 
-      <div className="mb-3 flex flex-wrap gap-2">
-        <TextInput className="max-w-xs" placeholder="Search reference, customer, category" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search rentals" />
-        <Select className="max-w-[200px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | RentalStatus)} aria-label="Filter by status">
-          <option value="all">All statuses</option>
-          {RENTAL_STATUSES.map((s) => <option key={s} value={s}>{RENTAL_STATUS_LABELS[s]}</option>)}
-        </Select>
-      </div>
-
-      <DataTable
+      <TableCard
+        title="Rental requests"
+        summary={`${rows.length} of ${db.rentals.length} shown · ${db.rentals.filter((r) => r.status === "draft" || r.status === "quoted").length} awaiting confirmation`}
+        toolbar={
+          <>
+            <SearchInput placeholder="Search reference, customer, category" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search rentals" />
+            <Select className="max-w-[190px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | RentalStatus)} aria-label="Filter by status">
+              <option value="all">All statuses</option>
+              {RENTAL_STATUSES.map((s) => <option key={s} value={s}>{RENTAL_STATUS_LABELS[s]}</option>)}
+            </Select>
+            <p className="rts-filter-bar-note" role="status">
+              {db.rentals.filter((r) => r.status === "in_progress").length} on the road · {db.rentals.filter((r) => r.status === "completed").length} completed
+            </p>
+          </>
+        }
+      >
+        <DataTable
         rows={rows}
         rowKey={(r) => r.id}
         emptyState={<EmptyState title={db.rentals.length ? "No rentals match" : "No rental requests yet"} body="Create a request to begin the quotation and booking flow." />}
@@ -114,11 +122,12 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
           { key: "cust", header: "Customer", render: (r) => <span className="font-semibold text-stone-900">{r.customerName}</span> },
           { key: "cat", header: "Category", render: (r) => categoryName(r.vehicleCategoryId) },
           { key: "dates", header: "Dates", render: (r) => <span className="whitespace-nowrap text-xs">{formatDate(r.startDate)} - {formatDate(r.endDate)}</span> },
-          { key: "value", header: "Quote", render: (r) => (r.quote ? money(r.quote.subtotal, r.quote.currencyCode) : <span className="text-stone-400">-</span>) },
+          { key: "value", header: "Quote", className: "rts-num", render: (r) => (r.quote ? money(r.quote.subtotal, r.quote.currencyCode) : <span className="text-stone-400">-</span>) },
           { key: "status", header: "Status", render: (r) => <Badge tone={statusTone[r.status]}>{RENTAL_STATUS_LABELS[r.status]}</Badge> },
           { key: "actions", header: "", className: "text-right", render: (r) => <Button variant="ghost" onClick={() => setSelectedId(r.id)}>Open</Button> },
         ]}
-      />
+        />
+      </TableCard>
 
       {creating && (
         <RequestForm

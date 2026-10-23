@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { VEHICLE_TRANSITIONS, type VehicleInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { VEHICLE_STATUS_LABELS, VEHICLE_STATUSES, type Vehicle, type VehicleStatus } from "../tms/types";
-import { Badge, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, TextArea, TextInput, formatDateTime } from "../ui/primitives";
+import { Badge, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDateTime } from "../ui/primitives";
 import type { Route } from "../routes";
 
 type PanelState = { mode: "create" } | { mode: "edit"; vehicle: Vehicle } | { mode: "transition"; vehicle: Vehicle } | null;
@@ -57,17 +57,25 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
         </Notice>
       )}
 
-      <div className="mb-3 flex flex-wrap gap-2">
-        <TextInput className="max-w-xs" placeholder="Search registration, make, model, category" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search vehicles" />
-        <Select className="max-w-[200px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | VehicleStatus)} aria-label="Filter by status">
-          <option value="all">All statuses</option>
-          {VEHICLE_STATUSES.map((s) => (
-            <option key={s} value={s}>{VEHICLE_STATUS_LABELS[s]}</option>
-          ))}
-        </Select>
-      </div>
-
-      <DataTable
+      <TableCard
+        title="Fleet register"
+        summary={`${rows.length} of ${db.vehicles.length} shown · ${db.vehicles.filter((v) => v.status === "available").length} available`}
+        toolbar={
+          <>
+            <SearchInput placeholder="Search registration, make, model, category" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search vehicles" />
+            <Select className="max-w-[190px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | VehicleStatus)} aria-label="Filter by status">
+              <option value="all">All statuses</option>
+              {VEHICLE_STATUSES.map((s) => (
+                <option key={s} value={s}>{VEHICLE_STATUS_LABELS[s]}</option>
+              ))}
+            </Select>
+            <p className="rts-filter-bar-note" role="status">
+              {db.vehicles.filter((v) => v.status === "maintenance").length} in maintenance · {db.vehicles.filter((v) => v.status === "out_of_service").length} off road
+            </p>
+          </>
+        }
+      >
+        <DataTable
         rows={rows}
         rowKey={(v) => v.id}
         emptyState={<EmptyState title={db.vehicles.length ? "No vehicles match" : "No vehicles registered"} body={db.vehicles.length ? "Adjust the search or status filter." : "Vehicles added here become available for trip assignment in the next phase."} />}
@@ -75,7 +83,7 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
           { key: "reg", header: "Registration", render: (v) => <span className="font-mono text-xs font-semibold text-stone-900">{v.registration}</span> },
           { key: "cat", header: "Category", render: (v) => categoryName(v.categoryId) },
           { key: "mm", header: "Make / model", render: (v) => [v.make, v.model].filter(Boolean).join(" ") || <span className="text-stone-400">-</span> },
-          { key: "seats", header: "Seats", render: (v) => v.seatCapacity },
+          { key: "seats", header: "Seats", className: "rts-num", render: (v) => v.seatCapacity },
           { key: "status", header: "Status", render: (v) => <Badge tone={statusTone[v.status]}>{VEHICLE_STATUS_LABELS[v.status]}</Badge> },
           { key: "upd", header: "Updated", render: (v) => <span className="text-xs text-stone-500">{formatDateTime(v.updatedAt)}</span> },
           {
@@ -94,7 +102,8 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
             ),
           },
         ]}
-      />
+        />
+      </TableCard>
 
       {panel && panel.mode !== "transition" && (
         <VehicleForm

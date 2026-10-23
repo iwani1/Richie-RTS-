@@ -18,7 +18,7 @@ import {
   type Trip,
   type TripStatus,
 } from "../tms/types";
-import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, Stat, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 
 type Errors = Record<string, string>;
 type Tab = "routes" | "passengers" | "trips" | "performance";
@@ -93,22 +93,22 @@ function RoutesTab() {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="max-w-xl text-xs text-stone-500">
-          A route needs an active client and a vehicle category. Stops and times are entered by operations; none are assumed.
-        </p>
-        {allowed("routes:create") && (
-          <Button
-            variant="primary"
-            disabled={!canCreate}
-            title={canCreate ? undefined : "Needs an active client and at least one vehicle category"}
-            onClick={() => setPanel({ mode: "create" })}
-          >
-            New route
-          </Button>
-        )}
-      </div>
-
+      <TableCard
+        title="Route register"
+        summary={`${rows.length} route${rows.length === 1 ? "" : "s"} · ${rows.filter((r) => r.status === "active").length} active · a route needs an active client and a vehicle category`}
+        actions={
+          allowed("routes:create") ? (
+            <Button
+              variant="primary"
+              disabled={!canCreate}
+              title={canCreate ? undefined : "Needs an active client and at least one vehicle category"}
+              onClick={() => setPanel({ mode: "create" })}
+            >
+              New route
+            </Button>
+          ) : undefined
+        }
+      >
       <DataTable
         rows={rows}
         rowKey={(r) => r.id}
@@ -145,7 +145,8 @@ function RoutesTab() {
             ),
           },
         ]}
-      />
+        />
+      </TableCard>
 
       {panel?.mode === "create" && <RouteForm route={null} onClose={() => setPanel(null)} />}
       {panel?.mode === "edit" && <RouteForm route={panel.route} onClose={() => setPanel(null)} />}
@@ -378,22 +379,22 @@ function PassengersTab() {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-2">
-          <TextInput className="max-w-xs" placeholder="Search name, employee ref, client" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search passengers" />
-          <Select className="max-w-[160px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} aria-label="Filter by status">
-            <option value="all">All</option>
-            {PASSENGER_STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </Select>
-        </div>
-        {allowed("passengers:create") && <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add passenger</Button>}
-      </div>
-      <Notice tone="info" className="mb-3">
-        Passenger records are personal data. Capture only what is needed to run the route. See docs/DATA_PROTECTION.md.
-      </Notice>
-
+      <TableCard
+        title="Passenger roster"
+        summary={`${rows.length} of ${db.passengers.length} shown · ${db.passengers.filter((p) => !p.routeId).length} not yet on a route · personal data, capture only what the route needs`}
+        actions={allowed("passengers:create") ? <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add passenger</Button> : undefined}
+        toolbar={
+          <>
+            <SearchInput placeholder="Search name, employee ref, client" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search passengers" />
+            <Select className="max-w-[160px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} aria-label="Filter by status">
+              <option value="all">All</option>
+              {PASSENGER_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </Select>
+          </>
+        }
+      >
       <DataTable
         rows={rows}
         rowKey={(p) => p.id}
@@ -412,7 +413,8 @@ function PassengersTab() {
             render: (p) => (allowed("passengers:update") ? <Button variant="ghost" onClick={() => setPanel({ mode: "edit", passenger: p })}>Edit</Button> : null),
           },
         ]}
-      />
+        />
+      </TableCard>
 
       {panel?.mode === "create" && <PassengerForm passenger={null} onClose={() => setPanel(null)} />}
       {panel?.mode === "edit" && <PassengerForm passenger={panel.passenger} onClose={() => setPanel(null)} />}
@@ -588,14 +590,19 @@ function TripsTab() {
       </div>
 
       <div className="rts-spread">
-        <div>
-          <div className="rts-band-label" style={{ marginBottom: 0 }}>
-            <h3 className="rts-band-title">Run sheet</h3>
-            <p className="rts-band-note">In departure order. The next action on each run sits beside it.</p>
+        <section className="rts-card" aria-labelledby="run-sheet-heading">
+          <div className="rts-card-head">
+            <div className="rts-head-text">
+              <h3 id="run-sheet-heading" className="rts-card-title">Run sheet</h3>
+              <p className="rts-card-desc">In departure order. The next action on each run sits beside it.</p>
+            </div>
+            <span className="rts-stamp">{trips.length} run{trips.length === 1 ? "" : "s"} · {formatDate(date)}</span>
           </div>
 
           {trips.length === 0 ? (
-            <EmptyState title="No trips on this date" body="Generate trips from a route on the Routes tab. Nothing is scheduled automatically." />
+            <div className="rts-card-body">
+              <EmptyState title="No trips on this date" body="Generate trips from a route on the Routes tab. Nothing is scheduled automatically." />
+            </div>
           ) : (
             <div className="rts-runs">
               {trips.map((t) => {
@@ -627,7 +634,7 @@ function TripsTab() {
               })}
             </div>
           )}
-        </div>
+        </section>
 
         <aside className="rts-desk" aria-label="Dispatch desk">
           <p className="rts-kicker">Dispatch desk</p>

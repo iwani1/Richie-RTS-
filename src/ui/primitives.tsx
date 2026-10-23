@@ -115,6 +115,52 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
   );
 }
 
+/** A search field with its icon inside the control, sized for a card header or filter bar. */
+export function SearchInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <span className={cn("rts-search", className)}>
+      <svg className="rts-search-icon" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true" focusable="false">
+        <circle cx="9" cy="9" r="5.5" />
+        <path d="m13.5 13.5 3 3" />
+      </svg>
+      <input className="rts-search-input" type="search" {...props} />
+    </span>
+  );
+}
+
+/**
+ * The shell every register uses: a card with a title, the sentence that counts the rows, the
+ * screen's filters, and the table flush to the card's edges. Keeping the filter row inside the card
+ * is what stops a register from looking like a table dropped on a canvas.
+ */
+export function TableCard({
+  title,
+  summary,
+  actions,
+  toolbar,
+  children,
+}: {
+  title: string;
+  summary?: string;
+  actions?: ReactNode;
+  toolbar?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rts-card rts-table-card">
+      <div className="rts-card-head">
+        <div className="rts-head-text">
+          <h2 className="rts-card-title">{title}</h2>
+          {summary && <p className="rts-card-desc">{summary}</p>}
+        </div>
+        {actions && <div className="rts-band-actions">{actions}</div>}
+      </div>
+      {toolbar && <div className="rts-filter-bar">{toolbar}</div>}
+      <div className="rts-card-body rts-card-body--flush">{children}</div>
+    </section>
+  );
+}
+
 export interface Column<T> {
   key: string;
   header: string;

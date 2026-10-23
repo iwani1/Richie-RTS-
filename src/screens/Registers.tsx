@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import type { ClientInput, DriverInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { CLIENT_STATUSES, DRIVER_STATUSES, type Client, type Driver } from "../tms/types";
-import { Badge, Button, DataTable, EmptyState, Field, PageHeader, Panel, Select, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { Badge, Button, DataTable, EmptyState, Field, PageHeader, Panel, SearchInput, Select, TableCard, TextInput, formatDate, todayYmd } from "../ui/primitives";
 
 type Errors = Record<string, string>;
 
@@ -40,14 +40,23 @@ export function DriversPage() {
         description="Driver register with licence details. Driver assignment to trips arrives with the dispatch module."
         actions={allowed("drivers:create") ? <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add driver</Button> : undefined}
       />
-      <div className="mb-3 flex flex-wrap items-end gap-3">
-        <TextInput className="max-w-xs" placeholder="Search name, phone, licence" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search drivers" />
-        <p className="rts-resultcount" role="status">
-          {rows.length} of {db.drivers.length} driver{db.drivers.length === 1 ? "" : "s"}
-          {expiredCount > 0 && <span className="rts-resultcount-alert"> · {expiredCount} with an expired licence</span>}
-        </p>
-      </div>
-      <DataTable
+      <TableCard
+        title="Driver register"
+        summary={
+          expiredCount > 0
+            ? `${rows.length} of ${db.drivers.length} shown · ${expiredCount} with an expired licence`
+            : `${rows.length} of ${db.drivers.length} shown`
+        }
+        toolbar={
+          <>
+            <SearchInput placeholder="Search name, phone, licence" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search drivers" />
+            <p className="rts-filter-bar-note" role="status">
+              {db.drivers.filter((d) => d.status === "active").length} active · {db.drivers.filter((d) => d.status !== "active").length} inactive or suspended
+            </p>
+          </>
+        }
+      >
+        <DataTable
         rows={rows}
         rowKey={(d) => d.id}
         emptyState={<EmptyState title={db.drivers.length ? "No drivers match" : "No drivers registered"} body="Add drivers with their licence number and expiry date." />}
@@ -73,7 +82,8 @@ export function DriversPage() {
             render: (d) => (allowed("drivers:update") ? <Button variant="ghost" onClick={() => setPanel({ mode: "edit", driver: d })}>Edit</Button> : null),
           },
         ]}
-      />
+        />
+      </TableCard>
       {panel && (
         <DriverForm key={panel.mode === "edit" ? panel.driver.id : "create"} title={panel.mode === "edit" ? `Edit ${panel.driver.fullName}` : "Add driver"} initial={panel.mode === "edit" ? driverToInput(panel.driver) : emptyDriver()} onClose={() => setPanel(null)} onSubmit={handle} />
       )}
@@ -141,10 +151,14 @@ export function ClientsPage() {
         description="Organisations served by staff busing and bus rentals. Contracts, routes and billing attach to these records in later phases."
         actions={allowed("clients:create") ? <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add client</Button> : undefined}
       />
-      <div className="mb-3">
-        <TextInput className="max-w-xs" placeholder="Search client or contact" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search clients" />
-      </div>
-      <DataTable
+      <TableCard
+        title="Client register"
+        summary={`${rows.length} of ${db.clients.length} shown · ${db.clients.filter((c) => c.status === "active").length} active`}
+        toolbar={
+          <SearchInput placeholder="Search client or contact" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search clients" />
+        }
+      >
+        <DataTable
         rows={rows}
         rowKey={(c) => c.id}
         emptyState={<EmptyState title={db.clients.length ? "No clients match" : "No clients yet"} body="Add the organisations you transport staff for or hire vehicles to." />}
@@ -161,7 +175,8 @@ export function ClientsPage() {
             render: (c) => (allowed("clients:update") ? <Button variant="ghost" onClick={() => setPanel({ mode: "edit", client: c })}>Edit</Button> : null),
           },
         ]}
-      />
+        />
+      </TableCard>
       {panel && (
         <ClientForm key={panel.mode === "edit" ? panel.client.id : "create"} title={panel.mode === "edit" ? `Edit ${panel.client.name}` : "Add client"} initial={panel.mode === "edit" ? clientToInput(panel.client) : emptyClient()} onClose={() => setPanel(null)} onSubmit={handle} />
       )}

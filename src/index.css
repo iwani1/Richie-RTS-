@@ -156,6 +156,29 @@ body {
 
 h1, h2, h3, h4 { text-wrap: balance; }
 
+::selection { background: var(--accent-line); color: var(--ink); }
+
+/* thin, quiet scrollbars in the rail and in wide tables — never a chunky OS bar on a card */
+.rts-spine-nav,
+.rts-table-wrap,
+.rts-panel-body,
+.rts-palette-list { scrollbar-width: thin; scrollbar-color: #d7dbe4 transparent; }
+
+.rts-spine-nav::-webkit-scrollbar,
+.rts-table-wrap::-webkit-scrollbar,
+.rts-panel-body::-webkit-scrollbar,
+.rts-palette-list::-webkit-scrollbar { width: 8px; height: 8px; }
+
+.rts-spine-nav::-webkit-scrollbar-thumb,
+.rts-table-wrap::-webkit-scrollbar-thumb,
+.rts-panel-body::-webkit-scrollbar-thumb,
+.rts-palette-list::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: #d7dbe4; background-clip: content-box; }
+
+.rts-spine-nav::-webkit-scrollbar-track,
+.rts-table-wrap::-webkit-scrollbar-track,
+.rts-panel-body::-webkit-scrollbar-track,
+.rts-palette-list::-webkit-scrollbar-track { background: transparent; }
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -299,9 +322,9 @@ h1, h2, h3, h4 { text-wrap: balance; }
   align-items: center;
   gap: 9px;
   width: 100%;
-  padding: 7px 9px;
+  padding: 8px 9px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--ink-2);
   font-family: var(--body);
@@ -355,6 +378,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
   font-size: 10px;
   font-weight: 600;
   line-height: 1.4;
+  font-variant-numeric: tabular-nums;
 }
 
 .rts-nav-badge--warn { background: var(--amber-soft); color: var(--amber-ink); }
@@ -731,7 +755,22 @@ h1, h2, h3, h4 { text-wrap: balance; }
 
 /* ---------- ledger tables ------------------------------------------------------------------------ */
 
-.rts-table-wrap { overflow-x: auto; }
+.rts-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+/* inside a card the table is flush: the card already supplies the edge */
+.rts-card-body--flush .rts-table-wrap,
+.rts-band-body .rts-table-wrap,
+.rts-table-card .rts-table-wrap {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
 
 .rts-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 
@@ -744,18 +783,19 @@ h1, h2, h3, h4 { text-wrap: balance; }
   background: var(--card-2);
   color: var(--muted-2);
   font-family: var(--body);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
   text-align: left;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .rts-table thead th:first-child { padding-left: 16px; }
 .rts-table thead th:last-child { padding-right: 16px; }
 
 .rts-table tbody td {
-  padding: 12px 14px;
+  padding: 13px 14px;
   border-bottom: 1px solid #f0f2f6;
   color: var(--ink-2);
   vertical-align: middle;
@@ -766,6 +806,19 @@ h1, h2, h3, h4 { text-wrap: balance; }
 .rts-table tbody tr:last-child td { border-bottom: 0; }
 .rts-table tbody tr:hover td { background: #fafbfd; }
 .rts-table tbody td:first-child { color: var(--ink); font-weight: 600; }
+
+.rts-table tbody td .rts-badge { vertical-align: middle; }
+
+/* a register sits inside a card, so the header band needs no shadow of its own */
+.rts-table-card thead th { background: var(--card-2); }
+
+.rts-table-card .rts-table-wrap { border-radius: 0 0 14px 14px; }
+
+/* empty states inside a card keep the card's corners clean */
+.rts-table-card .rts-empty { padding: 26px 18px; }
+.rts-table-card .rts-empty h3 { font-size: 14px; }
+
+/* a register with no rows still shows its header, so the columns stay learnable */
 
 .rts-code {
   padding: 2px 5px;
@@ -778,6 +831,10 @@ h1, h2, h3, h4 { text-wrap: balance; }
 }
 
 .rts-mono { font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+.rts-table .rts-num,
+.rts-num { text-align: right; font-variant-numeric: tabular-nums; }
+.rts-table th.rts-num { text-align: right; }
 
 .rts-resultcount { color: var(--muted); font-size: 11.5px; }
 .rts-resultcount-alert { color: var(--red-ink); font-weight: 600; }
@@ -1026,12 +1083,18 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   align-items: flex-end;
   gap: 10px;
   margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
 }
 
-.rts-toolbar > .rts-field { width: 172px; }
+.rts-toolbar > .rts-field { width: 190px; }
 .rts-toolbar > .rts-input { width: auto; }
+.rts-toolbar .rts-input { min-height: 34px; padding-top: 7px; padding-bottom: 7px; font-size: 12px; }
 
-.rts-toolbar-note { margin: 0 0 9px; color: var(--muted); font-size: 11.5px; }
+.rts-toolbar-note { margin: 0 0 9px auto; color: var(--muted); font-size: 11.5px; }
 
 /* ---------- in-flight and start-up ------------------------------------------------------------------------- */
 
@@ -1783,6 +1846,66 @@ select.rts-input option { background: var(--card); color: var(--ink); }
 .rts-statusline--boxed .rts-statusline-cell span { font-size: 9.5px; letter-spacing: 0.01em; }
 
 
+
+/* ---------- search control ------------------------------------------------------------------- */
+
+.rts-search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 240px;
+  max-width: 320px;
+}
+
+.rts-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.rts-search-input {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px 7px 31px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 12px;
+  line-height: 1.45;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.rts-search-input::placeholder { color: var(--muted); opacity: 0.9; }
+
+.rts-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.rts-search-input::-webkit-search-cancel-button { appearance: none; }
+
+/* the filter row inside a register card -------------------------------------------------------- */
+
+.rts-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+
+.rts-filter-bar .rts-input { min-height: 34px; padding-top: 7px; padding-bottom: 7px; font-size: 12px; }
+.rts-filter-bar > .rts-field { width: 190px; }
+.rts-filter-bar > .rts-field > .rts-label { display: none; }
+.rts-filter-bar-note { margin: 0 0 0 auto; color: var(--muted); font-size: 11px; }
+
 /* ==========================================================================================================
    Responsive
    ========================================================================================================== */
@@ -1858,6 +1981,9 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   .rts-run { grid-template-columns: 56px minmax(0, 1fr); row-gap: 6px; padding: 12px 14px; }
   .rts-runs-head { display: none; }
   .rts-statusline--boxed { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rts-filter-bar { padding: 11px 14px; }
+  .rts-search { max-width: none; }
+  .rts-filter-bar-note { margin-left: 0; width: 100%; }
   .rts-donut { gap: 14px; }
   .rts-run-time { grid-row: 1 / span 2; align-self: start; }
   .rts-run-route { grid-column: 2; }

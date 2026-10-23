@@ -3,7 +3,7 @@ import { PASSWORD_MIN_LENGTH, type UserInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { ROLES, ROLE_LABELS, type User } from "../tms/types";
 import { ROLE_PERMISSIONS } from "../tms/permissions";
-import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, TextInput, formatDateTime } from "../ui/primitives";
+import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, TableCard, TextInput, formatDateTime } from "../ui/primitives";
 
 type Errors = Record<string, string>;
 type PanelState = { mode: "create" } | { mode: "edit"; user: User } | { mode: "reset"; user: User } | null;
@@ -40,6 +40,10 @@ export function UsersPage() {
         actions={allowed("users:create") ? <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add user</Button> : undefined}
       />
 
+      <TableCard
+        title="Accounts"
+        summary={`${db.users.length} account${db.users.length === 1 ? "" : "s"} · ${db.users.filter((u) => u.active).length} active · ${db.users.filter((u) => u.role === "administrator").length} administrator${db.users.filter((u) => u.role === "administrator").length === 1 ? "" : "s"}`}
+      >
       <DataTable
         rows={[...db.users].sort((a, b) => a.fullName.localeCompare(b.fullName))}
         rowKey={(u) => u.id}
@@ -64,6 +68,7 @@ export function UsersPage() {
           },
         ]}
       />
+      </TableCard>
 
       <Band label="Role permissions" note="resource:action strings enforced by the service layer. All Phase 1A permissions are company-scoped.">
         <div className="overflow-x-auto">

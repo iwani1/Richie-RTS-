@@ -246,7 +246,7 @@ function Shell() {
         <div className="rts-workspace">
           <i aria-hidden="true" />
           {actor ? ROLE_LABELS[actor.role] : "Signed in"}
-          <small>live</small>
+          <small>signed in</small>
         </div>
 
         <nav className="rts-spine-nav" aria-label="Sections">
@@ -269,7 +269,13 @@ function Shell() {
                       <Icon name={ROUTE_ICONS[item.route]} className="rts-nav-icon" />
                       <span className="rts-nav-name">{item.label}</span>
                       {count > 0 && (
-                        <span className={cn("rts-nav-badge", item.route === "compliance" && "rts-nav-badge--alert", item.route !== "compliance" && "rts-nav-badge--warn")}>
+                        <span
+                          className={cn(
+                            "rts-nav-badge",
+                            item.route === "compliance" && "rts-nav-badge--alert",
+                            item.route === "fleetReadiness" && "rts-nav-badge--warn",
+                          )}
+                        >
                           {count}
                         </span>
                       )}

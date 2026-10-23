@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { readinessReport, type OdometerInput, type ReadinessStatus } from "../tms/maintenance";
 import type { OdometerReading } from "../tms/types";
 import { useTms } from "../tms/useTms";
-import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 
 type Tab = "readiness" | "odometer";
 type Errors = Record<string, string>;
@@ -174,12 +174,17 @@ function OdometerTab() {
 
   return (
     <div className="space-y-4">
-      <Notice tone="info">
-        Odometer readings are the km input for readiness. They are recorded by hand; this build does not read a vehicle telematics feed (not configured).
-      </Notice>
-      <div className="flex justify-end">
-        {allowed("fleet:record") && <Button variant="primary" disabled={vehicles.length === 0} title={vehicles.length === 0 ? "All vehicles are retired or none exist" : undefined} onClick={() => setPanel("record")}>Record reading</Button>}
-      </div>
+      <TableCard
+        title="Odometer readings"
+        summary={`${rows.length} reading${rows.length === 1 ? "" : "s"} · recorded by hand, not from a telematics feed · ${rows.filter((r) => r.status === "current").length} current`}
+        actions={
+          allowed("fleet:record") ? (
+            <Button variant="primary" disabled={vehicles.length === 0} title={vehicles.length === 0 ? "All vehicles are retired or none exist" : undefined} onClick={() => setPanel("record")}>
+              Record reading
+            </Button>
+          ) : undefined
+        }
+      >
       <DataTable
         rows={rows}
         rowKey={(reading) => reading.id}
@@ -187,7 +192,7 @@ function OdometerTab() {
         columns={[
           { key: "vehicle", header: "Vehicle", render: (reading) => db.vehicles.find((v) => v.id === reading.vehicleId)?.registration ?? "Unknown" },
           { key: "date", header: "Date", render: (reading) => formatDate(reading.readingDate) },
-          { key: "km", header: "Reading", render: (reading) => <span className="tabular-nums font-semibold">{reading.readingKm} km</span> },
+          { key: "km", header: "Reading", className: "rts-num", render: (reading) => <span className="tabular-nums font-semibold">{reading.readingKm} km</span> },
           { key: "note", header: "Note", render: (reading) => reading.note || <span className="text-stone-400">-</span> },
           { key: "by", header: "Recorded by", render: (reading) => <span className="text-xs">{reading.createdBy}</span> },
           {
@@ -207,7 +212,8 @@ function OdometerTab() {
             render: (reading) => (reading.status === "current" && allowed("fleet:void") ? <Button variant="danger" onClick={() => setVoidTarget(reading)}>Void</Button> : null),
           },
         ]}
-      />
+        />
+      </TableCard>
 
       {panel === "record" && <OdometerForm onClose={() => setPanel(null)} />}
       {voidTarget && (

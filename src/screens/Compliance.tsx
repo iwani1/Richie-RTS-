@@ -14,6 +14,7 @@ import {
   Panel,
   Select,
   Stat,
+  TableCard,
   TextArea,
   TextInput,
   formatDate,
@@ -96,27 +97,35 @@ export function CompliancePage() {
         <Stat label="Total recorded" value={counts.total} caption="vehicle and driver documents" />
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-2">
-          <Select className="max-w-[160px]" value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value as OwnerFilter)} aria-label="Filter by owner type">
-            <option value="all">All owners</option>
-            <option value="vehicle">Vehicles</option>
-            <option value="driver">Drivers</option>
-          </Select>
-          <Select className="max-w-[180px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} aria-label="Filter by status">
-            <option value="all">All statuses</option>
-            <option value="expired">Expired</option>
-            <option value="expiring_soon">Expiring soon</option>
-            <option value="valid">Valid</option>
-          </Select>
-        </div>
-        {allowed("documents:create") && (
-          <Button variant="primary" disabled={!typesConfigured} onClick={() => setPanel({ mode: "create" })}>
-            Record a document
-          </Button>
-        )}
-      </div>
-
+      <TableCard
+        title="Document register"
+        summary={`${rows.length} of ${counts.total} shown · ${counts.expired} expired · ${counts.valid} valid`}
+        actions={
+          allowed("documents:create") ? (
+            <Button variant="primary" disabled={!typesConfigured} onClick={() => setPanel({ mode: "create" })}>
+              Record a document
+            </Button>
+          ) : undefined
+        }
+        toolbar={
+          <>
+            <Select className="max-w-[160px]" value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value as OwnerFilter)} aria-label="Filter by owner type">
+              <option value="all">All owners</option>
+              <option value="vehicle">Vehicles</option>
+              <option value="driver">Drivers</option>
+            </Select>
+            <Select className="max-w-[180px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} aria-label="Filter by status">
+              <option value="all">All statuses</option>
+              <option value="expired">Expired</option>
+              <option value="expiring_soon">Expiring soon</option>
+              <option value="valid">Valid</option>
+            </Select>
+            <p className="rts-filter-bar-note" role="status">
+              {leadDays === null ? "No reminder lead time set" : `Expiring soon means within ${leadDays} day${leadDays === 1 ? "" : "s"}`}
+            </p>
+          </>
+        }
+      >
       <DataTable
         rows={rows}
         rowKey={(r) => r.doc.id}
@@ -145,7 +154,8 @@ export function CompliancePage() {
             render: (r) => (allowed("documents:update") ? <Button variant="ghost" onClick={() => setPanel({ mode: "edit", doc: r.doc })}>Edit</Button> : null),
           },
         ]}
-      />
+        />
+      </TableCard>
 
       {panel?.mode === "create" && <CreateDocumentForm onClose={() => setPanel(null)} onSubmit={async (input) => dispatch({ type: "create_document", input })} notify={setFlash} onClosed={() => setPanel(null)} />}
       {panel?.mode === "edit" && (
