@@ -39,6 +39,9 @@ const placeholder = /change-me|replace-me|example\.com/i;
 // POSTGRES_PASSWORD only matters when a container creates the database from it. Whether the pair
 // actually works is decided by the connection test below, not by comparing two strings.
 let passwordMismatch = false;
+// Tracks the one condition that makes the application's own health check fail for a known reason,
+// so it is reported once rather than as two unrelated problems.
+let schemaMissing = false;
 
 if (!existsSync(".env")) {
   add("fail", ".env is missing", ["Run: cp .env.example .env", "Then fill in DATABASE_URL, SESSION_SECRET and POSTGRES_PASSWORD."]);
@@ -133,7 +136,11 @@ if (!databaseUrl) {
     add("ok", `Connected: ${version.split(",")[0]}`);
     const hasMigrations = (await client.query("select count(*)::int as n from information_schema.tables where table_name = 'schema_migrations'")).rows[0].n as number;
     if (hasMigrations === 0) {
-      add("fail", "The schema has not been created in this database", ["Run: npm run db:migrate"]);
+      schemaMissing = true;
+      add("fail", "The schema has not been created in this database", [
+        "Run: npm run db:migrate        (creates the tables, constraints and triggers)",
+        "Then: ./run.sh start           (restart the app so it picks the schema up)",
+      ]);
     } else {
       const applied = (await client.query("select version from schema_migrations order by version")).rows.map((r) => r.version as string);
       const users = (await client.query("select count(*)::int as n from app_user")).rows[0].n as number;
@@ -219,7 +226,13 @@ if (connected) {
 const health = run("curl", ["-sS", "--max-time", "3", "http://localhost:3000/api/health"]);
 if (health === null) add("info", "The application is not running on port 3000", ["Start it: ./run.sh start"]);
 else if (health.includes('"ok":true')) add("ok", "The application answers /api/health with ok:true");
-else add("fail", `The application is running but unhealthy: ${health.slice(0, 200)}`);
+else if (schemaMissing || /schema_migrations|relation .* does not exist/.test(health)) {
+  // Expected while the schema is missing: same cause as the row above, not a second problem.
+  add("info", "The running app reports the missing schema (it will recover once migrated)", [
+    "Its own answer: " + health.slice(0, 160),
+    "No restart is needed; the health check reads the database on every request.",
+  ]);
+} else add("fail", `The application is running but unhealthy: ${health.slice(0, 200)}`);
 
 // ------------------------------------------------------------------ report
 const icon: Record<Level, string> = { ok: "✓", warn: "!", fail: "✗", info: "·" };

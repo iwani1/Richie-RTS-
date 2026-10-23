@@ -18,6 +18,8 @@ The application now runs as the brief specifies: Next.js + PostgreSQL, with auth
 - Scripts: `db:migrate`, `db:seed` (three locks; no default password), `db:reset`, `db:backup`,
   `db:restore`.
 - `docs/SETUP_AND_DEPLOYMENT.md` (Fedora run book), `run.sh`, `docker-compose.yml`, `.env.example`.
+- `npm run doctor` reports a missing schema once, with the two commands that fix it, instead of
+  also flagging the application's health check as a second, unrelated problem.
 - `npm run doctor` / `./run.sh doctor`: reads the configuration, the container state, who holds
   the database port, the live connection and the applied migrations, and names the fix for the
   first thing that is wrong. `./run.sh db-reset-container` clears an orphaned Podman
