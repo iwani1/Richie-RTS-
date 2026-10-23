@@ -574,6 +574,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 .rts-sheet-meta { display: flex; align-items: center; gap: 10px; margin-left: auto; padding-top: 2px; }
 
 .rts-stamp {
+  flex: 0 0 auto;
   padding: 5px 9px;
   border-radius: 20px;
   background: var(--accent-soft);
@@ -581,7 +582,11 @@ h1, h2, h3, h4 { text-wrap: balance; }
   font-family: var(--body);
   font-size: 11px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
+
+.rts-stamp--warn { background: var(--amber-soft); color: var(--amber-ink); }
 
 /* ---------- cards and bands -------------------------------------------------------------------- */
 

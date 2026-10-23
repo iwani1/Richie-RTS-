@@ -330,10 +330,11 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
             <div className="rts-card-head">
               <div className="rts-head-text">
                 <h2 id="attention-heading" className="rts-card-title">Needs attention</h2>
-                <p className="rts-card-desc">
-                  {attention.length === 0 ? "Nothing outstanding" : `${attention.length} item${attention.length === 1 ? "" : "s"}`}
-                </p>
+                <p className="rts-card-desc">Everything below is counted from records on this screen.</p>
               </div>
+              <span className={attention.length === 0 ? "rts-stamp" : "rts-stamp rts-stamp--warn"}>
+                {attention.length === 0 ? "All clear" : `${attention.length} item${attention.length === 1 ? "" : "s"}`}
+              </span>
             </div>
             <div className="rts-card-body">
               {attention.length === 0 ? (

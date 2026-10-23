@@ -55,10 +55,23 @@ export function SettingsPage() {
 
       <section className="rts-band" aria-labelledby="rules-heading">
         <div className="rts-band-label">
-          <h2 id="rules-heading" className="rts-band-title">Rules to supply</h2>
-          <p className="rts-band-note">Straight from the saved record. A rule counts only once it is stored.</p>
+          <div className="rts-head-text">
+            <h2 id="rules-heading" className="rts-band-title">Rules to supply</h2>
+            <p className="rts-band-note">Straight from the saved record. A rule counts only once it is stored.</p>
+          </div>
+          <span className={setup.complete ? "rts-stamp" : "rts-stamp rts-stamp--warn"}>
+            {setup.done} of {setup.items.length} set
+          </span>
         </div>
         <div className="rts-band-body">
+          <div className="rts-progress" role="img" aria-label={`${setup.done} of ${setup.items.length} rules supplied`}>
+            <span className="rts-progress-fill" style={{ width: `${setup.percent}%` }} />
+          </div>
+          <p className="rts-progress-caption">
+            {setup.complete
+              ? "Every rule this build needs is stored."
+              : `${setup.outstanding} rule${setup.outstanding === 1 ? "" : "s"} still missing — dependent features stay blocked until they are supplied.`}
+          </p>
           <ul className="rts-rules">
             {setup.items.map((item) => (
               <li key={item.key} className="rts-rule">
