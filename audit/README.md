@@ -10,6 +10,7 @@ Independent security and code-quality review of
 |---|---|
 | an engineering lead | [`AUDIT-REPORT.md`](AUDIT-REPORT.md) §1, §4 (findings table), §9 (plan) |
 | a security reviewer | `AUDIT-REPORT.md` §4 in full, then [`findings.json`](findings.json) |
+| comparing the two demos | [`DEMO-COMPARISON.md`](DEMO-COMPARISON.md) — feature-by-feature against the briefs |
 | implementing fixes | [`patches/`](patches/) — six verified patches, apply in order |
 | setting up the repository properly | [`templates/`](templates/) — `.gitignore`, `SECURITY.md`, README snippet |
 | checking my work | [`evidence/toolchain.txt`](evidence/toolchain.txt) — every command used |
@@ -27,6 +28,7 @@ Six concrete defects or governance gaps are fixable now and patched here; the re
 ```
 audit/
 ├── AUDIT-REPORT.md      main deliverable: summary, findings, architecture, tests, plan, patches
+├── DEMO-COMPARISON.md   demo 1 vs demo 2 measured against the standing brief and phase prompts
 ├── findings.json        machine-readable: target, metrics, scorecard, 21 findings, plan
 ├── README.md            this file
 ├── patches/             6 verified patches + apply instructions
