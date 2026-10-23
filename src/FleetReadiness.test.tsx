@@ -90,8 +90,9 @@ describe("Fleet readiness end-to-end (jsdom)", () => {
     expect(await screen.findByText(/Odometer recorded at 130500 km/i)).toBeTruthy();
     expect(screen.getByText("130500 km")).toBeTruthy();
 
-    // The dashboard surfaces the overdue condition.
+    // The dashboard surfaces the overdue condition. The 2026 redesign replaced the old notice
+    // with an exception row on the operations board; the promise is the same, the wording is new.
     fireEvent.click(screen.getByRole("button", { name: /Setup and overview/i }));
-    expect(await screen.findByText(/Service schedules need attention/i)).toBeTruthy();
+    expect(await screen.findByText(/vehicle past service interval/i)).toBeTruthy();
   }, 30000);
 });

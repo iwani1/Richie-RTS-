@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BriefDesk } from "./docs/BriefDesk";
 import { AuditPage } from "./screens/Audit";
 import { SetupPage, SignInPage } from "./screens/Auth";
@@ -19,6 +19,8 @@ import { NAV_ITEMS, type Route } from "./routes";
 import { ROLE_LABELS } from "./tms/types";
 import { TmsContext, useTms, useTmsState } from "./tms/useTms";
 import { Button, Notice } from "./ui/primitives";
+import { CommandPalette } from "./ui/CommandPalette";
+import { Icon, type IconName } from "./ui/icons";
 import { cn } from "./utils/cn";
 
 const NAV_GROUPS: { label: string; routes: Route[] }[] = [
@@ -28,6 +30,26 @@ const NAV_GROUPS: { label: string; routes: Route[] }[] = [
   { label: "Administration", routes: ["users", "settings", "audit"] },
   { label: "Archive", routes: ["documents"] },
 ];
+
+const ROUTE_ICONS: Record<Route, IconName> = {
+  dashboard: "dashboard",
+  rentals: "rental",
+  busing: "busing",
+  logistics: "logistics",
+  fleetReadiness: "readiness",
+  compliance: "compliance",
+  vehicles: "vehicle",
+  drivers: "driver",
+  clients: "client",
+  users: "user",
+  settings: "settings",
+  audit: "audit",
+  documents: "archive",
+  driver_portal: "busing",
+  client_portal: "client",
+};
+
+const COLLAPSE_KEY = "rts.rail.collapsed";
 
 function initialsOf(name: string | undefined): string {
   if (!name) return "RT";
@@ -98,6 +120,17 @@ function Shell() {
   const bound = actor ? isRecordBound(actor.role) : false;
   const [requestedRoute, setRoute] = useState<Route>(portalRoute ?? "dashboard");
   const [navOpen, setNavOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // The rail starts expanded: names beat icons for someone who opens this twice a week. It collapses
+  // to an icon strip when a wide table needs the width, and that choice is remembered.
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(COLLAPSE_KEY) === "true";
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem(COLLAPSE_KEY, String(collapsed));
+  }, [collapsed]);
 
   const items =
     bound && portalRoute
@@ -113,6 +146,23 @@ function Shell() {
     setNavOpen(false);
     window.scrollTo({ top: 0 });
   };
+
+  const openPalette = useCallback(() => setPaletteOpen(true), []);
+
+  // ⌘K on a Mac, Ctrl-K everywhere else. Ignored while typing in a field so a stray shortcut never
+  // steals a keystroke from a form.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.key === "k" || event.key === "K")) return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      event.preventDefault();
+      setPaletteOpen(true);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   if (route === "documents") return <BriefDesk onExit={() => navigate("dashboard")} />;
 
@@ -142,9 +192,12 @@ function Shell() {
       .filter((item): item is (typeof items)[number] => Boolean(item)),
   })).filter((group) => group.items.length > 0);
 
-  const activeLabel = items.find((i) => i.route === route)?.label ?? "Dashboard";
+  const activeItem = items.find((i) => i.route === route);
+  const activeLabel = activeItem?.label ?? "Operations board";
   const today = new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
-  // Running ledger numbers per visible group, computed without mutating during render.
+
+  // Running index numerals per visible group, computed without mutating during render: the rail
+  // reads as a ledger tab index (01…14) rather than a list of links.
   const numberedGroups = visibleGroups.reduce<{ label: string; items: { item: (typeof items)[number]; index: number }[] }[]>(
     (acc, group) => {
       const start = acc.reduce((total, prior) => total + prior.items.length, 0);
@@ -154,7 +207,9 @@ function Shell() {
   );
 
   return (
-    <div className="rts-shell">
+    <div className={cn("rts-shell", collapsed && "is-collapsed")}>
+      <a className="rts-skip" href="#main-content">Skip to content</a>
+
       {navOpen && <button type="button" className="rts-scrim-mobile" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
 
       <aside className={cn("rts-rail", navOpen && "is-open")} aria-label="Workspace navigation">
@@ -170,6 +225,20 @@ function Shell() {
           </div>
         </div>
 
+        <div className="rts-rail-tools">
+          <button
+            type="button"
+            className="rts-rail-toggle"
+            onClick={() => setCollapsed((value) => !value)}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+            title={collapsed ? "Expand navigation" : "Collapse navigation (more room for tables)"}
+          >
+            <Icon name="chevron" className={cn("rts-rail-toggle-icon", !collapsed && "is-flipped")} />
+            <span className="rts-rail-toggle-text">Collapse</span>
+          </button>
+        </div>
+
         <nav className="rts-nav" aria-label="Main">
           {numberedGroups.map((group) => (
             <div className="rts-nav-group" key={group.label}>
@@ -183,8 +252,10 @@ function Shell() {
                     onClick={() => navigate(item.route)}
                     aria-current={active ? "page" : undefined}
                     className="rts-nav-item"
+                    title={collapsed ? `${item.label} — ${item.caption}` : undefined}
                   >
                     <span className="rts-nav-index" aria-hidden="true">{String(index).padStart(2, "0")}</span>
+                    <Icon name={ROUTE_ICONS[item.route]} className="rts-nav-icon" />
                     <span className="rts-nav-copy">
                       <strong>{item.label}</strong>
                       <small>{item.caption}</small>
@@ -197,8 +268,8 @@ function Shell() {
         </nav>
 
         <div className="rts-rail-foot">
-          <div className="rts-rail-note">
-            <span aria-hidden="true">▣</span> LOCAL LEDGER · NO SERVER
+          <div className="rts-rail-note" title="Records live in PostgreSQL on the application server. The browser holds a redacted copy of what your role may see.">
+            <i aria-hidden="true" /> Server ledger · PostgreSQL
           </div>
           <div className="rts-user">
             <div className="rts-avatar" aria-hidden="true">{initialsOf(actor?.fullName)}</div>
@@ -225,13 +296,12 @@ function Shell() {
             </div>
           </div>
           <div className="rts-top-right">
+            <button type="button" className="rts-palette-trigger" onClick={openPalette} aria-keyshortcuts="Control+K Meta+K">
+              <Icon name="search" className="rts-palette-trigger-icon" />
+              <span className="rts-palette-trigger-text">Jump to a screen</span>
+              <kbd className="rts-kbd">Ctrl K</kbd>
+            </button>
             <span className="rts-date">{today}</span>
-            <span
-              className="rts-chip"
-              title="Records are stored in PostgreSQL on the application server. The browser holds only a redacted copy of the data you are allowed to see."
-            >
-              <i aria-hidden="true" /> Server ledger · PostgreSQL
-            </span>
           </div>
         </header>
 
@@ -245,13 +315,17 @@ function Shell() {
               </div>
             )}
             {page}
-            <footer className="mt-10 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--rts-line-strong)] pt-3 font-mono text-[8px] uppercase tracking-[0.14em] text-[#7d8375]">
-              <span>Richie Transport Services · Operations Ledger</span>
-              <span>Server ledger · PostgreSQL · audit-logged</span>
+            <footer className="rts-provenance">
+              <span>Richie Transport Services · Operations ledger</span>
+              <span>Every change is attributed and audit-logged</span>
             </footer>
           </div>
         </main>
       </div>
+
+      {paletteOpen && (
+        <CommandPalette onClose={() => setPaletteOpen(false)} onNavigate={navigate} allowed={allowed} />
+      )}
     </div>
   );
 }

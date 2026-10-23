@@ -1,7 +1,17 @@
 import { useTms } from "../tms/useTms";
 import { readinessReport } from "../tms/maintenance";
-import { RENTAL_STATUS_LABELS, RENTAL_STATUSES, ROLE_LABELS, VEHICLE_STATUS_LABELS, VEHICLE_STATUSES } from "../tms/types";
-import { Badge, Button, Card, Notice, Stat, todayYmd } from "../ui/primitives";
+import {
+  DIRECTION_LABELS,
+  RENTAL_STATUS_LABELS,
+  RENTAL_STATUSES,
+  ROLE_LABELS,
+  TRIP_STATUS_LABELS,
+  VEHICLE_STATUS_LABELS,
+  VEHICLE_STATUSES,
+  type Trip,
+} from "../tms/types";
+import { Badge, Button, todayYmd } from "../ui/primitives";
+import { Icon } from "../ui/icons";
 import type { Route } from "../routes";
 
 function money(amount: number, currency: string | null) {
@@ -13,38 +23,25 @@ function money(amount: number, currency: string | null) {
   }
 }
 
-function RentalsSummary() {
-  const { db } = useTms();
-  const rentals = db.rentals;
-  const completed = rentals.filter((r) => r.status === "completed" && r.finalInvoice);
-  const billed = completed.reduce((sum, r) => sum + (r.finalInvoice?.total ?? 0), 0);
-  const depositsHeld = rentals.filter((r) => (r.status === "confirmed" || r.status === "in_progress") && r.deposit).reduce((sum, r) => sum + (r.deposit?.amount ?? 0), 0);
-  const currency = db.settings.currencyCode;
-
-  return (
-    <Card title="Bus rentals summary" description="Counts all rentals; money figures sum only amounts actually recorded. Not a profit or margin figure.">
-      <div className="mb-4 grid gap-2 sm:grid-cols-3">
-        <Stat label="Completed (billed)" value={money(billed, currency)} caption={`${completed.length} completed rental${completed.length === 1 ? "" : "s"}`} />
-        <Stat label="Deposits held (active)" value={money(depositsHeld, currency)} caption="Confirmed / in-progress" />
-        <Stat label="Total requests" value={rentals.length} caption={`${rentals.filter((r) => ["draft", "quoted"].includes(r.status)).length} awaiting confirmation`} />
-      </div>
-      <div className="grid gap-2 sm:grid-cols-4">
-        {RENTAL_STATUSES.map((s) => (
-          <div key={s} className="rounded-sm bg-stone-50 px-3 py-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">{RENTAL_STATUS_LABELS[s]}</p>
-            <p className="text-lg font-semibold text-stone-900">{rentals.filter((r) => r.status === s).length}</p>
-          </div>
-        ))}
-      </div>
-      {!currency && rentals.length > 0 && <p className="mt-3 text-xs text-amber-700">Billing currency is not set, so amounts are shown without a currency symbol.</p>}
-    </Card>
-  );
+/** First scheduled stop of a trip's route — the time a dispatcher actually looks for. */
+function departureTime(trip: Trip, startTimes: Map<string, string>): string {
+  return startTimes.get(trip.routeId) ?? "";
 }
 
+/**
+ * The operations board: what is wrong today, then today's departures, then the state of the fleet
+ * and the one thing only management can fix (unset business rules).
+ *
+ * Deliberately not a KPI dashboard. A count of "12 vehicles" changes no decision; "3 services
+ * overdue · 1 licence expired · 2 rentals unconfirmed" is the morning's work list. Charts are absent
+ * because this installation has no history to chart yet — RPT-02/RPT-03 remain open (docs/KPIS.md).
+ */
 export function DashboardPage({ navigate }: { navigate: (route: Route) => void }) {
   const { db, actor, allowed } = useTms();
   const s = db.settings;
+  const today = todayYmd();
 
+  // ---- setup checklist ------------------------------------------------------------------------
   const checklist = [
     { label: "Company name", done: !!s.companyName },
     { label: "Billing currency", done: !!s.currencyCode },
@@ -53,104 +50,361 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
     { label: "On-time threshold (minutes)", done: s.onTimeThresholdMinutes !== null },
   ];
   const outstanding = checklist.filter((c) => !c.done).length;
-  const today = todayYmd();
-  const expiredLicences = db.drivers.filter((d) => d.status === "active" && d.licenceExpiry < today).length;
+  const done = checklist.length - outstanding;
+
+  // ---- exceptions ------------------------------------------------------------------------------
+  const expiredLicences = db.drivers.filter((d) => d.status === "active" && d.licenceExpiry < today);
   const readiness = readinessReport(db, today);
+  const awaitingConfirmation = db.rentals.filter((r) => r.status === "draft" || r.status === "quoted");
+  const depositsHeld = db.rentals
+    .filter((r) => (r.status === "confirmed" || r.status === "in_progress") && r.deposit)
+    .reduce((sum, r) => sum + (r.deposit?.amount ?? 0), 0);
+  const billed = db.rentals
+    .filter((r) => r.status === "completed" && r.finalInvoice)
+    .reduce((sum, r) => sum + (r.finalInvoice?.total ?? 0), 0);
+
+  // ---- today's work ----------------------------------------------------------------------------
+  const startTimes = new Map<string, string>(
+    db.routes.map((route) => {
+      const first = [...route.stops].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))[0];
+      return [route.id, first?.scheduledTime ?? ""];
+    }),
+  );
+  const todaysTrips = db.trips
+    .filter((trip) => trip.serviceDate === today && trip.status !== "cancelled")
+    .sort((a, b) => departureTime(a, startTimes).localeCompare(departureTime(b, startTimes)));
+  const undispatched = todaysTrips.filter((trip) => trip.status === "planned");
+
+  const vehiclesById = new Map(db.vehicles.map((v) => [v.id, v]));
+  const driversById = new Map(db.drivers.map((d) => [d.id, d]));
+  const routesById = new Map(db.routes.map((r) => [r.id, r]));
+
+  // Everything the operator must act on, in one list. Empty rows are omitted, never zero-filled.
+  const attention: { key: string; label: string; detail: string; count: number; tone: "error" | "warning" | "info"; action?: Route }[] = [];
+  if (allowed("drivers:read") && expiredLicences.length > 0) {
+    attention.push({
+      key: "licences",
+      label: `${expiredLicences.length} driver licence${expiredLicences.length === 1 ? "" : "s"} expired`,
+      detail: expiredLicences.map((d) => d.fullName).slice(0, 3).join(", "),
+      count: expiredLicences.length,
+      tone: "error",
+      action: allowed("drivers:read") ? "drivers" : undefined,
+    });
+  }
+  if (allowed("fleet:read") && readiness.counts.overdue > 0) {
+    attention.push({
+      key: "overdue",
+      label: `${readiness.counts.overdue} vehicle${readiness.counts.overdue === 1 ? "" : "s"} past service interval`,
+      detail: "Scheduled maintenance is overdue as of today.",
+      count: readiness.counts.overdue,
+      tone: "error",
+      action: "fleetReadiness",
+    });
+  }
+  if (allowed("fleet:read") && readiness.counts.due > 0) {
+    attention.push({
+      key: "due",
+      label: `${readiness.counts.due} service${readiness.counts.due === 1 ? "" : "s"} due soon`,
+      detail: "Within the configured lead time for its category.",
+      count: readiness.counts.due,
+      tone: "warning",
+      action: "fleetReadiness",
+    });
+  }
+  if (allowed("rentals:read") && awaitingConfirmation.length > 0) {
+    attention.push({
+      key: "rentals",
+      label: `${awaitingConfirmation.length} rental${awaitingConfirmation.length === 1 ? "" : "s"} awaiting confirmation`,
+      detail: "Draft or quoted — no vehicle is held until confirmed.",
+      count: awaitingConfirmation.length,
+      tone: "info",
+      action: "rentals",
+    });
+  }
+  if (undispatched.length > 0) {
+    attention.push({
+      key: "dispatch",
+      label: `${undispatched.length} of today's ${todaysTrips.length} trip${todaysTrips.length === 1 ? "" : "s"} not dispatched`,
+      detail: "A planned trip has no departure recorded yet.",
+      count: undispatched.length,
+      tone: "warning",
+      action: "busing",
+    });
+  }
+  if (allowed("settings:read") && outstanding > 0) {
+    attention.push({
+      key: "settings",
+      label: `${outstanding} business rule${outstanding === 1 ? "" : "s"} still unset`,
+      detail: "Dependent features stay blocked until management supplies them.",
+      count: outstanding,
+      tone: "info",
+      action: allowed("settings:update") ? "settings" : undefined,
+    });
+  }
+
   const canSeeMaster = allowed("vehicles:read") || allowed("drivers:read") || allowed("clients:read");
+  const go = (route: Route | undefined) => (route ? () => navigate(route) : undefined);
 
   return (
-    <div className="space-y-6">
-      <div className="rts-page-head">
+    <div className="rts-screen">
+      {/* ---- sheet masthead ---------------------------------------------------------------- */}
+      <header className="rts-sheet-head">
         <div className="min-w-0">
-          <p className="rts-eyebrow">Operations desk</p>
+          <p className="rts-eyebrow">Operations board · {today}</p>
           <h1 className="rts-title">{s.companyName ?? "Richie Transport Services"}</h1>
           <p className="rts-page-desc">
-            Signed in as {actor?.fullName} — {actor ? ROLE_LABELS[actor.role] : ""}. Staff busing, rentals and fleet
-            logistics on one ledger.
+            {actor?.fullName} — {actor ? ROLE_LABELS[actor.role] : ""}. What needs attention today, then
+            today&apos;s departures and the state of the fleet.
           </p>
         </div>
-        <div className="rts-page-actions">
-          <span className="rts-stamp">Active ledger</span>
+        <div className="rts-sheet-meta">
+          <span className="rts-stamp">{todaysTrips.length} departures today</span>
+          <button type="button" className="rts-link" onClick={() => navigate("busing")}>
+            Open dispatch <Icon name="chevron" className="rts-link-icon" />
+          </button>
         </div>
-      </div>
+      </header>
 
       {!canSeeMaster && (
-        <Notice tone="info" title="No screens are enabled for your role yet">
-          The {actor ? ROLE_LABELS[actor.role] : ""} role will gain record-scoped features (trips, boarding, bookings) in later phases. Nothing is hidden behind this message - there is simply nothing to show yet.
-        </Notice>
-      )}
-
-      {allowed("settings:read") && (
-        <Card
-          title="Setup status"
-          description="Business rules the company must supply. None has a default; dependent features stay blocked until these are set."
-          actions={allowed("settings:update") ? <Button onClick={() => navigate("settings")}>Open settings</Button> : undefined}
-        >
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {checklist.map((item) => (
-              <li key={item.label} className="flex items-center justify-between gap-3 border border-[var(--rts-line)] bg-[#fffdf6] px-3 py-2 text-sm">
-                <span className="text-stone-700">{item.label}</span>
-                <Badge tone={item.done ? "success" : "warning"}>{item.done ? "Set" : "Not set"}</Badge>
-              </li>
-            ))}
-          </ul>
-          {outstanding > 0 && (
-            <p className="mt-3 text-xs text-stone-500">
-              {outstanding} of {checklist.length} required settings still need a value from management. See docs/OPEN_QUESTIONS.md.
-            </p>
-          )}
-        </Card>
-      )}
-
-      {canSeeMaster && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {allowed("vehicles:read") && <Stat label="Vehicles" value={db.vehicles.length} caption={`${db.vehicles.filter((v) => v.status === "available").length} available`} />}
-          {allowed("drivers:read") && <Stat label="Drivers" value={db.drivers.length} caption={`${db.drivers.filter((d) => d.status === "active").length} active`} />}
-          {allowed("clients:read") && <Stat label="Corporate clients" value={db.clients.length} caption={`${db.clients.filter((c) => c.status === "active").length} active`} />}
-          {allowed("rentals:read") && <Stat label="Rentals" value={db.rentals.length} caption={`${db.rentals.filter((r) => r.status === "in_progress").length} in progress`} />}
-          {allowed("users:read") && <Stat label="User accounts" value={db.users.length} caption={`${db.users.filter((u) => u.active).length} active`} />}
+        <div className="rts-notice rts-notice--info" role="status">
+          <p className="rts-notice-title">No screens are enabled for your role yet</p>
+          The {actor ? ROLE_LABELS[actor.role] : ""} role gains record-scoped features (trips, boarding,
+          bookings) in later phases. Nothing is hidden behind this message — there is simply nothing to show yet.
         </div>
       )}
 
-      {allowed("vehicles:read") && db.vehicles.length > 0 && (
-        <Card title="Fleet by status">
-          <div className="grid gap-2 sm:grid-cols-4">
-            {VEHICLE_STATUSES.map((status) => (
-              <div key={status} className="rounded-sm bg-stone-50 px-3 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">{VEHICLE_STATUS_LABELS[status]}</p>
-                <p className="text-lg font-semibold text-stone-900">{db.vehicles.filter((v) => v.status === status).length}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      {/* ---- band 1: what needs attention -------------------------------------------------- */}
+      <section className="rts-band" aria-labelledby="attention-heading">
+        <div className="rts-band-label">
+          <h2 id="attention-heading" className="rts-band-title">Needs attention</h2>
+          <p className="rts-band-note">Only exceptions. Zero rows here means nothing is wrong.</p>
+        </div>
+        <div className="rts-band-body">
+          {attention.length === 0 ? (
+            <p className="rts-all-clear">
+              <Icon name="clock" className="rts-all-clear-icon" />
+              Nothing is waiting on you: no expiries, no overdue service, no unconfirmed rentals.
+            </p>
+          ) : (
+            <ul className="rts-attention">
+              {attention.map((row) => (
+                <li key={row.key} className="rts-attention-row">
+                  <span className={`rts-attention-mark rts-attention-mark--${row.tone}`} aria-hidden="true" />
+                  <span className="rts-attention-text">
+                    <strong>{row.label}</strong>
+                    <small>{row.detail}</small>
+                  </span>
+                  {row.action ? (
+                    <button type="button" className="rts-link" onClick={go(row.action)}>
+                      Review <Icon name="chevron" className="rts-link-icon" />
+                    </button>
+                  ) : (
+                    <span className="rts-attention-noaction">Admin only</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
 
-      {allowed("drivers:read") && expiredLicences > 0 && (
-        <Notice tone="warning" title={`${expiredLicences} active driver${expiredLicences === 1 ? " has" : "s have"} an expired licence`}>
-          Review the Drivers screen. Reminder lead times are an open question for management; only already-expired dates are flagged.
-        </Notice>
-      )}
-
-      {allowed("fleet:read") && (readiness.counts.overdue > 0 || readiness.counts.due > 0 || readiness.counts.no_data > 0) && (
-        <Notice tone={readiness.counts.overdue > 0 ? "warning" : "info"} title="Service schedules need attention">
-          {readiness.counts.overdue} overdue, {readiness.counts.due} due soon and {readiness.counts.no_data} not evaluable as of {today}.{" "}
-          <button type="button" className="underline" onClick={() => navigate("fleetReadiness")}>
-            Open fleet readiness
-          </button>
-          .
-        </Notice>
-      )}
-
-      {allowed("rentals:read") && <RentalsSummary />}
-
-      <Card title="Operational KPIs" description="Definitions for RPT-01 to RPT-03 are pending management confirmation (docs/KPIS.md).">
-        <div className="rounded-sm border border-dashed border-stone-300 px-4 py-6 text-center">
-          <p className="text-sm font-semibold text-stone-700">RPT-01 is computed on Staff busing</p>
-          <p className="mx-auto mt-1 max-w-lg text-xs text-stone-500">
-            The on-time rate is shown with its reporting period and data coverage under Staff busing, Performance. RPT-02 (fleet utilisation) and RPT-03 (cost per trip) are not configured because no fleet-hours or cost inputs exist yet.
+      {/* ---- band 2: today's departures ---------------------------------------------------- */}
+      <section className="rts-band" aria-labelledby="departures-heading">
+        <div className="rts-band-label">
+          <h2 id="departures-heading" className="rts-band-title">Today&apos;s departures</h2>
+          <p className="rts-band-note">
+            {todaysTrips.length === 0
+              ? "No trips are scheduled for this date."
+              : `${todaysTrips.length} scheduled · earliest ${departureTime(todaysTrips[0], startTimes) || "—"}`}
           </p>
         </div>
-      </Card>
+        <div className="rts-band-body">
+          {todaysTrips.length === 0 ? (
+            <p className="rts-band-empty">
+              Trips appear here once a staff route generates one for today.{" "}
+              <button type="button" className="rts-link" onClick={() => navigate("busing")}>
+                Open staff busing <Icon name="chevron" className="rts-link-icon" />
+              </button>
+            </p>
+          ) : (
+            <div className="rts-board" role="table" aria-label="Today's departures">
+              <div className="rts-board-head" role="row">
+                <span role="columnheader">Dep</span>
+                <span role="columnheader">Route</span>
+                <span role="columnheader">Vehicle</span>
+                <span role="columnheader">Driver</span>
+                <span role="columnheader">State</span>
+              </div>
+              {todaysTrips.map((trip) => {
+                const route = routesById.get(trip.routeId);
+                const vehicle = trip.vehicleId ? vehiclesById.get(trip.vehicleId) : null;
+                const driver = trip.driverId ? driversById.get(trip.driverId) : null;
+                return (
+                  <div className="rts-board-row" role="row" key={trip.id}>
+                    <span className="rts-board-time" role="cell">{departureTime(trip, startTimes) || "—"}</span>
+                    <span className="rts-board-route" role="cell">
+                      <strong>{route?.name ?? "Unknown route"}</strong>
+                      <small>
+                        {route?.reference ?? "—"} · {route ? DIRECTION_LABELS[route.direction] : "—"}
+                      </small>
+                    </span>
+                    <span role="cell" className="rts-board-cell">
+                      {vehicle ? vehicle.registration : <em className="rts-unset">not assigned</em>}
+                    </span>
+                    <span role="cell" className="rts-board-cell">
+                      {driver ? driver.fullName : <em className="rts-unset">not assigned</em>}
+                    </span>
+                    <span role="cell">
+                      <span className={`rts-flag rts-flag--${trip.status}`}>{TRIP_STATUS_LABELS[trip.status]}</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ---- band 3: fleet ----------------------------------------------------------------- */}
+      {allowed("vehicles:read") && (
+        <section className="rts-band" aria-labelledby="fleet-heading">
+          <div className="rts-band-label">
+            <h2 id="fleet-heading" className="rts-band-title">Fleet</h2>
+            <p className="rts-band-note">
+              {db.vehicles.filter((v) => v.status !== "retired").length} in service · readiness as of {readiness.asOf}
+            </p>
+          </div>
+          <div className="rts-band-body">
+            <div className="rts-fleet-status">
+              {VEHICLE_STATUSES.map((status) => {
+                const count = db.vehicles.filter((v) => v.status === status).length;
+                return (
+                  <div key={status} className="rts-fleet-cell">
+                    <span className="rts-figure">{count}</span>
+                    <span className="rts-fleet-label">{VEHICLE_STATUS_LABELS[status]}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {readiness.status === "not_configured" ? (
+              <p className="rts-band-empty">
+                Service intervals are not configured, so readiness cannot be computed.{" "}
+                <button type="button" className="rts-link" onClick={() => navigate("fleetReadiness")}>
+                  Review readiness <Icon name="chevron" className="rts-link-icon" />
+                </button>
+              </p>
+            ) : (
+              <div className="rts-meter" role="img" aria-label={`Readiness: ${readiness.counts.overdue} overdue, ${readiness.counts.due} due, ${readiness.counts.ok} ok, ${readiness.counts.no_data} without data`}>
+                {[
+                  { key: "overdue", tone: "error" as const },
+                  { key: "due", tone: "warning" as const },
+                  { key: "ok", tone: "success" as const },
+                  { key: "no_data", tone: "neutral" as const },
+                ].map(({ key, tone }) => {
+                  const count = readiness.counts[key as keyof typeof readiness.counts] ?? 0;
+                  if (count === 0) return null;
+                  return (
+                    <span
+                      key={key}
+                      className={`rts-meter-seg rts-meter-seg--${tone}`}
+                      style={{ flexGrow: count }}
+                      title={`${count} ${key.replace("_", " ")}`}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            {readiness.status !== "not_configured" && (
+              <p className="rts-meter-legend">
+                <span><i className="rts-dot rts-dot--error" /> {readiness.counts.overdue} overdue</span>
+                <span><i className="rts-dot rts-dot--warning" /> {readiness.counts.due} due</span>
+                <span><i className="rts-dot rts-dot--success" /> {readiness.counts.ok} ready</span>
+                <span><i className="rts-dot rts-dot--neutral" /> {readiness.counts.no_data} without data</span>
+                {readiness.coverage !== null && <span className="rts-meter-coverage">coverage {Math.round(readiness.coverage * 100)}%</span>}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ---- band 4: rentals --------------------------------------------------------------- */}
+      {allowed("rentals:read") && (
+        <section className="rts-band" aria-labelledby="rentals-heading">
+          <div className="rts-band-label">
+            <h2 id="rentals-heading" className="rts-band-title">Bus rentals</h2>
+            <p className="rts-band-note">Money figures sum recorded amounts only. Not a margin.</p>
+          </div>
+          <div className="rts-band-body">
+            <div className="rts-fleet-status">
+              <div className="rts-fleet-cell">
+                <span className="rts-figure rts-figure--money">{money(billed, s.currencyCode)}</span>
+                <span className="rts-fleet-label">billed · {db.rentals.filter((r) => r.status === "completed").length} completed</span>
+              </div>
+              <div className="rts-fleet-cell">
+                <span className="rts-figure rts-figure--money">{money(depositsHeld, s.currencyCode)}</span>
+                <span className="rts-fleet-label">deposits held · active rentals</span>
+              </div>
+              <div className="rts-fleet-cell">
+                <span className="rts-figure">{db.rentals.length}</span>
+                <span className="rts-fleet-label">requests in total</span>
+              </div>
+            </div>
+            <div className="rts-statusline">
+              {RENTAL_STATUSES.map((status) => {
+                const count = db.rentals.filter((r) => r.status === status).length;
+                return (
+                  <span key={status} className={count === 0 ? "rts-statusline-cell is-zero" : "rts-statusline-cell"}>
+                    <b>{count}</b> {RENTAL_STATUS_LABELS[status]}
+                  </span>
+                );
+              })}
+            </div>
+            {!s.currencyCode && db.rentals.length > 0 && (
+              <p className="rts-band-empty">Billing currency is not set, so amounts are shown without a currency symbol.</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ---- band 5: setup ----------------------------------------------------------------- */}
+      {allowed("settings:read") && (
+        <section className="rts-band" aria-labelledby="setup-heading">
+          <div className="rts-band-label">
+            <h2 id="setup-heading" className="rts-band-title">Setup</h2>
+            <p className="rts-band-note">Business rules only management can supply. None has a default.</p>
+          </div>
+          <div className="rts-band-body">
+            <div className="rts-progress" role="img" aria-label={`${done} of ${checklist.length} setup items complete`}>
+              <span className="rts-progress-fill" style={{ width: `${(done / checklist.length) * 100}%` }} />
+            </div>
+            <p className="rts-progress-caption">
+              {done} of {checklist.length} complete
+              {outstanding > 0 && ` — ${outstanding} still needed before dependent features open up`}
+            </p>
+            <ul className="rts-rules">
+              {checklist.map((item) => (
+                <li key={item.label} className="rts-rule">
+                  <span className="rts-rule-label">{item.label}</span>
+                  <Badge tone={item.done ? "success" : "warning"}>{item.done ? "Set" : "Not set"}</Badge>
+                </li>
+              ))}
+            </ul>
+            {allowed("settings:update") && (
+              <div className="rts-band-actions">
+                <Button variant="primary" onClick={() => navigate("settings")}>Open settings</Button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      <p className="rts-footnote">
+        On-time rate (RPT-01) is computed on Staff busing, with its reporting period and data coverage.
+        RPT-02 (fleet utilisation) and RPT-03 (cost per trip) are not configured because no fleet-hours
+        or cost inputs exist yet — <span className="rts-footnote-ref">docs/KPIS.md</span>.
+      </p>
     </div>
   );
 }
+
+export { money };
