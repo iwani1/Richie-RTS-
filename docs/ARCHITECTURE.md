@@ -2,20 +2,26 @@
 
 ## Deployment reality
 
-- Build: Vite 7 + React 19 + Tailwind 4, bundled into a single `dist/index.html` (`vite-plugin-singlefile`).
-- Runtime: the browser only. There is no Node.js server, no PostgreSQL, no background worker and no WebSocket host in this environment. The hosting target is unknown (OPEN_QUESTIONS Q-01).
-- Persistence: `localStorage` under `richie-tms:db:v1`, schema version 10. This is an interim seam (DECISIONS D-01), not production persistence.
-- Quality gates: `npm run check` runs typecheck, lint, tests with coverage thresholds, and
-  build, in that order. The same gates run in `.github/workflows/ci.yml` at the repository root,
-  alongside CodeQL, a dependency review and Dependabot. **The workflow has not yet been observed
-  running on GitHub's runner**: it was authored and reviewed here, and every command it invokes
-  was run locally (see `docs/PROGRESS.md`, Phase 12).
-- Security posture of the shipped bundle: a Content-Security-Policy meta tag limits sources to
-  the bundle itself plus the two Google Fonts hosts, and blocks connections (`connect-src
-  'none'`). `frame-ancestors` and HSTS must be sent as headers by the host (D-47).
-- Audit retention: the in-browser audit log is capped at 5,000 entries, and every backup export
-  is permission-checked and audited (D-45). A cap is a consequence of the storage medium, not a
-  policy decision; the server replaces it.
+- Build: Next.js 15 (App Router) + React 19 + Tailwind 4. `npm run build` emits a server bundle
+  and static assets into `.next/`; `npm start` serves them. There is no single-file artifact any
+  more — the page needs a server, because that is where authority lives.
+- Runtime: one Node.js process on the operator's workstation (Fedora), plus PostgreSQL. The
+  database is the source of truth. See `docs/SETUP_AND_DEPLOYMENT.md`.
+- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (16 tables, `btree_gist` +
+  `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
+  odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
+- Session: `iron-session` sealed cookie; passwords Argon2id (`@node-rs/argon2`) — D-51.
+- The browser receives a **redacted snapshot** and holds no credentials; it posts commands to
+  `POST /api/commands` (D-52).
+- Quality gates: `npm run check` runs typecheck, lint, tests with coverage thresholds, and build,
+  in that order. `npm run test:integration` runs the PostgreSQL suite (skipped without
+  `TEST_DATABASE_URL`). `.github/workflows/ci.yml` runs both on a runner; the integration job has
+  not been observed on GitHub from the development environment.
+- Security posture: headers are set by the server (`next.config.ts`, D-49): `X-Frame-Options:
+  DENY`, `nosniff`, `no-referrer`, a restrictive `Permissions-Policy`, and a CSP with
+  `frame-ancestors 'none'`. HSTS and TLS belong at the reverse proxy (§5 of the run guide).
+- Audit retention: the table keeps every entry; the *screen* reads the newest 5,000 because the
+  snapshot is sent whole. No retention job exists yet (Q-18).
 
 ## Interface system
 
@@ -62,42 +68,61 @@ Dependency direction: pages depend on `useTms`, which depends on `commands`, whi
 
 ## Request flow for a write
 
-1. A UI handler calls `dispatch(command)` from `useTms`.
-2. `executeCommand(db, actor, command, now)` routes by command type.
-3. The module checks the permission (`authorise`). Without it, the command is refused and nothing changes.
-4. The module validates input and returns field-keyed errors (for example `stops.1.scheduledTime`). Any error means nothing changes.
-5. The module checks state (for example trip `planned` to `dispatched`) and resource conflicts (same-day time overlap, rental clash, licence expiry).
-6. The module builds a new immutable `Database` and appends an audit entry (`audit()`).
-7. `useTms.commit()` sets React state and writes to `localStorage` **synchronously, in the same
-   call**. This is the single write site; there is no window in which state and storage
-   disagree (D-29). A storage failure is surfaced as `storageError` and the UI shows it.
+1. A UI handler calls `dispatch(command)` from `useTms`. The browser's command union
+   (`src/tms/clientCommand.ts`) contains no credential-bearing and no restore command, so those
+   cannot even be expressed.
+2. `POST /api/commands` runs `src/server/commands.ts`:
+   1. the actor is resolved **from the session cookie**, never from the request body;
+   2. the command type is checked against an allow-list, and a coarse permission pre-check runs;
+   3. a credential, if the command sets one, is hashed here with Argon2id — the browser cannot
+      supply a hash;
+   4. one transaction opens and takes `pg_advisory_xact_lock`, so two operators cannot interleave
+      a read-modify-write;
+   5. the snapshot is loaded from PostgreSQL;
+   6. the pure command layer (`executeCommand`) runs: permission, validation, state machine,
+      resource conflicts, audit entry;
+   7. the difference is written back (reservations first, then children-first deletes,
+      parents-first upserts, settings, insert-only audit);
+   8. the new state is **redacted** and returned. A database error is mapped to an operator
+      message (conflict, constraint, unknown) rather than leaking SQL.
+3. The browser replaces its snapshot with the response. `useTms` serialises commands, so an older
+   response can never overwrite a newer one on screen.
 
-This flow is enforced, not just described: ESLint forbids any page or UI file from importing
-an `execute*` function or `executeCommand` (D-28). The only path to a write is `dispatch()`.
+Two layers, on purpose: the pure layer gives fast, testable, precise rules and good error messages;
+PostgreSQL gives the guarantee. If the service layer is wrong, the exclusion constraint, the
+triggers and the foreign keys still refuse the write.
 
-Guarantees in this build: no mutation without a permission; illegal transitions are rejected; every successful write produces an audit entry; failed writes leave data untouched.
+This flow is enforced, not just described: ESLint forbids screens and UI files from importing an
+`execute*` function, `executeCommand`, or anything from `src/server/` (D-53). The only path to a
+write is `dispatch()`.
+
+Guarantees in this build: no mutation without a permission; illegal transitions refused; every
+successful write produces an audit entry; failed writes leave data untouched (transaction
+rollback); a vehicle cannot be double-booked even if the service layer is bypassed; audit rows
+cannot be changed or deleted.
 
 Known limits:
 
-1. State lives in one browser profile. Two open tabs can overwrite each other (last write
-   wins). Server transactions are required before multi-user production use.
-2. **Own-record scope runs in the caller's process.** `src/tms/scope.ts` is the only thing
-   between a `driver` or `client_contact` and company data, and it runs in the same JavaScript
-   context as the UI. It is applied consistently on every read and write and is covered by
-   tests, but with no server there is no privileged boundary — a production deployment must
-   enforce the same rules in the API layer, where the caller cannot rewrite them. The app
-   shell also walls record-bound roles off from the internal screens, which is defence in
-   depth rather than the security boundary itself.
+1. **The snapshot is coarse.** Each command returns the whole redacted workload for the role, and
+   scope filtering for portal users happens in the domain layer (`src/tms/scope.ts`) rather than in
+   SQL. Correct for a single operator's ledger; pagination and row-level filtering are the next
+   step (§11 of the run guide).
+2. **The sign-in throttle is in-process memory**, so it does not coordinate across instances.
+   Writes themselves are safe (advisory lock in the database), so this is a rate-limiting limit,
+   not a correctness one.
+3. **Own-record scope is applied in the domain layer on every read and write** and is covered by
+   tests, but it is not yet a row-level database policy. A query written outside the repository
+   would not inherit it.
 
 ## Provider interfaces (seams for later)
 
 | Seam | Current implementation | Target |
 |---|---|---|
-| Persistence | `localStorage` via `useTms` | PostgreSQL behind an API, with transactions and the constraints in `ERD.md` |
-| Authentication | Local PBKDF2 accounts created by administrators | Chosen provider (decision pending; no provider selected yet) |
-| Clock | `now` is passed into every command | Server time, which also keeps tests deterministic |
+| Persistence | PostgreSQL behind `/api/commands`, with the constraints in `ERD.md` (done, Phase 13) | Pagination / row-level filtering for larger datasets |
+| Authentication | Argon2id accounts, `iron-session` cookies, server-side permission checks (D-51) | A provider (Auth.js / Better Auth) once email verification or 2FA is required |
+| Clock | `now` is passed into every command; the server passes its own clock (done) | A scheduled job runner for daily generation and reminders |
 | Notifications | None | Email/SMS providers (not configured) |
 
 ## Job runner
 
-Not present. Trip generation runs only when an operator asks for it. Daily generation, document-expiry reminders and retention jobs need a scheduler, which needs a server runtime (D-01). They are not implemented and are not claimed as working.
+Not present. Trip generation runs only when an operator asks for it. A scheduler now has somewhere to run (the server exists), but daily generation, document-expiry reminders and retention jobs are still **not implemented** and are not claimed as working.

@@ -1,5 +1,41 @@
 # Changelog
 
+## Phase 13 — the intended stack, running (unreleased)
+
+The application now runs as the brief specifies: Next.js + PostgreSQL, with authority on the server.
+
+**Added**
+
+- PostgreSQL schema (`db/migrations/001_init.sql`, `002_resource_reservations.sql`): 16 tables,
+  `btree_gist` + `pgcrypto`, an exclusion constraint that makes double booking impossible at the
+  database, an append-only audit trigger and a monotonic odometer trigger.
+- Server layer (`src/server/`): validated environment, typed SQL via Kysely, repository that maps
+  the domain snapshot to tables, one transactional command path under an advisory lock.
+- HTTP API (`src/app/api/`): `/api/health`, `/api/session`, `/api/auth/login`, `/api/auth/logout`,
+  `/api/setup`, `/api/commands`. Zod-validated, redacted responses, mapped database errors.
+- Authentication on maintained libraries: Argon2id (`@node-rs/argon2`) and sealed cookies
+  (`iron-session`). Legacy browser-build PBKDF2 credentials still verify (D-51).
+- Scripts: `db:migrate`, `db:seed` (three locks; no default password), `db:reset`, `db:backup`,
+  `db:restore`.
+- `docs/SETUP_AND_DEPLOYMENT.md` (Fedora run book), `run.sh`, `docker-compose.yml`, `.env.example`.
+- Integration suite against a real PostgreSQL (`npm run test:integration`, 5 tests), and a fake
+  API for the UI tests so 130 existing tests keep driving real components.
+- CI: a second job that runs the integration suite against `postgres:18-alpine`.
+
+**Changed**
+
+- The browser no longer owns the database. `useTms` fetches a redacted snapshot and posts
+  commands; `dispatch` is asynchronous and every call site awaits it.
+- Enforcement of permissions moved to the server: the actor comes from the cookie, the command type
+  is allow-listed, and `setup_administrator` / `import_backup` cannot be called from a browser.
+- Backup export in the Users screen is now a redacted export; restoring is a server-side command.
+
+**Removed**
+
+- `localStorage`/`sessionStorage` persistence, in-page PBKDF2 hashing for new credentials, the
+  single-file Vite build, and the `server-only` marker (D-53 explains what replaced it).
+
+
 All notable changes to this repository. The project follows the phase structure in `AGENTS.md`
 and the phase prompts; entries below name the phase and the evidence.
 

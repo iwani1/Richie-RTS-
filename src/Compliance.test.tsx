@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { webcrypto } from "node:crypto";
 import App from "./App";
+import { installFakeServer } from "./test/fakeServer";
+
+let api: ReturnType<typeof installFakeServer>;
 import { executeCommand, type AnyCommand } from "./tms/commands";
 import { execute, type Actor } from "./tms/service";
 import { emptyDatabase, emptyRentalSettings, type Database } from "./tms/types";
@@ -19,7 +22,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function saved(): Database {
-  return JSON.parse(localStorage.getItem("richie-tms:db:v1") ?? "{}") as Database;
+  return api.db();
 }
 
 // Seeds a signed-in administrator with one vehicle, one driver and no document types
@@ -54,15 +57,21 @@ function seed(): { vehicleId: string } {
   const categoryId = db.settings.vehicleCategories[0].id;
   run({ type: "create_vehicle", input: { registration: "GT 900-26", categoryId, make: "", model: "", seatCapacity: "30", notes: "" } });
 
-  localStorage.setItem("richie-tms:db:v1", JSON.stringify(db));
-  sessionStorage.setItem("richie-tms:session", admin.id);
+  api = installFakeServer(db, admin.id);
   return { vehicleId: db.vehicles[0].id };
+}
+
+/** Renders the app and waits for the initial /api/session round trip to settle. */
+async function renderApp() {
+  const view = render(<App />);
+  await waitFor(() => expect(screen.queryByText(/Contacting the server/i)).toBeNull());
+  return view;
 }
 
 describe("Compliance documents end-to-end (jsdom)", () => {
   it("blocks recording until a document type is configured, then records and edits a document", async () => {
     seed();
-    render(<App />);
+    await renderApp();
 
     fireEvent.click(screen.getByRole("button", { name: /^Compliance/i }));
     expect(await screen.findByText(/No document types exist yet/i)).toBeTruthy();
@@ -109,7 +118,7 @@ describe("Compliance documents end-to-end (jsdom)", () => {
 
   it("flags an already-expired document even with no reminder lead time set", async () => {
     const { vehicleId } = seed();
-    render(<App />);
+    await renderApp();
 
     // Configure a document type with no lead time.
     fireEvent.click(screen.getByRole("button", { name: /^Settings/i }));

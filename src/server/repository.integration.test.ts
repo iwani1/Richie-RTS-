@@ -1,0 +1,174 @@
+// Integration tests against a real PostgreSQL.
+//
+// These exist to prove the claims the brief makes about the *database* rather than the UI:
+//   §5.1  two overlapping bookings of the same vehicle cannot both exist;
+//   §5.3  the audit log is append-only, enforced by a trigger, not by convention;
+//   §5.7  an odometer reading cannot go backwards.
+//
+// Run with:
+//   TEST_DATABASE_URL="postgresql://richie:dev@127.0.0.1:5432/richie_tms_test" npm run test:integration
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sql } from "kysely";
+import { closeDb, db } from "./db";
+import { loadDatabase, saveDatabase, truncateAll } from "./repository";
+import { emptyDatabase, emptyRentalSettings, type Database, type Rental, type Vehicle } from "../tms/types";
+
+const connectionString = process.env.TEST_DATABASE_URL;
+const suite = connectionString ? describe : describe.skip;
+
+const NOW = "2026-06-01T08:00:00.000Z";
+
+function vehicle(id: string, registration: string): Vehicle {
+  return {
+    id,
+    registration,
+    categoryId: "cat-1",
+    make: "Toyota",
+    model: "Coaster",
+    seatCapacity: 30,
+    status: "available",
+    notes: "",
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
+function rental(id: string, overrides: Partial<Rental>): Rental {
+  return {
+    id,
+    reference: `RR-${id}`,
+    clientId: null,
+    customerName: "Integration Test",
+    customerPhone: "+233 00 000 0000",
+    customerEmail: "test@example.invalid",
+    purpose: "Test",
+    pickupLocation: "Depot",
+    dropoffLocation: "Site",
+    startDate: "2026-07-01",
+    endDate: "2026-07-03",
+    passengers: 10,
+    vehicleCategoryId: "cat-1",
+    driverRequired: false,
+    notes: "",
+    status: "confirmed",
+    quote: null,
+    quoteHistory: [],
+    assignedVehicleId: "veh-1",
+    assignedDriverId: null,
+    deposit: null,
+    finalInvoice: null,
+    resolutionReason: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function snapshotWith(rentals: Rental[]): Database {
+  const base = emptyDatabase();
+  return {
+    ...base,
+    settings: { ...base.settings, rental: emptyRentalSettings() },
+    vehicles: [vehicle("veh-1", "GT 1000-26")],
+    rentals,
+  };
+}
+
+async function write(database: Database, before: Database = emptyDatabase()): Promise<void> {
+  await db()
+    .transaction()
+    .execute(async (trx) => {
+      await sql`select pg_advisory_xact_lock(728411)`.execute(trx);
+      await saveDatabase(trx, before, database);
+    });
+}
+
+suite("PostgreSQL constraints, through the repository", () => {
+  beforeAll(async () => {
+    if (!connectionString) return;
+    process.env.DATABASE_URL = connectionString;
+    const { migrate } = await import("../../scripts/migrate");
+    await migrate(connectionString, () => undefined);
+    await db()
+      .transaction()
+      .execute(async (trx) => {
+        await sql`select pg_advisory_xact_lock(728411)`.execute(trx);
+        await truncateAll(trx);
+      });
+  });
+
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("stores and reads back a confirmed rental with its reservation", async () => {
+    const database = snapshotWith([rental("rent-1", { startDate: "2026-07-01", endDate: "2026-07-03" })]);
+    await write(database);
+
+    const reloaded = await loadDatabase();
+    expect(reloaded.rentals.map((r) => r.id)).toEqual(["rent-1"]);
+    expect(reloaded.vehicles[0].registration).toBe("GT 1000-26");
+
+    const reservations = await db()
+      .selectFrom("resource_reservation")
+      .select(["resource_id", "period", "active"])
+      .where("resource_id", "=", "veh-1")
+      .execute();
+    expect(reservations).toHaveLength(1);
+    // Postgres 14+ canonicalises an inclusive upper bound: 1–3 July is stored and displayed as
+    // [2026-07-01,2026-07-04). The inclusive `[]` literal in the migration is still the meaning.
+    expect(reservations[0].period).toBe("[2026-07-01,2026-07-04)");
+    expect(reservations[0].active).toBe(true);
+  });
+
+  it("refuses a second booking of the same vehicle on overlapping dates (SQLSTATE 23P01)", async () => {
+    // 1–3 July is already reserved. 2–5 July overlaps by two days.
+    const database = snapshotWith([
+      rental("rent-1", { startDate: "2026-07-01", endDate: "2026-07-03" }),
+      rental("rent-2", { startDate: "2026-07-02", endDate: "2026-07-05" }),
+    ]);
+
+    await expect(write(database)).rejects.toMatchObject({ code: "23P01" });
+
+    // Nothing was written: the transaction rolled back, so the first booking is untouched.
+    const reservations = await db().selectFrom("resource_reservation").select(["id"]).execute();
+    expect(reservations).toHaveLength(1);
+  });
+
+  it("accepts back-to-back bookings, because the range is inclusive and non-overlapping", async () => {
+    const database = snapshotWith([
+      rental("rent-1", { startDate: "2026-07-01", endDate: "2026-07-03" }),
+      rental("rent-2", { startDate: "2026-07-04", endDate: "2026-07-06" }),
+    ]);
+    await write(database);
+
+    const reservations = await db().selectFrom("resource_reservation").select(["resource_id"]).execute();
+    expect(reservations).toHaveLength(2);
+  });
+
+  it("refuses to rewrite or delete an audit entry", async () => {
+    const entry = await db().selectFrom("audit_entry").select(["id"]).limit(1).executeTakeFirst();
+    if (!entry) {
+      // The seeded writes above produced no audit rows (they bypassed the command layer), so make
+      // one directly: the trigger, not the writer, is what is under test.
+      await sql`
+        insert into audit_entry (id, at, actor_id, actor_name, action, entity, entity_id, summary)
+        values ('audit-integration-1', now(), null, 'Integration', 'test:append', 'test', 'x', 'append test')
+      `.execute(db());
+    }
+    await expect(
+      sql`update audit_entry set summary = 'rewritten' where action = 'test:append'`.execute(db()),
+    ).rejects.toThrow();
+    await expect(sql`delete from audit_entry where action = 'test:append'`.execute(db())).rejects.toThrow();
+  });
+
+  it("refuses an odometer reading that goes backwards", async () => {
+    const insert = (id: string, km: number, date: string) => sql`
+      insert into odometer_reading (id, vehicle_id, reading_km, reading_date, status, note, void_reason, created_at, created_by, data)
+      values (${id}, 'veh-1', ${km}, ${date}::date, 'current', '', null, now(), 'integration', ${JSON.stringify({ id })}::jsonb)
+    `.execute(db());
+
+    await insert("odo-1", 150_000, "2026-07-01");
+    await expect(insert("odo-2", 140_000, "2026-07-02")).rejects.toThrow();
+  });
+});

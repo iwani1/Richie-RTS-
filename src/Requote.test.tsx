@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { webcrypto } from "node:crypto";
 import App from "./App";
+import { installFakeServer } from "./test/fakeServer";
+
 import { executeCommand, type AnyCommand } from "./tms/commands";
 import { execute, type Actor } from "./tms/service";
 import { emptyDatabase, type Database } from "./tms/types";
@@ -61,14 +63,20 @@ function seedExpiredQuote() {
   });
   const rentalId = db.rentals[0].id;
   run({ type: "quote_rental", id: rentalId, input: { lines: [{ description: "Airport transfer", quantity: "1", unitAmount: "1000" }] } });
-  localStorage.setItem("richie-tms:db:v1", JSON.stringify(db));
-  sessionStorage.setItem("richie-tms:session", admin.id);
+  installFakeServer(db, admin.id);
+}
+
+/** Renders the app and waits for the initial /api/session round trip to settle. */
+async function renderApp() {
+  const view = render(<App />);
+  await waitFor(() => expect(screen.queryByText(/Contacting the server/i)).toBeNull());
+  return view;
 }
 
 describe("Expired quotation policy end-to-end (jsdom)", () => {
   it("blocks renewal until configured, then revises in place and retains the old quote", async () => {
     seedExpiredQuote();
-    render(<App />);
+    await renderApp();
 
     fireEvent.click(screen.getByRole("button", { name: /Bus rentals/i }));
     fireEvent.click(screen.getByRole("button", { name: /^Open$/i }));

@@ -4,6 +4,12 @@ node_modules/
 # build output
 dist/
 coverage/
+.next/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# backups written by ./run.sh backup (contain personal data and credentials)
+backups/
 
 # local environment
 .env

@@ -1,20 +1,20 @@
 import { useState } from "react";
 import { BriefDesk } from "./docs/BriefDesk";
-import { AuditPage } from "./pages/Audit";
-import { SetupPage, SignInPage } from "./pages/Auth";
-import { DashboardPage } from "./pages/Dashboard";
-import { ClientsPage, DriversPage } from "./pages/Registers";
-import { RentalsPage } from "./pages/Rentals";
-import { StaffBusingPage } from "./pages/StaffBusing";
-import { StaffLogisticsPage } from "./pages/StaffLogistics";
-import { CompliancePage } from "./pages/Compliance";
-import { FleetReadinessPage } from "./pages/FleetReadiness";
-import { ClientPortalPage } from "./pages/ClientPortal";
-import { DriverPortalPage } from "./pages/DriverPortal";
+import { AuditPage } from "./screens/Audit";
+import { SetupPage, SignInPage } from "./screens/Auth";
+import { DashboardPage } from "./screens/Dashboard";
+import { ClientsPage, DriversPage } from "./screens/Registers";
+import { RentalsPage } from "./screens/Rentals";
+import { StaffBusingPage } from "./screens/StaffBusing";
+import { StaffLogisticsPage } from "./screens/StaffLogistics";
+import { CompliancePage } from "./screens/Compliance";
+import { FleetReadinessPage } from "./screens/FleetReadiness";
+import { ClientPortalPage } from "./screens/ClientPortal";
+import { DriverPortalPage } from "./screens/DriverPortal";
 import { isRecordBound } from "./tms/permissions";
-import { SettingsPage } from "./pages/Settings";
-import { UsersPage } from "./pages/Users";
-import { VehiclesPage } from "./pages/Vehicles";
+import { SettingsPage } from "./screens/Settings";
+import { UsersPage } from "./screens/Users";
+import { VehiclesPage } from "./screens/Vehicles";
 import { NAV_ITEMS, type Route } from "./routes";
 import { ROLE_LABELS } from "./tms/types";
 import { TmsContext, useTms, useTmsState } from "./tms/useTms";
@@ -43,13 +43,47 @@ export default function App() {
   const tms = useTmsState();
   return (
     <TmsContext.Provider value={tms}>
-      {tms.db.users.length === 0 ? <SetupPage /> : !tms.actor ? <SignInPage /> : <Shell />}
+      {tms.status === "loading" ? (
+        <BootScreen message="Contacting the server..." />
+      ) : tms.status === "offline" ? (
+        <BootScreen message={tms.connectionError ?? "The server is not reachable."} error onRetry={tms.refresh} />
+      ) : tms.setupRequired ? (
+        <SetupPage />
+      ) : !tms.actor ? (
+        <SignInPage />
+      ) : (
+        <Shell />
+      )}
     </TmsContext.Provider>
   );
 }
 
+/**
+ * Shown while the browser is waiting for /api/session, and when that call fails. It replaces the
+ * prototype's habit of silently rendering an empty local database, which looked like "no data"
+ * when the truth was "no server".
+ */
+function BootScreen({ message, error, onRetry }: { message: string; error?: boolean; onRetry?: () => void }) {
+  return (
+    <main className="rts-auth">
+      <section className="rts-auth-side">
+        <div className="rts-auth-card" role="status" aria-live="polite">
+          <p className="rts-auth-eyebrow">Richie Transport Services</p>
+          <h1 className="rts-auth-title">{error ? "Cannot reach the ledger" : "Opening the ledger"}</h1>
+          <p className="rts-auth-intro">{message}</p>
+          {error && onRetry && (
+            <Button variant="primary" onClick={() => void onRetry()} className="mt-4">
+              Try again
+            </Button>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function Shell() {
-  const { db, actor, allowed, signOut, flash, setFlash, storageError } = useTms();
+  const { db, actor, allowed, signOut, flash, setFlash, connectionError } = useTms();
   // Record-bound roles (driver, client_contact) are confined to their own portal.
   // The internal screens read company-wide records, so those roles must not reach them.
   const portalRoute: Route | null =
@@ -166,7 +200,7 @@ function Shell() {
               <small>{actor ? (ROLE_LABELS[actor.role] ?? "UNKNOWN ROLE").toUpperCase() : ""}</small>
             </div>
           </div>
-          <button type="button" className="rts-btn rts-btn--rail" onClick={signOut}>
+          <button type="button" className="rts-btn rts-btn--rail" onClick={() => void signOut()}>
             <span>Sign out</span>
             <span aria-hidden="true">→</span>
           </button>
@@ -187,16 +221,16 @@ function Shell() {
             <span className="rts-date">{today}</span>
             <span
               className="rts-chip"
-              title="This build stores data in the browser. A server and PostgreSQL are not configured in this environment."
+              title="Records are stored in PostgreSQL on the application server. The browser holds only a redacted copy of the data you are allowed to see."
             >
-              <i aria-hidden="true" /> Browser-local · no server
+              <i aria-hidden="true" /> Server ledger · PostgreSQL
             </span>
           </div>
         </header>
 
         <main className="rts-main" id="main-content">
           <div className="rts-main-inner">
-            {storageError && <Notice tone="error" className="mb-4">{storageError}</Notice>}
+            {connectionError && <Notice tone="error" className="mb-4">{connectionError}</Notice>}
             {flash && (
               <div className="rts-flash-row">
                 <Notice tone={flash.tone} className="flex-1">{flash.message}</Notice>
@@ -206,7 +240,7 @@ function Shell() {
             {page}
             <footer className="mt-10 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--rts-line-strong)] pt-3 font-mono text-[8px] uppercase tracking-[0.14em] text-[#7d8375]">
               <span>Richie Transport Services · Operations Ledger</span>
-              <span>Browser-local data · export before clearing site storage</span>
+              <span>Server ledger · PostgreSQL · audit-logged</span>
             </footer>
           </div>
         </main>

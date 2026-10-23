@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { webcrypto } from "node:crypto";
 import App from "./App";
+import { installFakeServer } from "./test/fakeServer";
+
 import { executeCommand, type AnyCommand } from "./tms/commands";
 import { execute, type Actor } from "./tms/service";
 import { emptyDatabase, emptyRentalSettings, type Database } from "./tms/types";
@@ -50,8 +52,7 @@ function seed(): { vehicleId: string } {
   const categoryId = db.settings.vehicleCategories[0].id;
   run({ type: "create_vehicle", input: { registration: "GT 900-26", categoryId, make: "", model: "", seatCapacity: "30", notes: "" } });
 
-  localStorage.setItem("richie-tms:db:v1", JSON.stringify(db));
-  sessionStorage.setItem("richie-tms:session", admin.id);
+  installFakeServer(db, admin.id);
   return { vehicleId: db.vehicles[0].id };
 }
 
@@ -62,10 +63,17 @@ const advanceTo = (dialog: HTMLElement, status: string, label: RegExp, note: str
   fireEvent.click(within(dialog).getByRole("button", { name: /Record change/i }));
 };
 
+/** Renders the app and waits for the initial /api/session round trip to settle. */
+async function renderApp() {
+  const view = render(<App />);
+  await waitFor(() => expect(screen.queryByText(/Contacting the server/i)).toBeNull());
+  return view;
+}
+
 describe("Staff logistics end-to-end (jsdom)", () => {
   it("reports a breakdown, takes the vehicle off the road and runs the response to resolution", async () => {
     const { vehicleId } = seed();
-    render(<App />);
+    await renderApp();
     openLogistics();
 
     // Report a breakdown and take the vehicle out of service (the default choice).
@@ -117,7 +125,7 @@ describe("Staff logistics end-to-end (jsdom)", () => {
 
   it("records costs, drives the work order to closure and reports the cost with coverage", async () => {
     const { vehicleId } = seed();
-    render(<App />);
+    await renderApp();
     openLogistics();
 
     fireEvent.click(screen.getByRole("button", { name: /Report incident/i }));

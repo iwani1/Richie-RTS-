@@ -488,3 +488,82 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
   reproduction (`artifacts/` evidence stays in `audit/`).
 - **Why.** A product gate must be fast and deterministic; evidence code must remain runnable on
   demand. Mixing them makes both worse.
+
+## D-49 (Phase 13) Security headers are sent by the server, not by a meta tag
+
+- **Decision.** `next.config.ts` sets `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy:
+  no-referrer`, a narrow `Permissions-Policy` and a CSP with `frame-ancestors 'none'`, on every
+  route. The single-file build's meta tag is gone with the build itself.
+- **Why.** A meta tag cannot set `frame-ancestors` or HSTS at all, and the previous build relied
+  on a static host to supply the rest. Now the application owns its own headers.
+- **Limits, stated plainly.** `script-src` still needs `'unsafe-inline'` because Next injects its
+  bootstrap inline; moving to a nonce requires middleware and is the recorded follow-up. HSTS
+  belongs at the TLS terminator (§5 of the run guide) and is not set by the app.
+
+## D-50 (Phase 13) Kysely and hand-written SQL instead of Prisma
+
+- **Context.** The brief names Prisma. Prisma downloads a platform query engine at install time
+  (`binaries.prisma.sh`); in the environment where this application was built that download is
+  blocked, so `prisma generate` cannot run, which means nothing Prisma-based could be *verified*
+  here — only written and hoped for.
+- **Decision.** Use `kysely` + `pg`: typed SQL with no engine binary, no code generation, and a
+  schema written by hand in `db/migrations/*.sql`. Constraints the brief specifically wants
+  (exclusion constraint, partial unique indexes, triggers) are SQL anyway, so the migrations were
+  always going to be plain SQL (the brief says so too).
+- **Storage shape.** Each entity is stored whole in `data jsonb` **and** projected into typed
+  columns (`status`, foreign keys, dates, `numeric(14,2)` money, unique keys) written from the same
+  object in the same statement. Constraints, indexes and reports therefore see real columns, while
+  the domain layer keeps its immutable-snapshot model. Child tables for quote lines, trip stops and
+  boardings are deferred: they are read through their parent, never queried alone.
+- **Trade-off.** No Prisma Studio/migrate niceties and no generated types from the schema; types
+  are declared by hand in `src/server/db.ts` and checked against the SQL by the integration suite.
+- **Revisit when.** The entity graph needs independent child queries (reporting across quote
+  lines, per-stop analytics) or the team grows enough to want generated client types. Migrating to
+  Prisma then is a change of the repository layer only: the domain layer and every test stay put.
+
+## D-51 (Phase 13) `iron-session` + Argon2id instead of Auth.js/Better Auth
+
+- **Decision.** Sessions are sealed cookies managed by `iron-session` (maintained, encrypted and
+  integrity-checked with the `SESSION_SECRET`, `httpOnly`, `sameSite=lax`, `secure` in production,
+  8-hour lifetime). Passwords are hashed with `@node-rs/argon2` (Argon2id, m=19456, t=2, p=1 —
+  OWASP's current recommendation).
+- **Why not Auth.js or Better Auth.** Both are good, and both are the right answer once there are
+  providers, email verification, 2FA or invitations. For a single-tenant application with one
+  local password per user, they add a framework, a database schema of their own and a
+  configuration surface larger than the feature needs. The brief forbids *hand-rolled* auth, not
+  small maintained libraries: no cryptography, cookie format or token is written here.
+- **Upgrade path kept open.** `User` has an email and an active flag; the sign-in route is one
+  file. Moving to Better Auth later means replacing `src/server/session.ts` and the sign-in route,
+  not the domain layer. Legacy PBKDF2 credentials from the browser build still verify and are
+  re-hashed on the next password reset (there is a test for it).
+- **Rejected.** A hand-written JWT: no revocation, and it is exactly the class of code the brief
+  says not to write.
+
+## D-52 (Phase 13) Server-authoritative commands; the browser is a renderer
+
+- **Context.** The prototype ran every command in the page, so the permission matrix, own-record
+  scope and audit trail were advice, not enforcement (audit C-01, H-01).
+- **Decision.** The browser holds a **redacted** snapshot of the database and posts commands to
+  `POST /api/commands`. The server resolves the actor from the cookie (never from the body), calls
+  the same pure command layer the tests exercise, writes the difference in one transaction under
+  an advisory lock, and replies with the new redacted snapshot. The API's allowed command list
+  excludes `setup_administrator` (only `/api/setup`, once) and `import_backup` (server-side only).
+- **Why keep the pure command layer.** 117 domain tests run in milliseconds with no database, and
+  the same code now runs inside the server. The alternative — reimplementing every rule as SQL —
+  would duplicate the rules and break them apart.
+- **Traffic shape.** One full (redacted) snapshot per command. Acceptable for a single operator's
+  ledger; pagination is the next scalability step and is recorded as a limit, not hidden.
+- **Redaction is not optional.** Credentials are stripped server-side (`src/server/snapshot.ts`) so
+  no client can verify, reproduce or replay a password, and an export cannot leak one.
+
+## D-53 (Phase 13) `server-only` is not used; the boundary is enforced by lint and by layout
+
+- **Context.** `server-only` throws when the module is loaded outside the Next bundler — including
+  from CLI scripts (`db:migrate`, `db:seed`) and from the integration tests, both of which must
+  import the database layer.
+- **Decision.** No `server-only` marker. Instead: server modules live under `src/server/` and
+  `src/app/api/`, and ESLint forbids browser code (`src/tms/**`, `src/screens/**`, `src/ui/**`,
+  `src/App.tsx`) from importing them, `kysely`, `pg` or `next/headers`. Only the route handlers and
+  scripts import the server layer.
+- **Trade-off.** A build-time guarantee became a lint-time one. `npm run lint` is a hard gate in CI
+  and in `npm run check`, so the rule is still mechanical.

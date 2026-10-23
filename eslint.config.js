@@ -12,7 +12,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "node_modules/**", "coverage/**"] },
+  { ignores: ["dist/**", "node_modules/**", "coverage/**", ".next/**", "next-env.d.ts", "audit/**"] },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -48,9 +48,16 @@ export default tseslint.config(
     },
   },
 
-  // Architecture: pages and UI never bypass the command router.
+  // Server-only modules run under Node, not the browser.
   {
-    files: ["src/pages/**/*.tsx", "src/App.tsx", "src/ui/**/*.tsx", "src/docs/**/*.tsx"],
+    files: ["src/server/**/*.ts", "src/app/api/**/*.ts", "scripts/**/*.ts"],
+    languageOptions: { globals: { ...globals.node } },
+    rules: { "no-console": "off" }, // these run in a terminal: stdout is the interface
+  },
+
+  // Architecture: screens and UI never bypass the command router.
+  {
+    files: ["src/screens/**/*.tsx", "src/App.tsx", "src/ui/**/*.tsx", "src/docs/**/*.tsx"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -68,9 +75,29 @@ export default tseslint.config(
     },
   },
 
+  // The browser must never import server modules: they own the database, the cookie and the
+  // password hasher. `server-only` would enforce this at build time but throws when the same files
+  // are loaded by CLI scripts and integration tests, so the rule lives here instead.
+  {
+    files: ["src/screens/**/*.tsx", "src/App.tsx", "src/tms/**/*.ts", "src/ui/**/*.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["../server/*", "../../server/*", "@/server/*", "next/headers", "kysely", "pg"],
+              message: "Browser code must not import server modules. Use dispatch() from useTms; the server owns the database.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Tests run under Vitest (node + jsdom); allow node globals and console for debugging.
   {
-    files: ["**/*.test.{ts,tsx}", "vite.config.ts", "vitest.config.ts", "eslint.config.js"],
+    files: ["**/*.test.{ts,tsx}", "src/test/**/*.ts", "vitest.config.ts", "vitest.integration.config.ts", "eslint.config.js"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: { "no-console": "off" },
   },

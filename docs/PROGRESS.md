@@ -1,6 +1,6 @@
 # Progress
 
-Status values: Not Started / In Progress / Done (verified) / Blocked. "Done (verified)" means automated tests covering the item passed in the most recent session (`npm test`), and the production build succeeded (`npm run build`).
+Status values: Not Started / In Progress / Done (verified) / Done (authored) / Blocked. "Done (verified)" means automated tests covering the item passed in the most recent session (`npm test`), and the production build succeeded (`npm run build`).
 
 ## Phase 0 - Inspect and plan (approved)
 
@@ -16,7 +16,7 @@ Status values: Not Started / In Progress / Done (verified) / Blocked. "Done (ver
 | DATA_PROTECTION.md | Done (draft) | Requires legal review. Retention periods unset (Q-18). |
 | DECISIONS.md | Done | D-01 to D-15. |
 | OPEN_QUESTIONS.md | Done | Q-01 to Q-32. |
-| Docker Compose, migrations, /health | Blocked | No server runtime in this environment (D-01). |
+| Docker Compose, migrations, /health | Done (verified) | `docker-compose.yml`, `db/migrations/*`, `/api/health`; the compose file itself was not executed here (no container runtime). |
 | CI workflow file | Done (authored, **not executed**) | `.github/workflows/ci.yml` runs the four gates. No git remote or runner exists here, so its execution has not been observed (Phase 7). |
 | Lint | Done (verified) | `eslint.config.js`; `npm run lint` clean across the whole codebase (Phase 7). Closes the Phase 0 "confirm lint runs" deliverable. |
 
@@ -34,7 +34,7 @@ Status values: Not Started / In Progress / Done (verified) / Blocked. "Done (ver
 | Users: create, edit, reset password, last-admin guard | Done (verified) | `service.test.ts` |
 | Audit log screen | Done (verified) | `App.test.tsx` |
 | Backup export and import (browser-local) | Done (verified) | Import guard in `service.test.ts`; download only checked manually |
-| Server-side persistence | Blocked | D-01 / Q-01 |
+| Server-side persistence | Done (verified) | Phase 13 |
 
 ## Phase 1B - Bus rentals (approved)
 
@@ -65,7 +65,7 @@ Status values: Not Started / In Progress / Done (verified) / Blocked. "Done (ver
 | RPT-02 fleet utilisation, RPT-03 cost per trip | Blocked | Definitions and inputs (Q-29) |
 | Boarding codes | Blocked | Policy unknown (Q-19). Not implemented |
 | Passenger personal-data controls | Partial | Minimal fields and role limits; retention, notice and rights workflow not done (see DATA_PROTECTION.md) |
-| Server-side persistence and multi-tab safety | Blocked | D-01 / Q-01 |
+| Server-side persistence and multi-tab safety | Done (verified) | Phase 13: writes are serialised server-side |
 
 ## Phase 3 - Staff logistics (built this session, awaiting review)
 
@@ -279,6 +279,49 @@ Gates run in this session, in the brief's order:
 
 Not verified, and not claimed: that the CI workflow passes on GitHub's runner (it has never
 run there), and anything about a real browser or a real server.
+
+## Phase 13 - The intended stack: server, database, real enforcement (this session)
+
+The rebuild the brief and the audit both required. The browser no longer holds a database: it holds
+a redacted snapshot and a session cookie. Every write is a command sent to the server, authorised
+there, validated there, applied in a transaction there, and checked again by PostgreSQL.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Next.js App Router replaces the Vite single-page build | Done (verified) | `npm run build`, `next start`, `/` returns 200 |
+| PostgreSQL 18 schema: 16 tables, `btree_gist`, `pgcrypto`, typed columns + JSONB value objects (D-50) | Done (verified) | `npm run db:migrate`, `\dt` equivalent over `information_schema` |
+| Double booking prevented by the database: exclusion constraint on `(resource_type, resource_id, period)` | Done (verified) | `repository.integration.test.ts` — overlapping booking rejected with `23P01`, back-to-back accepted |
+| Audit log is append-only by trigger, not by convention | Done (verified) | `repository.integration.test.ts` — UPDATE and DELETE both refused |
+| Odometer cannot go backwards | Done (verified) | `repository.integration.test.ts` — lower reading refused |
+| Password hashing: Argon2id (`@node-rs/argon2`, m=19456, t=2, p=1) replacing in-page PBKDF2 (D-51) | Done (verified) | `password.test.ts`; stored hash inspected in `app_user` |
+| Sessions: `iron-session` sealed cookie, 8-hour lifetime, `httpOnly`/`sameSite=lax`/`secure` in production (D-51) | Done (verified) | sign-in over HTTP set the cookie; signed-out `/api/session` returns no data |
+| First-run administrator creation, then refused forever | Done (verified) | `/api/setup` 201 then 409; service layer refuses too |
+| Sign-in throttle (8 failures / 15 min per address+account) | Done (verified) | `rateLimit.test.ts`; known single-process limit documented |
+| Authorisation enforced at the boundary *and* in the domain layer | Done (verified) | operations user → `update_settings` 403; no session → 401 |
+| Every response redacted: no `passwordHash`, no `passwordSalt` | Done (verified) | `snapshot.test.ts`; live `/api/session` inspected |
+| Browser cannot send a credential, cannot restore a backup, cannot run setup | Done (verified) | `clientCommand.ts` types; `/api/commands` rejects unknown types; server hashes supplied passwords |
+| Zod validation at every route boundary; database errors mapped to operator language | Done | `src/app/api/**`, `describeDatabaseError` |
+| Concurrency: serialised writes via `pg_advisory_xact_lock` in one transaction | Done (verified) | 10 parallel `create_client` requests → 10 `ok:true`, 10 rows stored (no lost update) |
+| Scripts: `db:migrate`, `db:seed`, `db:reset`, `db:backup`, `db:restore` | Done (verified) | all five executed against a real database; backup/restore round-tripped 1 user, 2 vehicles, 8 audit rows |
+| Fedora run guide, `run.sh`, docker-compose, `.env.example` | Done (authored; the container and Fedora steps **not executed** here) | `docs/SETUP_AND_DEPLOYMENT.md` §12 |
+| UI tests drive the app through a request/response boundary instead of `localStorage` | Done (verified) | `src/test/fakeServer.ts`, 130 UI/domain tests still green |
+| Integration suite against a real PostgreSQL, skipped without `TEST_DATABASE_URL` | Done (verified) | 5 tests pass against PostgreSQL 18.4 |
+| CI updated for the new gates | Done (authored, not executed) | `.github/workflows/ci.yml`: quality-gates job + an integration job against a `postgres:18-alpine` service. Never run on a GitHub runner from here. |
+| HTTPS / reverse proxy, systemd unit, TLS, multi-instance operation | Authored, **not verified** | `docs/SETUP_AND_DEPLOYMENT.md` §4, §5 |
+| Row-level pagination of reads | Not started | The whole redacted workload is returned per request; documented as limit §11.2 |
+| Request-level scoping in SQL (own-record rows filtered in the database) | Not started | Scope is applied in the domain layer today; the snapshot is redacted but not per-row filtered for portal users beyond `scopedView` |
+
+Gates run at the end of this phase:
+
+- `npm run typecheck` — clean.
+- `npm run lint` — clean.
+- `npm test` — **147 passed, 5 skipped** (the integration suite, which needs a database).
+- `TEST_DATABASE_URL=… npm run test:integration` — **5 passed** against PostgreSQL 18.4.
+- `npm run test:coverage` — 72.4 % statements, 65.0 % branches, 68.3 % functions, 76.9 % lines
+  (thresholds 70/62/66/74), after excluding the database/request-context modules covered by the
+  integration suite (see `vitest.config.ts` for the list and the reason).
+- `npm run build` — production build, 8 routes; `next start` served it and `/api/health` returned
+  `200` with the live PostgreSQL version.
 
 ## Not started (later phases)
 

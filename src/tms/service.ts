@@ -187,12 +187,19 @@ export const PASSWORD_MIN_LENGTH = MIN_PASSWORD_LENGTH;
 // out) and a credential minted outside hashPassword() for a password the form would refuse.
 const CREDENTIAL_HASH_RE = /^[0-9a-f]{64}$/;
 const CREDENTIAL_SALT_RE = /^[0-9a-f]{32}$/;
+// Argon2id PHC string, as produced by the server's password hasher (D-51). Argon2 carries its own
+// salt inside the string, so passwordSalt is legitimately empty for these credentials.
+const ARGON2_RE = /^\$argon2(id|i|d)\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/;
 
 export function validateCredential(credential: Credential | null | undefined): Errors {
   const errors: Errors = {};
   const hash = credential?.passwordHash;
   const salt = credential?.passwordSalt;
-  if (typeof hash !== "string" || !CREDENTIAL_HASH_RE.test(hash)) {
+  if (typeof hash !== "string" || hash.length === 0) {
+    errors.password = "The password must be set through the app so it is hashed before it reaches the service layer.";
+  } else if (ARGON2_RE.test(hash)) {
+    // Well-formed Argon2id credential; the salt is embedded.
+  } else if (!CREDENTIAL_HASH_RE.test(hash)) {
     errors.password = "The password must be set through the app so it is hashed before it reaches the service layer.";
   } else if (typeof salt !== "string" || !CREDENTIAL_SALT_RE.test(salt)) {
     errors.password = "The password salt is missing or malformed.";

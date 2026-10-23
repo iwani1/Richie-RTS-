@@ -1,9 +1,13 @@
 # Quality gates on every push and pull request.
 #
-# These are the same four gates the standing brief (AGENTS.md §14) requires before any
-# change, run in the same order as `npm run check`, plus a coverage ratchet and a full
-# dependency audit. Nothing here depends on a database, a server or a secret: the
-# application is a static single-file build in this phase.
+# Two jobs, because the application now has two kinds of proof:
+#   1. quality-gates  — typecheck, lint, unit/UI tests with coverage thresholds, production build,
+#                       dependency audit. No database needed.
+#   2. integration    — the same suite the brief cares most about: real PostgreSQL, real
+#                       constraints (double booking, append-only audit, monotonic odometer).
+#
+# The integration job has never been observed on a GitHub runner from this development
+# environment; the suite itself runs green locally against PostgreSQL 18.4.
 
 name: ci
 
@@ -32,7 +36,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.19
+          # .nvmrc and package.json engines both require 20.19+.
+          node-version: 22
           cache: npm
 
       - name: Install (exact lockfile)
@@ -55,15 +60,55 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       # Dev dependencies run on the runner and in every contributor's shell, so they are
-      # audited too. This is a hard gate: after the Phase 12 upgrade the tree carries one low
-      # advisory (esbuild dev server, Windows only), well below the threshold.
+      # audited too. This is a hard gate.
       - name: Audit all dependencies
         run: npm run audit:dev -- --audit-level=high
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist/index.html
+          name: next-build
+          path: .next/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: richie_tms_test
+          POSTGRES_USER: richie
+          POSTGRES_PASSWORD: ci-not-a-secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U richie -d richie_tms_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Migrate the scratch database
+        env:
+          DATABASE_URL: postgresql://richie:ci-not-a-secret@127.0.0.1:5432/richie_tms_test
+          SESSION_SECRET: ci-only-session-secret-at-least-32-characters
+        run: npm run db:migrate
+
+      # These fail the job; they are never allowed to silently skip.
+      - name: Integration tests (real PostgreSQL)
+        env:
+          TEST_DATABASE_URL: postgresql://richie:ci-not-a-secret@127.0.0.1:5432/richie_tms_test
+        run: npm run test:integration

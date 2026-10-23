@@ -3,12 +3,15 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { webcrypto } from "node:crypto";
 import App from "./App";
+import { installFakeServer } from "./test/fakeServer";
 
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   if (!globalThis.crypto?.subtle) Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
   Object.defineProperty(window, "scrollTo", { value: () => undefined, configurable: true });
+  // This suite starts at first run and creates the administrator through the UI.
+  installFakeServer();
 });
 afterEach(cleanup);
 
@@ -17,13 +20,20 @@ const setField = (label: RegExp | string, value: string, scope: { getByLabelText
 };
 
 async function setup() {
-  render(<App />);
+  await renderApp();
   setField(/Full name/i, "Admin");
   setField(/^Email/i, "admin@example.test");
   setField(/^Password/i, "correct-horse-battery");
   setField(/Confirm password/i, "correct-horse-battery");
   fireEvent.click(screen.getByRole("button", { name: /Create administrator/i }));
   await screen.findByRole("heading", { name: /Richie Transport Services/i });
+}
+
+/** Renders the app and waits for the initial /api/session round trip to settle. */
+async function renderApp() {
+  const view = render(<App />);
+  await waitFor(() => expect(screen.queryByText(/Contacting the server/i)).toBeNull());
+  return view;
 }
 
 describe("Bus rentals end-to-end (jsdom)", () => {

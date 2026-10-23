@@ -3,12 +3,16 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { webcrypto } from "node:crypto";
 import App from "./App";
+import { installFakeServer } from "./test/fakeServer";
 
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   if (!globalThis.crypto?.subtle) Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
   Object.defineProperty(window, "scrollTo", { value: () => undefined, configurable: true });
+  // A fresh, empty server per test: the app's first request is /api/session, which reports
+  // setupRequired on an installation with no accounts.
+  installFakeServer();
 });
 afterEach(cleanup);
 
@@ -22,7 +26,7 @@ describe("Richie TMS end-to-end (jsdom)", () => {
     const { unmount } = render(<App />);
 
     // 1. First run: administrator setup, no accounts exist.
-    expect(screen.getByText(/Create the first administrator/i)).toBeTruthy();
+    expect(await screen.findByText(/Create the first administrator/i)).toBeTruthy();
     type(/Full name/i, "Ama Mensah");
     type(/^Email/i, "ama@example.test");
     type(/^Password/i, "correct-horse-battery");
@@ -69,7 +73,8 @@ describe("Richie TMS end-to-end (jsdom)", () => {
     expect(screen.getByText(/vehicles:transition/)).toBeTruthy();
     expect(screen.getByText(/users:setup/)).toBeTruthy();
 
-    // 6. Sign out, reload the app, and sign back in: data persisted in localStorage.
+    // 6. Sign out, reload the app, and sign back in: the data lives on the server, so it survives
+    //    a fresh browser session and a full remount.
     fireEvent.click(screen.getByRole("button", { name: /Sign out/i }));
     expect(await screen.findByRole("heading", { name: /^Sign in$/i })).toBeTruthy();
     unmount();
@@ -77,7 +82,7 @@ describe("Richie TMS end-to-end (jsdom)", () => {
     await act(async () => {
       render(<App />);
     });
-    expect(screen.getByRole("heading", { name: /^Sign in$/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /^Sign in$/i })).toBeTruthy();
     type(/^Email/i, "ama@example.test");
     type(/^Password/i, "wrong-password-here");
     fireEvent.click(screen.getByRole("button", { name: /^Sign in$/i }));

@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { webcrypto } from "node:crypto";
 import App from "./App";
+import { installFakeServer } from "./test/fakeServer";
+
 import { executeCommand, type AnyCommand } from "./tms/commands";
 import { execute, type Actor } from "./tms/service";
 import { emptyDatabase, type Database } from "./tms/types";
@@ -42,14 +44,20 @@ function seed() {
   run({ type: "advance_work_order", id: workOrderId, input: { to: "in_progress", note: "Booked in", costsConfirmedComplete: false, vehicleRestoredTo: "unchanged" } });
   run({ type: "advance_work_order", id: workOrderId, input: { to: "completed", note: "Oil, filters and inspection", costsConfirmedComplete: true, vehicleRestoredTo: "unchanged" } });
 
-  localStorage.setItem("richie-tms:db:v1", JSON.stringify(db));
-  sessionStorage.setItem("richie-tms:session", admin.id);
+  installFakeServer(db, admin.id);
+}
+
+/** Renders the app and waits for the initial /api/session round trip to settle. */
+async function renderApp() {
+  const view = render(<App />);
+  await waitFor(() => expect(screen.queryByText(/Contacting the server/i)).toBeNull());
+  return view;
 }
 
 describe("Fleet readiness end-to-end (jsdom)", () => {
   it("starts unconfigured, schedules a category, reports overdue, records an odometer and flags the dashboard", async () => {
     seed();
-    render(<App />);
+    await renderApp();
 
     // Nothing is scheduled, so the report refuses to estimate.
     fireEvent.click(screen.getByRole("button", { name: /Fleet readiness/i }));

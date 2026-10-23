@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { webcrypto } from "node:crypto";
 import App from "./App";
+import { installFakeServer } from "./test/fakeServer";
+
+let api: ReturnType<typeof installFakeServer>;
 import { executeCommand, type AnyCommand } from "./tms/commands";
 import { execute, type Actor } from "./tms/service";
 import { emptyDatabase, emptyRentalSettings, type Database } from "./tms/types";
@@ -77,15 +80,21 @@ function seed(): { vehicleId: string; driverId: string } {
   });
   run({ type: "generate_trips", routeId: route.id, fromDate: today, toDate: today });
 
-  localStorage.setItem("richie-tms:db:v1", JSON.stringify(db));
-  sessionStorage.setItem("richie-tms:session", admin.id);
+  api = installFakeServer(db, admin.id);
   return { vehicleId: db.vehicles[0].id, driverId: db.drivers[0].id };
+}
+
+/** Renders the app and waits for the initial /api/session round trip to settle. */
+async function renderApp() {
+  const view = render(<App />);
+  await waitFor(() => expect(screen.queryByText(/Contacting the server/i)).toBeNull());
+  return view;
 }
 
 describe("Staff busing end-to-end (jsdom)", () => {
   it("runs a trip from assignment through dispatch and completion to on-time performance", async () => {
     const { vehicleId, driverId } = seed();
-    render(<App />);
+    await renderApp();
 
     fireEvent.click(screen.getByRole("button", { name: /Staff busing/i }));
     fireEvent.click(screen.getByRole("tab", { name: /^Trips$/ }));
@@ -118,7 +127,7 @@ describe("Staff busing end-to-end (jsdom)", () => {
 
   it("adds a rider to a future stop mid-run, blocks recorded stops, and completes with them", async () => {
     const { vehicleId, driverId } = seed();
-    render(<App />);
+    await renderApp();
 
     fireEvent.click(screen.getByRole("button", { name: /Staff busing/i }));
     fireEvent.click(screen.getByRole("tab", { name: /^Trips$/ }));
@@ -181,7 +190,7 @@ describe("Staff busing end-to-end (jsdom)", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Complete run/i }));
     await screen.findByText(/completed\. On time: yes/i);
 
-    const db = JSON.parse(localStorage.getItem("richie-tms:db:v1") ?? "{}") as Database;
+    const db = api.db();
     expect(db.trips[0].boardings).toHaveLength(2);
     expect(db.audit.some((entry) => entry.summary.includes("Mid-trip addition"))).toBe(true);
   }, 30000);

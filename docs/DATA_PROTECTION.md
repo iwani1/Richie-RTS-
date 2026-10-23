@@ -40,9 +40,16 @@ No retention period is set. Every period below is a proposal to confirm, and non
 
 These are not acceptable for live personal data. They must be closed before production:
 
-1. All personal data sits in browser `localStorage` in plain text, including password hashes. Anyone with access to the device or browser profile can read it.
-2. Backups (Users screen, "Download backup") are unencrypted JSON containing all personal data.
-3. There is no encryption at rest, no network transport security (no server), and no per-record access control beyond roles.
+1. Personal data now sits in PostgreSQL on a machine the company controls, protected by the
+   database user's password. **There is still no encryption at rest**: anyone with root on that
+   machine, or a copy of the data directory, can read it. Full-disk encryption on the workstation
+   is the minimum before real data goes in.
+2. `npm run db:backup` writes **unencrypted JSON containing password hashes**; move it to encrypted
+   storage. The Users-screen export is redacted (no credentials) but still contains personal data.
+3. There is no TLS inside the application: staff on the office network must reach it through an
+   HTTPS reverse proxy (`docs/SETUP_AND_DEPLOYMENT.md` §5) or their session cookie and traffic are
+   exposed on that network. There is no per-record access control beyond roles and own-record
+   scope, and scope filtering happens in the application layer, not in SQL.
 4. No workflow for subject access, correction or deletion requests.
 5. No retention jobs.
 6. No audit trail of reads. Only writes are audited.
@@ -56,7 +63,9 @@ These are not acceptable for live personal data. They must be closed before prod
 
 - Role-based permissions on every write, enforced in the service layer, not only in the UI (PERMISSIONS.md).
 - Audit summaries for passenger and driver records avoid personal names. Entity IDs are recorded instead.
-- Passwords are hashed with PBKDF2-SHA256 and a random salt. Sign-in failures return a generic message.
+- Passwords are hashed with Argon2id (m=19456, t=2, p=1) on the server and never sent to the browser; sign-in failures return a generic message for unknown account, inactive account and wrong password alike, in equivalent time.
+- Sessions are sealed, `httpOnly`, `sameSite=lax` cookies (`iron-session`), `Secure` in production, with an eight-hour lifetime. Sign-in is throttled per address and account.
+- Every API response is redacted: `passwordHash` and `passwordSalt` are blanked server-side, and the browser cannot submit a credential hash or restore a backup.
 - Data minimisation in forms: passengers need a name and a client. Phone and employee reference are optional.
 - **Phase 4 addition.** Record-bound accounts are confined to their own record, and the client
   portal shows roster **name and pickup stop only** — not phone, employee reference or any

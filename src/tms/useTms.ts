@@ -1,12 +1,18 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cryptoAvailable, hashPassword, verifyPassword } from "./crypto";
-import { can, type Permission } from "./permissions";
-import { execute, PASSWORD_MIN_LENGTH, type Actor, type CommandResult } from "./service";
-import { executeCommand, type AnyCommand } from "./commands";
-import { emptyDatabase, migrate, type Database, type User } from "./types";
+"use client";
 
-const DB_KEY = "richie-tms:db:v1";
-const SESSION_KEY = "richie-tms:session";
+// The browser's view of the system.
+//
+// In the prototype this module owned the database: it read localStorage, ran commands in the page
+// and wrote back. The audit found the consequences — every rule was advisory, because the person
+// with the browser was the server (audit/H-01, H-02, M-04). Here the browser holds nothing but a
+// redacted snapshot and a cookie. `dispatch` sends an intent to /api/commands; the server decides,
+// writes, and returns the new snapshot. Anything this module believes about permissions is UI
+// polish, not enforcement.
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { can, type Permission } from "./permissions";
+import type { ClientCommand } from "./clientCommand";
+import { PASSWORD_MIN_LENGTH, type Actor, type CommandResult } from "./service";
+import { emptyDatabase, type Database, type User } from "./types";
 
 export type Tone = "info" | "success" | "warning" | "error";
 export interface Flash {
@@ -14,175 +20,218 @@ export interface Flash {
   message: string;
 }
 
+export type LoadStatus = "loading" | "ready" | "offline";
+
 export interface Tms {
   db: Database;
   actor: Actor | null;
   currentUser: User | null;
-  storageError: string | null;
+  status: LoadStatus;
+  /** Why the app cannot reach the server, if it cannot. Shown in the shell, never swallowed. */
+  connectionError: string | null;
+  setupRequired: boolean;
   flash: Flash | null;
   setFlash: (flash: Flash | null) => void;
   allowed: (permission: Permission) => boolean;
-  dispatch: (command: AnyCommand) => CommandResult;
+  dispatch: (command: ClientCommand) => Promise<CommandResult>;
   signIn: (email: string, password: string) => Promise<string | null>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
   setupAdministrator: (fullName: string, email: string, password: string) => Promise<CommandResult>;
-  createCredential: (password: string) => Promise<{ ok: true; credential: { passwordHash: string; passwordSalt: string } } | { ok: false; error: string }>;
-  exportBackup: () => string | null;
+  exportBackup: () => Promise<string | null>;
+  refresh: () => Promise<void>;
 }
 
-function loadDatabase(): Database {
-  try {
-    const raw = localStorage.getItem(DB_KEY);
-    if (!raw) return emptyDatabase();
-    const parsed: unknown = JSON.parse(raw);
-    return migrate(parsed) ?? emptyDatabase();
-  } catch {
-    return emptyDatabase();
-  }
+interface SessionPayload {
+  ok: boolean;
+  setupRequired?: boolean;
+  user?: User | null;
+  database?: Database | null;
+  message?: string;
 }
 
-function loadSession(): string | null {
-  try {
-    return sessionStorage.getItem(SESSION_KEY);
-  } catch {
-    return null;
-  }
+async function postJson<T>(url: string, body?: unknown): Promise<{ status: number; data: T | null }> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: "same-origin",
+  });
+  const data = (await response.json().catch(() => null)) as T | null;
+  return { status: response.status, data };
 }
+
+const NETWORK_ERROR = "Cannot reach the server. Check that the application is running and reload.";
 
 export function useTmsState(): Tms {
-  const [db, setDb] = useState<Database>(loadDatabase);
-  const dbRef = useRef(db);
-  const [sessionUserId, setSessionUserId] = useState<string | null>(loadSession);
-  const [storageError, setStorageError] = useState<string | null>(null);
+  const [db, setDb] = useState<Database>(emptyDatabase);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [setupRequired, setSetupRequired] = useState(false);
+  const [status, setStatus] = useState<LoadStatus>("loading");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
 
-  // Persist synchronously at the single point where state changes (commit below), not in an
-  // effect after the fact. Persisting in an effect meant setState inside an effect on every
-  // write (a cascading render), and a window after commit where React state and storage
-  // disagreed. The one write that does not go through commit is the initial load, handled
-  // once on mount here.
-  const persist = useCallback((next: Database): string | null => {
-    try {
-      localStorage.setItem(DB_KEY, JSON.stringify(next));
-      return null;
-    } catch (error) {
-      return `Browser storage write failed: ${error instanceof Error ? error.message : "unknown error"}. Changes are not being saved.`;
-    }
+  // Commands are serialised: the server applies them one at a time, and replies in the same order,
+  // so the newest response is always the newest state. Sending them concurrently would let an
+  // older snapshot overwrite a newer one on screen.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+
+  const applySession = useCallback((session: SessionPayload) => {
+    setSetupRequired(Boolean(session.setupRequired));
+    setCurrentUser(session.user ?? null);
+    if (session.database) setDb(session.database);
   }, []);
 
+  const refresh = useCallback(async () => {
+    try {
+      const response = await fetch("/api/session", { credentials: "same-origin", cache: "no-store" });
+      const session = (await response.json().catch(() => null)) as SessionPayload | null;
+      if (!session) {
+        setConnectionError(NETWORK_ERROR);
+        setStatus("offline");
+        return;
+      }
+      if (!session.ok) {
+        // Reachable but unhappy (database down, migrations missing): say so, do not pretend.
+        setConnectionError(session.message ?? "The server reported a problem.");
+        setStatus("offline");
+        return;
+      }
+      applySession(session);
+      setConnectionError(null);
+      setStatus("ready");
+    } catch {
+      setConnectionError(NETWORK_ERROR);
+      setStatus("offline");
+    }
+  }, [applySession]);
+
+  // First paint: ask the server who we are and what we may see. There is no synchronous
+  // fallback to a local database any more, so this effect is the only initial load.
   useEffect(() => {
-    // Mount only: surface a storage problem that already exists for the loaded database
-    // (for example a quota exhausted before this session), without a render-time setState.
-    const error = persist(dbRef.current);
-    if (error !== null) queueMicrotask(() => setStorageError(error));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally mount-only
-  }, []);
+    // The rule cannot see through `refresh`: every setState happens after an await, not
+    // synchronously in the effect body. Loading the session once on mount is the intended
+    // "subscribe to an external system" case.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refresh();
+  }, [refresh]);
 
   useEffect(() => {
     if (!flash) return;
-    const t = window.setTimeout(() => setFlash(null), 4500);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => setFlash(null), 4500);
+    return () => window.clearTimeout(timer);
   }, [flash]);
 
-  const currentUser = useMemo(() => db.users.find((u) => u.id === sessionUserId && u.active) ?? null, [db.users, sessionUserId]);
-  const actor = useMemo<Actor | null>(() => (currentUser ? { id: currentUser.id, fullName: currentUser.fullName, role: currentUser.role } : null), [currentUser]);
-  const actorRef = useRef(actor);
-  // Keep the ref in sync in an effect, not during render. Under concurrent rendering a
-  // render can start and be discarded; writing the ref during render would leave
-  // dispatch() acting as a stale (or never-committed) actor.
-  useEffect(() => {
-    actorRef.current = actor;
-  }, [actor]);
-
-  const commit = useCallback(
-    (next: Database) => {
-      dbRef.current = next;
-      setDb(next);
-      const error = persist(next);
-      setStorageError((previous) => (previous === error ? previous : error));
-    },
-    [persist],
+  const actor = useMemo<Actor | null>(
+    () => (currentUser ? { id: currentUser.id, fullName: currentUser.fullName, role: currentUser.role } : null),
+    [currentUser],
   );
 
   const dispatch = useCallback(
-    (command: AnyCommand): CommandResult => {
-      const result = executeCommand(dbRef.current, actorRef.current, command);
-      if (result.ok) commit(result.db);
-      return result;
+    (command: ClientCommand): Promise<CommandResult> => {
+      const run = async (): Promise<CommandResult> => {
+        try {
+          const { status: httpStatus, data } = await postJson<{
+            ok: boolean;
+            message?: string;
+            errors?: Record<string, string>;
+            database?: Database;
+          }>("/api/commands", command);
+          if (httpStatus === 401) {
+            setCurrentUser(null);
+            setDb(emptyDatabase());
+            return { ok: false, message: "Your session has ended. Sign in again.", errors: {} };
+          }
+          if (!data) return { ok: false, message: NETWORK_ERROR, errors: {} };
+          if (!data.ok) return { ok: false, message: data.message ?? "The change was not saved.", errors: data.errors ?? {} };
+          if (data.database) setDb(data.database);
+          return { ok: true, db: data.database ?? emptyDatabase(), message: data.message ?? "Saved." };
+        } catch {
+          setConnectionError(NETWORK_ERROR);
+          setStatus("offline");
+          return { ok: false, message: NETWORK_ERROR, errors: {} };
+        }
+      };
+      const next = queue.current.then(run, run);
+      queue.current = next.catch(() => undefined);
+      return next;
     },
-    [commit],
+    [],
   );
-
-  const createCredential = useCallback(async (password: string) => {
-    if (password.length < PASSWORD_MIN_LENGTH) return { ok: false as const, error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` };
-    if (!cryptoAvailable()) return { ok: false as const, error: "Web Crypto is unavailable (a secure context such as HTTPS or localhost is required)." };
-    return { ok: true as const, credential: await hashPassword(password) };
-  }, []);
 
   const signIn = useCallback(
     async (email: string, password: string): Promise<string | null> => {
-      if (!cryptoAvailable()) return "Web Crypto is unavailable (a secure context such as HTTPS or localhost is required).";
-      const user = dbRef.current.users.find((u) => u.email === email.trim().toLowerCase());
-      // Same message for unknown user, inactive user and wrong password.
-      const generic = "Incorrect email or password.";
-      if (!user || !user.active) return generic;
-      const ok = await verifyPassword(password, user);
-      if (!ok) return generic;
-      const signedInActor: Actor = { id: user.id, fullName: user.fullName, role: user.role };
-      const result = execute(dbRef.current, signedInActor, { type: "record_sign_in" });
-      if (result.ok) commit(result.db);
       try {
-        sessionStorage.setItem(SESSION_KEY, user.id);
+        const { data } = await postJson<SessionPayload>("/api/auth/login", { email, password });
+        if (!data?.ok) return data?.message ?? "Incorrect email or password.";
+        applySession(data);
+        setConnectionError(null);
+        setStatus("ready");
+        return null;
       } catch {
-        // Session will last for this page only.
+        return NETWORK_ERROR;
       }
-      setSessionUserId(user.id);
-      return null;
     },
-    [commit],
+    [applySession],
   );
 
-  const signOut = useCallback(() => {
-    try {
-      sessionStorage.removeItem(SESSION_KEY);
-    } catch {
-      // ignore
-    }
-    setSessionUserId(null);
+  const signOut = useCallback(async () => {
+    await postJson("/api/auth/logout").catch(() => null);
+    setCurrentUser(null);
+    setDb(emptyDatabase());
     setFlash({ tone: "info", message: "Signed out." });
   }, []);
 
   const setupAdministrator = useCallback(
     async (fullName: string, email: string, password: string): Promise<CommandResult> => {
-      const cred = await createCredential(password);
-      if (!cred.ok) return { ok: false, message: cred.error, errors: { password: cred.error } };
-      const result = execute(dbRef.current, null, { type: "setup_administrator", input: { fullName, email }, credential: cred.credential });
-      if (result.ok) {
-        commit(result.db);
-        const user = result.db.users[0];
-        try {
-          sessionStorage.setItem(SESSION_KEY, user.id);
-        } catch {
-          // ignore
-        }
-        setSessionUserId(user.id);
+      if (password.length < PASSWORD_MIN_LENGTH) {
+        const message = `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
+        return { ok: false, message, errors: { password: message } };
       }
-      return result;
+      try {
+        const { data } = await postJson<SessionPayload>("/api/setup", { fullName, email, password });
+        if (!data?.ok) return { ok: false, message: data?.message ?? "The account could not be created.", errors: {} };
+        applySession(data);
+        setConnectionError(null);
+        setStatus("ready");
+        return { ok: true, db: data.database ?? emptyDatabase(), message: data.message ?? "Administrator account created." };
+      } catch {
+        return { ok: false, message: NETWORK_ERROR, errors: {} };
+      }
     },
-    [commit, createCredential],
+    [applySession],
   );
 
   const allowed = useCallback((permission: Permission) => can(actor?.role, permission), [actor]);
 
-  const exportBackup = useCallback(() => {
-    // Data egress is a permissioned, audited action, not a read. `backup:export` is what the
-    // service layer checks; the button gating in the UI is convenience, not the boundary.
-    const recorded = dispatch({ type: "record_backup_export" });
-    if (!recorded.ok) return null;
-    return JSON.stringify(dbRef.current, null, 2);
+  const exportBackup = useCallback(async (): Promise<string | null> => {
+    // Data leaving the system is a permissioned, audited event, not a read. The server records it
+    // and refuses if the role lacks backup:export; the file itself is the redacted snapshot, so a
+    // backup can never contain a password hash.
+    const recorded = await dispatch({ type: "record_backup_export" });
+    if (!recorded.ok) {
+      setFlash({ tone: "error", message: recorded.message });
+      return null;
+    }
+    return JSON.stringify(recorded.db, null, 2);
   }, [dispatch]);
 
-  return { db, actor, currentUser, storageError, flash, setFlash, allowed, dispatch, signIn, signOut, setupAdministrator, createCredential, exportBackup };
+  return {
+    db,
+    actor,
+    currentUser,
+    status,
+    connectionError,
+    setupRequired,
+    flash,
+    setFlash,
+    allowed,
+    dispatch,
+    signIn,
+    signOut,
+    setupAdministrator,
+    exportBackup,
+    refresh,
+  };
 }
 
 export const TmsContext = createContext<Tms | null>(null);

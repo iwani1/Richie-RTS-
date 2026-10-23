@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { webcrypto } from "node:crypto";
 import App from "./App";
+import { installFakeServer } from "./test/fakeServer";
+
+let api: ReturnType<typeof installFakeServer>;
 import { executeCommand, type AnyCommand } from "./tms/commands";
 import type { Actor } from "./tms/service";
 import { emptyDatabase, emptyRentalSettings, type Database } from "./tms/types";
@@ -20,7 +23,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function saved(): Database {
-  return JSON.parse(localStorage.getItem("richie-tms:db:v1") ?? "{}") as Database;
+  return api.db();
 }
 
 // Two clients and two routes, with a driver account and a client contact account each
@@ -92,17 +95,24 @@ function seed(): { driverUserId: string; clientUserId: string; driverVehicleId: 
   });
   const clientUserId = db.users[3].id;
 
-  localStorage.setItem("richie-tms:db:v1", JSON.stringify(db));
+  api = installFakeServer(db, null);
   return { driverUserId, clientUserId, driverVehicleId, otherVehicleId };
 }
 
-const signInAs = (id: string) => sessionStorage.setItem("richie-tms:session", id);
+const signInAs = (id: string) => api.setUser(id);
+
+/** Renders the app and waits for the initial /api/session round trip to settle. */
+async function renderApp() {
+  const view = render(<App />);
+  await waitFor(() => expect(screen.queryByText(/Contacting the server/i)).toBeNull());
+  return view;
+}
 
 describe("Driver portal (jsdom)", () => {
   it("lands on the driver's own runs and hides the internal screens", async () => {
     const { driverUserId, driverVehicleId } = seed();
     signInAs(driverUserId);
-    render(<App />);
+    await renderApp();
 
     // The driver lands on its portal, not the dashboard.
     expect(await screen.findByText("Alpha run")).toBeTruthy();
@@ -136,7 +146,7 @@ describe("Driver portal (jsdom)", () => {
   it("starts the run, records stops and boarding progressively, then completes", async () => {
     const { driverUserId } = seed();
     signInAs(driverUserId);
-    render(<App />);
+    await renderApp();
 
     fireEvent.click(await screen.findByRole("button", { name: /Start run/i }));
     fireEvent.click(await screen.findByRole("button", { name: /Record next stop/i }));
@@ -174,7 +184,7 @@ describe("Client portal (jsdom)", () => {
   it("shows only its own client's records and raises a request for that client", async () => {
     const { clientUserId } = seed();
     signInAs(clientUserId);
-    render(<App />);
+    await renderApp();
 
     expect((await screen.findAllByText("Alpha run")).length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Beta run")).toHaveLength(0);

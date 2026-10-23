@@ -1,0 +1,107 @@
+import { z } from "zod";
+import { json } from "../../../server/api";
+import { runCommand } from "../../../server/commands";
+import { WeakPasswordError, hashPassword } from "../../../server/password";
+import { redact } from "../../../server/snapshot";
+import { currentUserId } from "../../../server/session";
+import { can } from "../../../tms/permissions";
+import { db } from "../../../server/db";
+import { loadDatabase } from "../../../server/repository";
+
+export const dynamic = "force-dynamic";
+
+// One endpoint for every state change. The browser sends a command *intent*; the server decides
+// whether it is allowed, validates it, applies it in a transaction and returns the new redacted
+// snapshot. The client no longer holds a database it can mutate, which is the whole point of the
+// rebuild (brief §5.1, §5.3, §5.10).
+const KNOWN_TYPES = [
+  "record_sign_in",
+  "update_settings",
+  "create_vehicle", "update_vehicle", "transition_vehicle",
+  "create_driver", "update_driver",
+  "create_client", "update_client",
+  "create_rental", "update_rental", "quote_rental", "requote_rental", "confirm_rental",
+  "assign_rental", "start_rental", "complete_rental", "decline_rental", "cancel_rental",
+  "create_route", "update_route", "generate_trips", "dispatch_trip", "assign_trip",
+  "start_trip", "complete_trip", "cancel_trip", "record_trip_stop",
+  "create_passenger", "update_passenger",
+  "create_incident", "update_incident", "advance_incident", "add_incident_cost", "remove_incident_cost",
+  "create_work_order", "update_work_order", "advance_work_order", "add_work_order_cost", "remove_work_order_cost",
+  "create_document", "update_document",
+  "record_odometer", "void_odometer",
+  "create_user", "update_user", "reset_user_password",
+  "record_backup_export",
+] as const;
+
+// `setup_administrator` is deliberately absent: it is only reachable from /api/setup, which
+// refuses once an account exists. `import_backup` is absent too — a client-supplied database
+// would let any signed-in user overwrite every table and every credential, so restore is a
+// server-side operation (scripts/restore.ts) documented in docs/SETUP_AND_DEPLOYMENT.md.
+const COMMAND_TYPES = new Set<string>(KNOWN_TYPES);
+const PASSWORD_TYPES = new Set(["create_user", "reset_user_password"]);
+
+const envelope = z.object({
+  type: z.string().min(1).max(64),
+  password: z.string().min(1).max(1024).optional(),
+  input: z.record(z.string(), z.unknown()).optional(),
+  id: z.string().min(1).max(64).optional(),
+  reason: z.string().max(2000).optional(),
+  to: z.string().max(40).optional(),
+  routeId: z.string().max(64).optional(),
+  fromDate: z.string().max(40).optional(),
+  toDate: z.string().max(40).optional(),
+  costId: z.string().max(64).optional(),
+});
+
+// Which permission each command needs at the boundary. The service layer checks again with the
+// real actor; this table exists so an unauthenticated or obviously unpermitted call is rejected
+// before a transaction opens, and so the mapping is visible in one place (docs/PERMISSIONS.md).
+const PERMISSION_FOR: Record<string, Parameters<typeof can>[1]> = {
+  update_settings: "settings:update",
+  create_user: "users:create",
+  update_user: "users:update",
+  reset_user_password: "users:update",
+  record_backup_export: "backup:export",
+};
+
+export async function POST(request: Request) {
+  const userId = await currentUserId();
+  if (!userId) return json(401, { ok: false, message: "Sign in is required." });
+
+  const parsed = envelope.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return json(400, { ok: false, message: "Malformed command." });
+  const body = parsed.data;
+  if (!COMMAND_TYPES.has(body.type)) return json(400, { ok: false, message: "Unknown command." });
+
+  // Permission pre-check against the current role. The actor is re-resolved inside runCommand, so
+  // a role changed mid-request still cannot get an unauthorised write through.
+  if (body.type in PERMISSION_FOR) {
+    const database = await loadDatabase(db());
+    const user = database.users.find((candidate) => candidate.id === userId && candidate.active);
+    if (!user) return json(401, { ok: false, message: "Sign in is required." });
+    if (!can(user.role, PERMISSION_FOR[body.type])) {
+      return json(403, { ok: false, message: "Not permitted." });
+    }
+  }
+
+  // Credentials are minted here, never accepted from the browser. A client that sends a
+  // `passwordHash` of its own choosing is ignored: the field is not part of the envelope.
+  let credential: { passwordHash: string; passwordSalt: string } | undefined;
+  if (PASSWORD_TYPES.has(body.type)) {
+    if (!body.password) return json(400, { ok: false, message: "A password is required.", errors: { password: "Enter a password." } });
+    try {
+      credential = await hashPassword(body.password);
+    } catch (error) {
+      if (error instanceof WeakPasswordError) {
+        return json(400, { ok: false, message: "Please correct the highlighted fields.", errors: { password: error.message } });
+      }
+      throw error;
+    }
+  }
+
+  const { password: _password, ...rest } = body;
+  const command = (credential ? { ...rest, credential } : rest) as unknown as Parameters<typeof runCommand>[0];
+  const result = await runCommand(command, { userId });
+  if (!result.ok) return json(result.status, { ok: false, message: result.message, errors: result.errors });
+  return json(200, { ok: true, message: result.message, database: redact(result.database) });
+}
