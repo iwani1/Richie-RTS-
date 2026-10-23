@@ -85,7 +85,7 @@ written briefs instead, and only the chosen one was built:
 | Ground | White (#ffffff) with grey panels | Newsprint (#fdfcf8) with true-white surfaces only inside panels | **Newsprint** | White for a full page is glare under office strip lighting; a warm off-white reads as printed stock and lets true white mean "raised". |
 | Colour | One accent for the whole app | One flat spot colour per section, carried by the rubric block and section marks | **Per section** | Fourteen destinations in a horizontal strip are hard to tell apart by name alone; colour gives each a place, and it is never the only cue — the rubric also carries the section name. |
 | Type | Grotesque only, weights for hierarchy | Display serif + grotesque for text + mono for figures | **Three voices** | The serif gives the page a headline and a by-line; the grotesque stays legible at 12.5px in tables; the mono lines up times, plates and money. |
-| Navigation | Left rail (rejected with the old build) | Numbered horizontal contents strip under the masthead, drawer under 980px | **Contents strip** | A rail spends 240px of every wide table on 14 labels; the strip returns that width to the departures table and reads as the contents page of the section. |
+| Navigation | Numbered horizontal contents strip (the first attempt at this direction) | A printed **spine** down the left edge: wordmark, fourteen destinations in the display face with their numbers, the desk's instruments at the foot | **Spine** | The strip was the previous build's pattern in a new palette — the same skeleton, and the owner rejected it as "not redesigned". A list of fourteen destinations belongs down a margin, not across the top of the page, and the spine gives every screen a fixed left edge for the colour band to run against. |
 | Dashboard | Four KPI cards over a chart, then an activity table | Front page: a masthead figure, a lead story drawn from the first real exception, a numbered brief, then a two-column spread | **Front page** | KPI cards change no decision. "3 services overdue · 1 licence expired" is the morning's work list, and the first one gets the space to be read. |
 | State | Colour only | Colour block plus the word (`Expired`, `Not set`, `Draft`) | **Word plus colour** | Colour alone fails for red–green deficiency, and ochre in this palette is too light for text. |
 | Records | Cards per record | Ruled tables and side panels | **Tables** | Comparison is the task: which vehicle is free on the 14th. |
@@ -117,9 +117,12 @@ headline, and the rest of the page set as ruled sections rather than boxes.
 
 - **Masthead.** Wordmark, section line, search, live clock, date, user, sign out. Sticky; a 3px ink
   rule closes it.
-- **Contents strip.** Fourteen destinations in five named groups, each numbered `01…14`, sitting under
-  the masthead. Below 980px it becomes a drawer reached from a Menu button.
-- **Rubric.** The screen's colour block: eyebrow, display title, one line of purpose, actions.
+- **Spine.** A 268px column down the left edge, fixed while the sheet scrolls: the wordmark, then the
+  fourteen destinations in five named groups, each in the display face with its number `01…14`, then
+  the desk's instruments — search, the live clock, who is signed in — at the foot. The current screen
+  carries a bar in its section colour. Below 980px the spine turns into a bar with a Menu drawer.
+- **Rubric.** A colour band flush to the top and to both edges of the sheet — no margin, no rounded
+  corner — carrying the eyebrow, a display title at 42–82px, one line of purpose and the actions.
 - **Spread.** Sections are full-width bands (label and note above an ink rule, work below) or a
   two-column `rts-spread` at 1180px and up — the dashboard sets today's departures beside fleet and
   setup, so the page reads as an inside spread rather than a stack.
