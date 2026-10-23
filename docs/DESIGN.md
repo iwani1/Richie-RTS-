@@ -119,7 +119,8 @@ software, not of a document.
 - **One type family.** Inter Variable for every word and figure, Plex Mono only for machine data —
   references, plates, times, money in tables. Figures are tabular.
 - **Radii and edges.** 14px cards, 10px controls, 8px chips, 20px pills. A hairline plus a 1px shadow
-  is the edge; blur is reserved for the command palette and the side panel.
+  is the edge. Nothing is translucent and nothing is blurred: the top bar, the scrims and the palette
+  are all opaque, so a table scrolling underneath never shows through a frame.
 - **Numbers are evidence.** Every card says what it counts and over what period, or says that it
   cannot.
 

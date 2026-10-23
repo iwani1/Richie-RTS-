@@ -1080,8 +1080,7 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(15, 23, 42, 0.38);
-  backdrop-filter: blur(2px);
+  background: rgba(15, 23, 42, 0.42);
   cursor: pointer;
 }
 
