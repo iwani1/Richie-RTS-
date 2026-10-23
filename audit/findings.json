@@ -1,0 +1,487 @@
+{
+  "report": {
+    "title": "Richie Transport Services TMS — security and code-quality audit",
+    "version": "1.0",
+    "generated": "2026-10-23",
+    "auditor": "Arena.ai agent (security and code-quality review)",
+    "confidentiality": "Public repository. No client data was accessed; all findings derive from source and synthetic fixtures."
+  },
+  "target": {
+    "repository": "https://github.com/iwani1/Richie-RTS-",
+    "branch": "main",
+    "commit": "030197e5c80eb7e09adef734f6398cc811e37242",
+    "commit_subject": "Add files via upload",
+    "commit_date": "2026-10-23T01:01:27Z",
+    "visibility": "public",
+    "license_file": null,
+    "default_branch": "main",
+    "tags": 0,
+    "releases": 0,
+    "pull_requests": 0,
+    "github_actions_workflows_detected": 0,
+    "files_at_root": 4,
+    "artifacts_audited": [
+      "Richie TMS demo 1.zip (sha: 1,009,439 bytes, 75 entries)",
+      "Richie TMS demo 2.zip (sha: 1,020,065 bytes, 75 entries)",
+      "richie-tms-phase-prompts.md (276 lines)",
+      "richie-tms-standing-brief.md (342 lines)"
+    ],
+    "primary_snapshot": "Richie TMS demo 2.zip (newer; 1,952 changed source lines vs demo 1)",
+    "notes": "The repository contains no working tree. Source exists only inside the two archives, so every gate below was run against an unpacked copy."
+  },
+  "scope": {
+    "in_scope": [
+      "all TypeScript/TSX source, tests, CSS and HTML (34 source files, 9,780 lines; 14 test files, 3,583 lines)",
+      "docs/*.md, AGENTS.md and the two root briefs (16,331 words)",
+      "eslint/tsconfig/vite configuration, package manifests and lockfile",
+      "the CI workflow inside the archives",
+      "git history, GitHub metadata, workflows, branches, releases"
+    ],
+    "out_of_scope": [
+      "runtime behaviour in a production deployment (none exists)",
+      "the hosting target and any infrastructure-as-code (none present)",
+      "legal advice on Ghana's Data Protection Act 2012 (Act 843)",
+      "branch protection settings (not readable with the available token: HTTP 403)",
+      "dynamic/DAST testing against a live instance"
+    ]
+  },
+  "toolchain": {
+    "node": "22.22.3",
+    "npm": "10.9.8",
+    "typescript": "5.9.3",
+    "eslint": "10.13.0",
+    "vitest": "3.2.7",
+    "vite": "7.3.2",
+    "secret_scanners": ["detect-secrets 1.5.0", "custom regex sweep", "gitleaks 8.30.1 (unavailable)"],
+    "complexity": "eslint complexity/max-depth/max-lines-per-function lint pass",
+    "dead_code": "ts-prune 0.10.3 + reference greps",
+    "dependencies": "npm audit + npm registry dist-tags",
+    "behavioural": "vitest harness written for this audit (permission sweep, PoC, benchmarks)"
+  },
+  "metrics": {
+    "source_lines": 9780,
+    "test_lines": 3583,
+    "source_files": 34,
+    "tests": 118,
+    "test_files": 14,
+    "test_runs": 3,
+    "test_flakiness_observed": false,
+    "coverage_statements_pct": 82.02,
+    "coverage_branches_pct": 75.11,
+    "coverage_functions_pct": 72.02,
+    "coverage_lines_pct": 82.02,
+    "coverage_all_files_basis_statements_pct": 72.16,
+    "bundle_bytes": 567589,
+    "bundle_gzip_bytes": 152922,
+    "build_seconds": 3.13,
+    "npm_packages_before": 293,
+    "npm_packages_after_patches": 282,
+    "vulnerabilities_before": {"critical": 2, "high": 4, "moderate": 1, "low": 1, "total": 8},
+    "vulnerabilities_production_before": {"total": 0},
+    "vulnerabilities_after_patches": {"critical": 0, "high": 0, "moderate": 0, "low": 1, "total": 1},
+    "licenses": {"MIT": 335, "ISC": 22, "Apache-2.0": 19, "MPL-2.0": 12, "BSD-2-Clause": 8, "BSD-3-Clause": 7, "BlueOak-1.0.0": 5, "MIT-0": 1, "CC-BY-4.0": 1, "copyleft_GPL_AGPL_SSPL": 0},
+    "max_cyclomatic_complexity": 151,
+    "functions_over_complexity_10": 40,
+    "todos_or_fixmes": 0,
+    "typescript_suppressions": 0,
+    "eslint_disable_comments": 3,
+    "dead_exports_confirmed": 3
+  },
+  "scorecard": [
+    {"area": "Correctness of domain logic", "grade": "A-", "comment": "State machines, conflict checks, validation and audit are consistent and well tested."},
+    {"area": "Test suite", "grade": "B+", "comment": "118 deterministic tests, 82% statement coverage, but admin user-management screens are near-untested."},
+    {"area": "Security architecture", "grade": "D", "comment": "The entire trust boundary is the user's own browser. Acceptable only as a demo, never with real personal data."},
+    {"area": "Application security hygiene", "grade": "B", "comment": "No XSS sinks, constant-time comparison, generic auth errors, permission check on every write; weaknesses are in policy enforcement and untrusted import."},
+    {"area": "Secrets", "grade": "A", "comment": "No credentials in source, docs or history."},
+    {"area": "Dependencies", "grade": "C+", "comment": "Production dependencies clean and current; dev toolchain carries 2 critical and 4 high advisories (patched here)."},
+    {"area": "Licences", "grade": "B", "comment": "Dependency licences are permissive and compatible; the project itself declares no licence."},
+    {"area": "CI/CD", "grade": "D", "comment": "A good workflow exists but is inside a ZIP, so it has never run. No SAST, licence, coverage or dev-dependency gates."},
+    {"area": "Repository hygiene", "grade": "F", "comment": "Source is packaged in opaque archives; single binary commit; no README, licence, .gitignore or reviewable history."},
+    {"area": "Documentation", "grade": "A-", "comment": "Exceptionally candid about limitations; a few claims have drifted from the code (see L-05)."},
+    {"area": "Data protection readiness", "grade": "D", "comment": "Correctly documents its own gaps: plaintext personal data, unencrypted backups, no retention, no read auditing."}
+  ],
+  "findings": [
+    {
+      "id": "C-01",
+      "severity": "critical",
+      "production_blocker": true,
+      "category": "architecture/security",
+      "title": "The entire security model runs in the user's browser, where the user is the adversary",
+      "description": "Authentication, authorisation, personal data and the audit log all live in localStorage/sessionStorage in the same JavaScript context as the UI. The session is a bare user id in sessionStorage; roles are read from the database the user can edit. Anyone with devtools, a shared device or a browser-profile copy can read every record, every password hash, and promote themselves to administrator by editing one field.",
+      "evidence": [
+        "src/tms/useTms.ts:35-70 (database and session read/write from localStorage/sessionStorage)",
+        "src/tms/useTms.ts:96-120 (currentUser derived from db.users; actor role taken from that row)",
+        "src/tms/scope.ts:1-14 (the module's own comment: 'this build has no server ... it runs in the same process as the caller')",
+        "docs/DATA_PROTECTION.md §4 items 1-3 (documented by the authors)",
+        "docs/ARCHITECTURE.md 'Known limits' item 2"
+      ],
+      "impact": "Total loss of confidentiality, integrity and accountability for any real fleet, staff or passenger data. Also means the 'audit trail' is only as trustworthy as the person being audited.",
+      "remediation": [
+        "Treat this build as a UI prototype. Do not load real personal data into it; keep the visible 'browser-local, no server' banner until it is replaced.",
+        "Move the command layer behind an HTTP API and PostgreSQL: the service modules are already pure and synchronous, so executeCommand() maps almost 1:1 to an endpoint.",
+        "Enforce the same ROLE_PERMISSIONS matrix, own-record scope and validation server-side; the browser keeps only a session cookie (HttpOnly, Secure, SameSite=Lax) and never sees hashes.",
+        "Add server-side audit writes in the same transaction as the change."
+      ],
+      "effort": "4-6 weeks for a first vertical slice (auth + users + one domain module), 3-4 months for the full system.",
+      "references": ["docs/ERD.md", "docs/DECISIONS.md D-01"]
+    },
+    {
+      "id": "H-01",
+      "severity": "high",
+      "production_blocker": false,
+      "category": "security/auth",
+      "title": "Password policy is enforced only in the UI; the service layer accepts any credential",
+      "description": "PASSWORD_MIN_LENGTH is checked in useTms.createCredential() only. validateUser() validates the user record but never the credential, so execute() will happily store a credential for a one-character password, or an empty hash and salt (which permanently locks the account out because verification can never match).",
+      "evidence": [
+        "src/tms/service.ts:514-620 (setup_administrator / create_user / reset_user_password copy command.credential into the record unchecked)",
+        "src/tms/useTms.ts:117-120 (the only place the length rule exists)",
+        "PoC (audit/audit-probe.test.ts): create_user with hashPassword('x') returns ok=true and sign-in with 'x' returns true; reset_user_password with {\"passwordHash\":\"\",\"passwordSalt\":\"\"} returns ok=true"
+      ],
+      "impact": "A single weak or empty credential defeats the account model; the empty-credential path is a self-inflicted denial of service. Any future API/thin-client reuses the same service layer, so the hole propagates.",
+      "remediation": [
+        "Validate credential shape at the service boundary and refuse anything the app did not produce.",
+        "Make hashPassword() the single choke point that enforces length, so no caller can mint a credential for a rejected password.",
+        "Keep the plaintext-only policy checks (length, breached-password lookup) at the future API boundary."
+      ],
+      "effort": "2 hours (patch supplied: 0001).",
+      "status_after_patch": "fixed and regression-tested (4 new tests)"
+    },
+    {
+      "id": "H-02",
+      "severity": "high",
+      "production_blocker": false,
+      "category": "security/input-validation",
+      "title": "Backup import trusts arbitrary JSON, including roles that make permission checks throw",
+      "description": "import_backup runs migrate(), which only checks the schema version, a handful of arrays and that settings is an object. Every record is then cast to its TypeScript type. A crafted or corrupted file can therefore inject an unknown role (can() then throws TypeError and the app white-screens), wrong field types, duplicate ids/emails, or empty credentials.",
+      "evidence": [
+        "src/tms/types.ts:544-591 (migrate: structural checks plus casts)",
+        "src/tms/service.ts:990-1000 (import_backup: migrate() then substitute the whole database)",
+        "PoC (audit/audit-probe.test.ts): user with role 'superuser' imports successfully and can() throws \"Cannot read properties of undefined (reading 'includes')\"; vehicles:[{id:null,registration:42}] and settings.vehicleCategories:\"not-an-array\" both import successfully",
+        "src/pages/Users.tsx:31 (parsed as never)"
+      ],
+      "impact": "Client-side denial of service from a file the operator was told to restore; persistent corruption of the local database; a shared backup is an unvalidated way to seed an administrator account. With a server this becomes a stored-data integrity issue.",
+      "remediation": [
+        "Validate every record the application later trusts before it enters the database; collect problems and tell the operator what is wrong instead of crashing.",
+        "Reject unknown roles and malformed credentials; de-duplicate ids and emails; cap collection sizes.",
+        "Fix the type hole at the call site (parsed as never)."
+      ],
+      "effort": "1 day (patch supplied: 0002, 5 new tests).",
+      "status_after_patch": "fixed and regression-tested"
+    },
+    {
+      "id": "H-03",
+      "severity": "high",
+      "production_blocker": false,
+      "category": "reliability/data-integrity",
+      "title": "Unbounded audit log plus whole-database serialisation on every write ends in quota failure and silent data loss",
+      "description": "Every command prepends an audit entry and commit() serialises the entire database to localStorage synchronously. The audit log is never pruned, so the snapshot grows without limit. Measured: 20,000 entries = 4.65 MB and 15 ms per write; 50,000 entries = 11.6 MB and 35 ms. A typical 5 MB origin quota is reached at roughly 20,000 entries, after which the write throws, the UI shows a banner, React state advances and the change is lost on reload.",
+      "evidence": [
+        "src/tms/service.ts:226-247 (audit prepends; no ceiling)",
+        "src/tms/useTms.ts:62-70 (JSON.stringify of the whole database on every write)",
+        "src/tms/useTms.ts:87-95 (commit updates state even when persist() failed)",
+        "audit/evidence/benchmark.json (measured latency/size curve)",
+        "src/pages/Audit.tsx (display caps at 500 rows, storage does not)"
+      ],
+      "impact": "A busy operator silently loses transactions. Because the failing write is the audit entry, the record of the loss is the thing that fails first.",
+      "remediation": [
+        "Cap the in-browser audit log (patch 0003 uses 5,000 entries) and rotate older entries out through the audited export.",
+        "Split persistence: append-only log in IndexedDB, indexes for hot queries; or move to the server.",
+        "Make a failed persistence write block further writes with a modal, not a dismissible banner."
+      ],
+      "effort": "2 hours for the cap (patch supplied: 0003); 3-5 days for IndexedDB persistence.",
+      "status_after_patch": "capped and regression-tested"
+    },
+    {
+      "id": "H-04",
+      "severity": "high",
+      "production_blocker": true,
+      "category": "process/repository",
+      "title": "The repository is not a source repository: code lives in opaque ZIPs and CI never runs",
+      "description": "The only commit is 'Add files via upload' containing two 1 MB archives and two Markdown briefs. The GitHub API reports zero Actions workflows because ci.yml is inside the archives, not at .github/workflows. There is no working tree to build, no reviewable diffs, no tags, no releases, no PRs, no README, no .gitignore and no LICENSE.",
+      "evidence": [
+        "git log: single commit 030197e with 4 files, both zips shown as Bin",
+        "gh api repos/iwani1/Richie-RTS-/actions/workflows -> total_count 0",
+        "gh release list -> empty; no tags",
+        "archive listing: .github/workflows/ci.yml exists only inside the zips",
+        "GitHub API: license null, description null, visibility public"
+      ],
+      "impact": "No build reproducibility, no review gate, no vulnerability scanning, no provenance. Two snapshots differ by 1,952 source lines with no history explaining the change — an auditor cannot tell what was altered or why, and a future maintainer inherits an unbuildable repository.",
+      "remediation": [
+        "Unpack demo 2 to the repository root and commit the source (keep the archives out of the tree or in a releases/ folder).",
+        "Add README.md, LICENSE, SECURITY.md, CONTRIBUTING.md and .gitignore (templates supplied in audit/templates).",
+        "Move .github/workflows/ci.yml to the repository root so it actually runs; protect main (require PR, passing checks, linear history).",
+        "Tag a version and publish the built single-file artifact as a release."
+      ],
+      "effort": "1-2 hours.",
+      "references": ["audit/templates/*"]
+    },
+    {
+      "id": "M-01",
+      "severity": "medium",
+      "production_blocker": false,
+      "category": "supply-chain",
+      "title": "Dev-only dependencies carry 2 critical and 4 high advisories that the CI audit gate cannot see",
+      "description": "npm audit reports 8 advisories (2 critical, 4 high, 1 moderate, 1 low) in vitest/vite/tinypool/@vitest/mocker/micromatch/braces/esbuild. The CI gate is `npm audit --omit=dev`, so it passes. Production dependencies are clean.",
+      "evidence": [
+        "audit/evidence/npm-audit-before.json",
+        "vitest 3.2.7 -> tinypool (prototype-pollution gadget to RCE), @vitest/mocker (path traversal / code injection)",
+        "vite 7.3.2 -> 6 advisories, fixed in 7.3.7",
+        "vite-plugin-singlefile 2.3.0 -> 2.3.4 (micromatch/braces stack exhaustion)"
+      ],
+      "impact": "A compromised or malicious test dependency executes on the CI runner and on every developer machine with the developer's credentials. Low exploitability from the deployed artifact, material risk in the build environment.",
+      "remediation": [
+        "Upgrade (verified: vite 7.3.7 + singlefile 2.3.4 + vitest 5.0.5 removes all high and critical advisories and keeps 130 tests green).",
+        "Add a full-tree audit gate and Dependabot with grouped updates (patch 0004).",
+        "Run npm ci --ignore-scripts in CI where postinstall is not required."
+      ],
+      "effort": "1 hour (patch supplied: 0006, verified end to end).",
+      "status_after_patch": "0 critical, 0 high, 1 low remaining (esbuild dev-server advisory, Windows only)"
+    },
+    {
+      "id": "M-02",
+      "severity": "medium",
+      "production_blocker": false,
+      "category": "ci-cd",
+      "title": "CI/CD has no coverage, SAST, licence or supply-chain gates, and uses mutable action tags",
+      "description": "The workflow is otherwise well formed (pinned Node, npm ci, four gates, prod-only audit, read-only token) but stops there: no coverage threshold, no CodeQL/SAST, no licence policy, no dependency review, no artifact retention, no concurrency cancellation, no engines/packageManager pinning, actions referenced by mutable tag.",
+      "evidence": [
+        ".github/workflows/ci.yml inside both archives",
+        "no .github/dependabot.yml, no CODEOWNERS, no SECURITY.md anywhere in the archives",
+        "package.json has no engines field; CI pins Node 20 while the audit environment runs 22"
+      ],
+      "impact": "Regressions in coverage and dependency posture are silent; a compromised action tag can exfiltrate the token (mitigated only partly by read-only permissions).",
+      "remediation": "Patch 0004 adds coverage thresholds, a full-tree audit, concurrency, persist-credentials:false, artifact upload, CodeQL, dependency review with a licence denylist, Dependabot groups and an engines pin. Pinning actions to commit SHAs remains a follow-up (needs the SHAs resolved at merge time).",
+      "effort": "2 hours (patch supplied: 0004).",
+      "status_after_patch": "addressed"
+    },
+    {
+      "id": "M-03",
+      "severity": "medium",
+      "production_blocker": false,
+      "category": "audit/accountability",
+      "title": "The audit trail is not tamper-evident and does not record data leaving the system",
+      "description": "Audit entries are a plain array in localStorage with no hash chain and no signature, yet the UI calls it 'append-only'. Backup export — a full copy of all personal data and password hashes — is not permission-checked in the service layer and is not audited at all; backup import replaces the entire history. Failed sign-ins are not recorded.",
+      "evidence": [
+        "src/tms/types.ts:244-253 (AuditEntry has no prev-hash/chain field)",
+        "src/tms/useTms.ts:170 (exportBackup serialises the database directly, bypassing execute())",
+        "src/pages/Users.tsx:99 (permission checked only to render the button)",
+        "src/tms/service.ts:990-1010 (import_backup substitutes the database)",
+        "src/pages/Audit.tsx (page copy: 'Append-only record of every change')"
+      ],
+      "impact": "An insider can deny an export or an action and there is no evidence to the contrary; the accountability story required for Act 843 cannot be supported by this log.",
+      "remediation": [
+        "Route export through a command that checks backup:export and writes an audit entry (patch 0003).",
+        "Chain entries (prevHash = sha256(previous entry)) and verify the chain when rendering the audit page; sign or ship off-device for real assurance.",
+        "Audit auth failures and permission denials."
+      ],
+      "effort": "2 hours for export auditing (patch supplied: 0003); 1-2 days for a hash chain plus verification UI.",
+      "status_after_patch": "export is now permissioned and audited; hash chain still recommended"
+    },
+    {
+      "id": "M-04",
+      "severity": "medium",
+      "production_blocker": false,
+      "category": "cryptography",
+      "title": "PBKDF2 iteration count is below current guidance while unencrypted backups distribute the hashes",
+      "description": "PBKDF2-HMAC-SHA256 with 120,000 iterations is roughly one-fifth of OWASP's 600,000 recommendation. The work factor matters because the hash database leaves the device in plaintext JSON backups, so offline cracking is realistic once a backup file is mishandled.",
+      "evidence": [
+        "src/tms/crypto.ts:3 (ITERATIONS = 120_000)",
+        "docs/DATA_PROTECTION.md §4 item 2 (backups unencrypted)",
+        "src/pages/Users.tsx:16-25 (download writes password hashes to a plain .json file)"
+      ],
+      "impact": "Weak user passwords fall quickly if a backup leaks; the demo's own flash message warns the file contains hashes, which shows the risk is understood but unmitigated.",
+      "remediation": "Raise to 600,000 with the algorithm parameters stored alongside the hash so the cost can be raised again without locking anyone out (patch 0001 raises the constant; the versioned string format is the follow-up). Encrypt backups with a passphrase-derived key, or omit credentials from exports.",
+      "effort": "Patch now; versioned hash format 1 day."
+    },
+    {
+      "id": "M-05",
+      "severity": "medium",
+      "production_blocker": false,
+      "category": "security/auth",
+      "title": "No sign-in throttling or lockout, no failed-attempt auditing, and a timing oracle for unknown accounts",
+      "description": "signIn() returns a generic message (good) but performs PBKDF2 only when the user exists, so response time distinguishes known from unknown accounts. Nothing limits attempts, and failures are not recorded.",
+      "evidence": [
+        "src/tms/useTms.ts:124-142 (early return before verifyPassword when user missing)",
+        "src/tms/service.ts (no auth:failure audit action exists)"
+      ],
+      "impact": "Low in a single-browser demo; it becomes a credential-stuffing and account-enumeration enabler the moment the API exists.",
+      "remediation": "Perform a dummy PBKDF2 derivation for unknown users, add a per-account attempt counter with backoff, and record auth:sign_in_failed; do the same at the future API boundary.",
+      "effort": "Half a day."
+    },
+    {
+      "id": "M-06",
+      "severity": "medium",
+      "production_blocker": false,
+      "category": "confidentiality",
+      "title": "The internal project brief is exposed to external roles",
+      "description": "'Project brief' is registered with permission: null and is deliberately included for record-bound roles, so a corporate client contact (an external party) and a driver can read the internal build brief: mission, integrity rules, business context questions, phase prompts and the authors' note that the build has no server.",
+      "evidence": [
+        "src/routes.ts:46 (permission: null)",
+        "src/App.tsx:62-64 (record-bound roles get portalRoute or 'documents')",
+        "src/docs/BriefDesk.tsx (renders briefSections and the phase prompts)"
+      ],
+      "impact": "Confidential business context and a candid description of security limitations reach third parties; it also invites social-engineering of the demo.",
+      "remediation": "Gate the route behind an administrator-only permission and exclude it from production builds (a build-time flag or a separate entry point).",
+      "effort": "1 hour."
+    },
+    {
+      "id": "M-07",
+      "severity": "medium",
+      "production_blocker": false,
+      "category": "testing",
+      "title": "The most privilege-sensitive screens are the least tested",
+      "description": "Overall coverage is good (82% statements), but Users.tsx is 3.1% covered (uncovered lines 12-252: creating users, assigning roles, linking driver/client records, resetting passwords) and Registers.tsx is 6.0%. Those two screens are where privilege is granted.",
+      "evidence": [
+        "audit/evidence/coverage-before.json",
+        "src/pages/Users.tsx (252 lines, covered 12-252 not executed)",
+        "src/pages/Registers.tsx (193 lines, only 5.98% covered)"
+      ],
+      "impact": "A regression in role assignment or account linking would not be caught by CI, and those are exactly the bugs that become privilege-escalation incidents.",
+      "remediation": "Add jsdom tests for Users.tsx (create all four roles, the driver/client link constraints, password reset, backup download/import error paths) and for the client/driver registers. Target 80% on src/pages.",
+      "effort": "1-2 days."
+    },
+    {
+      "id": "M-08",
+      "severity": "medium",
+      "production_blocker": false,
+      "category": "input-validation",
+      "title": "No maximum lengths or numeric ceilings on stored text and money fields",
+      "description": "Validators check required/malformed values but never bound their size: notes, purpose, reason, incident description and every name are unbounded, and quote quantities/amounts have no upper limit. Combined with full-database serialisation this is a cheap way to fill the storage quota; with a server it becomes a storage-exhaustion and reporting-integrity issue.",
+      "evidence": [
+        "src/tms/service.ts:223-320 (validators: presence checks only)",
+        "src/tms/service.ts:466-485 (validateQuoteLines: quantity > 0, amount >= 0, no ceiling)",
+        "src/tms/logistics.ts:208-247 (incident/work-order validators)"
+      ],
+      "impact": "Single-field storage exhaustion, absurd invoices, and unbounded strings that will need truncation when they reach a database column.",
+      "remediation": "Bound every free-text field (e.g. 200 chars for names, 1,000 for notes/descriptions) and every numeric field (quantity <= 10,000; amount <= 100,000,000 minor units), with matching maxLength on the inputs and column widths in the future schema.",
+      "effort": "Half a day."
+    },
+    {
+      "id": "L-01",
+      "severity": "low",
+      "production_blocker": false,
+      "category": "architecture",
+      "title": "Type-only import cycle between service.ts and scope.ts contradicts the documented dependency rule",
+      "description": "ARCHITECTURE.md states there is no cycle; scope.ts imports type Actor from service.ts while service.ts imports the value confinedClientId from scope.ts. The cycle is erased at compile time (type-only) so runtime is unaffected, but the stated invariant is not what the code does, and the next value import would make it real.",
+      "evidence": ["src/tms/scope.ts:16 (import type { Actor } from './service')", "src/tms/service.ts:7 (import { confinedClientId } from './scope')", "import-graph analysis: 1 cycle"],
+      "impact": "Weakens a design rule that the project relies on to keep the core React-free and portable to a server.",
+      "remediation": "Move Actor (and Credential) into types.ts; keep scope.ts importing types only from there.",
+      "effort": "30 minutes."
+    },
+    {
+      "id": "L-02",
+      "severity": "low",
+      "production_blocker": false,
+      "category": "code-quality",
+      "title": "Dead exports: PERMISSION_SCOPE, driverTripIds, and isOwnScoped (tests only)",
+      "description": "PERMISSION_SCOPE and driverTripIds have zero references anywhere; isOwnScoped is called only from tests. PERMISSION_SCOPE is also misleading: it assigns 'company' to every permission, including the ones the module documents as own-record scoped.",
+      "evidence": ["src/tms/permissions.ts:141-143", "src/tms/scope.ts:62-64", "ts-prune + reference greps"],
+      "impact": "Small maintenance drag and a map that contradicts the comment above it; no runtime effect.",
+      "remediation": "Delete the three exports (or derive PERMISSION_SCOPE from isOwnScoped if a UI needs it) and drop the test that only exercises a dead helper.",
+      "effort": "30 minutes."
+    },
+    {
+      "id": "L-03",
+      "severity": "low",
+      "production_blocker": false,
+      "category": "privacy/web",
+      "title": "A 'no network' application still calls Google Fonts, and shipped with no CSP",
+      "description": "index.html loads fonts from fonts.googleapis.com/gstatic, which discloses visitor IP and referer to a third party and degrades offline rendering. The build had no Content-Security-Policy at all (verified absent in dist/index.html).",
+      "evidence": ["index.html:8-16", "dist/index.html external URLs: fonts.googleapis.com, fonts.gstatic.com", "grep Content-Security-Policy dist/index.html -> 0"],
+      "impact": "Third-party tracking surface and a weakened defence-in-depth posture for a page that handles personal data; small cross-border-transfer question under Act 843.",
+      "remediation": "Self-host the three families as woff2 and remove the third-party origins; add the CSP (patch 0005) and upgrade it to per-build script hashes at the host, which is the only place that can also send frame-ancestors.",
+      "effort": "1-2 hours.",
+      "status_after_patch": "CSP added; font self-hosting recommended as follow-up"
+    },
+    {
+      "id": "L-04",
+      "severity": "low",
+      "production_blocker": false,
+      "category": "maintainability",
+      "title": "Four god-functions dominate complexity (max 151)",
+      "description": "execute() in service.ts has cyclomatic complexity 151 across 465 lines; executeBusing() 122/367; executeLogistics() 103/324; RentalDetail() 74/184. 40 source functions exceed a threshold of 10 (41 including one test helper).",
+      "evidence": ["audit/evidence/complexity-all.json", "audit/evidence/complexity-top.json"],
+      "impact": "Each new command increases the chance of a missed authorise/validate/audit step; the router pattern that makes the code testable is being stretched past the point where it stays reviewable.",
+      "remediation": "Split each execute* into a map of per-command handlers (type -> handler) with shared authorise/validate/audit middleware; add the complexity budget to eslint so it ratchets down.",
+      "effort": "2-3 days, mechanical and test-covered."
+    },
+    {
+      "id": "L-05",
+      "severity": "low",
+      "production_blocker": false,
+      "category": "documentation",
+      "title": "Documentation drift: audit PII, 'no cycle', schema/CI claims",
+      "description": "DATA_PROTECTION.md §5 claims audit summaries for driver and passenger records avoid personal names, but driver create/update summaries include the driver's full name and licence number, and assignment summaries include the driver's name. ARCHITECTURE.md claims no import cycle (see L-01). These are small, but the project's credibility rests on its documentation being exactly true.",
+      "evidence": ["src/tms/service.ts:662, 679, 893", "docs/DATA_PROTECTION.md §5"],
+      "impact": "A privacy reviewer relying on the document would under-estimate where PII appears.",
+      "remediation": "Reference driver/client ids in audit summaries (the UI can resolve names) or amend the document to state that audit entries intentionally contain operator-visible names and licence numbers.",
+      "effort": "1 hour."
+    },
+    {
+      "id": "L-06",
+      "severity": "low",
+      "production_blocker": false,
+      "category": "governance",
+      "title": "No licence, README, security policy, ownership or version metadata",
+      "description": "The repository is public with no LICENSE (default: all rights reserved), no README, no SECURITY.md, no CODEOWNERS, no version tags. package.json still says name 'react-vite-tailwind', version 0.0.0, with no description, repository or engines field.",
+      "evidence": ["GitHub API: license null, description null", "package.json:2-4"],
+      "impact": "Unclear redistribution rights for a public repo, no path to report a vulnerability privately, no release identity for the artifact.",
+      "remediation": "Add LICENSE (or keep the repo private), README, SECURITY.md (templates supplied), rename the package, and tag releases.",
+      "effort": "1 hour."
+    },
+    {
+      "id": "L-07",
+      "severity": "low",
+      "production_blocker": false,
+      "category": "robustness",
+      "title": "Small error-path fragilities: Math.random id fallback and unguarded role lookups",
+      "description": "makeId() falls back to Date.now()+Math.random when crypto.randomUUID is missing, producing guessable ids in insecure contexts. ROLE_LABELS[actor.role] and ROLE_PERMISSIONS[role] assume the role exists; both throw for a role restored from a hand-edited file (the latter is fixed in patch 0002).",
+      "evidence": ["src/tms/service.ts:180-183", "src/App.tsx:186 (ROLE_LABELS lookup)", "src/tms/permissions.ts:144-148"],
+      "impact": "White screen instead of a message on corrupted data; predictable identifiers in non-secure contexts (which the app already refuses to sign in from).",
+      "remediation": "Fail closed with a clear message on unknown roles; refuse to run (or degrade to a read-only banner) when crypto.subtle is unavailable rather than minting weak ids.",
+      "effort": "1 hour."
+    },
+    {
+      "id": "I-01",
+      "severity": "info",
+      "production_blocker": false,
+      "category": "positive",
+      "title": "Controls worth preserving through the rewrite",
+      "description": "The codebase is unusually disciplined for a demo. These properties should survive the move to a server.",
+      "evidence": [
+        "No XSS sinks: no dangerouslySetInnerHTML, innerHTML, eval, new Function, document.write or user-controlled href; React escaping plus plain text throughout",
+        "No outbound network calls from application code (only the font stylesheet)",
+        "Permission check present on every mutating command; unauthenticated sweep of 47 command types produced zero successes; a driver actor could only record its own sign-in",
+        "Own-record scope fails closed: a record-bound account with no linked record sees an empty view",
+        "Constant-time password comparison; generic sign-in error message",
+        "State changes only through one dispatcher, enforced mechanically by no-restricted-imports",
+        "Injected clock (now) makes every command deterministic and testable",
+        "Zero TODOs, zero @ts-ignore, zero console statements, strict TypeScript with noUnusedLocals",
+        "118 tests green across three runs including shuffled order; no flakiness observed"
+      ],
+      "impact": "n/a",
+      "remediation": "Keep as acceptance criteria when porting: same permission matrix, same state machines, same audit-on-every-write, same deterministic clock."
+    }
+  ],
+  "remediation_plan": [
+    {
+      "window": "Day 0 (do now, before any demo to an external party)",
+      "items": ["H-04 repository unpack and CI at the root", "M-01 dependency upgrade (patch 0006)", "H-01, H-02, H-03, M-03, L-03 patches 0001-0005", "M-06 hide the project brief from external roles", "Publish a one-paragraph 'this is a prototype, no real data' notice in the README"]
+    },
+    {
+      "window": "Weeks 1-2",
+      "items": ["M-07 tests for Users and Registers", "M-05 auth throttling and failure auditing", "M-08 field bounds", "L-01, L-02, L-04, L-05, L-06, L-07 cleanup", "Hash-chain the audit log"]
+    },
+    {
+      "window": "Weeks 2-6 (the real fix)",
+      "items": ["C-01 API + PostgreSQL vertical slice behind the existing executeCommand contract", "Server-side permission matrix and own-record scope", "Session cookies, re-auth for sensitive actions, CSRF protection", "Encrypted backups and a retention job", "Deployment target, backups, monitoring"]
+    }
+  ],
+  "unverified": [
+    "Branch protection settings on main (API returned 403 for the available token)",
+    "Runtime behaviour in any browser (no browser in the audit environment; behaviour was exercised through jsdom and the service layer)",
+    "Behaviour at real data volumes (benchmarks use synthetic audit entries)",
+    "Legal sufficiency of the Act 843 analysis in docs/DATA_PROTECTION.md",
+    "Whether the two archives correspond to any deployed build"
+  ]
+}

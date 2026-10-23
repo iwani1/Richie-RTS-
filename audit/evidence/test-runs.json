@@ -1,0 +1,1 @@
+{"note":"three consecutive full-suite runs on unmodified demo 2","runs":[{"order":"default","files":14,"tests":118,"passed":118,"duration":"29.11s"},{"order":"shuffled (--sequence.shuffle) #1","files":14,"tests":118,"passed":118},{"order":"shuffled (--sequence.shuffle) #2","files":14,"tests":118,"passed":118}],"flakiness_observed":"none","slowest_test":"Rentals.test.tsx (2.4s)"}

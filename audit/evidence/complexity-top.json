@@ -1,0 +1,62 @@
+[
+  {
+    "file": "tms/service.ts",
+    "line": 514,
+    "complexity": 151
+  },
+  {
+    "file": "tms/busing.ts",
+    "line": 321,
+    "complexity": 122
+  },
+  {
+    "file": "tms/logistics.ts",
+    "line": 300,
+    "complexity": 103
+  },
+  {
+    "file": "pages/Rentals.tsx",
+    "line": 145,
+    "complexity": 74
+  },
+  {
+    "file": "docs/BriefDesk.tsx",
+    "line": 221,
+    "complexity": 34
+  },
+  {
+    "file": "pages/Settings.tsx",
+    "line": 7,
+    "complexity": 30
+  },
+  {
+    "file": "tms/busing.ts",
+    "line": 136,
+    "complexity": 30
+  },
+  {
+    "file": "tms/busing.ts",
+    "line": 280,
+    "complexity": 29
+  },
+  {
+    "file": "tms/logistics.ts",
+    "line": 247,
+    "complexity": 29
+  },
+  {
+    "file": "tms/types.ts",
+    "line": 544,
+    "complexity": 29
+  },
+  {
+    "file": "pages/Dashboard.tsx",
+    "line": 44,
+    "complexity": 28
+  },
+  {
+    "file": "tms/service.ts",
+    "line": 315,
+    "complexity": 28
+  }
+]

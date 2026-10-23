@@ -1,0 +1,328 @@
+{
+  "generated_by": "eslint -c audit-eslint.config.js src --format json",
+  "rules": {
+    "complexity": 10,
+    "max-depth": 4,
+    "max-lines-per-function": 120
+  },
+  "files_with_violations": 21,
+  "violations_by_file": {
+    "App.tsx": [
+      {
+        "line": 51,
+        "rule": "max-lines-per-function",
+        "message": "Function 'Shell' has too many lines (166). Maximum allowed is 120."
+      },
+      {
+        "line": 51,
+        "rule": "complexity",
+        "message": "Function 'Shell' has a complexity of 23. Maximum allowed is 10."
+      },
+      {
+        "line": 78,
+        "rule": "complexity",
+        "message": "Arrow function has a complexity of 14. Maximum allowed is 10."
+      }
+    ],
+    "docs/BriefDesk.tsx": [
+      {
+        "line": 167,
+        "rule": "complexity",
+        "message": "Function 'Icon' has a complexity of 12. Maximum allowed is 10."
+      },
+      {
+        "line": 221,
+        "rule": "max-lines-per-function",
+        "message": "Function 'BriefDesk' has too many lines (316). Maximum allowed is 120."
+      },
+      {
+        "line": 221,
+        "rule": "complexity",
+        "message": "Function 'BriefDesk' has a complexity of 34. Maximum allowed is 10."
+      }
+    ],
+    "pages/ClientPortal.tsx": [
+      {
+        "line": 45,
+        "rule": "complexity",
+        "message": "Function 'ClientPortalPage' has a complexity of 12. Maximum allowed is 10."
+      }
+    ],
+    "pages/Compliance.tsx": [
+      {
+        "line": 38,
+        "rule": "complexity",
+        "message": "Function 'CompliancePage' has a complexity of 12. Maximum allowed is 10."
+      }
+    ],
+    "pages/Dashboard.tsx": [
+      {
+        "line": 44,
+        "rule": "complexity",
+        "message": "Function 'DashboardPage' has a complexity of 28. Maximum allowed is 10."
+      }
+    ],
+    "pages/DriverPortal.tsx": [
+      {
+        "line": 44,
+        "rule": "max-lines-per-function",
+        "message": "Function 'DriverPortalPage' has too many lines (187). Maximum allowed is 120."
+      },
+      {
+        "line": 44,
+        "rule": "complexity",
+        "message": "Function 'DriverPortalPage' has a complexity of 21. Maximum allowed is 10."
+      },
+      {
+        "line": 127,
+        "rule": "complexity",
+        "message": "Method 'render' has a complexity of 12. Maximum allowed is 10."
+      },
+      {
+        "line": 179,
+        "rule": "complexity",
+        "message": "Arrow function has a complexity of 11. Maximum allowed is 10."
+      }
+    ],
+    "pages/Rentals.tsx": [
+      {
+        "line": 145,
+        "rule": "max-lines-per-function",
+        "message": "Function 'RentalDetail' has too many lines (184). Maximum allowed is 120."
+      },
+      {
+        "line": 145,
+        "rule": "complexity",
+        "message": "Function 'RentalDetail' has a complexity of 74. Maximum allowed is 10."
+      },
+      {
+        "line": 410,
+        "rule": "complexity",
+        "message": "Function 'QuoteForm' has a complexity of 11. Maximum allowed is 10."
+      }
+    ],
+    "pages/Settings.tsx": [
+      {
+        "line": 7,
+        "rule": "max-lines-per-function",
+        "message": "Function 'SettingsPage' has too many lines (337). Maximum allowed is 120."
+      },
+      {
+        "line": 7,
+        "rule": "complexity",
+        "message": "Function 'SettingsPage' has a complexity of 30. Maximum allowed is 10."
+      }
+    ],
+    "pages/StaffBusing.tsx": [
+      {
+        "line": 163,
+        "rule": "max-lines-per-function",
+        "message": "Function 'RouteForm' has too many lines (166). Maximum allowed is 120."
+      },
+      {
+        "line": 537,
+        "rule": "max-lines-per-function",
+        "message": "Function 'TripsTab' has too many lines (123). Maximum allowed is 120."
+      },
+      {
+        "line": 537,
+        "rule": "complexity",
+        "message": "Function 'TripsTab' has a complexity of 14. Maximum allowed is 10."
+      },
+      {
+        "line": 555,
+        "rule": "complexity",
+        "message": "Arrow function has a complexity of 23. Maximum allowed is 10."
+      }
+    ],
+    "pages/StaffLogistics.tsx": [
+      {
+        "line": 181,
+        "rule": "complexity",
+        "message": "Function 'IncidentsTab' has a complexity of 12. Maximum allowed is 10."
+      },
+      {
+        "line": 359,
+        "rule": "max-lines-per-function",
+        "message": "Function 'IncidentDetail' has too many lines (137). Maximum allowed is 120."
+      },
+      {
+        "line": 359,
+        "rule": "complexity",
+        "message": "Function 'IncidentDetail' has a complexity of 16. Maximum allowed is 10."
+      },
+      {
+        "line": 656,
+        "rule": "complexity",
+        "message": "Function 'WorkOrderDetail' has a complexity of 21. Maximum allowed is 10."
+      },
+      {
+        "line": 775,
+        "rule": "complexity",
+        "message": "Function 'CostsTab' has a complexity of 12. Maximum allowed is 10."
+      }
+    ],
+    "pages/Users.tsx": [
+      {
+        "line": 11,
+        "rule": "max-lines-per-function",
+        "message": "Function 'UsersPage' has too many lines (146). Maximum allowed is 120."
+      },
+      {
+        "line": 11,
+        "rule": "complexity",
+        "message": "Function 'UsersPage' has a complexity of 12. Maximum allowed is 10."
+      }
+    ],
+    "pages/Vehicles.tsx": [
+      {
+        "line": 20,
+        "rule": "complexity",
+        "message": "Function 'VehiclesPage' has a complexity of 14. Maximum allowed is 10."
+      }
+    ],
+    "tms/busing.ts": [
+      {
+        "line": 136,
+        "rule": "complexity",
+        "message": "Function 'validateRoute' has a complexity of 30. Maximum allowed is 10."
+      },
+      {
+        "line": 204,
+        "rule": "complexity",
+        "message": "Function 'validatePassenger' has a complexity of 19. Maximum allowed is 10."
+      },
+      {
+        "line": 280,
+        "rule": "complexity",
+        "message": "Function 'assessResources' has a complexity of 29. Maximum allowed is 10."
+      },
+      {
+        "line": 321,
+        "rule": "max-lines-per-function",
+        "message": "Function 'executeBusing' has too many lines (367). Maximum allowed is 120."
+      },
+      {
+        "line": 321,
+        "rule": "complexity",
+        "message": "Function 'executeBusing' has a complexity of 122. Maximum allowed is 10."
+      }
+    ],
+    "tms/compliance.ts": [
+      {
+        "line": 58,
+        "rule": "complexity",
+        "message": "Function 'validateDocumentCore' has a complexity of 12. Maximum allowed is 10."
+      },
+      {
+        "line": 82,
+        "rule": "complexity",
+        "message": "Function 'executeCompliance' has a complexity of 22. Maximum allowed is 10."
+      }
+    ],
+    "tms/costs.ts": [
+      {
+        "line": 34,
+        "rule": "complexity",
+        "message": "Function 'costReport' has a complexity of 11. Maximum allowed is 10."
+      }
+    ],
+    "tms/logistics.ts": [
+      {
+        "line": 156,
+        "rule": "complexity",
+        "message": "Function 'validateCost' has a complexity of 11. Maximum allowed is 10."
+      },
+      {
+        "line": 208,
+        "rule": "complexity",
+        "message": "Function 'validateIncident' has a complexity of 21. Maximum allowed is 10."
+      },
+      {
+        "line": 247,
+        "rule": "complexity",
+        "message": "Function 'validateWorkOrder' has a complexity of 29. Maximum allowed is 10."
+      },
+      {
+        "line": 300,
+        "rule": "max-lines-per-function",
+        "message": "Function 'executeLogistics' has too many lines (324). Maximum allowed is 120."
+      },
+      {
+        "line": 300,
+        "rule": "complexity",
+        "message": "Function 'executeLogistics' has a complexity of 103. Maximum allowed is 10."
+      }
+    ],
+    "tms/maintenance.ts": [
+      {
+        "line": 119,
+        "rule": "complexity",
+        "message": "Arrow function has a complexity of 20. Maximum allowed is 10."
+      },
+      {
+        "line": 208,
+        "rule": "complexity",
+        "message": "Function 'executeMaintenance' has a complexity of 25. Maximum allowed is 10."
+      }
+    ],
+    "tms/service.test.ts": [
+      {
+        "line": 248,
+        "rule": "max-lines-per-function",
+        "message": "Arrow function has too many lines (236). Maximum allowed is 120."
+      },
+      {
+        "line": 249,
+        "rule": "complexity",
+        "message": "Arrow function has a complexity of 11. Maximum allowed is 10."
+      }
+    ],
+    "tms/service.ts": [
+      {
+        "line": 284,
+        "rule": "complexity",
+        "message": "Function 'validateUser' has a complexity of 19. Maximum allowed is 10."
+      },
+      {
+        "line": 315,
+        "rule": "complexity",
+        "message": "Function 'validateSettings' has a complexity of 28. Maximum allowed is 10."
+      },
+      {
+        "line": 430,
+        "rule": "complexity",
+        "message": "Function 'validateRentalRequest' has a complexity of 17. Maximum allowed is 10."
+      },
+      {
+        "line": 470,
+        "rule": "complexity",
+        "message": "Arrow function has a complexity of 11. Maximum allowed is 10."
+      },
+      {
+        "line": 514,
+        "rule": "max-lines-per-function",
+        "message": "Function 'execute' has too many lines (465). Maximum allowed is 120."
+      },
+      {
+        "line": 514,
+        "rule": "complexity",
+        "message": "Function 'execute' has a complexity of 151. Maximum allowed is 10."
+      }
+    ],
+    "tms/types.ts": [
+      {
+        "line": 544,
+        "rule": "complexity",
+        "message": "Function 'migrate' has a complexity of 29. Maximum allowed is 10."
+      }
+    ],
+    "tms/useTms.ts": [
+      {
+        "line": 52,
+        "rule": "max-lines-per-function",
+        "message": "Function 'useTmsState' has too many lines (129). Maximum allowed is 120."
+      }
+    ]
+  }
+}

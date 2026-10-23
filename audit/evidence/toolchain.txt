@@ -1,0 +1,85 @@
+Richie TMS — audit toolchain and exact commands
+===============================================
+
+Environment
+-----------
+node                22.22.3
+npm                 10.9.8
+typescript          5.9.3   (project devDependency)
+eslint              10.13.0 (project devDependency)
+vitest              3.2.7   (project devDependency)
+@vitest/coverage-v8 3.2.7   (installed in the scratch copy only, for this audit)
+vite                7.3.2   (project devDependency)
+detect-secrets      1.5.0   (pip, installed in a throwaway venv)
+ts-prune            0.10.3  (npx, one-shot)
+eslint-plugin-security 3.0.1 (installed in the scratch copy; incompatible with ESLint 10 — see report)
+gh CLI              authenticated for the GitHub API reads below
+
+Working copies
+--------------
+The repository contains no working tree, so both archives were extracted:
+  unzip -q "Richie TMS demo 1.zip" -d demo1
+  unzip -q "Richie TMS demo 2.zip" -d demo2
+All commands below ran in demo2 (the newer snapshot) unless stated.
+
+Install and gates (as the project defines them)
+-----------------------------------------------
+npm ci
+npx tsc --noEmit
+npx eslint .
+npx vitest run
+npx vite build
+npm audit --omit=dev --audit-level=high
+npm audit --json
+
+Coverage (provider added for the audit only)
+--------------------------------------------
+npm i -D @vitest/coverage-v8@3.2.7
+npx vitest run src --coverage --coverage.reporter=text --coverage.reporter=json-summary
+npx vitest run src --coverage --coverage.all          # all-files basis
+
+Complexity / size rules
+-----------------------
+cat > audit-eslint.config.js   # js.configs.recommended + typescript-eslint
+  rules: complexity: [error, 10], max-depth: [error, 4], max-lines-per-function: [error, 120]
+npx eslint -c audit-eslint.config.js src --format json > complexity.json
+
+Dead code
+---------
+npx --yes ts-prune@0.10.3
+grep -rn "\bSYMBOL\b" src   # for each exported symbol reported as unused
+
+Secret scanning
+---------------
+detect-secrets scan demo1 demo2 --all-files \
+  --exclude-files 'node_modules/.*|dist/.*|coverage/.*|package-lock.json'
+grep -rInE "AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_|xox[baprs]-|sk_live_|AIza[0-9A-Za-z_-]{35}|eyJ[A-Za-z0-9_-]{10,}\." demo1 demo2
+gitleaks 8.30.1 — NOT RUN (release asset could not be downloaded in this sandbox)
+
+Licences
+--------
+node -e '<walk package-lock.json packages, aggregate .license>'   # see report §8
+
+Dependency freshness
+--------------------
+for p in react react-dom clsx tailwind-merge vite vitest eslint typescript vite-plugin-singlefile; do
+  curl -s "https://registry.npmjs.org/$p" | jq -r '."dist-tags".latest'
+done
+
+Behavioural probes (written for this audit, not part of the repo)
+----------------------------------------------------------------
+audit/audit-probe.test.ts   # unauthenticated sweep, driver sweep, credential PoC,
+                            # poisoned-backup PoC, import shape PoC, write-latency benchmark
+
+Patch verification
+------------------
+git apply --check patches/*.patch      # against a fresh extract of demo 2
+npm ci && npm run check                # on the fully patched tree
+
+GitHub checks
+-------------
+gh api repos/iwani1/Richie-RTS-
+gh api repos/iwani1/Richie-RTS-/actions/workflows
+gh api repos/iwani1/Richie-RTS-/branches
+gh api repos/iwani1/Richie-RTS-/branches/main/protection   # 403: not readable by this token
+gh release list

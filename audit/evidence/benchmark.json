@@ -1,0 +1,47 @@
+{
+  "environment": {
+    "runtime": "node 22.22.3",
+    "harness": "vitest 3.2.7 (node env)",
+    "note": "executeCommand + JSON.stringify of the whole database, as useTms.commit() does on every write"
+  },
+  "write_path": [
+    {
+      "audit_entries": 1,
+      "command_ms": 0.01,
+      "stringify_ms": 0.01,
+      "snapshot_bytes": 1510
+    },
+    {
+      "audit_entries": 1000,
+      "command_ms": 0.07,
+      "stringify_ms": 0.63,
+      "snapshot_bytes": 232171
+    },
+    {
+      "audit_entries": 5000,
+      "command_ms": 0.23,
+      "stringify_ms": 3.97,
+      "snapshot_bytes": 1160171
+    },
+    {
+      "audit_entries": 20000,
+      "command_ms": 0.92,
+      "stringify_ms": 15.05,
+      "snapshot_bytes": 4650171
+    },
+    {
+      "audit_entries": 50000,
+      "command_ms": 2.38,
+      "stringify_ms": 34.8,
+      "snapshot_bytes": 11640171
+    }
+  ],
+  "read_path": {
+    "scoped_view_renders": 50,
+    "trips_in_database": 20000,
+    "total_ms": 0.38,
+    "per_render_ms": 0.008,
+    "conclusion": "own-record scope is not a performance hotspot"
+  },
+  "note": "A typical browser origin quota for localStorage is 5 MB. The 20,000-entry row already serialises to 4.65 MB, so writes begin to throw QuotaExceededError a little beyond that point."
+}

@@ -1,0 +1,158 @@
+From 8b2ea431ef506694ea966eb40d625c73fd93c51e Mon Sep 17 00:00:00 2001
+From: audit <a@b>
+Date: Fri, 23 Oct 2026 01:12:54 +0000
+Subject: [PATCH 3/6] fix(audit): cap the audit log and record backup exports
+
+---
+ src/pages/Users.tsx       |  7 ++++++-
+ src/tms/hardening.test.ts | 29 ++++++++++++++++++++++++++++-
+ src/tms/service.ts        | 24 ++++++++++++++++++++++--
+ src/tms/useTms.ts         | 10 ++++++++--
+ 4 files changed, 64 insertions(+), 6 deletions(-)
+
+diff --git a/src/pages/Users.tsx b/src/pages/Users.tsx
+index f848b67..7030d4c 100644
+--- a/src/pages/Users.tsx
++++ b/src/pages/Users.tsx
+@@ -14,7 +14,12 @@ export function UsersPage() {
+   const fileRef = useRef<HTMLInputElement>(null);
+ 
+   const download = () => {
+-    const blob = new Blob([exportBackup()], { type: "application/json" });
++    const json = exportBackup();
++    if (!json) {
++      setFlash({ tone: "error", message: "You do not have permission to export the database." });
++      return;
++    }
++    const blob = new Blob([json], { type: "application/json" });
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement("a");
+     a.href = url;
+diff --git a/src/tms/hardening.test.ts b/src/tms/hardening.test.ts
+index a560818..dc784d9 100644
+--- a/src/tms/hardening.test.ts
++++ b/src/tms/hardening.test.ts
+@@ -8,7 +8,7 @@
+ import { describe, expect, it } from "vitest";
+ import { can } from "./permissions";
+ import { hashPassword } from "./crypto";
+-import { execute, type Actor, type Credential } from "./service";
++import { AUDIT_LIMIT, audit, execute, type Actor, type Credential } from "./service";
+ import { emptyDatabase, type Database } from "./types";
+ 
+ const NOW = "2026-01-15T08:00:00.000Z";
+@@ -96,3 +96,30 @@ describe("backup import validation", () => {
+     expect(can("superuser" as never, "users:read")).toBe(false);
+   });
+ });
++
++// Regression tests for the audit-log fixes (audit finding H-03 / M-03).
++describe("audit log ceiling and audited exports", () => {
++  it("caps the audit log instead of growing until storage fails", () => {
++    let db = emptyDatabase();
++    const actor: Actor = { id: "u1", fullName: "Ada", role: "administrator" };
++    for (let i = 0; i < AUDIT_LIMIT + 25; i += 1) db = audit(db, actor, { action: "test", entity: "test", entityId: "test", summary: "tick" }, NOW);
++    expect(db.audit.length).toBe(AUDIT_LIMIT);
++  });
++
++  it("records an audit entry when a backup leaves the system", () => {
++    const { db, admin } = adminDb();
++    const res = execute(db, admin, { type: "record_backup_export" }, NOW);
++    expect(res.ok).toBe(true);
++    if (res.ok) {
++      expect(res.db.audit[0].action).toBe("backup:export");
++      expect(res.db.audit[0].actorId).toBe(admin.id);
++    }
++  });
++
++  it("refuses the export record for a role without backup:export", () => {
++    const { db } = adminDb();
++    const ops: Actor = { id: "u2", fullName: "Ops", role: "operations" };
++    const res = execute(db, ops, { type: "record_backup_export" }, NOW);
++    expect(res.ok).toBe(false);
++  });
++});
+diff --git a/src/tms/service.ts b/src/tms/service.ts
+index c7638fd..10020d1 100644
+--- a/src/tms/service.ts
++++ b/src/tms/service.ts
+@@ -142,7 +142,10 @@ export type Command =
+   | { type: "complete_rental"; id: string; input: QuoteInput }
+   | { type: "decline_rental"; id: string; reason: string }
+   | { type: "cancel_rental"; id: string; reason: string }
+-  | { type: "import_backup"; database: Database };
++  | { type: "import_backup"; database: Database }
++  // Recording the export is what makes data leaving the system visible in the audit log.
++  // The export itself stays client-side (it is a serialisation of the local database).
++  | { type: "record_backup_export" };
+ 
+ export type Failure = { ok: false; message: string; errors: Record<string, string> };
+ export type Success = { ok: true; db: Database; message: string };
+@@ -223,6 +226,11 @@ export function authorise(actor: Actor | null, permission: Permission): Failure
+   return null;
+ }
+ 
++// The audit log is held in browser storage and rewritten in full on every command, so it must
++// have a ceiling. At this size the persisted snapshot stays well inside a 5 MB origin quota;
++// older entries leave through the audited backup export, not by being silently dropped.
++export const AUDIT_LIMIT = 5_000;
++
+ export function audit(
+   db: Database,
+   actor: Actor | null,
+@@ -236,7 +244,7 @@ export function audit(
+     actorName: actor?.fullName ?? "System",
+     ...entry,
+   };
+-  return { ...db, audit: [record, ...db.audit] };
++  return { ...db, audit: [record, ...db.audit].slice(0, AUDIT_LIMIT) };
+ }
+ 
+ // ---------- validators ----------
+@@ -986,6 +994,18 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
+       return { ok: true, db: next, message: `${updated.reference} ${target}.` };
+     }
+ 
++    case "record_backup_export": {
++      const denied = authorise(actor, "backup:export");
++      if (denied) return denied;
++      const next = audit(db, actor, {
++        action: "backup:export",
++        entity: "database",
++        entityId: "database",
++        summary: `Exported a full backup: ${db.users.length} users, ${db.vehicles.length} vehicles, ${db.drivers.length} drivers, ${db.clients.length} clients, ${db.rentals.length} rentals, ${db.passengers.length} passengers.`,
++      }, now);
++      return { ok: true, db: next, message: "Backup export recorded." };
++    }
++
+     case "import_backup": {
+       const denied = authorise(actor, "backup:import");
+       if (denied) return denied;
+diff --git a/src/tms/useTms.ts b/src/tms/useTms.ts
+index ffe309c..79d66a4 100644
+--- a/src/tms/useTms.ts
++++ b/src/tms/useTms.ts
+@@ -27,7 +27,7 @@ export interface Tms {
+   signOut: () => void;
+   setupAdministrator: (fullName: string, email: string, password: string) => Promise<CommandResult>;
+   createCredential: (password: string) => Promise<{ ok: true; credential: { passwordHash: string; passwordSalt: string } } | { ok: false; error: string }>;
+-  exportBackup: () => string;
++  exportBackup: () => string | null;
+ }
+ 
+ function loadDatabase(): Database {
+@@ -174,7 +174,13 @@ export function useTmsState(): Tms {
+ 
+   const allowed = useCallback((permission: Permission) => can(actor?.role, permission), [actor]);
+ 
+-  const exportBackup = useCallback(() => JSON.stringify(dbRef.current, null, 2), []);
++  const exportBackup = useCallback(() => {
++    // Data egress is a permissioned, audited action, not a read. `backup:export` is what the
++    // service layer checks; the button gating in the UI is convenience, not the boundary.
++    const recorded = dispatch({ type: "record_backup_export" });
++    if (!recorded.ok) return null;
++    return JSON.stringify(dbRef.current, null, 2);
++  }, [dispatch]);
+ 
+   return { db, actor, currentUser, storageError, flash, setFlash, allowed, dispatch, signIn, signOut, setupAdministrator, createCredential, exportBackup };
+ }

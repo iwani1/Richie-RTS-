@@ -1,0 +1,236 @@
+From 1be6d94b966c9c1b2f3197a8b51a646e4c93ea58 Mon Sep 17 00:00:00 2001
+From: audit <a@b>
+Date: Fri, 23 Oct 2026 01:12:03 +0000
+Subject: [PATCH 2/6] fix(security): validate imported backups before trusting
+ them
+
+---
+ src/App.tsx               |   2 +-
+ src/tms/backupGuard.ts    | 108 ++++++++++++++++++++++++++++++++++++++
+ src/tms/hardening.test.ts |  40 ++++++++++++++
+ src/tms/permissions.ts    |   5 +-
+ src/tms/service.ts        |   7 ++-
+ 5 files changed, 158 insertions(+), 4 deletions(-)
+ create mode 100644 src/tms/backupGuard.ts
+
+diff --git a/src/App.tsx b/src/App.tsx
+index bcac61c..e749950 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -163,7 +163,7 @@ function Shell() {
+             <div className="rts-avatar" aria-hidden="true">{initialsOf(actor?.fullName)}</div>
+             <div className="min-w-0">
+               <strong className="truncate">{actor?.fullName}</strong>
+-              <small>{actor ? ROLE_LABELS[actor.role].toUpperCase() : ""}</small>
++              <small>{actor ? (ROLE_LABELS[actor.role] ?? "UNKNOWN ROLE").toUpperCase() : ""}</small>
+             </div>
+           </div>
+           <button type="button" className="rts-btn rts-btn--rail" onClick={signOut}>
+diff --git a/src/tms/backupGuard.ts b/src/tms/backupGuard.ts
+new file mode 100644
+index 0000000..95b23bb
+--- /dev/null
++++ b/src/tms/backupGuard.ts
+@@ -0,0 +1,108 @@
++// Strict validation for an imported backup.
++//
++// `migrate()` only checks that a backup is *broadly* the right shape: a known schema
++// version, a few arrays, a settings object. Everything else is cast. A backup file is
++// untrusted input — it can arrive from another deployment, a USB stick or an email — and
++// every record in it is trusted by the app afterwards, so the records that the code actually
++// depends on are checked here before they reach the database.
++//
++// Rejections are collected rather than thrown so the operator is told what is wrong with the
++// file instead of getting a white screen.
++
++import { migrate, ROLES, type Database } from "./types";
++
++export interface BackupProblem {
++  path: string;
++  message: string;
++}
++
++// A backup larger than this is not a backup of this application. The cap also stops a
++// crafted file from exhausting memory before any check runs.
++const MAX_RECORDS = 100_000;
++
++const PASSWORD_HASH_RE = /^[0-9a-f]{64}$/;
++const PASSWORD_SALT_RE = /^[0-9a-f]{32}$/;
++
++const isRecord = (value: unknown): value is Record<string, unknown> =>
++  typeof value === "object" && value !== null && !Array.isArray(value);
++
++const isText = (value: unknown, max = 500): value is string => typeof value === "string" && value.length > 0 && value.length <= max;
++
++const isOptionalId = (value: unknown): boolean => value === null || value === undefined || isText(value, 100);
++
++/**
++ * Validates an untrusted backup file. Returns the migrated database when it is safe to load,
++ * or null plus a list of problems when it is not.
++ */
++export function inspectBackup(value: unknown): { database: Database | null; problems: BackupProblem[] } {
++  const problems: BackupProblem[] = [];
++  const database = migrate(value);
++  if (!database) {
++    return { database: null, problems: [{ path: "(root)", message: "Not a Richie TMS backup this build can read (schema version 1-10)." }] };
++  }
++
++  const fail = (path: string, message: string) => {
++    // Keep the report readable: a corrupt file can repeat one fault hundreds of times.
++    if (problems.length < 50) problems.push({ path, message });
++  };
++
++  const collection = (key: keyof Database) => {
++    const rows = database[key];
++    if (!Array.isArray(rows)) {
++      fail(String(key), "Expected a list.");
++      return [] as unknown[];
++    }
++    if (rows.length > MAX_RECORDS) fail(String(key), `Too many records (${rows.length}); the limit is ${MAX_RECORDS}.`);
++    return rows as unknown[];
++  };
++
++  for (const key of ["vehicles", "drivers", "clients", "rentals", "routes", "passengers", "trips", "incidents", "workOrders", "documents", "odometerReadings", "audit"] as const) {
++    collection(key).forEach((row, i) => {
++      if (!isRecord(row)) fail(`${key}[${i}]`, "Expected a record.");
++      else if (!isText(row.id, 100)) fail(`${key}[${i}].id`, "Missing record id.");
++    });
++  }
++
++  const seenIds = new Set<string>();
++  const seenEmails = new Set<string>();
++  collection("users").forEach((row, i) => {
++    const path = `users[${i}]`;
++    if (!isRecord(row)) return fail(path, "Expected a record.");
++    if (!isText(row.id, 100)) return fail(`${path}.id`, "Missing record id.");
++    if (seenIds.has(row.id)) return fail(`${path}.id`, "Duplicate user id.");
++    seenIds.add(row.id);
++    if (!isText(row.fullName)) fail(`${path}.fullName`, "Missing full name.");
++    if (!isText(row.email)) fail(`${path}.email`, "Missing email.");
++    else if (seenEmails.has(row.email)) fail(`${path}.email`, "Duplicate email.");
++    else seenEmails.add(row.email);
++    // Roles are looked up in the permission matrix, so an unknown value would make every
++    // permission check throw. This is the check that a crafted backup used to bypass.
++    if (!ROLES.includes(row.role as never)) fail(`${path}.role`, `Unknown role "${String(row.role)}".`);
++    if (typeof row.active !== "boolean") fail(`${path}.active`, "Active must be true or false.");
++    if (typeof row.passwordHash !== "string" || !PASSWORD_HASH_RE.test(row.passwordHash)) fail(`${path}.passwordHash`, "Not a PBKDF2-SHA256 digest.");
++    if (typeof row.passwordSalt !== "string" || !PASSWORD_SALT_RE.test(row.passwordSalt)) fail(`${path}.passwordSalt`, "Not a 16-byte salt.");
++    if (!isOptionalId(row.driverId)) fail(`${path}.driverId`, "Driver link must be an id or null.");
++    if (!isOptionalId(row.clientId)) fail(`${path}.clientId`, "Client link must be an id or null.");
++    if (row.role === "driver" && !row.driverId) fail(`${path}.driverId`, "A driver account must be linked to a driver record.");
++    if (row.role === "client_contact" && !row.clientId) fail(`${path}.clientId`, "A client contact must be linked to a client record.");
++  });
++
++  const settings = database.settings;
++  if (!isRecord(settings)) fail("settings", "Expected an object.");
++  else {
++    for (const key of ["vehicleCategories", "shifts", "documentTypes"] as const) {
++      if (!Array.isArray(settings[key])) fail(`settings.${key}`, "Expected a list.");
++    }
++    if (!isRecord(settings.rental)) fail("settings.rental", "Expected an object.");
++    if (!isRecord(settings.maintenance)) fail("settings.maintenance", "Expected an object.");
++  }
++
++  return { database: problems.length ? null : database, problems };
++}
++
++/** One-line summary for the failure message shown to the operator. */
++export function describeProblems(problems: BackupProblem[]): string {
++  const shown = problems.slice(0, 3).map((p) => `${p.path}: ${p.message}`);
++  const rest = problems.length > shown.length ? ` (+${problems.length - shown.length} more)` : "";
++  return `${shown.join(" ")}${rest}`;
++}
+diff --git a/src/tms/hardening.test.ts b/src/tms/hardening.test.ts
+index 490f6c2..a560818 100644
+--- a/src/tms/hardening.test.ts
++++ b/src/tms/hardening.test.ts
+@@ -6,6 +6,7 @@
+ // silently locked the account out). These tests pin the boundary.
+ 
+ import { describe, expect, it } from "vitest";
++import { can } from "./permissions";
+ import { hashPassword } from "./crypto";
+ import { execute, type Actor, type Credential } from "./service";
+ import { emptyDatabase, type Database } from "./types";
+@@ -56,3 +57,42 @@ describe("credential policy at the service boundary", () => {
+     await expect(hashPassword("x")).rejects.toThrow(/at least 10 characters/);
+   });
+ });
++
++// Regression tests for the backup-import fix (audit finding H-02).
++describe("backup import validation", () => {
++  it("rejects a backup containing an unknown role instead of crashing later", () => {
++    const { db, admin } = adminDb();
++    const poisoned = JSON.parse(JSON.stringify(db)) as Database;
++    poisoned.users.push({ ...poisoned.users[0], id: "evil", email: "evil@example.com", role: "superuser" as never });
++    const res = execute(db, admin, { type: "import_backup", database: poisoned }, NOW);
++    expect(res.ok).toBe(false);
++    if (!res.ok) expect(res.message).toMatch(/Unknown role/);
++  });
++
++  it("rejects records whose fields have the wrong type", () => {
++    const { db, admin } = adminDb();
++    const bad = JSON.parse(JSON.stringify(db)) as Database;
++    (bad.vehicles as unknown as Record<string, unknown>[]).push({ id: null, registration: 42 });
++    const res = execute(db, admin, { type: "import_backup", database: bad }, NOW);
++    expect(res.ok).toBe(false);
++  });
++
++  it("rejects an empty credential in a restored user", () => {
++    const { db, admin } = adminDb();
++    const bad = JSON.parse(JSON.stringify(db)) as Database;
++    bad.users[0].passwordHash = "";
++    bad.users[0].passwordSalt = "";
++    const res = execute(db, admin, { type: "import_backup", database: bad }, NOW);
++    expect(res.ok).toBe(false);
++  });
++
++  it("still accepts a clean round-trip of its own backup", () => {
++    const { db, admin } = adminDb();
++    const res = execute(db, admin, { type: "import_backup", database: JSON.parse(JSON.stringify(db)) as Database }, NOW);
++    expect(res.ok).toBe(true);
++  });
++
++  it("does not throw on a role the matrix does not know", () => {
++    expect(can("superuser" as never, "users:read")).toBe(false);
++  });
++});
+diff --git a/src/tms/permissions.ts b/src/tms/permissions.ts
+index af51494..90a0181 100644
+--- a/src/tms/permissions.ts
++++ b/src/tms/permissions.ts
+@@ -186,5 +186,8 @@ export const PERMISSION_SCOPE: Record<Permission, Scope> = Object.fromEntries(
+ 
+ export function can(role: Role | null | undefined, permission: Permission): boolean {
+   if (!role) return false;
+-  return ROLE_PERMISSIONS[role].includes(permission);
++  // Fail closed on a role the matrix does not know (for example a user record restored from
++  // a hand-edited backup). This used to throw and take the whole screen down.
++  const granted = ROLE_PERMISSIONS[role];
++  return Array.isArray(granted) && granted.includes(permission);
+ }
+diff --git a/src/tms/service.ts b/src/tms/service.ts
+index dab0741..c7638fd 100644
+--- a/src/tms/service.ts
++++ b/src/tms/service.ts
+@@ -3,6 +3,7 @@
+ // unchanged. In this environment it runs in the browser (see docs/DECISIONS.md D-01).
+ 
+ import { can, type Permission } from "./permissions";
++import { describeProblems, inspectBackup } from "./backupGuard";
+ import { MIN_PASSWORD_LENGTH } from "./crypto";
+ import { confinedClientId } from "./scope";
+ import {
+@@ -988,8 +989,10 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
+     case "import_backup": {
+       const denied = authorise(actor, "backup:import");
+       if (denied) return denied;
+-      const imported = migrate(command.database);
+-      if (!imported) return fail("The file is not a valid Richie TMS backup (schema version 1 or 2).");
++      // A backup is untrusted input: validate every record the app later trusts, not just
++      // the top-level shape (see backupGuard.ts).
++      const { database: imported, problems } = inspectBackup(command.database);
++      if (!imported) return fail(`This file cannot be imported. ${describeProblems(problems)}`, { database: "Rejected by the backup validator." });
+       const stillAdmin = imported.users.some((u) => u.id === actor!.id && u.active && u.role === "administrator");
+       if (!stillAdmin) return fail("Import refused: your administrator account is not present in the backup, which would lock you out.");
+       const next = audit(imported, actor, {
