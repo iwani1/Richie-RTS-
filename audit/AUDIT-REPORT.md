@@ -19,7 +19,7 @@ Richie TMS is a React 19 + Vite + Tailwind single-page transport-management appl
 
 The single dominant risk (**C-01**) is architectural and cannot be patched in the client: authorisation, credentials, personal data and the audit log all live in `localStorage`/`sessionStorage`. A user with devtools can read every record, every password hash, and promote themselves to administrator by editing one field. The project documents this limit candidly (`docs/DATA_PROTECTION.md` §4, `docs/ARCHITECTURE.md` "Known limits"), which is to its credit — but it means the demo must never be pointed at real data.
 
-Beneath that ceiling, the engineering is disciplined and the gaps that *are* fixable are concrete and small. I found and demonstrated four exploitable-or-damaging defects in the service layer and two process defects that make the repository unreviewable, then wrote and verified patches for five of them.
+Beneath that ceiling, the engineering is disciplined and the fixable gaps are concrete and small. I found and reproduced three defects in the service layer (weak-credential acceptance, unvalidated backup import, and storage-quota data loss) plus two process gaps — an unbuildable repository and a dependency tree that no gate ever scanned. Six verified patches address seven findings and clear every critical and high advisory, with 130 tests green.
 
 ### Headline numbers
 
