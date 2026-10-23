@@ -5,7 +5,7 @@ import { actorLink, confinedClientId, driverVehicleIds, mayReportOnVehicle, scop
 import type { Actor, Credential } from "./service";
 import { emptyDatabase, emptyRentalSettings, type Database } from "./types";
 
-const cred: Credential = { passwordHash: "h", passwordSalt: "s" };
+const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const NOW = "2026-01-01T00:00:00.000Z";
 const DATE = "2026-01-05";
 

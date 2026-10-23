@@ -8,7 +8,7 @@ import { execute, type Actor } from "./tms/service";
 import { emptyDatabase, type Database } from "./tms/types";
 
 const NOW = "2026-01-01T00:00:00.000Z";
-const credential = { passwordHash: "hash", passwordSalt: "salt" };
+const credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 
 beforeEach(() => {
   localStorage.clear();

@@ -8,7 +8,7 @@ import type { Actor } from "./tms/service";
 import { emptyDatabase, emptyRentalSettings, type Database } from "./tms/types";
 
 const NOW = "2026-06-01T06:00:00.000Z";
-const fakeCred = { passwordHash: "h", passwordSalt: "s" };
+const fakeCred = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const DATE = new Date().toISOString().slice(0, 10);
 
 beforeEach(() => {

@@ -3,6 +3,7 @@
 // unchanged. In this environment it runs in the browser (see docs/DECISIONS.md D-01).
 
 import { can, type Permission } from "./permissions";
+import { MIN_PASSWORD_LENGTH } from "./crypto";
 import { confinedClientId } from "./scope";
 import {
   CLIENT_STATUSES,
@@ -174,7 +175,26 @@ export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 10
 
 const datesOverlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart <= bEnd && bStart <= aEnd;
 
-export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MIN_LENGTH = MIN_PASSWORD_LENGTH;
+
+// A credential must look like something this app produced: 32 PBKDF2-SHA256 digest bytes
+// and a 16-byte salt, both lower-case hex. Anything else is rejected before it becomes a
+// user record, which closes two holes: an empty credential (which silently locks an account
+// out) and a credential minted outside hashPassword() for a password the form would refuse.
+const CREDENTIAL_HASH_RE = /^[0-9a-f]{64}$/;
+const CREDENTIAL_SALT_RE = /^[0-9a-f]{32}$/;
+
+export function validateCredential(credential: Credential | null | undefined): Errors {
+  const errors: Errors = {};
+  const hash = credential?.passwordHash;
+  const salt = credential?.passwordSalt;
+  if (typeof hash !== "string" || !CREDENTIAL_HASH_RE.test(hash)) {
+    errors.password = "The password must be set through the app so it is hashed before it reaches the service layer.";
+  } else if (typeof salt !== "string" || !CREDENTIAL_SALT_RE.test(salt)) {
+    errors.password = "The password salt is missing or malformed.";
+  }
+  return errors;
+}
 
 export function makeId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -516,7 +536,9 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
     case "setup_administrator": {
       if (db.users.length > 0) return fail("Setup has already been completed.");
       const { errors, value } = validateUser(db, { ...command.input, role: "administrator", active: true });
-      if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
+      const credentialErrors = validateCredential(command.credential);
+      if (Object.keys(errors).length || Object.keys(credentialErrors).length)
+        return fail("Please correct the highlighted fields.", { ...errors, ...credentialErrors });
       const user: User = { id: makeId(), ...value, ...command.credential, createdAt: now, updatedAt: now };
       const next = audit({ ...db, users: [user] }, { id: user.id, fullName: user.fullName, role: user.role }, {
         action: "users:setup",
@@ -536,7 +558,9 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       const denied = authorise(actor, "users:create");
       if (denied) return denied;
       const { errors, value } = validateUser(db, command.input);
-      if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
+      const credentialErrors = validateCredential(command.credential);
+      if (Object.keys(errors).length || Object.keys(credentialErrors).length)
+        return fail("Please correct the highlighted fields.", { ...errors, ...credentialErrors });
       const user: User = { id: makeId(), ...value, ...command.credential, createdAt: now, updatedAt: now };
       const next = audit({ ...db, users: [...db.users, user] }, actor, {
         action: "users:create",
@@ -574,6 +598,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (denied) return denied;
       const existing = db.users.find((u) => u.id === command.id);
       if (!existing) return fail("User not found.");
+      const credentialErrors = validateCredential(command.credential);
+      if (Object.keys(credentialErrors).length) return fail("Please correct the highlighted fields.", credentialErrors);
       const updated: User = { ...existing, ...command.credential, updatedAt: now };
       const next = audit({ ...db, users: db.users.map((u) => (u.id === updated.id ? updated : u)) }, actor, {
         action: "users:reset_password",

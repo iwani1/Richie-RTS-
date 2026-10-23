@@ -9,14 +9,12 @@ Subject: [PATCH 4/6] ci: cover the full dependency tree, add coverage ratchet,
  .github/workflows/ci.yml                | 40 +++++++++++++++++++------
  .github/workflows/codeql.yml            | 26 ++++++++++++++++
  .github/workflows/dependency-review.yml | 23 ++++++++++++++
- node_modules                            |  1 -
  package.json                            |  7 ++++-
  vitest.config.ts                        | 15 ++++++++++
  7 files changed, 121 insertions(+), 11 deletions(-)
  create mode 100644 .github/dependabot.yml
  create mode 100644 .github/workflows/codeql.yml
  create mode 100644 .github/workflows/dependency-review.yml
- delete mode 120000 node_modules
  create mode 100644 vitest.config.ts
 
 diff --git a/.github/dependabot.yml b/.github/dependabot.yml
@@ -184,14 +182,6 @@ index 0000000..33c132c
 +          fail-on-severity: high
 +          # GPL/AGPL/SSPL are not in this dependency tree today and must not arrive.
 +          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, SSPL-1.0
-diff --git a/node_modules b/node_modules
-deleted file mode 120000
-index 639c51c..0000000
---- a/node_modules
-+++ /dev/null
-@@ -1 +0,0 @@
--../demo2/node_modules
-\ No newline at end of file
 diff --git a/package.json b/package.json
 index 39f49c7..22b4be6 100644
 --- a/package.json

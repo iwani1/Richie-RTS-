@@ -3,7 +3,7 @@ import { can, ROLE_PERMISSIONS } from "./permissions";
 import { execute, VEHICLE_TRANSITIONS, type Actor, type Credential } from "./service";
 import { emptyDatabase, type Database } from "./types";
 
-const cred: Credential = { passwordHash: "hash", passwordSalt: "salt" };
+const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const NOW = "2026-01-01T00:00:00.000Z";
 
 function seeded(): { db: Database; admin: Actor; ops: Actor; finance: Actor } {

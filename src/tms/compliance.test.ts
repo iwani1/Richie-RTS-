@@ -4,7 +4,7 @@ import { documentStatus, type CreateDocumentInput } from "./compliance";
 import type { Actor, Credential } from "./service";
 import { SCHEMA_VERSION, emptyDatabase, emptyRentalSettings, type Database } from "./types";
 
-const cred: Credential = { passwordHash: "hash", passwordSalt: "salt" };
+const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const NOW = "2026-01-01T00:00:00.000Z";
 
 interface World {

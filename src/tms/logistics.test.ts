@@ -5,7 +5,7 @@ import { INCIDENT_TRANSITIONS, WORK_ORDER_TRANSITIONS, type IncidentInput, type 
 import type { Actor, Credential } from "./service";
 import { emptyDatabase, type Database, type Incident, type WorkOrder } from "./types";
 
-const cred: Credential = { passwordHash: "hash", passwordSalt: "salt" };
+const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const NOW = "2026-01-01T00:00:00.000Z";
 
 interface World {

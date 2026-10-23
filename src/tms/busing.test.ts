@@ -6,7 +6,7 @@ import { execute, type Actor, type Credential, type CommandResult } from "./serv
 import { SCHEMA_VERSION, emptyDatabase, emptyRentalSettings, type BusRoute, type Database, type Trip } from "./types";
 
 const NOW = "2026-06-01T06:00:00.000Z";
-const cred: Credential = { passwordHash: "h", passwordSalt: "s" };
+const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const EMAILS = { admin: "admin@example.test", ops: "ops@example.test", finance: "fin@example.test", driver: "driver@example.test" } as const;
 type Who = keyof typeof EMAILS;
 

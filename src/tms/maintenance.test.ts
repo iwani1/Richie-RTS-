@@ -6,7 +6,7 @@ import type { Actor, Credential } from "./service";
 import { emptyDatabase, migrate, SCHEMA_VERSION, type Database, type ServiceSchedule } from "./types";
 
 const NOW = "2026-06-01T10:00:00.000Z";
-const credential: Credential = { passwordHash: "h", passwordSalt: "s" };
+const credential: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 // Readiness is evaluated at a fixed date so day maths is deterministic.
 const AS_OF = "2026-09-15"; // 106 days after NOW's date
 
