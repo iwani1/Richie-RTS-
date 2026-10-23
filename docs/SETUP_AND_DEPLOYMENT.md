@@ -54,7 +54,10 @@ sudo dnf install -y nodejs
 sudo dnf module reset nodejs -y && sudo dnf module enable nodejs:22 -y
 ```
 
-Podman can stand in for Docker; `podman-compose` reads the same `docker-compose.yml`. If you
+Podman can stand in for Docker; `podman-compose` reads the same `docker-compose.yml`. The file
+names the PostgreSQL image fully (`docker.io/library/postgres:18-alpine`) so Podman does not stop
+to ask which registry to use. If you see that prompt anyway, it means an older checkout of this
+file: choose `docker.io/library/postgres:18-alpine`, or run `git pull` and try again. If you
 prefer Docker CE, install it from Docker's repository and use `docker compose` instead — the file
 does not change.
 
@@ -335,6 +338,7 @@ sudo systemctl --user restart richie-tms     # or Ctrl-C and `npm start`
 | Browser: *"Cannot reach the ledger"* | server not running, or wrong port | `curl localhost:3000/api/health`; check `journalctl --user -u richie-tms` |
 | `/api/health` returns 503 | PostgreSQL down or unreachable | `docker compose ps`; `docker compose logs db` |
 | `password authentication failed for user "richie"` | password in `DATABASE_URL` and `POSTGRES_PASSWORD` disagree, or the volume was created with the old password | make them match; if the volume was created with a different password, either change it in SQL (`ALTER USER richie PASSWORD '...'`) or remove the volume (destroys data) |
+| Podman asks *"Please select an image"* | the compose file used a short image name, or a local `~/.config/containers/registries.conf` has no default | pick `docker.io/library/postgres:18-alpine`; or `git pull` (the file now names the registry) |
 | `port is already allocated` on `compose up` | something else uses 5432 (often a host PostgreSQL) | stop it (`sudo systemctl stop postgresql`) or change the published port and `DATABASE_URL` together |
 | `Cannot find module './chunks/vendor-chunks/next.js'` | `npm run build` ran while `npm run dev` was running | stop dev, `rm -rf .next`, start again |
 | `EADDRINUSE :3000` | another process on 3000 | `ss -ltnp \| grep 3000`, stop it, or `npm start -- -p 3100` |

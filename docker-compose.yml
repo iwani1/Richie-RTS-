@@ -10,7 +10,10 @@
 # and `podman` works as well as `docker`.
 services:
   db:
-    image: postgres:18-alpine
+    # Fully qualified on purpose: with a short name (`postgres:18-alpine`) Podman stops and asks
+    # which registry to use, which breaks a copy-paste first run on Fedora. docker.io is the
+    # official image. If your organisation mirrors images, change this one line.
+    image: docker.io/library/postgres:18-alpine
     container_name: richie-tms-db
     restart: unless-stopped
     environment:
