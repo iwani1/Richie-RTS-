@@ -388,3 +388,103 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
   Small-text tokens were darkened during review to reach contrast on paper.
 - **Limits.** External Google Fonts need network access; system serif/sans/mono fallbacks are
   defined. Print/PDF export of the ledger is not implemented.
+
+## D-42 (Phase 12) The supplied standing brief is the authoritative `AGENTS.md`
+
+- **Context.** The build had been running from a condensed `AGENTS.md` that stated "section 5.1
+  (exclusion constraints) and section 7 (feature IDs) were not supplied". Both sections are in
+  the text supplied with this repository (`richie-tms-standing-brief.md`): §5.1 defines the
+  database-enforced double-booking constraint, §7 is the 78-ID feature backlog. The condensed
+  file therefore mis-stated the brief, and feature tracking drifted into invented phase names.
+- **Decision.** Install the supplied standing brief verbatim as `AGENTS.md`, because the brief
+  itself says to do that. Preserve the condensed file at `docs/archive/AGENTS-condensed.md`
+  rather than deleting it (integrity rule 6), and keep the phase prompts at the root.
+- **Why.** The project should be measured against what the owner actually asked for, including
+  the parts the build could not meet.
+- **Consequence, recorded honestly.** Measured against the real §4 and §5.1/§7, this build is a
+  browser prototype, not the specified system: no Next.js, PostgreSQL, Prisma, Zod, job runner,
+  Playwright, Docker; no database-enforced exclusion constraint; 5 of 78 feature IDs done and
+  44 partial (`audit/DEMO-COMPARISON.md`). Nothing in this session can change that without a
+  server; it changes what the project claims.
+
+## D-43 (Phase 12) Credentials are validated where they are created, not where they are typed
+
+- **Context.** `PASSWORD_MIN_LENGTH` was checked only in `useTms.createCredential()`, a React
+  hook. `execute()` stored whatever `command.credential` contained: a one-character password
+  was accepted and signed in, and an empty hash/salt permanently locked an account out.
+- **Decision.** `validateCredential()` rejects anything `hashPassword()` could not have produced
+  (64 hex digest, 32 hex salt) at `setup_administrator`, `create_user` and
+  `reset_user_password`; the length rule moves into `hashPassword()` itself; PBKDF2 rises from
+  120,000 to 600,000 iterations.
+- **Why.** The service layer is the boundary that will move to the server unchanged. A rule that
+  only exists in the UI is not a rule (integrity rules 1 and 5).
+- **Rejected.** Passing the plaintext password into the service layer so it can check length and
+  breach lists: that would widen what the command layer handles and leak into the audit surface.
+  Strength checks belong at the future API edge, where the password arrives once.
+- **Limits.** A caller inside the app can still hash a weak password; only shape is enforced here.
+
+## D-44 (Phase 12) An imported backup is untrusted input
+
+- **Context.** `migrate()` checked a schema version, five arrays and that `settings` was an
+  object, then cast the rest. `import_backup` replaces the entire database, so a crafted file
+  could inject an unknown role — which made `can()` throw and white-screen the app — plus wrong
+  types, duplicate ids and empty credentials.
+- **Decision.** New `src/tms/backupGuard.ts` validates the records the application later trusts
+  (ids, roles against `ROLES`, credential shape, driver/client link invariants, duplicates,
+  collection ceilings) and returns a problem list that is shown to the operator. `can()` fails
+  closed on an unknown role.
+- **Why.** Import is the only path where untrusted data enters a system whose whole premise is
+  that its data is trustworthy.
+- **Rejected.** Trusting `migrate()` because backups "come from us": the brief treats import as
+  a feature for existing data (MIG-01), which means files from elsewhere.
+
+## D-45 (Phase 12) The audit log has a ceiling, and data egress is audited
+
+- **Context.** Every command prepended an audit entry, and `commit()` rewrote the entire database
+  to `localStorage` on each write. Measured: 20,000 entries = 4.65 MB and 15 ms per write, on a
+  typical 5 MB origin quota; after that, writes fail, state advances, and the change is lost on
+  reload. Backup export bypassed the service layer entirely: no permission check, no audit entry.
+- **Decision.** Cap the in-browser log at 5,000 entries (`AUDIT_LIMIT`); route older entries out
+  through the export. Add `record_backup_export`, which checks `backup:export` and writes the
+  audit entry before the file is produced; `exportBackup()` returns `null` when refused.
+- **Why.** A log that silently stops recording is worse than a bounded one that says so. The
+  export is the one action that moves all personal data off the device; it must be visible.
+- **Rejected.** Pruning silently (dishonest), keeping the log unbounded (data loss), moving to
+  IndexedDB in this session (half of the server work, and the server is the real fix).
+
+## D-46 (Phase 12) Pin the build toolchain forward to clear advisories
+
+- **Decision.** `vite` 7.3.7, `vite-plugin-singlefile` 2.3.4, `vitest` 5.0.5,
+  `@vitest/coverage-v8` 5.0.5, all exact. `npm audit` goes from 2 critical + 4 high to 1 low
+  (an esbuild dev-server advisory, Windows only).
+- **Why.** The advisories (tinypool prototype-pollution → RCE, `@vitest/mocker` path traversal,
+  vite `server.fs.deny` bypass) execute in CI and on every developer machine, and the old CI
+  gate ran `npm audit --omit=dev`, so it could never see them.
+- **Trade-off.** Vitest 5 reports coverage on an all-files basis, so the ratchet is set at
+  70/62/66/74 rather than the 80/72/70/80 it would be on the old basis. Raise it as the
+  untested screens (`Users`, `Registers`) gain tests.
+- **Rejected.** Staying on vitest 3 (keeps two critical advisories), or jumping to vite 8 in the
+  same change (extra migration risk for no security gain).
+
+## D-47 (Phase 12) A Content Security Policy for a single-file bundle
+
+- **Decision.** Ship a `Content-Security-Policy` meta tag: `default-src 'none'`, inline script
+  and style allowed (the bundle is one HTML file), fonts limited to the two Google hosts,
+  `connect-src 'none'`, `base-uri`/`form-action` `'none'`. Add `referrerpolicy="no-referrer"`
+  to the stylesheet link.
+- **Why.** The page handles personal data and previously had no policy at all, so any injected
+  markup could load anything.
+- **Limits, stated plainly.** `'unsafe-inline'` is weaker than a hash; `frame-ancestors` is
+  ignored in a meta tag and must be sent as a header by the host, together with HSTS. The
+  Google Fonts request remains a third-party call from an application that otherwise makes none;
+  self-hosting the three families is the follow-up.
+
+## D-48 (Phase 12) The audit harness is not part of the product suite
+
+- **Context.** `audit/probes/audit-probe.test.ts` was written to reproduce audit findings and
+  contains a deliberate latency benchmark that takes about 28 seconds. Committed at the root, it
+  would run under `npm test` and fail on the default 5-second timeout.
+- **Decision.** Exclude `audit/**` in `vitest.config.ts`; keep the prose and the file for
+  reproduction (`artifacts/` evidence stays in `audit/`).
+- **Why.** A product gate must be fast and deterministic; evidence code must remain runnable on
+  demand. Mixing them makes both worse.

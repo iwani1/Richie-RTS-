@@ -56,3 +56,19 @@ recorded as unverified. Nothing here is legal advice on Ghana's Data Protection 
 (permission sweep, credential and backup PoCs, latency benchmark). Drop it one level below the
 project root, exclude it from the project's test glob, and run it with `npx vitest run` to
 reproduce. It is reference material, not a change to the product.
+
+## Remediation status (updated 2026-10-23, Phase 12)
+
+| Finding | Status |
+|---|---|
+| H-01 credential policy | **Fixed** in the repository (commit `87d1688`), 4 regression tests |
+| H-02 untrusted backup import | **Fixed** (`fc07073`), 5 regression tests |
+| H-03 audit log growth / lost writes | **Fixed** (`126ad32`), 3 regression tests |
+| M-01 dev-dependency advisories | **Fixed** (`363f45d`): 2 critical + 4 high → 0 |
+| M-02 CI gaps | **Fixed** (`363f45d`); CI still unobserved on GitHub's runner |
+| M-03 audit tamper-evidence | **Partially fixed**: exports are permissioned and audited; hash chaining remains open |
+| H-04 repository layout | **Fixed** (`f46c984`): source at root, CI live, README/SECURITY/.gitignore added |
+| L-03 CSP / referer leak | **Fixed** (`532f861`); self-hosting the fonts remains open |
+| C-01 browser trust boundary | **Open** — needs the API + PostgreSQL rebuild (§9); cannot be fixed in the client |
+| M-04 … M-08, L-01, L-02, L-04…L-07 | Open; see `findings.json` for effort |
+

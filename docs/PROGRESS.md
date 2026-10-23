@@ -245,6 +245,40 @@ production audit pass.
 Totals in this session: **118 tests passing** across 14 test files (5 new unit tests, 1 new
 operations E2E). `npm run check` and `npm audit --omit=dev` (0 vulnerabilities) pass.
 
+## Phase 12 - Repository rebuild and security remediation (this session)
+
+The application previously shipped only inside two ZIP archives, so GitHub reported zero
+workflows, nothing was scanned, and the code could not be reviewed as a diff. This session
+unpacked demo 2 at the repository root and closed the defects an independent audit
+(`audit/AUDIT-REPORT.md`) could fix without a server.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Demo 2 source materialised at the root; archives removed from the tree (recoverable at `030197e`) | Done (verified) | `git log`, 69 files imported |
+| Credential policy enforced in the service layer (was UI-only; empty credential accepted) | Done (verified) | `hardening.test.ts` (4 tests), H-01 |
+| Backup import validates every trusted record; `can()` fails closed on unknown role | Done (verified) | `hardening.test.ts` (5 tests), H-02 |
+| Audit log capped at 5,000 entries; backup export permissioned and audited | Done (verified) | `hardening.test.ts` (3 tests), H-03/M-03 |
+| CSP on the single-file build; `referrerpolicy` on the font link | Done (verified) | `dist/index.html` contains the policy, L-03 |
+| CI at the root: coverage ratchet, full-tree audit, CodeQL, dependency review, Dependabot | Done (authored) | `.github/workflows/*`; **execution not yet observed** on a runner |
+| Toolchain upgraded: vite 7.3.7, singlefile 2.3.4, vitest 5.0.5 | Done (verified) | `npm audit` 2 critical + 4 high → 0; suite green |
+| Authoritative standing brief installed as `AGENTS.md`; condensed variant archived | Done | D-42, `docs/archive/AGENTS-condensed.md` |
+| README, SECURITY.md, .gitignore, .nvmrc | Done | repository root |
+| Licence, repository visibility | Blocked | Owner decision, Q-49 |
+| Browser visual verification of the rebuilt bundle | Not verified | No browser in this environment; build and jsdom tests only |
+
+Gates run in this session, in the brief's order:
+
+- `npm ci` — 293 packages, lockfile honoured.
+- `npm run typecheck` — clean.
+- `npm run lint` — clean.
+- `npm run test:coverage` — **130 tests in 15 files pass**; 72.16 % statements, 64.90 %
+  branches, 68.33 % functions, 76.77 % lines (Vitest 5 all-files basis; thresholds 70/62/66/74).
+- `npm run build` — single file, 573.57 kB (154.78 kB gzip).
+- `npm audit` — 1 low, 0 critical/high (was 2 critical, 4 high, 1 moderate, 1 low).
+
+Not verified, and not claimed: that the CI workflow passes on GitHub's runner (it has never
+run there), and anything about a real browser or a real server.
+
 ## Not started (later phases)
 
 - Contracts, invoices and a payments ledger. **Blocked:** contract activation requires billing

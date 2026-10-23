@@ -5,8 +5,17 @@
 - Build: Vite 7 + React 19 + Tailwind 4, bundled into a single `dist/index.html` (`vite-plugin-singlefile`).
 - Runtime: the browser only. There is no Node.js server, no PostgreSQL, no background worker and no WebSocket host in this environment. The hosting target is unknown (OPEN_QUESTIONS Q-01).
 - Persistence: `localStorage` under `richie-tms:db:v1`, schema version 10. This is an interim seam (DECISIONS D-01), not production persistence.
-- Quality gates: `npm run check` runs typecheck, lint, test and build in order. The same four
-  run in `.github/workflows/ci.yml` (authored here; execution not observed, no runner exists).
+- Quality gates: `npm run check` runs typecheck, lint, tests with coverage thresholds, and
+  build, in that order. The same gates run in `.github/workflows/ci.yml` at the repository root,
+  alongside CodeQL, a dependency review and Dependabot. **The workflow has not yet been observed
+  running on GitHub's runner**: it was authored and reviewed here, and every command it invokes
+  was run locally (see `docs/PROGRESS.md`, Phase 12).
+- Security posture of the shipped bundle: a Content-Security-Policy meta tag limits sources to
+  the bundle itself plus the two Google Fonts hosts, and blocks connections (`connect-src
+  'none'`). `frame-ancestors` and HSTS must be sent as headers by the host (D-47).
+- Audit retention: the in-browser audit log is capped at 5,000 entries, and every backup export
+  is permission-checked and audited (D-45). A cap is a consequence of the storage medium, not a
+  policy decision; the server replaces it.
 
 ## Interface system
 

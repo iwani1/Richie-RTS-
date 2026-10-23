@@ -3,9 +3,18 @@
 Six git-format patches against the `Richie TMS demo 2.zip` source tree. They apply in
 numerical order to a tree whose root is the contents of that archive.
 
-Verified: `git apply --check` clean for all six, and `npm ci && npm run check` passes on the
-fully patched tree (typecheck, lint, coverage thresholds, build) with **130 tests green**
-(118 original + 12 regression tests added by the patches).
+Verified: `git apply --check` clean for 0001–0005, and `npm ci && npm run check` passes on the
+patched tree (typecheck, lint, coverage thresholds, build) with **130 tests green** (118 original
++ 12 regression tests added by the patches).
+
+**Applied in this repository** (Phase 12, see `CHANGELOG.md`): 0001–0005 were applied verbatim.
+0006 (the dependency upgrade) was **not** applied from the patch: it was generated in a scratch
+tree that also contained audit-only packages (`@vitest/coverage-v8`, `eslint-plugin-security`),
+so its `package.json` context did not match this repository. The upgrade was instead performed
+directly (`npm install -D --save-exact vite@7.3.7 vite-plugin-singlefile@2.3.4 vitest@5.0.5
+@vitest/coverage-v8@5.0.5`) with the same result: 0 critical, 0 high, 1 low advisory.
+All patches were also sanitised to remove a stray `node_modules` symlink that leaked in from the
+scratch tree.
 
 | Patch | Fixes | Effect |
 |---|---|---|
