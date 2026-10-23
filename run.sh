@@ -3,6 +3,7 @@
 #
 #   ./run.sh setup     first-time: check tools, create .env, start the database, migrate, build
 #   ./run.sh start     run the production build on http://localhost:3000
+#   ./run.sh stop      stop the server listening on that port (only if it is this application)
 #   ./run.sh dev       run the development server with hot reload
 #   ./run.sh check     typecheck, lint, tests, production build
 #   ./run.sh doctor    diagnose a first run: config, port, container, connection, migrations
@@ -67,6 +68,17 @@ require_db() {
   require_env
   db_reachable || fail "PostgreSQL is not reachable with DATABASE_URL from .env. Is the database running? (podman-compose up -d db)"
 }
+
+# The port the application listens on. `PORT=3001 ./run.sh start` moves it.
+app_port() { printf '%s' "${PORT:-3000}"; }
+
+# Process ids listening on a TCP port. Empty when the port is free.
+listening_pids() {
+  ss -ltnp "sport = :$1" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u
+}
+
+# What a process is running, for the operator's benefit.
+pid_command() { ps -p "$1" -o args= 2>/dev/null || true; }
 
 # The compose command available here, empty if there is none.
 compose_cmd() {
@@ -214,6 +226,15 @@ or edit it by hand (docs/SETUP_AND_DEPLOYMENT.md §3.2)."
     ;;
   start)
     require_node; require_env; require_deps
+    port=$(app_port)
+    busy=$(listening_pids "$port")
+    if [ -n "$busy" ]; then
+      say "Port $port is already in use:"
+      for pid in $busy; do printf '    PID %s: %s\n' "$pid" "$(pid_command "$pid")"; done
+      fail "That is usually an earlier 'npm start' you forgot to stop.
+    Stop it with: ./run.sh stop
+    Or run on another port: PORT=3001 ./run.sh start"
+    fi
     if [ ! -f .next/BUILD_ID ]; then
       say "No production build yet (or it was removed). Building first..."
       npm run build || fail "The build failed. Fix the error above, then run ./run.sh start again."
@@ -312,6 +333,34 @@ or edit it by hand (docs/SETUP_AND_DEPLOYMENT.md §3.2)."
     say "The checkout is clean. Start again with:"
     say "    ./run.sh setup"
     say "    ./run.sh start"
+    ;;
+
+  stop)
+    port=$(app_port)
+    pids=$(listening_pids "$port")
+    if [ -z "$pids" ]; then say "Nothing is listening on port $port."; exit 0; fi
+    for pid in $pids; do
+      command=$(pid_command "$pid")
+      case "$command" in
+        *next*|*node*)
+          say "Stopping PID $pid: $command"
+          kill "$pid" 2>/dev/null || true
+          ;;
+        *)
+          # Something unrelated to this application: say so rather than killing it.
+          fail "Port $port is held by PID $pid ($command), which is not this application. Stop it yourself, or use PORT=3001 ./run.sh start."
+          ;;
+      esac
+    done
+    for _ in $(seq 1 10); do
+      [ -z "$(listening_pids "$port")" ] && break
+      sleep 1
+    done
+    if [ -n "$(listening_pids "$port")" ]; then
+      for pid in $(listening_pids "$port"); do kill -9 "$pid" 2>/dev/null || true; done
+      sleep 1
+    fi
+    [ -z "$(listening_pids "$port")" ] && say "Port $port is free." || fail "Port $port is still in use."
     ;;
 
   doctor)

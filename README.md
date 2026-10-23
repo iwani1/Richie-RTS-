@@ -35,6 +35,7 @@ Full guide, including systemd, HTTPS, backups and troubleshooting:
 Other commands:
 
 ```bash
+./run.sh stop       # stop the server on port 3000 (refuses to kill anything else)
 ./run.sh doctor     # if anything is wrong on first run, this says what
 ./run.sh nuke       # start completely over: remove container, volume, image, .env, build output
 ./run.sh dev        # development server with hot reload

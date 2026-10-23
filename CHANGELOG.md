@@ -18,6 +18,10 @@ The application now runs as the brief specifies: Next.js + PostgreSQL, with auth
 - Scripts: `db:migrate`, `db:seed` (three locks; no default password), `db:reset`, `db:backup`,
   `db:restore`.
 - `docs/SETUP_AND_DEPLOYMENT.md` (Fedora run book), `run.sh`, `docker-compose.yml`, `.env.example`.
+- `./run.sh stop`: stops the server on the application port, and only if the process looks like
+  this application (a `next`/`node` command); anything else is reported, not killed.
+- `./run.sh start` checks the port first and names the process holding it instead of failing with a
+  bare `EADDRINUSE`. `PORT=3001 ./run.sh start` moves the server.
 - `./run.sh nuke`: one confirmed command to start over — compose down -v, the container, its
   volume, the postgres image, a stale rootlessport, `.env`, `node_modules` and `.next`. The git
   checkout and source files are untouched. Run book §9 documents it, with the by-hand equivalent.
