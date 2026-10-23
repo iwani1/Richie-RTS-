@@ -16,6 +16,7 @@ import { SettingsPage } from "./screens/Settings";
 import { UsersPage } from "./screens/Users";
 import { VehiclesPage } from "./screens/Vehicles";
 import { NAV_ITEMS, type Route } from "./routes";
+import { documentStatus } from "./tms/compliance";
 import { readinessReport } from "./tms/maintenance";
 import { setupProgress } from "./tms/setup";
 import { todayYmd } from "./ui/primitives";
@@ -206,7 +207,10 @@ function Shell() {
     busing: db.trips.filter((t) => t.serviceDate === today && t.status === "planned").length,
     fleetReadiness: readiness.status === "not_configured" ? 0 : readiness.counts.overdue,
     logistics: db.incidents.filter((i) => i.status !== "closed" && i.status !== "resolved").length,
-    compliance: db.drivers.filter((d) => d.status === "active" && d.licenceExpiry < today).length,
+    compliance: db.documents.filter((doc) => {
+      const state = documentStatus(doc.expiryDate, db.settings.documentReminderLeadDays, today);
+      return state === "expired" || state === "expiring_soon";
+    }).length,
     settings: setup.outstanding,
   };
 
@@ -320,6 +324,10 @@ function Shell() {
               <span className="rts-palette-trigger-text">Search or jump to a screen</span>
               <kbd className="rts-kbd">Ctrl K</kbd>
             </button>
+            <span className="rts-top-user" title={actor ? `${actor.fullName} — ${ROLE_LABELS[actor.role]}` : "Signed in"}>
+              <span className="rts-avatar" aria-hidden="true">{initialsOf(actor?.fullName)}</span>
+              <span className="sr-only">Signed in as {actor?.fullName ?? "an operator"}</span>
+            </span>
           </div>
         </header>
 

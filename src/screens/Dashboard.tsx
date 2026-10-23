@@ -8,7 +8,6 @@ import {
   ROLE_LABELS,
   TRIP_STATUS_LABELS,
   type Trip,
-  type User,
 } from "../tms/types";
 import { Badge, Button, todayYmd } from "../ui/primitives";
 import { Icon } from "../ui/icons";
@@ -36,16 +35,6 @@ function lastSevenDays(today: string): string[] {
     day.setUTCDate(day.getUTCDate() - (6 - offset));
     return day.toISOString().slice(0, 10);
   });
-}
-
-function initialsOf(user: User | null): string {
-  if (!user) return "—";
-  return user.fullName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
 }
 
 /** A tiny recorded series: one bar per day, the last day marked. Height is relative, never invented. */
@@ -223,7 +212,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
           </p>
         </div>
         <div className="rts-page-actions">
-          <span className="rts-avatar rts-avatar--lg" aria-hidden="true">{initialsOf(currentUser)}</span>
+          <Button onClick={() => navigate("fleetReadiness")}>Check readiness</Button>
           <Button variant="primary" onClick={() => navigate("busing")}>
             Open dispatch
           </Button>
@@ -245,13 +234,15 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
             <span className="rts-stat-label">Runs today</span>
             {undispatched.length > 0 ? (
               <span className="rts-stat-chip rts-stat-chip--warn">{undispatched.length} waiting</span>
+            ) : todaysTrips.length === 0 ? (
+              <span className="rts-stat-chip rts-stat-chip--info">none planned</span>
             ) : (
-              <span className="rts-stat-chip">{todaysTrips.length === 0 ? "none planned" : "all dispatched"}</span>
+              <span className="rts-stat-chip">all dispatched</span>
             )}
           </div>
           <p className="rts-stat-value">
             {todaysTrips.length}
-            <span className="rts-stat-unit">of {todaysTrips.length} planned</span>
+            <span className="rts-stat-unit">run{todaysTrips.length === 1 ? "" : "s"} today</span>
           </p>
           <p className="rts-stat-caption">
             {todaysTrips.length === 0
@@ -275,15 +266,15 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
             )}
           </div>
           <p className="rts-stat-value">
-            {readiness.evaluable}
-            <span className="rts-stat-unit">of {readiness.total} evaluated</span>
+            {readiness.counts.ok}
+            <span className="rts-stat-unit">of {readiness.total} in the fleet</span>
           </p>
           <p className="rts-stat-caption">
             {readiness.status === "not_configured"
               ? "Service intervals are not set, so readiness cannot be computed."
               : readiness.coverage === null
                 ? "No vehicle has a recorded service basis yet."
-                : `Coverage ${Math.round(readiness.coverage * 100)}% — from recorded odometer and service dates.`}
+                : `${readiness.counts.due} due soon · ${readiness.counts.overdue} overdue · coverage ${Math.round(readiness.coverage * 100)}%`}
           </p>
         </article>
 
