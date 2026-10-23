@@ -8,40 +8,48 @@ Staff busing, bus rentals and staff logistics in one operational application.
 > a redacted copy of the data your role may see and never holds a credential.
 >
 > It is still an evaluation-stage system: there is no 2FA, no email, no HTTPS inside the app, and
-> no self-service password reset. `docs/SETUP_AND_DEPLOYMENT.md` §13 lists every limit before you
+> no self-service password reset. `docs/SETUP_AND_DEPLOYMENT.md` §12 lists every limit before you
 > put real people's data in it.
 
-## Run it (Fedora workstation)
+## Run it
+
+Requirements: **Node 20.19+** and **PostgreSQL 15+**. No other tooling.
 
 ```bash
-sudo dnf install -y nodejs npm git openssl podman podman-compose
 git clone https://github.com/iwani1/Richie-RTS-.git richie-tms
-cd richie-tms && git checkout arena/368c3fd2-richie-rts
+cd richie-tms
+git checkout arena/368c3fd2-richie-rts
 
-./run.sh setup                   # writes .env with generated secrets, starts PostgreSQL,
-                                 # installs, migrates, builds — one command
-./run.sh start                   # http://localhost:3000
+cp .env.example .env     # then set DATABASE_URL and SESSION_SECRET
+npm ci
+npm run db:migrate       # creates the schema
+npm run build && npm start
 ```
 
-Nothing else needs configuring: `setup` generates the database password and the session secret
-and writes them consistently. If a step fails, `./run.sh doctor` names the cause and the fix.
+Open <http://localhost:3000>. The first page asks you to create the administrator account. Then open
+**Settings** and supply the business rules — nothing is pre-filled, and dependent features stay
+blocked until you do.
 
-The first page asks you to create the administrator account. Then open **Settings** and supply the
-business rules — nothing is pre-filled, and dependent features stay blocked until you do.
+If you have no PostgreSQL yet, one container is enough:
 
-Full guide, including systemd, HTTPS, backups and troubleshooting:
+```bash
+podman run -d --name richie-db \
+  -e POSTGRES_USER=richie -e POSTGRES_PASSWORD='your-password' -e POSTGRES_DB=richie_tms \
+  -p 127.0.0.1:5432:5432 -v richie_pgdata:/var/lib/postgresql \
+  docker.io/library/postgres:18-alpine
+```
+
+Exact commands for every step, including backups and deployment notes:
 **`docs/SETUP_AND_DEPLOYMENT.md`**.
 
 Other commands:
 
 ```bash
-./run.sh stop       # stop the server on port 3000 (refuses to kill anything else)
-./run.sh doctor     # if anything is wrong on first run, this says what
-./run.sh nuke       # start completely over: remove container, volume, image, .env, build output
-./run.sh dev        # development server with hot reload
-./run.sh check      # typecheck, lint, tests with coverage thresholds, production build
-./run.sh health     # is the app up, and can it reach PostgreSQL?
-./run.sh backup     # full backup into ./backups/ (contains credentials: encrypt it)
+npm run dev              # development server with hot reload
+npm run check            # typecheck, lint, tests with coverage thresholds, production build
+npm test                 # unit and component tests
+npm run test:integration # against a real database (TEST_DATABASE_URL)
+npm run db:backup -- ./backups/today.json    # full export, contains password hashes
 ```
 
 ## What is here
@@ -76,7 +84,7 @@ the session/password decision (D-51).
 
 | Document | Contents |
 |---|---|
-| `docs/SETUP_AND_DEPLOYMENT.md` | install, run, back up, troubleshoot — start here |
+| `docs/SETUP_AND_DEPLOYMENT.md` | install, migrate, seed, build, run, limits — start here |
 | `richie-tms-standing-brief.md` | the standing brief: how this project is built (authoritative) |
 | `docs/ARCHITECTURE.md` | modules, request flow, known limits |
 | `docs/PROGRESS.md` | what is done, what is blocked, and the evidence for each claim |

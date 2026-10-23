@@ -6,7 +6,7 @@
   and static assets into `.next/`; `npm start` serves them. There is no single-file artifact any
   more — the page needs a server, because that is where authority lives.
 - Runtime: one Node.js process on the operator's workstation (Fedora), plus PostgreSQL. The
-  database is the source of truth. See `docs/SETUP_AND_DEPLOYMENT.md`.
+  database is the source of truth. See `docs/SETUP_AND_DEPLOYMENT.md` for the install and run commands.
 - Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (16 tables, `btree_gist` +
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).

@@ -47,7 +47,7 @@ These are not acceptable for live personal data. They must be closed before prod
 2. `npm run db:backup` writes **unencrypted JSON containing password hashes**; move it to encrypted
    storage. The Users-screen export is redacted (no credentials) but still contains personal data.
 3. There is no TLS inside the application: staff on the office network must reach it through an
-   HTTPS reverse proxy (`docs/SETUP_AND_DEPLOYMENT.md` §5) or their session cookie and traffic are
+   HTTPS reverse proxy (`docs/SETUP_AND_DEPLOYMENT.md` §11) or their session cookie and traffic are
    exposed on that network. There is no per-record access control beyond roles and own-record
    scope, and scope filtering happens in the application layer, not in SQL.
 4. No workflow for subject access, correction or deletion requests.

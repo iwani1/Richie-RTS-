@@ -27,7 +27,7 @@ In scope:
 - credential handling: hashing (Argon2id), storage, redaction, throttling.
 
 Out of scope for this stage (documented limits, not vulnerabilities — see
-`docs/SETUP_AND_DEPLOYMENT.md` §11): no 2FA or email verification, no TLS inside the application
+`docs/SETUP_AND_DEPLOYMENT.md` §12): no 2FA or email verification, no TLS inside the application
 (terminate at a reverse proxy), an in-process sign-in throttle, and an append-only audit log
 without a retention policy.
 

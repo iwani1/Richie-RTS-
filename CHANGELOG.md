@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — removed the local-run scaffolding
+
+The application is unchanged. What went away is the tooling that grew around getting it started on
+one particular workstation, which was more machinery than the task needed:
+
+- `run.sh` (setup, start, stop, dev, check, health, backup, seed, reset, doctor, nuke,
+  db-reset-container), `docker-compose.yml`, `scripts/doctor.ts`, `scripts/init-env.mjs`.
+- The `doctor`, `env:init`, `db:up` and `db:down` npm scripts, and the Fedora-specific sections of
+  the setup guide.
+
+`docs/SETUP_AND_DEPLOYMENT.md` is now the exact commands and nothing more: install, configure,
+create the database, migrate, seed, build, run, back up. It still records the known limits and what
+was verified. Requirements are now simply Node 20.19+ and PostgreSQL 15+; the database can be a
+package, a container or a hosted server, and one `podman run` line is given as an example.
+
+The previous state is preserved as the annotated tag `archive/local-run`, so nothing is lost:
+
+```bash
+git fetch --tags
+git checkout archive/local-run     # or: git diff archive/local-run HEAD
+```
+
+
 ## Phase 13 — the intended stack, running (unreleased)
 
 The application now runs as the brief specifies: Next.js + PostgreSQL, with authority on the server.
@@ -17,7 +40,7 @@ The application now runs as the brief specifies: Next.js + PostgreSQL, with auth
   (`iron-session`). Legacy browser-build PBKDF2 credentials still verify (D-51).
 - Scripts: `db:migrate`, `db:seed` (three locks; no default password), `db:reset`, `db:backup`,
   `db:restore`.
-- `docs/SETUP_AND_DEPLOYMENT.md` (Fedora run book), `run.sh`, `docker-compose.yml`, `.env.example`.
+- `docs/SETUP_AND_DEPLOYMENT.md`, `.env.example`.
 - `./run.sh stop`: stops the server on the application port, and only if the process looks like
   this application (a `next`/`node` command); anything else is reported, not killed.
 - `./run.sh start` checks the port first and names the process holding it instead of failing with a
