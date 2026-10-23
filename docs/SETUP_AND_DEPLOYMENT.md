@@ -120,6 +120,13 @@ podman-compose up -d db          # or: docker compose up -d db
 podman-compose ps                # wait until STATUS says "healthy"
 ```
 
+The data volume is mounted at **`/var/lib/postgresql`**, not the older
+`/var/lib/postgresql/data`. PostgreSQL 18 changed its data directory
+(`PGDATA=/var/lib/postgresql/18/docker`), and the image refuses to start if it finds a volume at
+the old path — it prints *"there appears to be PostgreSQL data in: /var/lib/postgresql/data
+(unused mount/volume)"* and exits. If you copy this compose file into another project, keep that
+path as it is.
+
 The container publishes the database on `127.0.0.1:${POSTGRES_PORT:-5433}`. 5433 rather than the
 default 5432 is deliberate: Fedora workstations often already have a PostgreSQL, or a stale Podman
 port forwarder, on 5432. If you need a different port, change `POSTGRES_PORT` **and**
@@ -376,7 +383,8 @@ Richie TMS — first-run diagnostics
 ```
 
 It only reads; it never starts, stops or deletes anything. Exit code is non-zero when something
-blocks the application.
+blocks the application. When a container exists but is not running, it reads that container's own
+log and names the cause — the volume-path error below is recognised by name.
 
 ### The `rootlessport` trap (Fedora, Podman)
 
@@ -419,6 +427,8 @@ podman-compose up -d db
 | `rootlessport listen tcp 127.0.0.1:5432: bind: address already in use` (or `port is already allocated`) | Fedora ships a PostgreSQL service that is already listening on 5432, so the container never started | `sudo systemctl disable --now postgresql` then `podman-compose up -d db`. Or keep it and set `POSTGRES_PORT="5433"` in `.env` **and** the same port in `DATABASE_URL`, then `podman-compose up -d db` |
 | `password authentication failed for user "richie"` while 5432 is taken | the migration connected to something that is not your container — the **host** PostgreSQL, or a dead `rootlessport` endpoint left by a failed container | that is the symptom of the row above, not a password problem: `./run.sh doctor`, then `./run.sh db-reset-container` |
 | Port 5432 held by `rootlessport` (`ss -ltnp` shows it, `postgresql.service` does not exist) | orphaned Podman port forwarder from a container that failed to start; survives `compose down` | `pkill -f rootlessport`, or just `./run.sh db-reset-container` |
+| `Waiting for PostgreSQL to accept connections...` then `setup` fails | the container was created and then exited; `podman logs richie-tms-db` says why | `./run.sh doctor` reads that log and names the cause. The most common one is the volume path above; `git pull` if your compose file mounts `/var/lib/postgresql/data` |
+| `there appears to be PostgreSQL data in: /var/lib/postgresql/data (unused mount/volume)` | compose mounts the volume at the pre-18 path | `git pull` (the path is now `/var/lib/postgresql`), then `podman-compose down -v && podman-compose up -d db` |
 | Container is `Up` but login fails and the volume is old | the volume was created with an earlier `POSTGRES_PASSWORD`; changing `.env` afterwards does not change it | `ALTER USER richie PASSWORD '...'` inside the container, or `./run.sh db-reset-container` to start fresh (destroys data) |
 | `Cannot find module './chunks/vendor-chunks/next.js'` | `npm run build` ran while `npm run dev` was running | stop dev, `rm -rf .next`, start again |
 | `EADDRINUSE :3000` | another process on 3000 | `ss -ltnp \| grep 3000`, stop it, or `npm start -- -p 3100` |

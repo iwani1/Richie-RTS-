@@ -91,11 +91,28 @@ if (container !== null) {
   else {
     const [, status] = line.split("|");
     if (/^Up .*healthy/i.test(status)) add("ok", `Container: ${status}`);
-    else if (/^Up/i.test(status)) add("warn", `Container is starting: ${status}`, ["Wait a few seconds; healthcheck retries for about a minute."]);
-    else add("fail", `Container is not running: ${status}`, [
-      "Recreate it: ./run.sh db-reset-container",
-      "If it says 'bind: address already in use', something else holds the port — see the next check.",
-    ]);
+    else if (/^Up/i.test(status)) add("warn", `Container is starting: ${status}`, ["Wait a few seconds; the healthcheck retries for about a minute."]);
+    else {
+      // A container that was created and then died explains itself in its own log, so read it.
+      const logs = run("podman", ["logs", "--tail", "40", "richie-tms-db"]) ?? run("docker", ["logs", "--tail", "40", "richie-tms-db"]) ?? "";
+      const detail = [`Container status: ${status}`];
+      if (/unused mount\/volume|PG_VERSION|pg_ctlcluster/i.test(logs)) {
+        detail.push(
+          "The image refused to start because of the volume path.",
+          "PostgreSQL 18+ keeps its data in /var/lib/postgresql/18/docker and wants the volume at",
+          "/var/lib/postgresql — not the old /var/lib/postgresql/data that earlier versions used.",
+          "Your docker-compose.yml is out of date: git pull, then ./run.sh db-reset-container",
+        );
+      } else if (/database files are incompatible|upgrade the underlying database/i.test(logs)) {
+        detail.push("The volume holds data from another PostgreSQL major version.", "Start clean: ./run.sh db-reset-container (destroys the database)");
+      } else if (/password authentication|role .* does not exist/i.test(logs)) {
+        detail.push("The volume was initialised with a different password than POSTGRES_PASSWORD.", "./run.sh db-reset-container recreates it with the current .env");
+      } else {
+        detail.push("Its own output:", ...logs.split("\n").filter(Boolean).slice(-12).map((row) => `  ${row}`));
+        detail.push("Recreate it: ./run.sh db-reset-container");
+      }
+      add("fail", `Container is not running: ${status}`, detail);
+    }
   }
 }
 

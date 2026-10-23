@@ -100,15 +100,41 @@ port_hint() {
   esac
 }
 
-compose_up() {
-  local up=""
+# The compose command available here, empty if there is none.
+compose_cmd() {
   if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then
-    up="docker compose"
+    printf 'docker compose'
   elif command -v podman-compose >/dev/null; then
-    up="podman-compose"
+    printf 'podman-compose'
   elif command -v podman >/dev/null && podman compose version >/dev/null 2>&1; then
-    up="podman compose"
-  else
+    printf 'podman compose'
+  fi
+}
+
+# Why a database container is not answering, in the operator's language. Prints the container's
+# own last words, because the most common cause (a wrong volume path, a bad volume, a refused
+# password) is stated there and nowhere else.
+database_diagnosis() {
+  local up
+  up=$(compose_cmd)
+  say "The database container is not answering. Its last log lines:"
+  if [ -n "$up" ]; then
+    $up logs --tail 25 db 2>&1 | sed 's/^/    /' || true
+  elif command -v podman >/dev/null; then
+    podman logs --tail 25 richie-tms-db 2>&1 | sed 's/^/    /' || true
+  elif command -v docker >/dev/null; then
+    docker logs --tail 25 richie-tms-db 2>&1 | sed 's/^/    /' || true
+  fi
+  if command -v podman >/dev/null; then
+    podman ps -a --filter name=richie-tms-db --format '    status: {{.Status}}' || true
+  fi
+  port_hint
+}
+
+compose_up() {
+  local up
+  up=$(compose_cmd)
+  if [ -z "$up" ]; then
     say "No docker/podman compose found. If PostgreSQL is already running on this machine, that is fine."
     return 0
   fi
@@ -138,13 +164,20 @@ or edit it by hand (docs/SETUP_AND_DEPLOYMENT.md §3.2)."
     compose_up || fail "Database start failed. Read the hint above, or docs/SETUP_AND_DEPLOYMENT.md §9."
     say "Waiting for PostgreSQL to accept connections..."
     for _ in $(seq 1 60); do require_db 2>/dev/null && break; sleep 1; done
-    require_db || { port_hint; fail "The database never became reachable. Run ./run.sh doctor."; }
+    if ! require_db 2>/dev/null; then
+      database_diagnosis
+      fail "The database never became reachable after 60 seconds. See the log lines above."
+    fi
     npm run db:migrate
     npm run build
     say "Ready. Start it with: ./run.sh start   (then open http://localhost:3000)"
     ;;
   start)
     require_node; require_env; require_deps
+    if [ ! -f .next/BUILD_ID ]; then
+      say "No production build yet (or it was removed). Building first..."
+      npm run build || fail "The build failed. Fix the error above, then run ./run.sh start again."
+    fi
     npm start
     ;;
   dev)
