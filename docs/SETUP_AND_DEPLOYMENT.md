@@ -225,3 +225,17 @@ Verified by running:
 Not verified here: installation on a specific operating system, a container runtime, a reverse proxy
 with TLS, and a second application instance. The commands above are the ones used; the platform
 steps around them depend on your machine.
+
+## Hosting a read-only preview
+
+The production headers refuse framing (`X-Frame-Options: DENY`, `frame-ancestors 'none'`), which
+breaks any hosted preview that shows the app inside someone else's frame. `PREVIEW_EMBED=1`
+relaxes exactly those two directives and nothing else. It is read when the config is loaded, so it
+must be set for the **build**, not only for `next start`:
+
+```bash
+PREVIEW_EMBED=1 npm run build
+PREVIEW_EMBED=1 npm start
+```
+
+Never set it on an installation that holds real data: it permits the app to be framed by any site.

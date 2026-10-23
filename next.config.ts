@@ -39,6 +39,17 @@ const securityHeaders = [
   },
 ];
 
+// A hosted preview is shown inside someone else's frame, which the production policy forbids on
+// purpose. PREVIEW_EMBED relaxes exactly two directives and nothing else; it is never set on a real
+// installation, and the default remains "no framing at all".
+const embeddable = process.env.PREVIEW_EMBED === "1";
+if (embeddable) {
+  const frame = securityHeaders.find((h) => h.key === "X-Frame-Options");
+  if (frame) securityHeaders.splice(securityHeaders.indexOf(frame), 1);
+  const csp = securityHeaders.find((h) => h.key === "Content-Security-Policy");
+  if (csp) csp.value = csp.value.replace("frame-ancestors 'none'", "frame-ancestors *");
+}
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   env: { NEXT_PUBLIC_BUILD: buildStamp() },
