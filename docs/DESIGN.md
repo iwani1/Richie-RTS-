@@ -173,7 +173,8 @@ changing clock does not reflow, and state never carried by colour alone.
 | Front page (dashboard) | Decide what to do next | What is broken, then what leaves today | Masthead figure, lead story from the first exception, numbered brief for the rest, then a spread of departures · fleet · setup, rentals across the foot |
 | Registers (vehicles, drivers, clients) | Find and change one record | The record and what is wrong with it | Rubric, count line ("2 of 9 · 1 expired"), ruled table, side-panel form |
 | Rentals | Move a request through its states | The state machine of the selected record | Five-step interval strip, request and quote side by side, actions for that state |
-| Busing / Logistics | Run the day | Today's runs and the next action on each | Rubric, tabs over banded sections, panels for trips and work orders |
+| Busing | Run the day | Today's runs and the next action on each | Rubric, tabs, then a run sheet: departure time in the gutter, route and crew in the middle, next action at the right; a dispatch desk beside it names the next run to leave and every run still waiting on a crew |
+| Logistics | Close the response to a breakdown | What is open and what it costs | Incidents beside the work orders they raise, and the reverse on the work-order tab; the cost report is a ruled statement — one total, three coverage figures, then entries grouped by category |
 | Compliance / Readiness | Prevent an unroadworthy dispatch | Expiry and overdue, soonest first | Summary figures, urgency-sorted table, plain-language Timing column, interval bars per basis |
 | Settings | Supply the company's real rules | Nothing prefilled; what is still missing | "Rules to supply" read from the saved record, then one band per rule — the first screen on an empty install |
 | Audit | Prove who changed what | Chronology and the actor | Dense table: mono timestamps, action as a code chip, record named, "showing 17 of 412" |
