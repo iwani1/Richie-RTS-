@@ -36,6 +36,9 @@ else add("fail", `Node ${nodeVersion} is too old`, ["This application needs 20.1
 
 // ------------------------------------------------------------------ 2. configuration
 const placeholder = /change-me|replace-me|example\.com/i;
+// POSTGRES_PASSWORD only matters when a container creates the database from it. Whether the pair
+// actually works is decided by the connection test below, not by comparing two strings.
+let passwordMismatch = false;
 
 if (!existsSync(".env")) {
   add("fail", ".env is missing", ["Run: cp .env.example .env", "Then fill in DATABASE_URL, SESSION_SECRET and POSTGRES_PASSWORD."]);
@@ -58,17 +61,10 @@ if (!existsSync(".env")) {
     add("ok", `DATABASE_URL points at ${parsed.hostname}:${parsed.port || "5432"}${parsed.pathname}`);
 
     const postgresPassword = envValue("POSTGRES_PASSWORD");
-    if (postgresPassword && decodeURIComponent(parsed.password) !== postgresPassword) {
-      add("fail", "The password in DATABASE_URL does not match POSTGRES_PASSWORD", [
-        "The container is created with POSTGRES_PASSWORD; the application connects with DATABASE_URL.",
-        "Make them the same, then recreate the database: ./run.sh db-reset-container",
-      ]);
-    } else if (postgresPassword) {
-      add("ok", "DATABASE_URL password matches POSTGRES_PASSWORD");
-    }
+    passwordMismatch = Boolean(postgresPassword) && decodeURIComponent(parsed.password) !== postgresPassword;
     if (placeholder.test(decodeURIComponent(parsed.password))) {
       add("warn", "The database password is still the example value", [
-        "Change it in .env (both places), then: ./run.sh db-reset-container",
+        "Change it: npm run env:init -- --force   (regenerates .env), then ./run.sh db-reset-container",
       ]);
     }
   }
@@ -147,6 +143,35 @@ if (!databaseUrl) {
   } finally {
     await client.end().catch(() => undefined);
   }
+}
+
+// ------------------------------------------------------------------ 4b. password pair verdict
+// Only now, because the connection result is the authority. A host PostgreSQL has nothing to do
+// with POSTGRES_PASSWORD, so a mismatch there is not a problem.
+if (passwordMismatch) {
+  if (!connected && compose) {
+    add("fail", "DATABASE_URL and POSTGRES_PASSWORD hold different passwords", [
+      "The container is created with POSTGRES_PASSWORD; the application connects with the password",
+      "inside DATABASE_URL. If the container has already been started, recreating it is the quickest",
+      "way to make them agree: ./run.sh db-reset-container",
+      "Or edit it by hand: npm run env:init -- --force",
+    ]);
+  } else if (!connected) {
+    add("fail", "DATABASE_URL and POSTGRES_PASSWORD hold different passwords", [
+      "You are not running the container, so POSTGRES_PASSWORD is unused; fix the password inside",
+      "DATABASE_URL to match the database server you actually run.",
+    ]);
+  } else if (compose) {
+    add("warn", "POSTGRES_PASSWORD differs from the password in DATABASE_URL", [
+      "The running database accepts DATABASE_URL, so the application works. But if you recreate the",
+      "container it will be built with POSTGRES_PASSWORD and the application will stop connecting.",
+      "Make them agree when convenient: npm run env:init -- --force, then ./run.sh db-reset-container",
+    ]);
+  } else {
+    add("info", "POSTGRES_PASSWORD is unused: PostgreSQL is not running in a container here");
+  }
+} else if (envValue("POSTGRES_PASSWORD")) {
+  add("ok", "DATABASE_URL password matches POSTGRES_PASSWORD");
 }
 
 // ------------------------------------------------------------------ 5. who owns the port
