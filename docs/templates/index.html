@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Richie TMS — three template directions</title>
+<style>
+  :root{
+    --chrome:#1b1f22; --chrome2:#24292d; --text:#eef1ef; --muted:#9aa4a0; --line:#333b3f;
+    --sans:"Inter","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--chrome);color:var(--text);font:13px/1.5 var(--sans);display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .brand{font:600 13px/1.2 var(--sans)}
+  .brand small{display:block;font:9.5px/1.6 var(--mono);color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  button.tab{font:600 11px/1 var(--sans);padding:8px 11px;border:1px solid var(--line);background:var(--chrome2);color:var(--text);cursor:pointer;letter-spacing:.01em}
+  button.tab:hover{border-color:#5a666b}
+  button.tab[aria-selected=true]{background:#eef1ef;color:#16181a;border-color:#eef1ef}
+  .spacer{flex:1}
+  .widths{display:flex;gap:4px;align-items:center}
+  .widths span{font:9.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+  button.w{font:10px/1 var(--mono);padding:6px 8px;border:1px solid var(--line);background:var(--chrome2);color:var(--muted);cursor:pointer}
+  button.w[aria-pressed=true]{color:#16181a;background:#c9d3ce;border-color:#c9d3ce}
+  .strap{display:flex;gap:18px;padding:9px 16px;border-bottom:1px solid var(--line);background:#171b1e;color:var(--muted);font-size:12px;flex-wrap:wrap}
+  .strap b{color:var(--text);font-weight:600}
+  .strap .best{color:#a8e0c4}
+  .stage{flex:1;min-height:0;display:flex;justify-content:center;background:repeating-linear-gradient(45deg,#15181b,#15181b 12px,#191d20 12px,#191d20 24px);padding:14px;overflow:auto}
+  .frame{width:100%;max-width:1440px;background:#fff;border:1px solid #000;box-shadow:0 18px 60px rgba(0,0,0,.5);transition:max-width .18s ease}
+  iframe{display:block;width:100%;height:100%;border:0;min-height:0}
+  .stage.fit .frame{height:100%;display:flex}
+  @media (prefers-reduced-motion: reduce){.frame{transition:none}}
+  .hint{font:10px var(--mono);color:var(--muted);letter-spacing:.03em;padding:0 16px 10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Richie TMS<small>THREE TEMPLATE DIRECTIONS</small></div>
+  <div class="tabs" role="tablist" aria-label="Template">
+    <button class="tab" role="tab" aria-selected="true" data-src="a-waybill.html" id="tab-a">A · Waybill</button>
+    <button class="tab" role="tab" aria-selected="false" data-src="b-control-room.html" id="tab-b">B · Control room</button>
+    <button class="tab" role="tab" aria-selected="false" data-src="c-statement.html" id="tab-c">C · Statement</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="widths">
+    <span>Width</span>
+    <button class="w" data-w="1440" aria-pressed="true">Desktop</button>
+    <button class="w" data-w="1024" aria-pressed="false">Tablet</button>
+    <button class="w" data-w="390" aria-pressed="false">Phone</button>
+  </div>
+</header>
+<div class="strap">
+  <span><b>A · Waybill</b> — warm paper, Fraunces-style serif headings, ruled bands with a label column, stamp chips. <span class="best">Closest to what is built today.</span></span>
+  <span><b>B · Control room</b> — dark board, split-flap times, LED states, top nav instead of a rail. Best for a dispatcher watching the clock; heaviest to read in daylight.</span>
+  <span><b>C · Statement</b> — cool white, one grotesque, hairlines, right-aligned figures, green accent. Best for money and audit; quietest to look at all day.</span>
+</div>
+<div class="stage fit" id="stage">
+  <div class="frame" id="frame">
+    <iframe id="view" title="Template preview" src="a-waybill.html"></iframe>
+  </div>
+</div>
+<p class="hint">Same content in all three: attention, today's runs, fleet readiness, a form with an error state, and the setup rules. Use the width buttons to see each at tablet and phone.</p>
+
+<script>
+  const view = document.getElementById("view");
+  const stage = document.getElementById("stage");
+  const frame = document.getElementById("frame");
+  const tabs = [...document.querySelectorAll(".tab")];
+  const widths = [...document.querySelectorAll(".w")];
+
+  tabs.forEach((tab) => tab.addEventListener("click", () => {
+    tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+    view.src = tab.dataset.src;
+  }));
+
+  widths.forEach((btn) => btn.addEventListener("click", () => {
+    widths.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+    frame.style.maxWidth = btn.dataset.w + "px";
+  }));
+</script>
+</body>
+</html>

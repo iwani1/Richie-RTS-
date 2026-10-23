@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Template B — Control room</title>
+<style>
+  :root{
+    --bg:#0b1210; --panel:#111b17; --panel2:#16241e; --edge:#24332c; --edge2:#35473d;
+    --text:#d6e4da; --muted:#8ba394; --dim:#6c8377;
+    --amber:#ffb545; --mint:#8fe0ab; --red:#ff8a6a;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+    --sans:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  .ribbon{display:flex;gap:10px;padding:7px 20px;background:#050908;border-bottom:1px solid var(--edge);font:10px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .ribbon b{color:var(--amber)}
+  header.top{display:flex;align-items:center;gap:22px;padding:12px 20px;border-bottom:1px solid var(--edge);background:var(--panel)}
+  .brand{display:flex;align-items:center;gap:10px;margin-right:6px}
+  .led{width:9px;height:9px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px var(--mint)}
+  .brand strong{font:600 14px/1 var(--sans);letter-spacing:.02em}
+  .brand small{display:block;font:9px/1.5 var(--mono);letter-spacing:.14em;color:var(--muted)}
+  nav{display:flex;gap:2px;flex-wrap:wrap}
+  nav a{color:var(--muted);text-decoration:none;font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:7px 9px;border:1px solid transparent}
+  nav a:hover{color:var(--text);border-color:var(--edge2)}
+  nav a[aria-current=page]{color:#08120d;background:var(--amber);border-color:var(--amber);font-weight:600}
+  .clock{margin-left:auto;font:600 15px/1 var(--mono);color:var(--text);letter-spacing:.06em}
+  .clock small{display:block;font:9px/1.6 var(--mono);color:var(--muted);letter-spacing:.14em;text-align:right}
+  .wrap{max-width:1280px;margin:0 auto;padding:18px 20px 40px}
+  .ticker{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border:1px solid var(--edge);border-left:3px solid var(--red);background:#160f0d;padding:9px 12px;margin-bottom:16px}
+  .ticker b{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
+  .ticker .item{font-size:12px;color:var(--text)}
+  .ticker .item em{font-style:normal;color:var(--muted)}
+  .ticker .sep{color:var(--edge2)}
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) 292px;gap:16px}
+  .panel{background:var(--panel);border:1px solid var(--edge)}
+  .panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid var(--edge)}
+  .panel-head h2{margin:0;font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .panel-head .right{font:10px/1 var(--mono);color:var(--dim);letter-spacing:.08em}
+  .run{display:grid;grid-template-columns:86px minmax(0,1fr) 150px 118px;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--edge)}
+  .run:last-child{border-bottom:0}
+  .run:hover{background:var(--panel2)}
+  .flap{display:inline-grid;place-items:center;min-width:66px;padding:5px 6px;background:#050908;border:1px solid var(--edge2);font:600 17px/1 var(--mono);color:#f3efe2;letter-spacing:.08em;font-variant-numeric:tabular-nums}
+  .flap.gap{color:var(--dim);border-style:dashed}
+  .route{font-weight:600}
+  .route small{display:block;font-weight:400;font-size:10.5px;color:var(--muted)}
+  .meta{font:10.5px/1.5 var(--mono);color:var(--muted)}
+  .meta b{color:var(--text);font-weight:500}
+  .state{display:inline-flex;align-items:center;gap:7px;font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
+  .state .dot{width:8px;height:8px;border-radius:50%;background:var(--mint);box-shadow:0 0 8px var(--mint)}
+  .state.planned{color:var(--amber)} .state.planned .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .state.late{color:var(--red)} .state.late .dot{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .state.done{color:var(--dim)} .state.done .dot{background:var(--dim);box-shadow:none}
+  .watch{padding:12px}
+  .watch h3{margin:0 0 8px;font:600 9.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+  .watch ul{list-style:none;margin:0 0 16px;padding:0}
+  .watch li{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--edge);font-size:12px}
+  .watch li span{color:var(--muted);font:10.5px/1.5 var(--mono)}
+  .watch li b{font-weight:600}
+  .big{display:flex;align-items:baseline;gap:8px;padding:10px 0 2px}
+  .big b{font:600 30px/1 var(--mono);letter-spacing:-.01em;color:var(--text)}
+  .big small{font:9.5px/1.4 var(--mono);color:var(--muted);letter-spacing:.08em}
+  .bar{height:6px;background:#050908;border:1px solid var(--edge2);margin:8px 0 4px}
+  .bar i{display:block;height:100%;width:50%;background:var(--mint)}
+  .legend{display:flex;justify-content:space-between;font:9px/1.6 var(--mono);color:var(--dim);letter-spacing:.08em}
+  .form{padding:12px;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .form label{display:block;font:600 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .form input,.form select{width:100%;margin-top:5px;padding:7px 8px;background:#050908;border:1px solid var(--edge2);color:var(--text);font:12px var(--mono)}
+  .form input:focus,.form select:focus{outline:2px solid var(--amber);outline-offset:1px}
+  .form input[aria-invalid=true]{border-color:var(--red)}
+  .form .err{display:block;margin-top:4px;font:10px var(--mono);color:var(--red)}
+  .form-foot{grid-column:1/-1;display:flex;gap:8px;align-items:center;padding-top:2px}
+  .btn{font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;padding:9px 12px;background:transparent;border:1px solid var(--edge2);color:var(--text);cursor:pointer}
+  .btn:hover{border-color:var(--text)}
+  .btn--primary{background:var(--amber);border-color:var(--amber);color:#0b1210}
+  .btn--primary:hover{background:#ffc76b}
+  .btn[disabled]{opacity:.4;cursor:not-allowed}
+  .footnote{margin-top:14px;font:10px/1.6 var(--mono);color:var(--dim);letter-spacing:.04em}
+  @media(max-width:1100px){.cols{grid-template-columns:1fr}}
+  @media(max-width:720px){
+    header.top{flex-wrap:wrap;gap:10px}.clock{margin-left:0}.run{grid-template-columns:74px minmax(0,1fr);row-gap:6px}
+    .run .meta{grid-column:2}.run .state{grid-column:2}
+  }
+</style>
+</head>
+<body>
+<div class="ribbon"><b>Template B</b><span>Control room — dark board, split-flap times, LED states, no left rail</span></div>
+
+<header class="top">
+  <div class="brand"><span class="led"></span><div><strong>Richie Transport</strong><small>OPERATIONS · ACCRA</small></div></div>
+  <nav>
+    <a href="#" aria-current="page">Board</a>
+    <a href="#">Busing</a>
+    <a href="#">Rentals</a>
+    <a href="#">Logistics</a>
+    <a href="#">Vehicles</a>
+    <a href="#">Drivers</a>
+    <a href="#">Compliance</a>
+    <a href="#">Readiness</a>
+    <a href="#">Settings</a>
+    <a href="#">Audit</a>
+  </nav>
+  <div class="clock">14:32<small>THU 23 OCT 2026</small></div>
+</header>
+
+<div class="wrap">
+  <div class="ticker">
+    <b>Act now</b>
+    <span class="item">1 licence expired <em>· Kofi Mensah, 11 days</em></span>
+    <span class="sep">|</span>
+    <span class="item">2 services overdue <em>· GT 500-26, GT 812-24</em></span>
+    <span class="sep">|</span>
+    <span class="item">2 rentals unconfirmed <em>· RQ-0142, RQ-0143</em></span>
+  </div>
+
+  <div class="cols">
+    <div>
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Departures · today</h2>
+          <span class="right">3 of 4 slots assigned</span>
+        </div>
+        <div class="run">
+          <span class="flap">06:30</span>
+          <span class="route">Accra → Tema<small>TR-0231 · Coaster · GT 500-26</small></span>
+          <span class="meta">Driver <b>Kofi Mensah</b><br>Bay <b>2</b></span>
+          <span class="state"><span class="dot"></span>Dispatched</span>
+        </div>
+        <div class="run">
+          <span class="flap">07:15</span>
+          <span class="route">Accra → Koforidua<small>TR-0232 · Sprinter · GT 812-24</small></span>
+          <span class="meta">Driver <b style="color:var(--amber)">unassigned</b><br>Bay <b>—</b></span>
+          <span class="state planned"><span class="dot"></span>Planned</span>
+        </div>
+        <div class="run">
+          <span class="flap">16:00</span>
+          <span class="route">Tema → Accra<small>TR-0233 · Coaster · GT 500-26</small></span>
+          <span class="meta">Driver <b>Ama Boateng</b><br>Bay <b>1</b></span>
+          <span class="state planned"><span class="dot"></span>Planned</span>
+        </div>
+        <div class="run">
+          <span class="flap gap">--:--</span>
+          <span class="route" style="color:var(--dim)">No fourth run scheduled</span>
+          <span class="meta">Slot free</span>
+          <span class="state done"><span class="dot"></span>Gap</span>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top:14px">
+        <div class="panel-head"><h2>Fleet readiness · live</h2><span class="right">intervals from settings</span></div>
+        <div class="run">
+          <span class="flap" style="min-width:52px">GT 500-26</span>
+          <span class="route">Coaster<small>Service interval 180 days · warn 14 days</small></span>
+          <span class="meta">Odometer <b>84 210 km</b><br>Last service <b>02 Apr 2026</b></span>
+          <span class="state late"><span class="dot"></span>Overdue 8 d</span>
+        </div>
+        <div class="run">
+          <span class="flap" style="min-width:52px">GT 812-24</span>
+          <span class="route">Sprinter<small>Service interval 10 000 km · warn 500 km</small></span>
+          <span class="meta">Odometer <b>61 940 km</b><br>Last service <b>18 Jun 2026</b></span>
+          <span class="state planned"><span class="dot"></span>Due in 320 km</span>
+        </div>
+        <div class="run">
+          <span class="flap" style="min-width:52px">GT 118-25</span>
+          <span class="route">Coaster<small>No odometer reading recorded</small></span>
+          <span class="meta">—<br>—</span>
+          <span class="state done"><span class="dot"></span>Not evaluable</span>
+        </div>
+        <div class="run">
+          <span class="flap" style="min-width:52px">GT 402-26</span>
+          <span class="route">Sprinter<small>Service interval 10 000 km · warn 500 km</small></span>
+          <span class="meta">Odometer <b>12 080 km</b><br>Last service <b>09 Sep 2026</b></span>
+          <span class="state"><span class="dot"></span>Ready</span>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top:14px">
+        <div class="panel-head"><h2>Record a document</h2><span class="right">panel over the board</span></div>
+        <form class="form">
+          <label>Owner<select><option>Vehicle · GT 500-26</option><option>Driver · Kofi Mensah</option></select></label>
+          <label>Type<select><option>Roadworthy certificate</option><option>Insurance</option><option>Driver licence</option></select></label>
+          <label>Number<input value="RW-88213" aria-invalid="true"><span class="err">Already recorded on another vehicle.</span></label>
+          <label>Expires<input type="date" value="2027-10-22"></label>
+          <div class="form-foot">
+            <button type="button" class="btn btn--primary">Save document</button>
+            <button type="button" class="btn" disabled>Save &amp; add another</button>
+            <button type="button" class="btn">Cancel</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-head"><h2>Watch</h2><span class="right">today</span></div>
+      <div class="watch">
+        <h3>Readiness</h3>
+        <div class="big"><b>2 / 4</b><small>VEHICLES EVALUABLE &amp; READY</small></div>
+        <div class="bar"><i></i></div>
+        <div class="legend"><span>1 OVERDUE</span><span>1 DUE SOON</span><span>1 NOT EVALUABLE</span></div>
+
+        <h3 style="margin-top:18px">Money held</h3>
+        <ul>
+          <li><span>Deposits held</span><b>GH₵ 4 200</b></li>
+          <li><span>Rentals billed</span><b>GH₵ 18 400</b></li>
+          <li><span>Unconfirmed quotes</span><b>2</b></li>
+        </ul>
+
+        <h3>Rules not supplied</h3>
+        <ul>
+          <li><span>On-time threshold</span><b style="color:var(--amber)">Not set</b></li>
+          <li><span>Document lead time</span><b style="color:var(--amber)">Not set</b></li>
+          <li><span>Service schedules</span><b>2 of 2</b></li>
+        </ul>
+        <p class="footnote" style="margin-top:0">Nothing here is estimated. A dash means the server has no such fact.</p>
+      </div>
+    </aside>
+  </div>
+
+  <p class="footnote">DEMO DATA FOR DESIGN REVIEW · NOT A LIVE RECORD · FONTS: PLEX MONO + HELVETICA IN THIS MOCKUP</p>
+</div>
+</body>
+</html>

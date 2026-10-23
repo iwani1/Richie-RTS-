@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Template A — Waybill</title>
+<style>
+  :root{
+    --ink:#14231d; --ink2:#2b463a; --muted:#5e6659;
+    --paper:#f2ecdf; --paper2:#fbf7ec; --paper3:#e9e1cf;
+    --line:#cfc5ae; --line2:#a99e86;
+    --amber:#e0a43c; --rust:#a24a30; --green:#4f7345;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  .ribbon{display:flex;gap:10px;align-items:baseline;padding:7px 24px;background:var(--ink);color:#f2ecdf;font:10px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+  .ribbon b{color:var(--amber);letter-spacing:.06em}
+  .shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:calc(100vh - 30px)}
+  aside{background:var(--ink);color:#e8e2d0;padding:18px 0;display:flex;flex-direction:column;gap:2px}
+  .brand{display:flex;align-items:center;gap:9px;padding:0 18px 16px}
+  .mark{display:grid;place-items:center;width:32px;height:32px;background:var(--amber);color:var(--ink);font:600 17px var(--serif)}
+  .brand p{margin:0;font:600 13px/1.15 var(--serif);color:#fbf7ec}
+  .brand small{display:block;font:8.5px/1.4 var(--mono);letter-spacing:.16em;color:#b8c1b2;margin-top:2px}
+  .nav-label{padding:14px 18px 6px;font:9px/1 var(--mono);letter-spacing:.16em;color:#9aa59b;text-transform:uppercase}
+  a.nav{display:flex;align-items:center;justify-content:space-between;padding:8px 18px;color:#c3bdad;text-decoration:none;font-size:12.5px;border-left:3px solid transparent}
+  a.nav:hover{background:rgba(242,236,223,.06);color:#f6f1e3}
+  a.nav[aria-current=page]{background:#20372d;color:#fbf7ec;border-left-color:var(--amber)}
+  a.nav span{font:10px var(--mono);color:#8f9d8f}
+  a.nav[aria-current=page] span{color:var(--amber)}
+  main{padding:0 clamp(16px,3vw,34px) 48px;max-width:1180px}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;height:46px;border-bottom:1px solid var(--line2);font:10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:22px}
+  .kbd{border:1px solid var(--line2);padding:2px 5px;color:var(--ink2)}
+  .masthead{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:6px}
+  .eyebrow{display:flex;align-items:center;gap:8px;margin:0 0 8px;font:600 9px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+  .eyebrow::before{content:"///";color:#b08b3e;letter-spacing:-.1em}
+  h1{margin:0;font:600 clamp(28px,3.2vw,40px)/1.03 var(--serif);letter-spacing:-.015em}
+  .lede{margin:8px 0 0;max-width:70ch;font-size:12.5px;color:var(--muted)}
+  .btn{font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:9px 12px;border:1px solid var(--ink);background:var(--paper2);color:var(--ink);cursor:pointer}
+  .btn:hover{box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
+  .btn--primary{background:var(--ink);color:#f7f2e5}
+  .btn--primary:hover{box-shadow:2px 2px 0 #b08b3e}
+  .btn[disabled]{opacity:.42;cursor:not-allowed;box-shadow:none;transform:none}
+  .band{display:grid;grid-template-columns:190px minmax(0,1fr);gap:24px;padding:16px 0 22px;border-bottom:1px solid var(--line)}
+  .band-label h2{margin:0;font:600 16px/1.2 var(--serif)}
+  .band-label p{margin:4px 0 0;font-size:10.5px;color:var(--muted)}
+  .band-body{min-width:0}
+  ul.attention{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+  li.attn{display:grid;grid-template-columns:3px minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+  li.attn .bar{width:3px;align-self:stretch;background:var(--rust)}
+  li.attn.amber .bar{background:var(--amber)}
+  .attn b{font:600 12.5px/1.3 var(--sans)}
+  .attn small{display:block;font-size:10.5px;color:var(--muted)}
+  .count{font:600 19px/1 var(--serif);font-variant-numeric:tabular-nums;padding-left:12px;border-left:2px solid var(--line2)}
+  a.link{color:var(--ink);font:600 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;text-decoration:none;border-bottom:1px solid var(--line2)}
+  .board{border:1px solid var(--line2);background:var(--paper2)}
+  .row{display:grid;grid-template-columns:64px minmax(0,2.1fr) minmax(0,1.1fr) 120px;gap:12px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .row.head{background:var(--paper3);font:600 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line2)}
+  .row:hover:not(.head){background:#f6f0e2}
+  .time{font:600 13px var(--mono);font-variant-numeric:tabular-nums}
+  .route{font-weight:600}
+  .route small{display:block;font-weight:400;font-size:10.5px;color:var(--muted)}
+  .flag{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border:1px solid #b58c3d;border-left-width:3px;background:#fbf1d6;color:#5f4b26;font:600 9px var(--mono);letter-spacing:.09em;text-transform:uppercase;white-space:nowrap}
+  .flag.ok{border-color:#7d9660;border-left-color:var(--green);background:#f2f6e6;color:#3f4f34}
+  .flag.bad{border-color:#b06044;border-left-color:var(--rust);background:#fbeee6;color:#66301f}
+  .unset{font-style:italic;color:var(--muted)}
+  .figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 18px}
+  .fig{padding:2px 0 2px 11px;border-left:2px solid var(--line2)}
+  .fig span{display:block;font:600 9px var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .fig b{display:block;margin-top:3px;font:500 25px/1.05 var(--serif);font-variant-numeric:tabular-nums}
+  .fig small{display:block;margin-top:2px;font-size:10px;color:var(--muted)}
+  .meter{height:8px;border:1px solid var(--line2);margin:10px 0 6px;background:var(--paper3)}
+  .meter i{display:block;height:100%;width:50%;background:var(--green)}
+  form.card{border-top:2px solid var(--ink2);padding-top:10px}
+  .fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+  label{display:block;font:600 9.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+  input,select{width:100%;margin-top:5px;padding:8px 9px;border:1px solid var(--line2);background:var(--paper2);font:12.5px var(--sans);color:var(--ink)}
+  input:focus,select:focus{outline:3px solid var(--green);outline-offset:1px;border-color:var(--ink)}
+  input[aria-invalid=true]{border-color:var(--rust);background:#fdf4ec}
+  .hint{display:block;margin-top:4px;font-size:10px;color:var(--muted)}
+  .err{display:block;margin-top:4px;font-size:10px;color:var(--rust)}
+  .actions{display:flex;gap:8px;margin-top:14px}
+  footer{margin-top:20px;padding-top:10px;border-top:1px solid var(--line2);font:10px/1.6 var(--mono);color:var(--muted);letter-spacing:.03em}
+  @media(max-width:1024px){.shell{grid-template-columns:1fr}aside{display:none}.band{grid-template-columns:1fr;gap:8px}}
+  @media(max-width:620px){.row{grid-template-columns:56px minmax(0,1fr);row-gap:4px}.row .driver,.row .state{grid-column:2}.masthead{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="ribbon"><b>Template A</b><span>Waybill — warm paper, serif headings, ruled bands, stamp chips</span></div>
+<div class="shell">
+  <aside>
+    <div class="brand">
+      <div class="mark">R</div>
+      <p>Richie<small>TRANSPORT SERVICES</small></p>
+    </div>
+    <p class="nav-label">Operations</p>
+    <a class="nav" href="#" aria-current="page">Operations board <span>01</span></a>
+    <a class="nav" href="#">Staff busing <span>02</span></a>
+    <a class="nav" href="#">Bus rentals <span>03</span></a>
+    <a class="nav" href="#">Staff logistics <span>04</span></a>
+    <p class="nav-label">Fleet</p>
+    <a class="nav" href="#">Vehicles <span>05</span></a>
+    <a class="nav" href="#">Drivers <span>06</span></a>
+    <a class="nav" href="#">Compliance <span>07</span></a>
+    <a class="nav" href="#">Readiness <span>08</span></a>
+    <p class="nav-label">Records</p>
+    <a class="nav" href="#">Clients <span>09</span></a>
+    <a class="nav" href="#">Users <span>10</span></a>
+    <a class="nav" href="#">Settings <span>11</span></a>
+    <a class="nav" href="#">Audit log <span>12</span></a>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span>RTS / Operations board</span>
+      <span>Thursday 23 October 2026 · <span class="kbd">Ctrl K</span> Jump to a screen</span>
+    </div>
+
+    <div class="masthead">
+      <div>
+        <p class="eyebrow">Operations · sheet 01</p>
+        <h1>What needs you today</h1>
+        <p class="lede">Every figure is from the record kept on this server. Where a rule has not been supplied, the sheet says so instead of guessing.</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn">Record a document</button>
+        <button class="btn btn--primary">Plan a trip</button>
+      </div>
+    </div>
+
+    <section class="band">
+      <div class="band-label"><h2>Needs attention</h2><p>Ordered by what stops a dispatch.</p></div>
+      <div class="band-body">
+        <ul class="attention">
+          <li class="attn">
+            <span class="bar"></span>
+            <span><b>1 driver licence expired</b><small>Kofi Mensah · expired 12 Oct 2026</small></span>
+            <span class="count">1</span>
+            <a class="link" href="#">Review</a>
+          </li>
+          <li class="attn amber">
+            <span class="bar"></span>
+            <span><b>2 vehicles past service interval</b><small>GT 500-26 · GT 812-24</small></span>
+            <span class="count">2</span>
+            <a class="link" href="#">Review</a>
+          </li>
+          <li class="attn amber">
+            <span class="bar"></span>
+            <span><b>2 rental requests unconfirmed</b><small>RQ-0142 · RQ-0143 — deposits not recorded</small></span>
+            <span class="count">2</span>
+            <a class="link" href="#">Review</a>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="band-label"><h2>Today’s departures</h2><p>3 of 4 slots assigned. Unassigned slots are named, not hidden.</p></div>
+      <div class="band-body">
+        <div class="board">
+          <div class="row head"><span>Time</span><span>Route</span><span>Driver</span><span>State</span></div>
+          <div class="row">
+            <span class="time">06:30</span>
+            <span class="route">Accra → Tema <small>TR-0231 · Coaster · GT 500-26</small></span>
+            <span class="driver">Kofi Mensah</span>
+            <span class="state"><span class="flag ok">Dispatched</span></span>
+          </div>
+          <div class="row">
+            <span class="time">07:15</span>
+            <span class="route">Accra → Koforidua <small>TR-0232 · Sprinter · GT 812-24</small></span>
+            <span class="driver"><em class="unset">not assigned</em></span>
+            <span class="state"><span class="flag">Planned</span></span>
+          </div>
+          <div class="row">
+            <span class="time">16:00</span>
+            <span class="route">Tema → Accra <small>TR-0233 · Coaster · GT 500-26</small></span>
+            <span class="driver">Ama Boateng</span>
+            <span class="state"><span class="flag">Planned</span></span>
+          </div>
+          <div class="row">
+            <span class="time">—</span>
+            <span class="route"><em class="unset">no fourth run scheduled</em></span>
+            <span class="driver">—</span>
+            <span class="state"><span class="flag bad">Gap</span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="band-label"><h2>Fleet</h2><p>Readiness on the configured service intervals.</p></div>
+      <div class="band-body">
+        <div class="figures">
+          <div class="fig"><span>Active vehicles</span><b>4</b><small>2 Coasters, 2 Sprinters</small></div>
+          <div class="fig"><span>Ready today</span><b>2 of 4</b><small>1 overdue, 1 due soon</small></div>
+          <div class="fig"><span>Odometer coverage</span><b>75%</b><small>1 vehicle without a reading</small></div>
+          <div class="fig"><span>Rentals billed</span><b>GH₵ 18,400</b><small>6 completed rentals</small></div>
+        </div>
+        <div class="meter" role="img" aria-label="2 of 4 vehicles ready"><i></i></div>
+        <p style="margin:0;font-size:10.5px;color:var(--muted)">Coverage counts only vehicles this build can evaluate. “Not evaluated” is not the same as “ready”.</p>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="band-label"><h2>Record a document</h2><p>Panel form, as it appears over the sheet.</p></div>
+      <div class="band-body">
+        <form class="card">
+          <div class="fields">
+            <label>Owner
+              <select><option>Vehicle · GT 500-26</option><option>Driver · Kofi Mensah</option></select>
+            </label>
+            <label>Document type
+              <select><option>Roadworthy certificate</option><option>Insurance</option><option>Driver licence</option></select>
+            </label>
+            <label>Number <input value="RW-88213" aria-invalid="true">
+              <span class="err">This number is already recorded for another vehicle.</span>
+            </label>
+            <label>Expires <input type="date" value="2027-10-22">
+              <span class="hint">Expiry is a fact, not a reminder. Nothing is assumed.</span>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn btn--primary">Save document</button>
+            <button type="button" class="btn" disabled>Save &amp; add another</button>
+            <button type="button" class="btn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <footer>DEMO DATA FOR DESIGN REVIEW · NOT A LIVE RECORD · docs/KPIS.md defines the figures shown</footer>
+  </main>
+</div>
+</body>
+</html>

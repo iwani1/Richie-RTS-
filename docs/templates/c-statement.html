@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Template C — Statement</title>
+<style>
+  :root{
+    --ink:#16181a; --ink2:#3d4247; --muted:#6b7076; --dim:#8f9499;
+    --paper:#fafaf9; --white:#ffffff; --line:#e2e2df; --line2:#cfcfca;
+    --green:#1f6b4a; --red:#a3352a; --amber:#8a5a12;
+    --sans:"Inter","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  .ribbon{display:flex;gap:10px;padding:7px 20px;background:var(--ink);color:#fafaf9;font:10px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase}
+  .ribbon b{color:#a8e0c4;letter-spacing:.04em}
+  header.bar{display:flex;align-items:center;gap:20px;height:54px;padding:0 22px;background:var(--white);border-bottom:1px solid var(--line2)}
+  .wordmark{font:650 15px/1 var(--sans);letter-spacing:-.01em}
+  .wordmark span{color:var(--dim);font-weight:400;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-left:8px}
+  .search{flex:0 1 320px;margin-left:14px;display:flex;align-items:center;gap:8px;border:1px solid var(--line2);background:var(--paper);padding:6px 9px;color:var(--dim);font-size:12px}
+  .search kbd{font:10px var(--mono);border:1px solid var(--line2);padding:1px 4px;background:var(--white);color:var(--muted)}
+  nav.tabs{margin-left:auto;display:flex;gap:16px;font-size:12px}
+  nav.tabs a{color:var(--muted);text-decoration:none;padding:6px 0;border-bottom:2px solid transparent}
+  nav.tabs a:hover{color:var(--ink)}
+  nav.tabs a[aria-current=page]{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+  .who{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding-left:16px;border-left:1px solid var(--line)}
+  .avatar{width:26px;height:26px;background:var(--ink);color:#fff;display:grid;place-items:center;font:600 11px var(--sans)}
+  .page{max-width:1240px;margin:0 auto;padding:26px 22px 44px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:28px}
+  .h1row{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:16px;border-bottom:1px solid var(--ink)}
+  h1{margin:0;font:600 26px/1.15 var(--sans);letter-spacing:-.02em}
+  .h1row p{margin:6px 0 0;color:var(--muted);font-size:12.5px;max-width:62ch}
+  .btn{font:600 11px/1 var(--sans);letter-spacing:.02em;padding:8px 12px;border:1px solid var(--ink);background:var(--white);color:var(--ink);cursor:pointer}
+  .btn:hover{background:#f0f0ee}
+  .btn--primary{background:var(--ink);border-color:var(--ink);color:#fff}
+  .btn--primary:hover{background:#2b2f33}
+  .btn[disabled]{color:var(--dim);border-color:var(--line2);background:var(--paper);cursor:not-allowed}
+  .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--line2);margin-bottom:4px}
+  .cell{padding:14px 14px 14px 0;border-right:1px solid var(--line)}
+  .cell:last-child{border-right:0;padding-right:0}
+  .cell span{display:block;font:600 9.5px/1.4 var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+  .cell b{display:block;margin-top:4px;font:600 21px/1.1 var(--sans);font-variant-numeric:tabular-nums;letter-spacing:-.015em}
+  .cell b.pos{color:var(--green)}
+  .cell b.neg{color:var(--red)}
+  .cell small{display:block;margin-top:3px;font-size:10.5px;color:var(--muted)}
+  h2.sec{margin:22px 0 8px;font:600 10px/1.4 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline}
+  h2.sec a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--line2);font-weight:500;letter-spacing:0;text-transform:none;font-size:11.5px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{font:600 9.5px/1.4 var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);text-align:left;padding:7px 10px 7px 0;border-bottom:1px solid var(--line2);background:var(--white);position:sticky;top:0}
+  td{padding:9px 10px 9px 0;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:hover{background:#f3f4f2}
+  .num{text-align:right;font:500 12px/1.4 var(--mono);font-variant-numeric:tabular-nums}
+  .ref{font:500 11px/1.4 var(--mono);color:var(--ink2)}
+  .sub{display:block;color:var(--muted);font-size:10.5px}
+  .status{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;white-space:nowrap}
+  .status i{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  .status.planned i{background:var(--amber)} .status.planned{color:var(--amber)}
+  .status.overdue i{background:var(--red)} .status.overdue{color:var(--red)}
+  .status.idle i{background:var(--line2);} .status.idle{color:var(--muted)}
+  .aside{display:flex;flex-direction:column;gap:22px}
+  .card{background:var(--white);border:1px solid var(--line2);padding:14px}
+  .card h3{margin:0 0 10px;font:600 9.5px/1.4 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px}
+  .kv:last-child{border-bottom:0}
+  .kv span{color:var(--muted)}
+  .kv b{font:500 12px var(--mono);font-variant-numeric:tabular-nums}
+  .total{display:flex;justify-content:space-between;padding-top:10px;margin-top:4px;border-top:1px solid var(--ink);font-weight:600}
+  .total b{font:600 15px/1 var(--sans)}
+  .note{margin:8px 0 0;font-size:10.5px;color:var(--muted);line-height:1.5}
+  form.panel{background:var(--white);border:1px solid var(--line2);padding:16px;margin-top:4px}
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  label{display:block;font:600 9.5px/1.4 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  input,select{width:100%;margin-top:5px;padding:8px 9px;border:1px solid var(--line2);background:var(--white);font:12.5px var(--sans);color:var(--ink)}
+  input:focus,select:focus{outline:2px solid var(--ink);outline-offset:1px}
+  input[aria-invalid=true]{border-color:var(--red);background:#fdf7f6}
+  .err{display:block;margin-top:4px;font-size:10.5px;color:var(--red)}
+  .hint{display:block;margin-top:4px;font-size:10.5px;color:var(--muted)}
+  .foot{display:flex;gap:8px;margin-top:14px;align-items:center}
+  .provenance{margin-top:26px;padding-top:10px;border-top:1px solid var(--line);font-size:10.5px;color:var(--dim);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  @media(max-width:1080px){.page{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}nav.tabs{display:none}}
+  @media(max-width:700px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.cell:nth-child(2){border-right:0}.grid{grid-template-columns:1fr}.search{display:none}thead{display:none}td{display:block;border:0;padding:2px 0}tbody tr{display:block;padding:10px 0;border-bottom:1px solid var(--line2)}td.num{text-align:left}}
+</style>
+</head>
+<body>
+<div class="ribbon"><b>Template C</b><span>Statement — cool white, grotesque only, hairlines, right-aligned figures, green as the single accent</span></div>
+
+<header class="bar">
+  <div class="wordmark">Richie <span>Transport Services</span></div>
+  <div class="search">Search trips, rentals, vehicles, drivers <kbd>Ctrl K</kbd></div>
+  <nav class="tabs">
+    <a href="#" aria-current="page">Today</a>
+    <a href="#">Busing</a>
+    <a href="#">Rentals</a>
+    <a href="#">Logistics</a>
+    <a href="#">Fleet</a>
+    <a href="#">Records</a>
+  </nav>
+  <div class="who"><span class="avatar">DA</span> Demo Administrator</div>
+</header>
+
+<div class="page">
+  <main>
+    <div class="h1row">
+      <div>
+        <h1>Thursday, 23 October 2026</h1>
+        <p>Statements are drawn from the record kept on this server. Figures are as at 14:32; anything the company has not configured is shown as not set.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button class="btn">Export</button>
+        <button class="btn btn--primary">New booking</button>
+      </div>
+    </div>
+
+    <div class="summary" style="margin-top:16px">
+      <div class="cell"><span>Trips today</span><b>3</b><small>1 dispatched · 2 planned</small></div>
+      <div class="cell"><span>Vehicles ready</span><b class="neg">2 / 4</b><small>1 overdue, 1 due soon</small></div>
+      <div class="cell"><span>Billed this month</span><b>18 400</b><small>GHS · 6 completed rentals</small></div>
+      <div class="cell"><span>Deposits held</span><b class="pos">4 200</b><small>GHS · 2 confirmed rentals</small></div>
+    </div>
+
+    <h2 class="sec">Today’s runs <a href="#">Open dispatch</a></h2>
+    <table>
+      <thead><tr><th style="width:74px">Time</th><th>Run</th><th style="width:180px">Driver</th><th style="width:150px">Vehicle</th><th style="width:128px">State</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="num" style="text-align:left">06:30</td>
+          <td><b>Accra → Tema</b><span class="sub"><span class="ref">TR-0231</span> · staff busing</span></td>
+          <td>Kofi Mensah<span class="sub">Licence expires 12 Oct 2026</span></td>
+          <td>GT 500-26<span class="sub">Coaster</span></td>
+          <td><span class="status"><i></i>Dispatched</span></td>
+        </tr>
+        <tr>
+          <td class="num" style="text-align:left">07:15</td>
+          <td><b>Accra → Koforidua</b><span class="sub"><span class="ref">TR-0232</span> · staff busing</span></td>
+          <td style="color:var(--muted)">Not assigned</td>
+          <td>GT 812-24<span class="sub">Sprinter</span></td>
+          <td><span class="status planned"><i></i>Planned</span></td>
+        </tr>
+        <tr>
+          <td class="num" style="text-align:left">16:00</td>
+          <td><b>Tema → Accra</b><span class="sub"><span class="ref">TR-0233</span> · staff busing</span></td>
+          <td>Ama Boateng<span class="sub">Licence valid</span></td>
+          <td>GT 500-26<span class="sub">Coaster</span></td>
+          <td><span class="status planned"><i></i>Planned</span></td>
+        </tr>
+        <tr>
+          <td class="num" style="text-align:left">—</td>
+          <td style="color:var(--muted)">No fourth run scheduled<span class="sub">Slot free for the day</span></td>
+          <td>—</td><td>—</td>
+          <td><span class="status idle"><i></i>Gap</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 class="sec">Fleet against service intervals <a href="#">Open readiness</a></h2>
+    <table>
+      <thead><tr><th>Vehicle</th><th>Basis</th><th class="num" style="width:130px">Used</th><th class="num" style="width:110px">Interval</th><th style="width:150px">State</th></tr></thead>
+      <tbody>
+        <tr><td>GT 500-26<span class="sub">Coaster</span></td><td>Days since service</td><td class="num">188</td><td class="num">180</td><td><span class="status overdue"><i></i>Overdue 8 days</span></td></tr>
+        <tr><td>GT 812-24<span class="sub">Sprinter</span></td><td>Kilometres</td><td class="num">9 680</td><td class="num">10 000</td><td><span class="status planned"><i></i>Due in 320 km</span></td></tr>
+        <tr><td>GT 118-25<span class="sub">Coaster</span></td><td>No reading recorded</td><td class="num">—</td><td class="num">—</td><td><span class="status idle"><i></i>Not evaluable</span></td></tr>
+        <tr><td>GT 402-26<span class="sub">Sprinter</span></td><td>Kilometres</td><td class="num">2 710</td><td class="num">10 000</td><td><span class="status"><i></i>Ready</span></td></tr>
+      </tbody>
+    </table>
+
+    <h2 class="sec">Record a document</h2>
+    <form class="panel">
+      <div class="grid">
+        <label>Owner<select><option>Vehicle · GT 500-26</option><option>Driver · Kofi Mensah</option></select></label>
+        <label>Type<select><option>Roadworthy certificate</option><option>Insurance</option><option>Driver licence</option></select></label>
+        <label>Number<input value="RW-88213" aria-invalid="true"><span class="err">Already recorded on another vehicle.</span></label>
+        <label>Expires<input type="date" value="2027-10-22"><span class="hint">Only dates you enter are stored.</span></label>
+      </div>
+      <div class="foot">
+        <button type="button" class="btn btn--primary">Save document</button>
+        <button type="button" class="btn" disabled>Save &amp; add another</button>
+        <button type="button" class="btn">Cancel</button>
+      </div>
+    </form>
+
+    <div class="provenance">
+      <span>DEMO DATA FOR DESIGN REVIEW · NOT A LIVE RECORD</span>
+      <span>Figures defined in docs/KPIS.md</span>
+    </div>
+  </main>
+
+  <aside class="aside">
+    <div class="card">
+      <h3>Needs attention</h3>
+      <div class="kv"><span>Licence expired</span><b style="color:var(--red)">1</b></div>
+      <div class="kv"><span>Services overdue</span><b style="color:var(--red)">2</b></div>
+      <div class="kv"><span>Rentals unconfirmed</span><b>2</b></div>
+      <div class="kv"><span>Trips not dispatched</span><b>2</b></div>
+      <p class="note">Ordered by whether it blocks a dispatch today, not by volume.</p>
+    </div>
+
+    <div class="card">
+      <h3>Rules to supply</h3>
+      <div class="kv"><span>On-time threshold</span><b style="color:var(--amber)">Not set</b></div>
+      <div class="kv"><span>Document lead time</span><b style="color:var(--amber)">Not set</b></div>
+      <div class="kv"><span>Company name</span><b>Set</b></div>
+      <div class="kv"><span>Billing currency</span><b>GHS</b></div>
+      <div class="kv"><span>Service schedules</span><b>2 of 2</b></div>
+      <div class="total"><span>Setup</span><b>3 of 5</b></div>
+      <p class="note">A rule counts only once it is stored. Half-typed forms never count.</p>
+    </div>
+
+    <div class="card">
+      <h3>Money this month</h3>
+      <div class="kv"><span>Quoted</span><b>22 100</b></div>
+      <div class="kv"><span>Deposits</span><b>4 200</b></div>
+      <div class="kv"><span>Invoiced</span><b>18 400</b></div>
+      <div class="total"><span>Outstanding</span><b>3 700</b></div>
+      <p class="note">All figures in GHS. Drafts are excluded until confirmed.</p>
+    </div>
+  </aside>
+</div>
+</body>
+</html>
