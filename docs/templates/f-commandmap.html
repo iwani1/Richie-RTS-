@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F · Command map — map-first operations</title>
+<style>
+  /* ============================================================================================
+     F · COMMAND MAP
+     The canvas is a map, and the controls float over it. No sidebar, no page frame: a floating
+     header pill, a unit list on the left, the selected trip on the right, and an exception dock
+     along the bottom that can be pulled up. This is the layout a dispatcher recognises from
+     tracking software — the map is the truth, the panels are instruments on top of it.
+     ============================================================================================ */
+  :root{
+    --map:#0d1519; --map-2:#111c21; --road:#1b2a31; --road-2:#22343c;
+    --panel:rgba(12,20,24,.86); --panel-solid:#0f1a1f;
+    --line:rgba(148,190,205,.16); --line-2:rgba(148,190,205,.28);
+    --text:#e6f1f5; --text-2:#a9c0c9; --muted:#6f8a95;
+    --cyan:#25d0e0; --cyan-ink:#04262b; --amber:#f5b942; --red:#ff6b5e; --green:#43d98c;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --blur:blur(18px) saturate(140%);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--map);color:var(--text);font:13px/1.5 var(--sans);
+       -webkit-font-smoothing:antialiased;overflow:hidden;min-width:1100px}
+  a{color:inherit;text-decoration:none}
+  svg{display:block}
+
+  /* ---------- the map ---------- */
+  .map{position:fixed;inset:0;background:
+        radial-gradient(900px 600px at 62% 38%,#16262c 0%,transparent 70%),
+        radial-gradient(700px 500px at 18% 78%,#122027 0%,transparent 65%),
+        linear-gradient(160deg,#0b1317,#0e1a1f 55%,#0b1418);
+       overflow:hidden}
+  /* an abstract street grid, drawn with gradients so it needs no image */
+  .map::before{content:"";position:absolute;inset:-20%;
+    background:
+      repeating-linear-gradient(24deg,transparent 0 78px,var(--road) 78px 80px),
+      repeating-linear-gradient(112deg,transparent 0 96px,var(--road-2) 96px 98px),
+      repeating-linear-gradient(24deg,transparent 0 312px,rgba(37,208,224,.10) 312px 314px);
+    opacity:.55;transform:rotate(-2deg)}
+  .map::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(circle at 50% 50%,transparent 35%,rgba(4,10,12,.72) 100%)}
+  .water{position:absolute;left:-6%;bottom:-16%;width:52%;height:52%;border-radius:46% 54% 38% 62%;
+         background:linear-gradient(140deg,#0a2228,#0c2a31);opacity:.9;filter:blur(2px)}
+  .district{position:absolute;font:10px/1 var(--sans);letter-spacing:.22em;color:#4f6b76;text-transform:uppercase}
+
+  /* route polylines */
+  .routes{position:absolute;inset:0;pointer-events:none}
+
+  /* vehicle markers */
+  .marker{position:absolute;transform:translate(-50%,-50%)}
+  .marker button{display:flex;align-items:center;gap:7px;border:1px solid var(--line-2);
+                 background:rgba(10,20,24,.88);color:var(--text);border-radius:999px;padding:5px 10px 5px 6px;
+                 font:600 11px var(--sans);cursor:pointer;backdrop-filter:var(--blur);
+                 box-shadow:0 10px 24px -12px rgba(0,0,0,.9)}
+  .marker button .ico{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+                      background:#173039;color:var(--cyan);font-size:10px}
+  .marker.selected button{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(37,208,224,.18),0 12px 28px -12px #000}
+  .marker.selected button .ico{background:var(--cyan);color:var(--cyan-ink)}
+  .marker .speed{font:10px/1 var(--mono);color:var(--muted)}
+  .marker.late button{border-color:rgba(245,185,66,.5)}
+  .marker.late button .ico{background:#3a2b12;color:var(--amber)}
+  .marker.stopped button .ico{background:#2a1a1a;color:var(--red)}
+  .pulse{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
+         border:1px solid rgba(37,208,224,.35);animation:pulse 2.8s ease-out infinite;pointer-events:none}
+  @keyframes pulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.pulse{animation:none;opacity:.4}}
+
+  /* ---------- floating chrome ---------- */
+  .float{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+         backdrop-filter:var(--blur);box-shadow:0 24px 60px -30px rgba(0,0,0,.95)}
+  .top{top:16px;left:16px;right:16px;display:flex;align-items:center;gap:14px;padding:9px 12px;border-radius:14px}
+  .brand{display:flex;align-items:center;gap:9px;padding-right:12px;border-right:1px solid var(--line)}
+  .brand .mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(150deg,var(--cyan),#1a9fb0);
+               color:var(--cyan-ink);display:grid;place-items:center;font-weight:800;font-size:13px}
+  .brand b{font-size:12.5px;letter-spacing:-.01em}
+  .brand small{display:block;font:9.5px/1.4 var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+  .tabs{display:flex;gap:2px;background:rgba(255,255,255,.04);padding:3px;border-radius:10px}
+  .tabs button{border:0;background:transparent;color:var(--text-2);font:600 11.5px var(--sans);padding:6px 11px;
+               border-radius:8px;cursor:pointer}
+  .tabs button[aria-pressed="true"]{background:rgba(37,208,224,.14);color:var(--cyan)}
+  .clock{margin-left:auto;display:flex;align-items:center;gap:10px;font:11px var(--mono);color:var(--text-2)}
+  .clock .live{display:flex;align-items:center;gap:6px;color:var(--green)}
+  .clock .live i{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(67,217,140,.16)}
+  .pill-btn{border:1px solid var(--line-2);background:rgba(255,255,255,.04);color:var(--text);border-radius:9px;
+            padding:7px 11px;font:600 11.5px var(--sans);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .pill-btn.primary{background:var(--cyan);border-color:var(--cyan);color:var(--cyan-ink)}
+  .avatar{width:28px;height:28px;border-radius:50%;background:#173039;border:1px solid var(--line-2);
+          display:grid;place-items:center;font:700 10px var(--sans);color:var(--text)}
+
+  /* left column: units */
+  .units{top:78px;left:16px;width:288px;max-height:calc(100vh - 210px);display:flex;flex-direction:column;overflow:hidden}
+  .panel-head{display:flex;align-items:center;gap:8px;padding:12px 13px;border-bottom:1px solid var(--line)}
+  .panel-head h2{margin:0;font-size:12px;font-weight:650;letter-spacing:.01em}
+  .panel-head .count{margin-left:auto;font:10px/1 var(--mono);color:var(--muted)}
+  .search{display:flex;align-items:center;gap:7px;margin:10px 12px;padding:7px 9px;border:1px solid var(--line);
+          border-radius:9px;background:rgba(255,255,255,.03);color:var(--muted)}
+  .search input{border:0;background:transparent;color:var(--text);font:11.5px var(--sans);outline:none;width:100%}
+  .unit-list{overflow-y:auto;padding:0 6px 8px}
+  .unit{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:10px;cursor:pointer}
+  .unit:hover{background:rgba(255,255,255,.045)}
+  .unit[aria-current="true"]{background:rgba(37,208,224,.10);box-shadow:inset 0 0 0 1px rgba(37,208,224,.28)}
+  .unit .dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:0 0 auto}
+  .unit .dot.idle{background:var(--muted)}
+  .unit .dot.late{background:var(--amber)}
+  .unit .dot.stop{background:var(--red)}
+  .unit b{display:block;font:600 11.5px var(--mono);letter-spacing:.01em}
+  .unit small{display:block;color:var(--muted);font-size:10.5px}
+  .unit .speed{margin-left:auto;text-align:right}
+  .unit .speed b{font-size:12px}
+  .unit .speed small{font-size:9.5px}
+
+  /* right column: selected trip */
+  .detail{top:78px;right:16px;width:330px;display:flex;flex-direction:column;overflow:hidden}
+  .detail-head{padding:14px 14px 12px;border-bottom:1px solid var(--line)}
+  .detail-head .ref{display:flex;align-items:center;gap:8px}
+  .detail-head .ref b{font:600 12px var(--mono);letter-spacing:.02em}
+  .chip{display:inline-flex;align-items:center;gap:6px;font:600 10px/1 var(--sans);padding:4px 8px;
+        border-radius:999px;background:rgba(37,208,224,.14);color:var(--cyan)}
+  .chip i{width:5px;height:5px;border-radius:50%;background:currentColor}
+  .chip.warn{background:rgba(245,185,66,.14);color:var(--amber)}
+  .chip.bad{background:rgba(255,107,94,.14);color:var(--red)}
+  .detail-head h3{margin:8px 0 2px;font-size:16px;letter-spacing:-.02em;font-weight:650}
+  .detail-head p{margin:0;color:var(--muted);font-size:11.5px}
+
+  .crew{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .crew div{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:10px;padding:8px 9px}
+  .crew span{display:block;font:9.5px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .crew b{display:block;margin-top:5px;font-size:11.5px;font-weight:600}
+
+  .stops{padding:6px 14px 10px;overflow-y:auto}
+  .stops h4{margin:10px 0 6px;font:9.5px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .stop{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:9px;padding:7px 0;position:relative}
+  .stop .node{width:9px;height:9px;margin-top:5px;border-radius:50%;border:2px solid var(--line-2)}
+  .stop.done .node{background:var(--green);border-color:var(--green)}
+  .stop.now .node{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 0 3px rgba(37,208,224,.2)}
+  .stop b{display:block;font-size:11.5px;font-weight:600}
+  .stop small{display:block;color:var(--muted);font-size:10px}
+  .stop time{font:10.5px var(--mono);color:var(--text-2)}
+  .stop.now time{color:var(--cyan)}
+  .rail-line{position:absolute;left:4px;top:20px;bottom:-7px;width:1px;background:var(--line)}
+  .stop:last-child .rail-line{display:none}
+
+  .detail-actions{display:flex;gap:7px;padding:12px 14px;border-top:1px solid var(--line)}
+  .detail-actions .pill-btn{flex:1;justify-content:center}
+
+  /* bottom dock */
+  .dock{left:320px;right:362px;bottom:16px;border-radius:14px;overflow:hidden}
+  .dock-bar{display:flex;align-items:center;gap:10px;padding:10px 12px}
+  .dock-bar .title{font-size:11.5px;font-weight:600}
+  .dock-bar .title span{color:var(--muted);font-weight:400;margin-left:6px}
+  .alerts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  .alert{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;
+         padding:6px 10px;font-size:11px;color:var(--text-2);background:rgba(255,255,255,.03)}
+  .alert i{width:6px;height:6px;border-radius:50%;background:var(--amber)}
+  .alert.bad i{background:var(--red)}
+  .alert.info i{background:var(--cyan)}
+  .dock-bar .go{margin-left:6px;color:var(--muted);font-size:11px}
+
+  /* scale + compass, bottom-left of the map */
+  .mapmeta{position:absolute;left:16px;bottom:16px;display:flex;align-items:center;gap:10px;
+           font:10px var(--mono);color:#5a7480}
+  .scalebar{width:64px;height:8px;border-left:1px solid #5a7480;border-right:1px solid #5a7480;
+            border-bottom:1px solid #5a7480}
+</style>
+</head>
+<body>
+
+<div class="map" aria-hidden="true">
+  <div class="water"></div>
+  <span class="district" style="left:58%;top:22%">East Legon</span>
+  <span class="district" style="left:30%;top:64%">Industrial area</span>
+  <span class="district" style="left:74%;top:70%">Tema road</span>
+
+  <svg class="routes" viewBox="0 0 1400 820" preserveAspectRatio="none">
+    <path d="M150 640 C 320 600, 380 460, 540 430 S 820 380, 980 300" fill="none" stroke="#25d0e0"
+          stroke-width="2.5" stroke-linecap="round" opacity=".85"/>
+    <path d="M150 640 C 320 600, 380 460, 540 430" fill="none" stroke="#e6f1f5" stroke-width="3"
+          stroke-linecap="round" opacity=".35"/>
+    <path d="M420 720 C 520 620, 700 560, 880 470 S 1120 330, 1250 260" fill="none" stroke="#f5b942"
+          stroke-width="2" stroke-dasharray="7 7" opacity=".7"/>
+    <circle cx="980" cy="300" r="5" fill="#25d0e0"/>
+  </svg>
+
+  <div class="marker selected" style="left:70%;top:37%">
+    <span class="pulse"></span>
+    <button><span class="ico">▸</span> GT 4821 <span class="speed">42 km/h</span></button>
+  </div>
+  <div class="marker" style="left:52%;top:52%">
+    <button><span class="ico">▸</span> GE 1104 <span class="speed">28 km/h</span></button>
+  </div>
+  <div class="marker late" style="left:38%;top:64%">
+    <button><span class="ico">!</span> GW 7733 <span class="speed">late 9m</span></button>
+  </div>
+  <div class="marker" style="left:24%;top:44%">
+    <button><span class="ico">▸</span> GR 2290 <span class="speed">51 km/h</span></button>
+  </div>
+  <div class="marker stopped" style="left:62%;top:72%">
+    <button><span class="ico">■</span> GT 0092 <span class="speed">stopped 12m</span></button>
+  </div>
+</div>
+
+<!-- ---------- floating header ---------- -->
+<header class="float top">
+  <div class="brand">
+    <div class="mark">R</div>
+    <div><b>Richie Transport</b><small>Command map</small></div>
+  </div>
+  <div class="tabs" role="group" aria-label="View">
+    <button aria-pressed="true">Live</button>
+    <button aria-pressed="false">Planned</button>
+    <button aria-pressed="false">History</button>
+    <button aria-pressed="false">Reports</button>
+  </div>
+  <div class="clock">
+    <span class="live"><i></i> 5 units reporting</span>
+    <span>09:47 · 23 Oct</span>
+  </div>
+  <div class="avatar">AM</div>
+  <button class="pill-btn primary">Dispatch run</button>
+</header>
+
+<!-- ---------- units ---------- -->
+<aside class="float units" aria-label="Units">
+  <div class="panel-head"><h2>Units</h2><span class="count">6 vehicles</span></div>
+  <div class="search">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input placeholder="Plate, driver, route" aria-label="Search units">
+  </div>
+  <div class="unit-list">
+    <div class="unit" aria-current="true">
+      <span class="dot"></span>
+      <div><b>GT 4821-26</b><small>Obuasi estate · K. Boateng</small></div>
+      <div class="speed"><b>42</b><small>km/h</small></div>
+    </div>
+    <div class="unit">
+      <span class="dot"></span>
+      <div><b>GE 1104-25</b><small>East Legon · Y. Mensah</small></div>
+      <div class="speed"><b>28</b><small>km/h</small></div>
+    </div>
+    <div class="unit">
+      <span class="dot late"></span>
+      <div><b>GW 7733-26</b><small>Tema shuttle · A. Osei</small></div>
+      <div class="speed"><b>0</b><small>9m late</small></div>
+    </div>
+    <div class="unit">
+      <span class="dot"></span>
+      <div><b>GR 2290-24</b><small>Airport run · K. Antwi</small></div>
+      <div class="speed"><b>51</b><small>km/h</small></div>
+    </div>
+    <div class="unit">
+      <span class="dot stop"></span>
+      <div><b>GT 0092-23</b><small>Adenta loop · E. Owusu</small></div>
+      <div class="speed"><b>0</b><small>12m stop</small></div>
+    </div>
+    <div class="unit">
+      <span class="dot idle"></span>
+      <div><b>GS 5511-26</b><small>No run today · in yard</small></div>
+      <div class="speed"><b>—</b><small>idle</small></div>
+    </div>
+  </div>
+</aside>
+
+<!-- ---------- selected trip ---------- -->
+<aside class="float detail" aria-label="Selected trip">
+  <div class="detail-head">
+    <div class="ref"><b>TR-0007</b><span class="chip"><i></i>On the road</span><span class="chip warn" style="margin-left:auto">2 min late</span></div>
+    <h3>Obuasi estate run</h3>
+    <p>Ashanti Goldfields · 3 stops · 18 aboard</p>
+  </div>
+  <div class="crew">
+    <div><span>Vehicle</span><b>GT 4821-26</b></div>
+    <div><span>Driver</span><b>Kofi Boateng</b></div>
+  </div>
+  <div class="stops">
+    <h4>Stops</h4>
+    <div class="stop done">
+      <span class="node"></span><span class="rail-line"></span>
+      <div><b>Estate gate</b><small>recorded 06:15 · 12 boarded</small></div>
+      <time>06:15</time>
+    </div>
+    <div class="stop now">
+      <span class="node"></span><span class="rail-line"></span>
+      <div><b>Market junction</b><small>arriving · 6 boarded so far</small></div>
+      <time>06:32</time>
+    </div>
+    <div class="stop">
+      <span class="node"></span>
+      <div><b>Head office</b><small>not reached</small></div>
+      <time>06:55</time>
+    </div>
+  </div>
+  <div class="detail-actions">
+    <button class="pill-btn">Record stop</button>
+    <button class="pill-btn primary">Open trip</button>
+  </div>
+</aside>
+
+<!-- ---------- exception dock ---------- -->
+<div class="float dock">
+  <div class="dock-bar">
+    <span class="title">Needs a decision <span>4 recorded</span></span>
+    <div class="alerts">
+      <span class="alert bad"><i></i>Licence expired · K. Boateng</span>
+      <span class="alert"><i></i>Service overdue · GW 7733</span>
+      <span class="alert info"><i></i>Rental quoted · RR-0004</span>
+      <span class="alert"><i></i>Run undispatched · TR-0009</span>
+    </div>
+    <a class="go" href="#">Open board →</a>
+  </div>
+</div>
+
+<div class="mapmeta">
+  <span class="scalebar"></span><span>500 m</span>
+  <span style="margin-left:8px">© OpenStreetMap</span>
+</div>
+
+</body>
+</html>

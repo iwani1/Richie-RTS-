@@ -61,6 +61,28 @@ What the research therefore changed, concretely:
    (`docs/templates/`); the owner rejected all of them and chose a fourth direction in words. §3
    compares the options and §8 states what the choice costs.
 
+## 2a. Three new directions, built (pending a decision)
+
+After the editorial direction was rejected as "not redesigned", the owner supplied three
+references — the Dribbble *transport management system* tag, the Behance *transport management
+system* search, and Wialon — and asked for three new templates of the UI. Their common language is
+the telematics / fleet-SaaS idiom: a dark or light app shell with an icon rail or a grouped
+sidebar, a run timeline or a map as the main canvas, status pills, sparklines and a right-hand
+rail of exceptions. Three complete directions were built against that language, each with a
+different *skeleton*, not a different palette:
+
+| Direction | File | Skeleton | Where it wins |
+|---|---|---|---|
+| **D · Nightshift** | `docs/templates/d-nightshift.html` | 60px icon rail + 236px navigator + one live board; KPI tiles, per-vehicle run timeline with a "now" cursor, exception table, readiness ring, activity feed | A dispatch room in the evening; the timeline is the whole day on one screen. |
+| **E · Daylight** | `docs/templates/e-daylight.html` | White 252px sidebar with count badges; canvas of soft cards; stat cards with sparklines, run timeline, rentals table with avatars, readiness donut, "due this week" checklist | Daylight, printouts, first-time users, and the manager who reads rather than watches. |
+| **F · Command map** | `docs/templates/f-commandmap.html` | No page frame: a map canvas with floating header pill, floating unit list, selected trip with a stop rail, and an exception dock | Answering "where is my bus", and anything that must be watched rather than read. |
+
+The harness (`docs/templates/index.html`) switches between them at 1440 / 1280 / 1024 so the
+comparison is like-for-like on the same mock dataset. None of the three is applied to the product
+yet: the application still runs the editorial build, and §4 below describes it. When the owner
+chooses, §4–§8 are rewritten around the chosen direction, and the rejected two are kept as history
+alongside A/B/C.
+
 ## 3. Alternatives considered
 
 The direction had already been through three built templates in `docs/templates/` — **A · Waybill**

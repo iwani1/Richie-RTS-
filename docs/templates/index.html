@@ -3,83 +3,130 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Richie TMS — three template directions</title>
+<title>Richie TMS — three new directions</title>
 <style>
   :root{
-    --chrome:#1b1f22; --chrome2:#24292d; --text:#eef1ef; --muted:#9aa4a0; --line:#333b3f;
-    --sans:"Inter","Helvetica Neue",Helvetica,Arial,sans-serif;
-    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+    --chrome:#0b0d11; --chrome-2:#14171d; --line:#242a34; --line-2:#333b48;
+    --text:#e9edf4; --muted:#8b95a6; --lime:#c8f169; --indigo:#7b89ff; --cyan:#25d0e0;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{margin:0;background:var(--chrome);color:var(--text);font:13px/1.5 var(--sans);display:flex;flex-direction:column}
-  header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .brand{font:600 13px/1.2 var(--sans)}
-  .brand small{display:block;font:9.5px/1.6 var(--mono);color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
-  .tabs{display:flex;gap:6px;flex-wrap:wrap}
-  button.tab{font:600 11px/1 var(--sans);padding:8px 11px;border:1px solid var(--line);background:var(--chrome2);color:var(--text);cursor:pointer;letter-spacing:.01em}
-  button.tab:hover{border-color:#5a666b}
-  button.tab[aria-selected=true]{background:#eef1ef;color:#16181a;border-color:#eef1ef}
-  .spacer{flex:1}
-  .widths{display:flex;gap:4px;align-items:center}
-  .widths span{font:9.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:4px}
-  button.w{font:10px/1 var(--mono);padding:6px 8px;border:1px solid var(--line);background:var(--chrome2);color:var(--muted);cursor:pointer}
-  button.w[aria-pressed=true]{color:#16181a;background:#c9d3ce;border-color:#c9d3ce}
-  .strap{display:flex;gap:18px;padding:9px 16px;border-bottom:1px solid var(--line);background:#171b1e;color:var(--muted);font-size:12px;flex-wrap:wrap}
-  .strap b{color:var(--text);font-weight:600}
-  .strap .best{color:#a8e0c4}
-  .stage{flex:1;min-height:0;display:flex;justify-content:center;background:repeating-linear-gradient(45deg,#15181b,#15181b 12px,#191d20 12px,#191d20 24px);padding:14px;overflow:auto}
-  .frame{width:100%;max-width:1440px;background:#fff;border:1px solid #000;box-shadow:0 18px 60px rgba(0,0,0,.5);transition:max-width .18s ease}
-  iframe{display:block;width:100%;height:100%;border:0;min-height:0}
-  .stage.fit .frame{height:100%;display:flex}
-  @media (prefers-reduced-motion: reduce){.frame{transition:none}}
-  .hint{font:10px var(--mono);color:var(--muted);letter-spacing:.03em;padding:0 16px 10px}
+  body{margin:0;background:var(--chrome);color:var(--text);font:13px/1.5 var(--sans);
+       display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--line);
+         background:var(--chrome-2);flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:9px}
+  .brand .mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(150deg,#c8f169,#7fd12b);
+               color:#111;display:grid;place-items:center;font-weight:800;font-size:13px}
+  .brand b{font-size:13px}
+  .brand small{display:block;font:9.5px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .tabs{display:flex;gap:6px;margin-left:8px}
+  button.tab{display:flex;align-items:center;gap:9px;border:1px solid var(--line);background:var(--chrome);
+             color:var(--text);border-radius:10px;padding:7px 12px;font:600 12px var(--sans);cursor:pointer}
+  button.tab:hover{border-color:var(--line-2)}
+  button.tab[aria-pressed="true"]{border-color:#3d4728;background:#1b2014;color:#eaf5cf}
+  button.tab i{width:9px;height:9px;border-radius:3px;display:block}
+  .tab[data-k="d"] i{background:linear-gradient(140deg,#c8f169,#8f7dff)}
+  .tab[data-k="e"] i{background:linear-gradient(140deg,#4453f0,#9aa6ff)}
+  .tab[data-k="f"] i{background:linear-gradient(140deg,#25d0e0,#0e6a76)}
+  .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .widths{display:flex;background:var(--chrome);border:1px solid var(--line);border-radius:9px;padding:2px}
+  .widths button{border:0;background:transparent;color:var(--muted);font:600 11px var(--mono);padding:5px 8px;
+                 border-radius:7px;cursor:pointer}
+  .widths button[aria-pressed="true"]{background:var(--chrome-2);color:var(--text)}
+  .note{display:flex;align-items:baseline;gap:10px;padding:9px 16px;border-bottom:1px solid var(--line);
+        color:var(--muted);font-size:12px}
+  .note b{color:var(--text);font-weight:600}
+  .note .tag{font:9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+             border:1px solid var(--line-2);border-radius:4px;padding:3px 5px}
+  .stage{flex:1;min-height:0;background:#05070a;display:flex;justify-content:center;padding:0}
+  iframe{border:0;height:100%;width:100%;background:#fff;transition:max-width 160ms ease}
+  footer{padding:7px 16px;border-top:1px solid var(--line);color:#5f6a7c;font:10.5px/1.5 var(--mono);
+         display:flex;gap:14px;flex-wrap:wrap}
+  footer a{color:#8b95a6}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand">Richie TMS<small>THREE TEMPLATE DIRECTIONS</small></div>
-  <div class="tabs" role="tablist" aria-label="Template">
-    <button class="tab" role="tab" aria-selected="true" data-src="a-waybill.html" id="tab-a">A · Waybill</button>
-    <button class="tab" role="tab" aria-selected="false" data-src="b-control-room.html" id="tab-b">B · Control room</button>
-    <button class="tab" role="tab" aria-selected="false" data-src="c-statement.html" id="tab-c">C · Statement</button>
+  <div class="brand">
+    <div class="mark">R</div>
+    <div><b>Richie TMS</b><small>Three new directions</small></div>
   </div>
-  <div class="spacer"></div>
-  <div class="widths">
-    <span>Width</span>
-    <button class="w" data-w="1440" aria-pressed="true">Desktop</button>
-    <button class="w" data-w="1024" aria-pressed="false">Tablet</button>
-    <button class="w" data-w="390" aria-pressed="false">Phone</button>
+  <div class="tabs" role="group" aria-label="Direction">
+    <button class="tab" data-k="d" aria-pressed="true" data-file="d-nightshift.html"><i></i>D · Nightshift</button>
+    <button class="tab" data-k="e" aria-pressed="false" data-file="e-daylight.html"><i></i>E · Daylight</button>
+    <button class="tab" data-k="f" aria-pressed="false" data-file="f-commandmap.html"><i></i>F · Command map</button>
+  </div>
+  <div class="right">
+    <div class="widths" role="group" aria-label="Frame width">
+      <button data-w="1440" aria-pressed="true">1440</button>
+      <button data-w="1280" aria-pressed="false">1280</button>
+      <button data-w="1024" aria-pressed="false">1024</button>
+    </div>
   </div>
 </header>
-<div class="strap">
-  <span><b>A · Waybill</b> — warm paper, Fraunces-style serif headings, ruled bands with a label column, stamp chips. <span class="best">Closest to what is built today.</span></span>
-  <span><b>B · Control room</b> — dark board, split-flap times, LED states, top nav instead of a rail. Best for a dispatcher watching the clock; heaviest to read in daylight.</span>
-  <span><b>C · Statement</b> — cool white, one grotesque, hairlines, right-aligned figures, green accent. Best for money and audit; quietest to look at all day.</span>
+
+<div class="note">
+  <b id="note-title">D · Nightshift</b>
+  <span class="tag" id="note-tag">dark</span>
+  <span id="note-text">A dispatch room at night. Icon rail, secondary navigator, and one live board: KPIs, a per-vehicle run timeline with a time cursor, then the exception list. Lime means act; violet means in motion.</span>
 </div>
-<div class="stage fit" id="stage">
-  <div class="frame" id="frame">
-    <iframe id="view" title="Template preview" src="a-waybill.html"></iframe>
-  </div>
+
+<div class="stage">
+  <iframe id="frame" src="d-nightshift.html" title="Template preview"></iframe>
 </div>
-<p class="hint">Same content in all three: attention, today's runs, fleet readiness, a form with an error state, and the setup rules. Use the width buttons to see each at tablet and phone.</p>
+
+<footer>
+  <span>Comparisons use one mock dataset; no figures are claims about the business.</span>
+  <span>Earlier directions: <a href="a-waybill.html">A · Waybill</a> · <a href="b-control-room.html">B · Control room</a> · <a href="c-statement.html">C · Statement</a></span>
+</footer>
 
 <script>
-  const view = document.getElementById("view");
-  const stage = document.getElementById("stage");
+  const notes = {
+    d: {
+      title: "D · Nightshift",
+      tag: "dark",
+      file: "d-nightshift.html",
+      text: "A dispatch room at night. Icon rail, secondary navigator, and one live board: KPIs, a per-vehicle run timeline with a time cursor, then the exception list. Lime means act; violet means in motion."
+    },
+    e: {
+      title: "E · Daylight",
+      tag: "light",
+      file: "e-daylight.html",
+      text: "The modern light SaaS shell: white sidebar with count badges, one soft shadow level, 14px cards, indigo accent. Stat cards carry a sparkline, then the run timeline, then rentals with avatars and state pills. Best lit office, printouts, and first-time users."
+    },
+    f: {
+      title: "F · Command map",
+      tag: "map",
+      file: "f-commandmap.html",
+      text: "No page frame at all: the map is the canvas and every control floats over it — header pill with view tabs, unit list, selected trip with its stop rail, and an exception dock along the bottom. The telematics pattern; strongest for 'where is my bus'."
+    }
+  };
+
   const frame = document.getElementById("frame");
-  const tabs = [...document.querySelectorAll(".tab")];
-  const widths = [...document.querySelectorAll(".w")];
+  const title = document.getElementById("note-title");
+  const tag = document.getElementById("note-tag");
+  const text = document.getElementById("note-text");
 
-  tabs.forEach((tab) => tab.addEventListener("click", () => {
-    tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
-    view.src = tab.dataset.src;
-  }));
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const key = tab.dataset.k;
+      document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-pressed", String(t === tab)));
+      frame.src = notes[key].file;
+      title.textContent = notes[key].title;
+      tag.textContent = notes[key].tag;
+      text.textContent = notes[key].text;
+    });
+  });
 
-  widths.forEach((btn) => btn.addEventListener("click", () => {
-    widths.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
-    frame.style.maxWidth = btn.dataset.w + "px";
-  }));
+  document.querySelectorAll(".widths button").forEach((b) => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".widths button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      frame.style.maxWidth = b.dataset.w + "px";
+    });
+  });
 </script>
 </body>
 </html>

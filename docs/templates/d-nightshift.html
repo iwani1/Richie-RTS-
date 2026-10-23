@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D · Nightshift — dark telematics workspace</title>
+<style>
+  /* ============================================================================================
+     D · NIGHTSHIFT
+     A dispatch room at night: near-black canvas, an icon rail for the section, a secondary
+     navigator for the screens inside it, then one live board. The board answers three questions
+     in one glance — how today is going, what leaves next, what is broken. Rounded panels, soft
+     borders, one lime accent for "act", one violet for "in motion".
+     ============================================================================================ */
+  :root{
+    --bg:#0a0c10; --panel:#11141a; --panel-2:#161a21; --panel-3:#1c212a;
+    --line:#232936; --line-2:#2e3646;
+    --text:#e9edf4; --text-2:#b6bfcd; --muted:#7f8a9c;
+    --lime:#c8f169; --lime-ink:#12210a; --violet:#8f7dff; --teal:#3ad6c9;
+    --amber:#ffb454; --red:#ff6b6b; --green:#4ade80;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --r:12px; --r-sm:8px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 var(--sans);
+       -webkit-font-smoothing:antialiased;display:flex;min-width:1080px}
+  a{color:inherit;text-decoration:none}
+  svg{display:block}
+
+  /* ---------- icon rail ---------- */
+  .rail{width:60px;flex:0 0 60px;border-right:1px solid var(--line);background:#0a0c10;
+        display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0}
+  .rail .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(150deg,var(--lime),#7fd12b);
+              color:#111;display:grid;place-items:center;font-weight:800;font-size:15px;margin-bottom:12px}
+  .rail button{width:38px;height:38px;border:0;border-radius:10px;background:transparent;color:var(--muted);
+               display:grid;place-items:center;cursor:pointer;position:relative}
+  .rail button:hover{background:var(--panel-2);color:var(--text)}
+  .rail button[aria-current="true"]{background:var(--panel-3);color:var(--lime)}
+  .rail button[aria-current="true"]::before{content:"";position:absolute;left:-11px;top:9px;bottom:9px;width:3px;
+               border-radius:0 3px 3px 0;background:var(--lime)}
+  .rail .spacer{flex:1}
+  .rail .avatar{width:30px;height:30px;border-radius:50%;background:#2b3242;color:var(--text);
+                display:grid;place-items:center;font-size:11px;font-weight:700;border:1px solid var(--line-2)}
+
+  /* ---------- secondary navigator ---------- */
+  .nav{width:236px;flex:0 0 236px;border-right:1px solid var(--line);background:var(--panel);
+       display:flex;flex-direction:column;padding:16px 12px;gap:18px}
+  .workspace{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:10px;border:1px solid var(--line);
+             background:var(--panel-2)}
+  .workspace b{display:block;font-size:12px;letter-spacing:.01em}
+  .workspace span{display:block;font:10px/1.4 var(--mono);color:var(--muted)}
+  .nav-group{display:flex;flex-direction:column;gap:2px}
+  .nav-label{font:10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:#5d687a;
+             padding:0 10px 6px;font-weight:700}
+  .nav a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;color:var(--text-2);font-size:12.5px}
+  .nav a:hover{background:var(--panel-2);color:var(--text)}
+  .nav a[aria-current="page"]{background:#20261f;color:#eaf5cf;box-shadow:inset 0 0 0 1px #37451f}
+  .nav a[aria-current="page"] .dot{background:var(--lime)}
+  .nav a .dot{width:6px;height:6px;border-radius:50%;background:var(--line-2);flex:0 0 auto}
+  .nav a .count{margin-left:auto;font:10px/1 var(--mono);color:var(--muted);background:var(--panel-3);
+                padding:3px 6px;border-radius:20px}
+  .nav a .count.alert{color:#2a1206;background:var(--amber);font-weight:700}
+  .nav-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:2px}
+
+  /* ---------- main ---------- */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;background:
+        radial-gradient(1100px 500px at 80% -10%,#141a24 0%,transparent 60%),var(--bg)}
+  .topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line)}
+  .crumbs{font-size:12px;color:var(--muted)}
+  .crumbs b{color:var(--text);font-weight:600}
+  .search{margin-left:auto;display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
+          border-radius:10px;padding:8px 10px;width:280px;color:var(--muted)}
+  .search input{border:0;background:transparent;color:var(--text);font:12.5px var(--sans);outline:none;width:100%}
+  .kbd{font:10px/1 var(--mono);border:1px solid var(--line-2);border-radius:5px;padding:3px 5px;color:var(--muted)}
+  .live{display:flex;align-items:center;gap:7px;font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+        color:var(--lime)}
+  .live i{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 4px rgba(200,241,105,.16)}
+  .btn{border:1px solid var(--line-2);background:var(--panel-2);color:var(--text);border-radius:9px;padding:8px 12px;
+       font:600 12px var(--sans);cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{background:var(--panel-3)}
+  .btn.primary{background:var(--lime);border-color:var(--lime);color:var(--lime-ink)}
+  .btn.primary:hover{filter:brightness(1.06)}
+
+  .board{padding:20px 22px 28px;display:flex;flex-direction:column;gap:16px}
+  .board-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+  h1{margin:0;font-size:22px;letter-spacing:-.02em;font-weight:650}
+  .sub{margin:3px 0 0;color:var(--muted);font-size:12px}
+  .segments{margin-left:auto;display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+  .segments button{border:0;background:transparent;color:var(--muted);font:600 11.5px var(--sans);padding:6px 12px;
+                   border-radius:7px;cursor:pointer}
+  .segments button[aria-pressed="true"]{background:var(--panel-3);color:var(--text)}
+
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:16px;align-items:start}
+  .col{display:flex;flex-direction:column;gap:16px;min-width:0}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+  .panel-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .panel-head h2{margin:0;font-size:13px;font-weight:600;letter-spacing:-.01em}
+  .panel-head .hint{color:var(--muted);font-size:11px}
+  .panel-head .more{margin-left:auto;color:var(--muted);font-size:11px;display:flex;align-items:center;gap:6px}
+  .panel-body{padding:14px 16px}
+
+  /* KPI tiles */
+  .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px}
+  .kpi .label{font:10px/1 var(--sans);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .kpi .value{display:flex;align-items:baseline;gap:7px;margin-top:9px}
+  .kpi .value b{font-size:26px;letter-spacing:-.03em;font-weight:650}
+  .kpi .value span{font:11px/1 var(--mono);color:var(--muted)}
+  .kpi .delta{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font:10.5px/1 var(--mono);
+              padding:3px 6px;border-radius:5px;background:#17251a;color:var(--green)}
+  .kpi .delta.warn{background:#2a1c0c;color:var(--amber)}
+  .kpi .bars{display:flex;align-items:flex-end;gap:3px;height:26px;margin-top:10px}
+  .kpi .bars i{flex:1;background:var(--line-2);border-radius:2px}
+  .kpi .bars i.hi{background:var(--lime)}
+
+  /* run timeline */
+  .legend{display:flex;gap:14px;margin-left:auto;font:10px/1 var(--mono);color:var(--muted)}
+  .legend i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:5px}
+  .timeline{padding:0 16px 14px}
+  .tl-hours{display:grid;grid-template-columns:150px repeat(14,1fr);gap:0;padding:12px 0 8px;
+            font:9.5px/1 var(--mono);color:#5f6a7c;border-bottom:1px solid var(--line)}
+  .tl-hours span{text-align:left}
+  .row{display:grid;grid-template-columns:150px repeat(14,1fr);align-items:center;height:46px;
+       border-bottom:1px solid #1a1f28}
+  .row:last-child{border-bottom:0}
+  .unit{display:flex;align-items:center;gap:8px;font-size:12px}
+  .unit b{font-weight:600}
+  .unit small{color:var(--muted);font:10px/1.2 var(--mono)}
+  .track{grid-column:2 / -1;position:relative;height:26px;background:
+          repeating-linear-gradient(90deg,transparent 0 calc(100%/14 - 1px),#1b2029 calc(100%/14 - 1px) calc(100%/14))}
+  .bar{position:absolute;top:3px;height:20px;border-radius:6px;display:flex;align-items:center;padding:0 7px;
+       font:10.5px/1 var(--mono);white-space:nowrap;overflow:hidden}
+  .bar.done{background:#1d2a22;color:#8fe0a8;box-shadow:inset 0 0 0 1px #2a4436}
+  .bar.run{background:#20233a;color:#c3bcff;box-shadow:inset 0 0 0 1px #3a3f66}
+  .bar.late{background:#2b1f12;color:#ffca8a;box-shadow:inset 0 0 0 1px #543a1c}
+  .bar.plan{background:#1b2028;color:#98a3b6;box-shadow:inset 0 0 0 1px #2b3341}
+  .now{position:absolute;top:0;bottom:0;width:1px;background:var(--lime);left:38%}
+  .now::before{content:"";position:absolute;top:-4px;left:-3px;width:7px;height:7px;border-radius:50%;background:var(--lime)}
+
+  /* table */
+  table{width:100%;border-collapse:collapse}
+  th{font:10px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:#66718a;text-align:left;
+     padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700}
+  td{padding:11px 14px;border-bottom:1px solid #191e26;font-size:12.5px;color:var(--text-2);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  tr:hover td{background:#141922}
+  td b{color:var(--text);font-weight:600}
+  .pill{display:inline-flex;align-items:center;gap:6px;font:600 10.5px/1 var(--sans);padding:4px 8px;border-radius:20px}
+  .pill i{width:5px;height:5px;border-radius:50%}
+  .pill.late{background:#2b1a14;color:#ffb1a3}.pill.late i{background:var(--red)}
+  .pill.ok{background:#16261c;color:#8ce0a9}.pill.ok i{background:var(--green)}
+  .pill.warn{background:#2a2010;color:#ffcf92}.pill.warn i{background:var(--amber)}
+  .pill.info{background:#1b2130;color:#a9b8d6}.pill.info i{background:#7d93bd}
+  .mono{font:11.5px var(--mono);color:var(--muted)}
+  .rowlink{color:var(--muted);font-size:11px}
+
+  /* right column */
+  .gauge{display:flex;align-items:center;gap:16px;padding:16px}
+  .gauge .num{font-size:30px;letter-spacing:-.03em;font-weight:650}
+  .gauge .cap{color:var(--muted);font-size:11px}
+  .stack{display:flex;flex-direction:column;gap:0}
+  .task{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid #191e26}
+  .task:last-child{border-bottom:0}
+  .task .sev{width:3px;height:26px;border-radius:2px;background:var(--amber);flex:0 0 auto}
+  .task .sev.red{background:var(--red)}.task .sev.blue{background:#7d93bd}
+  .task b{display:block;font-size:12px;font-weight:600}
+  .task small{display:block;color:var(--muted);font-size:10.5px}
+  .task .go{margin-left:auto;color:var(--muted)}
+  .feed{display:flex;flex-direction:column;gap:12px;padding:14px 16px}
+  .feed i{width:22px;height:22px;border-radius:50%;background:#252b38;display:grid;place-items:center;
+          font:9px/1 var(--sans);color:#c9d2e0;flex:0 0 auto;font-weight:700}
+  .feed div{display:flex;gap:9px;font-size:11.5px;color:var(--text-2)}
+  .feed time{margin-left:auto;color:#5f6a7c;font:10px/1.6 var(--mono);flex:0 0 auto}
+  .feed b{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+
+<aside class="rail" aria-label="Sections">
+  <div class="logo">R</div>
+  <button aria-current="true" title="Operations">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+  </button>
+  <button title="Runs">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 17h4l2-6h8"/><circle cx="6" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/><path d="M3 7h6"/></svg>
+  </button>
+  <button title="Fleet">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="10" rx="2"/><path d="M7 16v3M17 16v3M7 10h10"/></svg>
+  </button>
+  <button title="People">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="9" r="3.2"/><path d="M3.5 20c.6-3.4 2.9-5 5.5-5s4.9 1.6 5.5 5"/><path d="M16 8.5a3 3 0 1 1 0 5.6M17.5 20c-.2-2.3-1-3.8-2.5-4.7"/></svg>
+  </button>
+  <button title="Money">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V9M10 19V5M16 19v-6M22 19H2"/></svg>
+  </button>
+  <div class="spacer"></div>
+  <button title="Settings">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4 15a2 2 0 1 1 0-4h.2A1.7 1.7 0 0 0 5.4 8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 11 4.1V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H22a2 2 0 1 1 0 4z"/></svg>
+  </button>
+  <div class="avatar">KA</div>
+</aside>
+
+<nav class="nav" aria-label="Operations">
+  <div class="workspace">
+    <div style="width:26px;height:26px;border-radius:7px;background:#1f2a18;color:var(--lime);display:grid;place-items:center;font-weight:800;font-size:12px">R</div>
+    <div><b>Richie Transport</b><span>Accra · 6 vehicles</span></div>
+  </div>
+
+  <div class="nav-group">
+    <p class="nav-label">Live</p>
+    <a href="#" aria-current="page"><span class="dot"></span>Operations board</a>
+    <a href="#"><span class="dot"></span>Run sheet <span class="count">12</span></a>
+    <a href="#"><span class="dot"></span>Dispatch <span class="count alert">3</span></a>
+  </div>
+  <div class="nav-group">
+    <p class="nav-label">Commercial</p>
+    <a href="#"><span class="dot"></span>Rentals <span class="count">4</span></a>
+    <a href="#"><span class="dot"></span>Clients</a>
+    <a href="#"><span class="dot"></span>Quotations</a>
+  </div>
+  <div class="nav-group">
+    <p class="nav-label">Fleet</p>
+    <a href="#"><span class="dot"></span>Vehicles</a>
+    <a href="#"><span class="dot"></span>Drivers</a>
+    <a href="#"><span class="dot"></span>Readiness <span class="count alert">2</span></a>
+    <a href="#"><span class="dot"></span>Compliance</a>
+  </div>
+  <div class="nav-group">
+    <p class="nav-label">Admin</p>
+    <a href="#"><span class="dot"></span>Settings</a>
+    <a href="#"><span class="dot"></span>Audit log</a>
+  </div>
+
+  <div class="nav-foot">
+    <a href="#"><span class="dot"></span>Jump to a screen <span class="count">⌘K</span></a>
+    <a href="#"><span class="dot"></span>Sign out</a>
+  </div>
+</nav>
+
+<main class="main">
+  <div class="topbar">
+    <div class="crumbs">Operations&nbsp; / &nbsp;<b>Live board</b></div>
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input placeholder="Search plates, routes, people" aria-label="Search">
+      <span class="kbd">⌘K</span>
+    </div>
+    <div class="live"><i></i> Live</div>
+    <button class="btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      New run
+    </button>
+  </div>
+
+  <div class="board">
+    <div class="board-head">
+      <div>
+        <h1>Thursday, 23 October</h1>
+        <p class="sub">12 runs today · 3 need a dispatcher · last update 4 seconds ago</p>
+      </div>
+      <div class="segments" role="group" aria-label="Period">
+        <button aria-pressed="true">Today</button>
+        <button aria-pressed="false">This week</button>
+        <button aria-pressed="false">Month</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="col">
+        <!-- KPI tiles -->
+        <div class="kpis">
+          <div class="kpi">
+            <p class="label">Runs today</p>
+            <p class="value"><b>12</b><span>/ 12 planned</span></p>
+            <div class="bars" aria-hidden="true">
+              <i style="height:40%"></i><i style="height:65%"></i><i class="hi" style="height:90%"></i>
+              <i style="height:70%"></i><i style="height:55%"></i><i style="height:80%"></i><i style="height:35%"></i>
+            </div>
+          </div>
+          <div class="kpi">
+            <p class="label">On time</p>
+            <p class="value"><b>92%</b><span>RPT-01</span></p>
+            <span class="delta">▲ 4 pts vs last week</span>
+          </div>
+          <div class="kpi">
+            <p class="label">Off the road</p>
+            <p class="value"><b>2</b><span>of 6 vehicles</span></p>
+            <span class="delta warn">1 awaiting workshop</span>
+          </div>
+          <div class="kpi">
+            <p class="label">Deposits held</p>
+            <p class="value"><b>GH₵ 4,800</b><span>2 rentals</span></p>
+            <div class="bars" aria-hidden="true">
+              <i style="height:30%"></i><i style="height:45%"></i><i style="height:60%"></i>
+              <i style="height:40%"></i><i class="hi" style="height:85%"></i><i style="height:50%"></i><i style="height:35%"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- run timeline -->
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Today's runs</h2>
+            <span class="hint">By vehicle · 05:00 → 19:00</span>
+            <div class="legend">
+              <span><i style="background:#2a4436"></i>done</span>
+              <span><i style="background:#3a3f66"></i>on the road</span>
+              <span><i style="background:#543a1c"></i>late</span>
+              <span><i style="background:#2b3341"></i>planned</span>
+            </div>
+          </div>
+          <div class="timeline">
+            <div class="tl-hours">
+              <span></span><span>05</span><span>06</span><span>07</span><span>08</span><span>09</span><span>10</span>
+              <span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span>
+            </div>
+            <div class="row">
+              <div class="unit"><b>GT 4821-26</b><small>Coaster</small></div>
+              <div class="track"><span class="bar done" style="left:6%;width:20%">Obuasi estate · 06:15</span></div>
+            </div>
+            <div class="row">
+              <div class="unit"><b>GE 1104-25</b><small>Coaster</small></div>
+              <div class="track"><span class="bar run" style="left:22%;width:26%">East Legon · 07:50</span><span class="now"></span></div>
+            </div>
+            <div class="row">
+              <div class="unit"><b>GW 7733-26</b><small>Sprinter</small></div>
+              <div class="track"><span class="bar late" style="left:12%;width:18%">Tema shuttle · 06:40</span><span class="bar plan" style="left:52%;width:19%">Harbour gate · 12:30</span></div>
+            </div>
+            <div class="row">
+              <div class="unit"><b>GR 2290-24</b><small>Sprinter</small></div>
+              <div class="track"><span class="bar plan" style="left:30%;width:15%">Airport run · 09:15</span></div>
+            </div>
+            <div class="row">
+              <div class="unit"><b>GT 0092-23</b><small>Coaster</small></div>
+              <div class="track"><span class="bar done" style="left:4%;width:16%">Adenta loop · 05:55</span><span class="bar plan" style="left:60%;width:22%">Adenta loop · 15:30</span></div>
+            </div>
+            <div class="row">
+              <div class="unit"><b>GS 5511-26</b><small>Bus</small></div>
+              <div class="track"><span class="bar plan" style="left:44%;width:24%">Staff charter · 10:40</span></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- exceptions table -->
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Needs a decision</h2>
+            <span class="hint">Nothing here is inferred — each line is a recorded fact</span>
+            <a class="more" href="#">Open register →</a>
+          </div>
+          <table>
+            <thead>
+              <tr><th>What</th><th>Record</th><th>Why it is here</th><th>Owner</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Licence expires in 22 days</b></td>
+                <td class="mono">Yaw Mensah · DL-339012</td>
+                <td><span class="pill warn"><i></i>Expiring</span></td>
+                <td>Dispatch</td>
+                <td class="rowlink">Review →</td>
+              </tr>
+              <tr>
+                <td><b>Service overdue</b></td>
+                <td class="mono">GW 7733-26 · 1,240 km past</td>
+                <td><span class="pill late"><i></i>Overdue</span></td>
+                <td>Workshop</td>
+                <td class="rowlink">Book →</td>
+              </tr>
+              <tr>
+                <td><b>Rental awaiting confirmation</b></td>
+                <td class="mono">RR-0004 · Tema Port</td>
+                <td><span class="pill info"><i></i>Quoted</span></td>
+                <td>Sales</td>
+                <td class="rowlink">Open →</td>
+              </tr>
+              <tr>
+                <td><b>Run not dispatched</b></td>
+                <td class="mono">TR-0009 · Adenta loop</td>
+                <td><span class="pill warn"><i></i>Planned</span></td>
+                <td>Dispatch</td>
+                <td class="rowlink">Dispatch →</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+
+      <!-- right column -->
+      <div class="col">
+        <section class="panel">
+          <div class="panel-head"><h2>Fleet readiness</h2><span class="more">Today</span></div>
+          <div class="gauge">
+            <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
+              <circle cx="48" cy="48" r="40" fill="none" stroke="#222834" stroke-width="9"/>
+              <circle cx="48" cy="48" r="40" fill="none" stroke="#c8f169" stroke-width="9"
+                      stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="83.8"
+                      transform="rotate(-90 48 48)"/>
+              <text x="48" y="53" text-anchor="middle" fill="#e9edf4" font-size="22" font-family="Inter,sans-serif" font-weight="650">4/6</text>
+            </svg>
+            <div>
+              <p class="num">67%</p>
+              <p class="cap">roadworthy right now</p>
+              <p class="cap" style="margin-top:8px">2 in the workshop · 1 due service</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Needs attention</h2><span class="more">4</span></div>
+          <div class="stack">
+            <div class="task"><span class="sev red"></span><div><b>1 licence expired</b><small>Kofi Boateng · 12 Oct</small></div><span class="go">›</span></div>
+            <div class="task"><span class="sev"></span><div><b>2 services due</b><small>Within 500 km of interval</small></div><span class="go">›</span></div>
+            <div class="task"><span class="sev blue"></span><div><b>1 rental unconfirmed</b><small>Quoted 3 days ago</small></div><span class="go">›</span></div>
+            <div class="task"><span class="sev"></span><div><b>1 run not dispatched</b><small>Leaves in 40 minutes</small></div><span class="go">›</span></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Activity</h2><span class="more">Live</span></div>
+          <div class="feed">
+            <div><i>KA</i><span><b>Kwesi</b> dispatched TR-0007</span><time>09:41</time></div>
+            <div><i>AM</i><span><b>Ama</b> confirmed RR-0003</span><time>09:28</time></div>
+            <div><i>KB</i><span><b>Kofi</b> recorded stop 2 of 3</span><time>09:12</time></div>
+            <div><i>AM</i><span><b>Ama</b> raised WO-0002</span><time>08:55</time></div>
+            <div><i>SY</i><span><b>System</b> vehicle taken off the road</span><time>08:54</time></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

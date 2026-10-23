@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E · Daylight — light operations SaaS</title>
+<style>
+  /* ============================================================================================
+     E · DAYLIGHT
+     The modern light SaaS shell: a white sidebar with grouped destinations and count badges, a
+     canvas of one soft shadow level, cards at 14px radius, and a single indigo accent. Everything
+     is separated by 1px borders and 8px rhythm rather than by boxes inside boxes. Charts are
+     small and honest: bars with a labelled axis, a donut with a legend, a sparkline.
+     ============================================================================================ */
+  :root{
+    --canvas:#f5f6f9; --card:#ffffff; --card-2:#fafbfc;
+    --line:#e7e9ef; --line-2:#dfe3ea;
+    --ink:#0f172a; --ink-2:#3d4759; --muted:#697386;
+    --accent:#4453f0; --accent-soft:#eef0ff; --accent-2:#7b89ff;
+    --green:#0f9d63; --green-soft:#e8f7f0;
+    --amber:#b8730b; --amber-soft:#fdf3e3;
+    --red:#d92d20; --red-soft:#fdecea;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 12px 32px -20px rgba(16,24,40,.28);
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--canvas);color:var(--ink);font:13px/1.55 var(--sans);
+       -webkit-font-smoothing:antialiased;display:flex;min-width:1080px}
+  a{color:inherit;text-decoration:none}
+  svg{display:block}
+
+  /* ---------- sidebar ---------- */
+  .side{width:252px;flex:0 0 252px;background:var(--card);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;padding:18px 14px;gap:20px}
+  .brand{display:flex;align-items:center;gap:10px;padding:2px 4px 0}
+  .brand .mark{width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;
+               place-items:center;font-weight:800;font-size:15px;box-shadow:0 6px 16px -8px rgba(68,83,240,.9)}
+  .brand b{display:block;font-size:13.5px;letter-spacing:-.01em}
+  .brand span{display:block;font-size:10.5px;color:var(--muted)}
+  .switcher{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;
+            padding:8px 10px;background:var(--card-2);font-size:11.5px;color:var(--ink-2)}
+  .switcher .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+  .switcher .chev{margin-left:auto;color:var(--muted)}
+  .group{display:flex;flex-direction:column;gap:1px}
+  .group p{margin:0 0 6px;padding:0 8px;font-size:10px;font-weight:700;letter-spacing:.1em;
+           text-transform:uppercase;color:#98a1b0}
+  .group a{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:9px;color:var(--ink-2);font-size:12.5px}
+  .group a:hover{background:#f4f5f9;color:var(--ink)}
+  .group a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .group a[aria-current="page"] .ico{color:var(--accent)}
+  .ico{width:16px;height:16px;color:#8b95a5;flex:0 0 auto}
+  .badge{margin-left:auto;font:600 10px/1 var(--sans);padding:3px 6px;border-radius:20px;
+         background:#eef0f4;color:var(--ink-2)}
+  .badge.warn{background:var(--amber-soft);color:var(--amber)}
+  .badge.hot{background:var(--red-soft);color:var(--red)}
+  .side-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;display:flex;align-items:center;gap:9px}
+  .avatar{width:30px;height:30px;border-radius:50%;background:#e9ecf5;color:#3d4759;display:grid;place-items:center;
+          font-size:11px;font-weight:700;flex:0 0 auto}
+  .side-foot b{display:block;font-size:11.5px}
+  .side-foot small{display:block;color:var(--muted);font-size:10.5px}
+
+  /* ---------- main ---------- */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .top{display:flex;align-items:center;gap:12px;padding:14px 26px;background:var(--card);
+       border-bottom:1px solid var(--line)}
+  .crumbs{font-size:12px;color:var(--muted)}
+  .crumbs b{color:var(--ink);font-weight:600}
+  .top .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .icon-btn{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:var(--card);
+            display:grid;place-items:center;color:var(--muted);cursor:pointer}
+  .icon-btn:hover{background:var(--card-2);color:var(--ink)}
+  .btn{display:inline-flex;align-items:center;gap:7px;border-radius:9px;padding:8px 13px;font:600 12px var(--sans);
+       border:1px solid var(--line-2);background:var(--card);color:var(--ink);cursor:pointer}
+  .btn:hover{background:var(--card-2)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;
+               box-shadow:0 8px 18px -12px rgba(68,83,240,.9)}
+  .btn.primary:hover{background:#3948e0}
+
+  .page{padding:22px 26px 30px;display:flex;flex-direction:column;gap:16px}
+  .page-head{display:flex;align-items:flex-start;gap:16px}
+  h1{margin:0;font-size:22px;letter-spacing:-.025em;font-weight:650}
+  .page-head p{margin:4px 0 0;color:var(--muted);font-size:12.5px}
+  .head-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .segment{display:flex;background:#eef0f5;border-radius:9px;padding:3px}
+  .segment button{border:0;background:transparent;font:600 11.5px var(--sans);color:var(--muted);
+                  padding:6px 11px;border-radius:7px;cursor:pointer}
+  .segment button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(16,24,40,.08)}
+
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+  .col{display:flex;flex-direction:column;gap:16px;min-width:0}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .card-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .card-head h2{margin:0;font-size:13px;font-weight:650;letter-spacing:-.01em}
+  .card-head .hint{color:var(--muted);font-size:11px}
+  .card-head .more{margin-left:auto;font-size:11.5px;color:var(--accent);font-weight:600}
+  .card-body{padding:16px}
+
+  /* stat cards */
+  .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:15px 16px}
+  .stat .top-row{display:flex;align-items:center;gap:8px}
+  .stat .label{font-size:11.5px;color:var(--muted);font-weight:500}
+  .stat .chip{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font:600 10.5px/1 var(--sans);
+              padding:4px 7px;border-radius:20px;background:var(--green-soft);color:var(--green)}
+  .stat .chip.warn{background:var(--amber-soft);color:var(--amber)}
+  .stat .chip.down{background:var(--red-soft);color:var(--red)}
+  .stat .big{margin:10px 0 0;font-size:27px;letter-spacing:-.035em;font-weight:650;display:flex;align-items:baseline;gap:6px}
+  .stat .big small{font-size:12px;color:var(--muted);font-weight:500;letter-spacing:0}
+  .stat .foot{margin:6px 0 0;font-size:11px;color:var(--muted)}
+  .spark{display:flex;align-items:flex-end;gap:3px;height:24px;margin-top:10px}
+  .spark i{flex:1;border-radius:3px 3px 1px 1px;background:#e6e9f2}
+  .spark i.hi{background:var(--accent)}
+
+  /* timeline */
+  .tl{padding:0 16px 14px}
+  .tl-head{display:grid;grid-template-columns:158px repeat(12,1fr);padding:12px 0 8px;
+           font:10px/1 var(--sans);color:#98a1b0;font-weight:600}
+  .tl-head span:not(:first-child){text-align:center}
+  .tl-row{display:grid;grid-template-columns:158px repeat(12,1fr);align-items:center;height:44px;
+          border-top:1px solid #f0f2f6}
+  .who{display:flex;align-items:center;gap:8px;min-width:0}
+  .who .plate{font:600 11px/1 var(--mono);background:#f2f4f9;border-radius:6px;padding:4px 6px;color:var(--ink-2)}
+  .who small{color:var(--muted);font-size:10.5px;white-space:nowrap}
+  .lane{grid-column:2 / -1;position:relative;height:24px;border-radius:6px;
+        background:repeating-linear-gradient(90deg,#f6f7fb 0 calc(100%/12 - 6px),transparent calc(100%/12 - 6px) calc(100%/12))}
+  .blk{position:absolute;top:2px;height:20px;border-radius:6px;font:600 10px/20px var(--sans);
+       padding:0 8px;white-space:nowrap;overflow:hidden}
+  .blk.a{background:#eef0ff;color:#3a48d6;box-shadow:inset 0 0 0 1px #dfe3ff}
+  .blk.b{background:#e8f7f0;color:#0b7d4e;box-shadow:inset 0 0 0 1px #cfeedd}
+  .blk.c{background:#fdf3e3;color:#8a5a08;box-shadow:inset 0 0 0 1px #f6e3c4}
+  .blk.d{background:#f2f4f9;color:#5b667a;box-shadow:inset 0 0 0 1px #e4e8f0}
+  .nowline{position:absolute;top:-6px;bottom:-6px;width:2px;border-radius:2px;background:var(--accent);left:46%}
+  .nowline::after{content:"";position:absolute;top:-3px;left:-3px;width:8px;height:8px;border-radius:50%;
+                  background:var(--accent);box-shadow:0 0 0 3px #eef0ff}
+
+  /* table */
+  table{width:100%;border-collapse:collapse}
+  th{font:600 10.5px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:#98a1b0;
+     text-align:left;padding:0 14px 10px}
+  td{padding:11px 14px;border-top:1px solid #f0f2f6;font-size:12.5px;color:var(--ink-2);vertical-align:middle}
+  tr:hover td{background:#fafbfd}
+  td b{color:var(--ink);font-weight:600}
+  .pill{display:inline-flex;align-items:center;gap:6px;font:600 10.5px/1 var(--sans);padding:5px 9px;border-radius:20px}
+  .pill i{width:5px;height:5px;border-radius:50%}
+  .pill.ok{background:var(--green-soft);color:var(--green)}.pill.ok i{background:var(--green)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}.pill.warn i{background:var(--amber)}
+  .pill.bad{background:var(--red-soft);color:var(--red)}.pill.bad i{background:var(--red)}
+  .pill.info{background:var(--accent-soft);color:var(--accent)}.pill.info i{background:var(--accent)}
+  .who-cell{display:flex;align-items:center;gap:9px}
+  .who-cell .avatar{width:26px;height:26px;font-size:10px}
+  .mono{font:11.5px var(--mono);color:var(--muted)}
+  .link{color:var(--accent);font-weight:600;font-size:11.5px}
+
+  /* right rail */
+  .donut{display:flex;align-items:center;gap:16px}
+  .donut .legend{display:flex;flex-direction:column;gap:7px;font-size:11.5px;color:var(--ink-2)}
+  .donut .legend span{display:flex;align-items:center;gap:7px}
+  .donut .legend i{width:8px;height:8px;border-radius:3px}
+  .donut .legend b{margin-left:auto;font:600 11.5px var(--mono);color:var(--ink)}
+  .checklist{display:flex;flex-direction:column}
+  .check{display:flex;gap:10px;padding:10px 0;border-top:1px solid #f0f2f6;align-items:flex-start}
+  .check:first-child{border-top:0;padding-top:0}
+  .check .box{width:16px;height:16px;border-radius:5px;border:1.5px solid #cfd5e0;flex:0 0 auto;margin-top:1px}
+  .check b{display:block;font-size:12px;font-weight:600}
+  .check small{display:block;color:var(--muted);font-size:10.5px}
+  .check .when{margin-left:auto;font:10.5px/1.6 var(--mono);color:var(--muted);flex:0 0 auto}
+  .quick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .quick a{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:10px;
+           padding:10px;font-size:11.5px;font-weight:600;color:var(--ink-2);background:var(--card-2)}
+  .quick a:hover{border-color:#cfd6ff;background:var(--accent-soft);color:var(--accent)}
+</style>
+</head>
+<body>
+
+<aside class="side" aria-label="Navigation">
+  <div class="brand">
+    <div class="mark">R</div>
+    <div><b>Richie TMS</b><span>Transport operations</span></div>
+  </div>
+
+  <div class="switcher"><span class="dot"></span> Accra HQ · live <span class="chev">⌄</span></div>
+
+  <div class="group">
+    <p>Operations</p>
+    <a href="#" aria-current="page">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>
+      Overview</a>
+    <a href="#">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17h3.5l2-6.5H17"/><circle cx="6" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/><path d="M3 7h6"/></svg>
+      Run sheet <span class="badge">12</span></a>
+    <a href="#">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="3.5"/></svg>
+      Dispatch <span class="badge hot">3</span></a>
+    <a href="#">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
+      Bookings</a>
+  </div>
+
+  <div class="group">
+    <p>Commercial</p>
+    <a href="#">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="12" rx="2"/><path d="M9 7V5h6v2"/></svg>
+      Rentals <span class="badge warn">4</span></a>
+    <a href="#">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c.7-3.6 3.4-5.4 7-5.4S18.3 16.4 19 20"/></svg>
+      Clients</a>
+    <a href="#">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg>
+      Quotations</a>
+  </div>
+
+  <div class="group">
+    <p>Fleet</p>
+    <a href="#">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="9" rx="2"/><path d="M7 16v3M17 16v3"/></svg>
+      Vehicles</a>
+    <a href="#">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="9" r="3.2"/><path d="M3.5 20c.6-3.4 2.9-5 5.5-5s4.9 1.6 5.5 5"/></svg>
+      Drivers</a>
+    <a href="#">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 4v6c0 4.2-3.2 7-8 8-4.8-1-8-3.8-8-8V7z"/><path d="m9 12 2 2 4-4"/></svg>
+      Readiness <span class="badge warn">2</span></a>
+  </div>
+
+  <div class="side-foot">
+    <div class="avatar">AM</div>
+    <div><b>Ama Mensah</b><small>Administrator</small></div>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="top">
+    <div class="crumbs">Operations&nbsp;/&nbsp;<b>Overview</b></div>
+    <div class="right">
+      <button class="icon-btn" title="Search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      </button>
+      <button class="icon-btn" title="Alerts" style="position:relative">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9Z"/><path d="M10 18a2 2 0 0 0 4 0"/></svg>
+        <span style="position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:#d92d20;border:2px solid #fff"></span>
+      </button>
+      <button class="btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        New
+      </button>
+      <button class="btn primary">Create rental</button>
+    </div>
+  </header>
+
+  <div class="page">
+    <div class="page-head">
+      <div>
+        <h1>Good morning, Ama</h1>
+        <p>Thursday 23 October · 12 runs today · 3 things need a dispatcher</p>
+      </div>
+      <div class="head-actions">
+        <div class="segment" role="group" aria-label="Period">
+          <button aria-pressed="true">Today</button>
+          <button aria-pressed="false">7 days</button>
+          <button aria-pressed="false">30 days</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="top-row"><span class="label">Runs today</span><span class="chip">▲ 2 vs Tue</span></div>
+        <p class="big">12 <small>of 12 planned</small></p>
+        <p class="foot">9 dispatched · 3 waiting</p>
+        <div class="spark" aria-hidden="true"><i style="height:40%"></i><i style="height:62%"></i><i style="height:48%"></i><i class="hi" style="height:92%"></i><i style="height:70%"></i><i style="height:54%"></i><i style="height:66%"></i></div>
+      </div>
+      <div class="stat">
+        <div class="top-row"><span class="label">On time</span><span class="chip">▲ 4 pts</span></div>
+        <p class="big">92% <small>RPT-01</small></p>
+        <p class="foot">11 of 12 within 10 min</p>
+        <div class="spark" aria-hidden="true"><i style="height:55%"></i><i style="height:60%"></i><i style="height:72%"></i><i style="height:66%"></i><i class="hi" style="height:88%"></i><i style="height:80%"></i><i style="height:76%"></i></div>
+      </div>
+      <div class="stat">
+        <div class="top-row"><span class="label">Available fleet</span><span class="chip warn">2 off road</span></div>
+        <p class="big">4 <small>of 6 vehicles</small></p>
+        <p class="foot">1 service overdue · 1 in workshop</p>
+        <div class="spark" aria-hidden="true"><i style="height:86%"></i><i style="height:80%"></i><i style="height:62%"></i><i style="height:70%"></i><i style="height:58%"></i><i class="hi" style="height:46%"></i><i style="height:52%"></i></div>
+      </div>
+      <div class="stat">
+        <div class="top-row"><span class="label">Deposits held</span><span class="chip">GH₵</span></div>
+        <p class="big">4,800 <small>2 active rentals</small></p>
+        <p class="foot">Billed to date GH₵ 18,200</p>
+        <div class="spark" aria-hidden="true"><i style="height:34%"></i><i style="height:46%"></i><i style="height:42%"></i><i style="height:58%"></i><i style="height:52%"></i><i style="height:74%"></i><i class="hi" style="height:88%"></i></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="col">
+        <section class="card">
+          <div class="card-head">
+            <h2>Today's runs</h2>
+            <span class="hint">vehicle · 05:00 → 17:00</span>
+            <a class="more" href="#">Open run sheet →</a>
+          </div>
+          <div class="tl">
+            <div class="tl-head">
+              <span></span><span>05</span><span>06</span><span>07</span><span>08</span><span>09</span><span>10</span>
+              <span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span>
+            </div>
+            <div class="tl-row">
+              <div class="who"><span class="plate">GT 4821</span><small>Coaster</small></div>
+              <div class="lane"><span class="blk b" style="left:5%;width:20%">06:15 Obuasi</span></div>
+            </div>
+            <div class="tl-row">
+              <div class="who"><span class="plate">GE 1104</span><small>Coaster</small></div>
+              <div class="lane"><span class="blk a" style="left:26%;width:24%">07:40 East Legon</span><span class="nowline"></span></div>
+            </div>
+            <div class="tl-row">
+              <div class="who"><span class="plate">GW 7733</span><small>Sprinter</small></div>
+              <div class="lane"><span class="blk c" style="left:12%;width:16%">06:40 Tema</span><span class="blk d" style="left:56%;width:20%">12:30 Harbour</span></div>
+            </div>
+            <div class="tl-row">
+              <div class="who"><span class="plate">GR 2290</span><small>Sprinter</small></div>
+              <div class="lane"><span class="blk d" style="left:33%;width:15%">09:15 Airport</span></div>
+            </div>
+            <div class="tl-row">
+              <div class="who"><span class="plate">GT 0092</span><small>Coaster</small></div>
+              <div class="lane"><span class="blk b" style="left:3%;width:15%">05:55 Adenta</span><span class="blk d" style="left:66%;width:20%">15:30 Adenta</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Rental requests</h2>
+            <span class="hint">4 open</span>
+            <a class="more" href="#">View all →</a>
+          </div>
+          <div class="card-body" style="padding:6px 2px 4px">
+            <table>
+              <thead>
+                <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Value</th><th>State</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">RR-0004</td>
+                  <td><div class="who-cell"><div class="avatar">TP</div><div><b>Tema Port Authority</b><br><span class="mono">Tema</span></div></div></td>
+                  <td>23 – 24 Oct</td>
+                  <td><b>GH₵ 3,200</b></td>
+                  <td><span class="pill info"><i></i>Quoted</span></td>
+                  <td><a class="link" href="#">Open</a></td>
+                </tr>
+                <tr>
+                  <td class="mono">RR-0003</td>
+                  <td><div class="who-cell"><div class="avatar">AG</div><div><b>Ashanti Goldfields</b><br><span class="mono">Obuasi</span></div></div></td>
+                  <td>24 – 26 Oct</td>
+                  <td><b>GH₵ 6,400</b></td>
+                  <td><span class="pill ok"><i></i>Confirmed</span></td>
+                  <td><a class="link" href="#">Open</a></td>
+                </tr>
+                <tr>
+                  <td class="mono">RR-0002</td>
+                  <td><div class="who-cell"><div class="avatar">KL</div><div><b>Karpow Logistics</b><br><span class="mono">Accra</span></div></div></td>
+                  <td>21 – 21 Oct</td>
+                  <td><b>GH₵ 1,800</b></td>
+                  <td><span class="pill warn"><i></i>Deposit due</span></td>
+                  <td><a class="link" href="#">Open</a></td>
+                </tr>
+                <tr>
+                  <td class="mono">RR-0001</td>
+                  <td><div class="who-cell"><div class="avatar">SA</div><div><b>St. Andrews School</b><br><span class="mono">Adenta</span></div></div></td>
+                  <td>19 – 19 Oct</td>
+                  <td><b>GH₵ 950</b></td>
+                  <td><span class="pill bad"><i></i>Declined</span></td>
+                  <td><a class="link" href="#">Open</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card">
+          <div class="card-head"><h2>Fleet readiness</h2><span class="hint">now</span></div>
+          <div class="card-body">
+            <div class="donut">
+              <svg width="104" height="104" viewBox="0 0 104 104" aria-hidden="true">
+                <circle cx="52" cy="52" r="40" fill="none" stroke="#eef0f5" stroke-width="14"/>
+                <circle cx="52" cy="52" r="40" fill="none" stroke="#0f9d63" stroke-width="14"
+                        stroke-dasharray="251.3" stroke-dashoffset="83.8" stroke-linecap="round"
+                        transform="rotate(-90 52 52)"/>
+                <text x="52" y="50" text-anchor="middle" fill="#0f172a" font-size="20" font-weight="650"
+                      font-family="Inter,system-ui,sans-serif">4/6</text>
+                <text x="52" y="66" text-anchor="middle" fill="#697386" font-size="9.5"
+                      font-family="Inter,system-ui,sans-serif">roadworthy</text>
+              </svg>
+              <div class="legend">
+                <span><i style="background:#0f9d63"></i>Available <b>4</b></span>
+                <span><i style="background:#b8730b"></i>In workshop <b>1</b></span>
+                <span><i style="background:#d92d20"></i>Off road <b>1</b></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>Due this week</h2><span class="more">3 items</span></div>
+          <div class="card-body">
+            <div class="checklist">
+              <div class="check"><span class="box"></span><div><b>Kofi Boateng — licence</b><small>Expired 12 Oct · cannot be dispatched</small></div><span class="when">overdue</span></div>
+              <div class="check"><span class="box"></span><div><b>GW 7733-26 — service</b><small>1,240 km past the interval</small></div><span class="when">overdue</span></div>
+              <div class="check"><span class="box"></span><div><b>Yaw Mensah — licence</b><small>Expires 14 Nov</small></div><span class="when">22d</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>Quick actions</h2></div>
+          <div class="card-body">
+            <div class="quick">
+              <a href="#">＋ Log a run</a>
+              <a href="#">＋ New rental</a>
+              <a href="#">＋ Odometer</a>
+              <a href="#">＋ Record cost</a>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>
