@@ -142,7 +142,10 @@ export type Command =
   | { type: "complete_rental"; id: string; input: QuoteInput }
   | { type: "decline_rental"; id: string; reason: string }
   | { type: "cancel_rental"; id: string; reason: string }
-  | { type: "import_backup"; database: Database };
+  | { type: "import_backup"; database: Database }
+  // Recording the export is what makes data leaving the system visible in the audit log.
+  // The export itself stays client-side (it is a serialisation of the local database).
+  | { type: "record_backup_export" };
 
 export type Failure = { ok: false; message: string; errors: Record<string, string> };
 export type Success = { ok: true; db: Database; message: string };
@@ -223,6 +226,11 @@ export function authorise(actor: Actor | null, permission: Permission): Failure 
   return null;
 }
 
+// The audit log is held in browser storage and rewritten in full on every command, so it must
+// have a ceiling. At this size the persisted snapshot stays well inside a 5 MB origin quota;
+// older entries leave through the audited backup export, not by being silently dropped.
+export const AUDIT_LIMIT = 5_000;
+
 export function audit(
   db: Database,
   actor: Actor | null,
@@ -236,7 +244,7 @@ export function audit(
     actorName: actor?.fullName ?? "System",
     ...entry,
   };
-  return { ...db, audit: [record, ...db.audit] };
+  return { ...db, audit: [record, ...db.audit].slice(0, AUDIT_LIMIT) };
 }
 
 // ---------- validators ----------
@@ -984,6 +992,18 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         summary: `${updated.reference} ${target}. Reason: ${command.reason.trim()}`,
       }, now);
       return { ok: true, db: next, message: `${updated.reference} ${target}.` };
+    }
+
+    case "record_backup_export": {
+      const denied = authorise(actor, "backup:export");
+      if (denied) return denied;
+      const next = audit(db, actor, {
+        action: "backup:export",
+        entity: "database",
+        entityId: "database",
+        summary: `Exported a full backup: ${db.users.length} users, ${db.vehicles.length} vehicles, ${db.drivers.length} drivers, ${db.clients.length} clients, ${db.rentals.length} rentals, ${db.passengers.length} passengers.`,
+      }, now);
+      return { ok: true, db: next, message: "Backup export recorded." };
     }
 
     case "import_backup": {

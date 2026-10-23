@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { can } from "./permissions";
 import { hashPassword } from "./crypto";
-import { execute, type Actor, type Credential } from "./service";
+import { AUDIT_LIMIT, audit, execute, type Actor, type Credential } from "./service";
 import { emptyDatabase, type Database } from "./types";
 
 const NOW = "2026-01-15T08:00:00.000Z";
@@ -94,5 +94,32 @@ describe("backup import validation", () => {
 
   it("does not throw on a role the matrix does not know", () => {
     expect(can("superuser" as never, "users:read")).toBe(false);
+  });
+});
+
+// Regression tests for the audit-log fixes (audit finding H-03 / M-03).
+describe("audit log ceiling and audited exports", () => {
+  it("caps the audit log instead of growing until storage fails", () => {
+    let db = emptyDatabase();
+    const actor: Actor = { id: "u1", fullName: "Ada", role: "administrator" };
+    for (let i = 0; i < AUDIT_LIMIT + 25; i += 1) db = audit(db, actor, { action: "test", entity: "test", entityId: "test", summary: "tick" }, NOW);
+    expect(db.audit.length).toBe(AUDIT_LIMIT);
+  });
+
+  it("records an audit entry when a backup leaves the system", () => {
+    const { db, admin } = adminDb();
+    const res = execute(db, admin, { type: "record_backup_export" }, NOW);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.db.audit[0].action).toBe("backup:export");
+      expect(res.db.audit[0].actorId).toBe(admin.id);
+    }
+  });
+
+  it("refuses the export record for a role without backup:export", () => {
+    const { db } = adminDb();
+    const ops: Actor = { id: "u2", fullName: "Ops", role: "operations" };
+    const res = execute(db, ops, { type: "record_backup_export" }, NOW);
+    expect(res.ok).toBe(false);
   });
 });

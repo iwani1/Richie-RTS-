@@ -27,7 +27,7 @@ export interface Tms {
   signOut: () => void;
   setupAdministrator: (fullName: string, email: string, password: string) => Promise<CommandResult>;
   createCredential: (password: string) => Promise<{ ok: true; credential: { passwordHash: string; passwordSalt: string } } | { ok: false; error: string }>;
-  exportBackup: () => string;
+  exportBackup: () => string | null;
 }
 
 function loadDatabase(): Database {
@@ -174,7 +174,13 @@ export function useTmsState(): Tms {
 
   const allowed = useCallback((permission: Permission) => can(actor?.role, permission), [actor]);
 
-  const exportBackup = useCallback(() => JSON.stringify(dbRef.current, null, 2), []);
+  const exportBackup = useCallback(() => {
+    // Data egress is a permissioned, audited action, not a read. `backup:export` is what the
+    // service layer checks; the button gating in the UI is convenience, not the boundary.
+    const recorded = dispatch({ type: "record_backup_export" });
+    if (!recorded.ok) return null;
+    return JSON.stringify(dbRef.current, null, 2);
+  }, [dispatch]);
 
   return { db, actor, currentUser, storageError, flash, setFlash, allowed, dispatch, signIn, signOut, setupAdministrator, createCredential, exportBackup };
 }
