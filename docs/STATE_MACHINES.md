@@ -1,0 +1,118 @@
+# State machines
+
+Encoded and enforced in `src/tms/service.ts`. Each transition is authorised by a permission and written to the audit log. Illegal transitions are rejected server-side (here, service-side — see DECISIONS D-01).
+
+## Vehicle (`VEHICLE_TRANSITIONS`)
+
+| From | To | Actor permission | Preconditions |
+|---|---|---|---|
+| available | maintenance, out_of_service, retired | vehicles:transition | reason required |
+| maintenance | available, out_of_service, retired | vehicles:transition | reason required |
+| out_of_service | available, maintenance, retired | vehicles:transition | reason required |
+| retired | (none) | - | terminal |
+
+`in_service` is intentionally not a manual status; it is reserved for system-driven trip assignment in a later phase.
+
+## Rental (`RENTAL_TRANSITIONS`)
+
+| From | To | Actor permission | Preconditions |
+|---|---|---|---|
+| draft | quoted | rentals:quote | quoting settings configured (currency, pricing basis, deposit %, validity, >=1 payment method); >=1 valid line item |
+| draft | cancelled | rentals:cancel | reason required |
+| quoted | confirmed | rentals:confirm | quote not expired; deposit >= required; known payment method |
+| quoted | declined | rentals:quote | reason required |
+| quoted | cancelled | rentals:cancel | reason required |
+| confirmed | in_progress | rentals:dispatch | vehicle assigned; driver assigned if required |
+| confirmed | cancelled | rentals:cancel | reason required |
+| in_progress | completed | rentals:complete | >=1 valid final-invoice line item |
+| in_progress | cancelled | rentals:cancel | reason required |
+| completed / declined / cancelled | (none) | - | terminal |
+
+An expired quote can be renewed in place without changing rental status only when
+`settings.rental.requotePolicy = revise_in_place`. The old quote snapshot is appended to
+`quoteHistory` before the new snapshot becomes current. If policy is unset, renewal is blocked.
+If policy is `new_request`, the existing cancel-and-create flow must be used. A quote cannot be
+renewed before it expires. The new revision uses the configured pricing basis, deposit percent
+and validity currently in force (Q-46).
+
+Assignment (not a status change) requires `rentals:dispatch` and checks: vehicle category matches request; vehicle not retired/out_of_service; driver active with licence valid through the rental end date; and no overlapping confirmed/in-progress booking for the same vehicle or driver.
+
+## Trip (`TRIP_*` rules in `busing.ts`)
+
+| From | To | Actor permission | Preconditions |
+|---|---|---|---|
+| planned | planned (assign or reassign) | trips:assign | Vehicle in the route's category and Available; driver active with licence valid on the service date; no same-day time overlap for the vehicle or driver; no confirmed or in-progress rental covering the date |
+| planned | dispatched | trips:dispatch | Route is active; vehicle and driver assigned; the assignment checks above pass again |
+| dispatched | in_progress | trips:start | Route active; assigned resources still valid; own-record scope checked before state |
+| in_progress | in_progress (record next stop) | trips:record | Exactly the next route stop; actual HH:MM not before previous stop; one boarded/no-show outcome for every active passenger at that stop; no other passenger |
+| planned | cancelled | trips:cancel | Reason required |
+| dispatched | completed | trips:complete (own run only for a driver) | Full-form compatibility: actual time for every route stop; one outcome for every active passenger; threshold snapshot taken |
+| in_progress | completed | trips:complete (own run only for a driver) | Every stop and active passenger outcome already recorded progressively; replacement data is refused |
+| dispatched | cancelled | trips:cancel | Reason required |
+| completed / cancelled | (none) | - | Terminal; a completed stop log cannot be edited |
+
+Trips are created only by `generate_trips` (trips:generate), which creates planned trips for operating dates inside the route's date range. Existing trips for a route and date are never duplicated. `startedAt` is recorded on the dispatched -> in_progress transition.
+
+Mid-trip roster changes (Phase 11, D-40) are not a trip transition: while a trip is in
+progress, operations may add, move, or deactivate passengers only where no boarding outcome
+exists yet and the affected stop is still in the future on every in-progress trip on the route.
+Recorded stops and boarded passengers are immutable.
+
+## Route status (manual)
+
+| Status | Effect |
+|---|---|
+| active | Trips may be generated and dispatched |
+| suspended | Trips cannot be generated or dispatched. Existing planned trips are kept (Q-31) |
+| ended | Passengers cannot be assigned to it; no trips are generated |
+
+Stops, client and vehicle category are locked once any trip exists for the route (D-14).
+
+## Passenger status (manual)
+
+active or inactive. Only active passengers appear in a trip's roster, which is taken at completion. Inactive passengers are not expected to board.
+
+## Incident (`IN-*`, `INCIDENT_TRANSITIONS` in `logistics.ts`)
+
+| From | To | Permission | Preconditions |
+|---|---|---|---|
+| reported | acknowledged | incidents:advance | — |
+| acknowledged | responding | incidents:advance | A responder must be named for a breakdown |
+| responding | resolved | incidents:advance | Resolution note required; operator chooses the vehicle status afterwards |
+| resolved | closed | incidents:advance | Every linked work order must be closed |
+
+Type and severity are free choices from the configured lists. A breakdown, accident or damage
+report requires a vehicle; a safety concern or "other" does not. `takeVehicleOutOfService` is an
+operator choice recorded at report time and applied immediately. The report freezes once the
+incident is `responding`; corrections are appended to the response log. `closed` is terminal.
+
+## Work order (`WO-*`, `WORK_ORDER_TRANSITIONS` in `logistics.ts`)
+
+| From | To | Permission | Preconditions |
+|---|---|---|---|
+| open | in_progress | maintenance:advance | Vehicle moves to maintenance |
+| in_progress | on_hold | maintenance:advance | Hold reason required |
+| in_progress / on_hold | completed | maintenance:advance | Note required; cost position confirmed (recorded, or explicitly confirmed as none) |
+| completed | closed | maintenance:advance | Cost review note required; operator chooses the vehicle status, but "Available" is refused while another work order for that vehicle is active |
+
+`completed` and `closed` cannot be edited; further work needs a new work order. Costs can be
+added and removed until `closed`. `closed` is terminal. The vehicle cannot be set to `retired`
+here — that stays with the vehicle register.
+
+## Odometer reading (`fleet:*`, Phase 8)
+
+A reading is `current` or `void`. It becomes void only with a reason (`fleet:void`); voided
+readings stay in the audit trail and are excluded from every calculation. A new reading may not be
+lower than the newest current reading for that vehicle; correcting one means voiding the wrong
+entry first.
+
+## Service interval anchor (Phase 8)
+
+A work order becomes the "last service" for a vehicle only when it carries
+`resetsServiceInterval` and reaches `completed` (or is later closed). The flag is an operator
+choice recorded while the work order is still editable; `completedAt` is fixed at the completion
+transition. There is no transition that retroactively marks or unmarks a service.
+
+## Planned (not yet implemented)
+
+Quotation (as a standalone revisable document), booking vs trip split, contract and invoice state machines are Not Started.

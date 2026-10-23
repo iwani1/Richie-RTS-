@@ -1,0 +1,21 @@
+// Single entry point for every state-changing command. Routes to the core service
+// (Phases 1A/1B), the staff busing module (Phase 2), the staff logistics module
+// (Phase 3), the compliance documents module (Phase 6) or the maintenance/readiness
+// module (Phase 8). UI code calls executeCommand only.
+
+import { executeBusing, isBusingCommand, type BusingCommand } from "./busing";
+import { executeCompliance, isComplianceCommand, type ComplianceCommand } from "./compliance";
+import { executeLogistics, isLogisticsCommand, type LogisticsCommand } from "./logistics";
+import { executeMaintenance, isMaintenanceCommand, type MaintenanceCommand } from "./maintenance";
+import { execute, type Actor, type Command, type CommandResult } from "./service";
+import type { Database } from "./types";
+
+export type AnyCommand = Command | BusingCommand | LogisticsCommand | ComplianceCommand | MaintenanceCommand;
+
+export function executeCommand(db: Database, actor: Actor | null, command: AnyCommand, now?: string): CommandResult {
+  if (isBusingCommand(command)) return executeBusing(db, actor, command, now);
+  if (isLogisticsCommand(command)) return executeLogistics(db, actor, command, now);
+  if (isComplianceCommand(command)) return executeCompliance(db, actor, command, now);
+  if (isMaintenanceCommand(command)) return executeMaintenance(db, actor, command, now);
+  return execute(db, actor, command, now);
+}

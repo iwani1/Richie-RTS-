@@ -1,0 +1,48 @@
+# Quality gates on every push and pull request.
+#
+# These are the same four gates the standing brief (AGENTS.md §14) requires before any
+# change, run in the same order as `npm run check`. Nothing here depends on a database,
+# a server or a secret: the application is a static single-file build in this phase.
+#
+# HONEST LIMIT: this file was authored in an environment with no git remote and no CI
+# runner, so its execution has NOT been observed. The gates it invokes have each been run
+# locally and pass. Treat the first green run on the real repository as the verification.
+
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (exact lockfile)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

@@ -1,0 +1,483 @@
+import { describe, expect, it } from "vitest";
+import { can, ROLE_PERMISSIONS } from "./permissions";
+import { execute, VEHICLE_TRANSITIONS, type Actor, type Credential } from "./service";
+import { emptyDatabase, type Database } from "./types";
+
+const cred: Credential = { passwordHash: "hash", passwordSalt: "salt" };
+const NOW = "2026-01-01T00:00:00.000Z";
+
+function seeded(): { db: Database; admin: Actor; ops: Actor; finance: Actor } {
+  let db = emptyDatabase();
+  let r = execute(db, null, { type: "setup_administrator", input: { fullName: "Admin One", email: "admin@example.test" }, credential: cred }, NOW);
+  if (!r.ok) throw new Error(r.message);
+  db = r.db;
+  const admin: Actor = { id: db.users[0].id, fullName: "Admin One", role: "administrator" };
+  r = execute(db, admin, { type: "create_user", input: { fullName: "Ops", email: "ops@example.test", role: "operations", active: true }, credential: cred }, NOW);
+  if (!r.ok) throw new Error(r.message);
+  db = r.db;
+  r = execute(db, admin, { type: "create_user", input: { fullName: "Fin", email: "fin@example.test", role: "finance", active: true }, credential: cred }, NOW);
+  if (!r.ok) throw new Error(r.message);
+  db = r.db;
+  const ops: Actor = { id: db.users[1].id, fullName: "Ops", role: "operations" };
+  const finance: Actor = { id: db.users[2].id, fullName: "Fin", role: "finance" };
+  return { db, admin, ops, finance };
+}
+
+function withCategory(db: Database, admin: Actor): Database {
+  const r = execute(db, admin, { type: "update_settings", input: { ...db.settings, vehicleCategories: [{ id: "", name: "Minibus" }] } }, NOW);
+  if (!r.ok) throw new Error(r.message);
+  return r.db;
+}
+
+describe("permissions", () => {
+  it("administrator has every permission; record-bound roles get only their own-record set", () => {
+    expect(can("administrator", "settings:update")).toBe(true);
+    expect(ROLE_PERMISSIONS.driver).toEqual(["trips:read", "trips:start", "trips:record", "trips:complete", "incidents:read", "incidents:create", "documents:read"]);
+    expect(ROLE_PERMISSIONS.client_contact).toEqual(["routes:read", "passengers:read", "rentals:read", "rentals:create"]);
+    // Record-bound roles never reach internal administration.
+    expect(can("driver", "settings:update")).toBe(false);
+    expect(can("client_contact", "users:create")).toBe(false);
+    expect(can(null, "vehicles:read")).toBe(false);
+  });
+
+  it("finance cannot create vehicles; operations cannot change settings", () => {
+    const { db, ops, finance } = seeded();
+    const v = execute(db, finance, { type: "create_vehicle", input: { registration: "GT 1-26", categoryId: "x", make: "", model: "", seatCapacity: "14", notes: "" } }, NOW);
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.message).toMatch(/Not permitted/);
+    const s = execute(db, ops, { type: "update_settings", input: db.settings }, NOW);
+    expect(s.ok).toBe(false);
+  });
+});
+
+describe("setup and users", () => {
+  it("setup only works once and creates an administrator", () => {
+    const { db } = seeded();
+    expect(db.users[0].role).toBe("administrator");
+    const again = execute(db, null, { type: "setup_administrator", input: { fullName: "X", email: "x@example.test" }, credential: cred }, NOW);
+    expect(again.ok).toBe(false);
+  });
+
+  it("rejects duplicate emails and protects the last administrator", () => {
+    const { db, admin } = seeded();
+    const dup = execute(db, admin, { type: "create_user", input: { fullName: "Dup", email: "ADMIN@example.test", role: "finance", active: true }, credential: cred }, NOW);
+    expect(dup.ok).toBe(false);
+    if (!dup.ok) expect(dup.errors.email).toBeDefined();
+    const demote = execute(db, admin, { type: "update_user", id: admin.id, input: { fullName: "Admin One", email: "admin@example.test", role: "finance", active: true } }, NOW);
+    expect(demote.ok).toBe(false);
+    const deactivate = execute(db, admin, { type: "update_user", id: admin.id, input: { fullName: "Admin One", email: "admin@example.test", role: "administrator", active: false } }, NOW);
+    expect(deactivate.ok).toBe(false);
+  });
+});
+
+describe("settings", () => {
+  it("has no defaults and validates currency and categories", () => {
+    const { db, admin } = seeded();
+    expect(db.settings.currencyCode).toBeNull();
+    expect(db.settings.vehicleCategories).toHaveLength(0);
+    const bad = execute(db, admin, { type: "update_settings", input: { ...db.settings, currencyCode: "cedis", vehicleCategories: [{ id: "", name: "Bus" }, { id: "", name: "bus" }] } }, NOW);
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) {
+      expect(bad.errors.currencyCode).toBeDefined();
+      expect(bad.errors["vehicleCategories.1"]).toMatch(/Duplicate/);
+    }
+  });
+
+  it("refuses to remove a category in use", () => {
+    const { admin } = seeded();
+    let db = withCategory(seeded().db, admin);
+    const catId = db.settings.vehicleCategories[0].id;
+    const v = execute(db, admin, { type: "create_vehicle", input: { registration: "GT 1-26", categoryId: catId, make: "Toyota", model: "Hiace", seatCapacity: "14", notes: "" } }, NOW);
+    expect(v.ok).toBe(true);
+    if (v.ok) db = v.db;
+    const remove = execute(db, admin, { type: "update_settings", input: { ...db.settings, vehicleCategories: [] } }, NOW);
+    expect(remove.ok).toBe(false);
+    if (!remove.ok) expect(remove.errors.vehicleCategories).toMatch(/in use/);
+  });
+});
+
+describe("vehicles", () => {
+  it("is blocked until a category exists, then enforces unique registration and seat capacity", () => {
+    const { db, admin, ops } = seeded();
+    const blocked = execute(db, ops, { type: "create_vehicle", input: { registration: "GT 1-26", categoryId: "", make: "", model: "", seatCapacity: "14", notes: "" } }, NOW);
+    expect(blocked.ok).toBe(false);
+    if (!blocked.ok) expect(blocked.message).toMatch(/Blocked/);
+
+    let next = withCategory(db, admin);
+    const catId = next.settings.vehicleCategories[0].id;
+    const first = execute(next, ops, { type: "create_vehicle", input: { registration: "gt 1-26", categoryId: catId, make: "", model: "", seatCapacity: "14", notes: "" } }, NOW);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    next = first.db;
+    expect(next.vehicles[0].registration).toBe("GT 1-26");
+    expect(next.vehicles[0].status).toBe("available");
+    expect(next.audit[0].action).toBe("vehicles:create");
+
+    const dup = execute(next, ops, { type: "create_vehicle", input: { registration: "GT126", categoryId: catId, make: "", model: "", seatCapacity: "0", notes: "" } }, NOW);
+    expect(dup.ok).toBe(false);
+    if (!dup.ok) {
+      expect(dup.errors.registration).toMatch(/already exists/);
+      expect(dup.errors.seatCapacity).toBeDefined();
+    }
+  });
+
+  it("follows the state machine and requires a reason", () => {
+    const { db, admin, ops } = seeded();
+    let next = withCategory(db, admin);
+    const catId = next.settings.vehicleCategories[0].id;
+    const created = execute(next, ops, { type: "create_vehicle", input: { registration: "GT 2-26", categoryId: catId, make: "", model: "", seatCapacity: "30", notes: "" } }, NOW);
+    if (!created.ok) throw new Error(created.message);
+    next = created.db;
+    const id = next.vehicles[0].id;
+
+    const noReason = execute(next, ops, { type: "transition_vehicle", id, to: "maintenance", reason: "  " }, NOW);
+    expect(noReason.ok).toBe(false);
+
+    const toMaint = execute(next, ops, { type: "transition_vehicle", id, to: "maintenance", reason: "Brake pads" }, NOW);
+    expect(toMaint.ok).toBe(true);
+    if (!toMaint.ok) return;
+    next = toMaint.db;
+
+    const retire = execute(next, ops, { type: "transition_vehicle", id, to: "retired", reason: "Written off" }, NOW);
+    expect(retire.ok).toBe(true);
+    if (!retire.ok) return;
+    next = retire.db;
+    expect(VEHICLE_TRANSITIONS.retired).toHaveLength(0);
+    const revive = execute(next, ops, { type: "transition_vehicle", id, to: "available", reason: "Oops" }, NOW);
+    expect(revive.ok).toBe(false);
+  });
+});
+
+describe("drivers and clients", () => {
+  it("validates driver licence fields and uniqueness", () => {
+    const { db, ops } = seeded();
+    const bad = execute(db, ops, { type: "create_driver", input: { fullName: "", phone: "", licenceNumber: "", licenceExpiry: "2026-02-30", status: "active" } }, NOW);
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(Object.keys(bad.errors).sort()).toEqual(["fullName", "licenceExpiry", "licenceNumber", "phone"]);
+    const ok = execute(db, ops, { type: "create_driver", input: { fullName: "Kofi", phone: "024", licenceNumber: "abc123", licenceExpiry: "2027-05-01", status: "active" } }, NOW);
+    expect(ok.ok).toBe(true);
+    if (!ok.ok) return;
+    const dup = execute(ok.db, ops, { type: "create_driver", input: { fullName: "Ama", phone: "020", licenceNumber: "ABC123", licenceExpiry: "2027-05-01", status: "active" } }, NOW);
+    expect(dup.ok).toBe(false);
+  });
+
+  it("lets finance manage clients but not operations", () => {
+    const { db, ops, finance } = seeded();
+    const input = { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "bad-email", status: "active" as const };
+    const denied = execute(db, ops, { type: "create_client", input }, NOW);
+    expect(denied.ok).toBe(false);
+    const invalid = execute(db, finance, { type: "create_client", input }, NOW);
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) expect(invalid.errors.contactEmail).toBeDefined();
+    const ok = execute(db, finance, { type: "create_client", input: { ...input, contactEmail: "" } }, NOW);
+    expect(ok.ok).toBe(true);
+  });
+});
+
+describe("backup import", () => {
+  it("refuses backups that would lock out the importing administrator", () => {
+    const { db, admin } = seeded();
+    const foreign = emptyDatabase();
+    const r = execute(db, admin, { type: "import_backup", database: foreign }, NOW);
+    expect(r.ok).toBe(false);
+    const self = execute(db, admin, { type: "import_backup", database: db }, NOW);
+    expect(self.ok).toBe(true);
+  });
+});
+
+function rentalReady(): { db: Database; admin: Actor; ops: Actor; finance: Actor; catId: string } {
+  const { admin, ops, finance } = seeded();
+  let db = withCategory(seeded().db, admin);
+  const catId = db.settings.vehicleCategories[0].id;
+  const r = execute(db, admin, {
+    type: "update_settings",
+    input: { ...db.settings, currencyCode: "GHS", rental: { pricingBasis: "per_day", depositPercent: 25, quotationValidityDays: 7, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer", "Mobile money"], requotePolicy: null } },
+  }, NOW);
+  if (!r.ok) throw new Error(r.message);
+  db = r.db;
+  return { db, admin, ops, finance, catId };
+}
+
+function addVehicle(db: Database, admin: Actor, catId: string, reg: string): { db: Database; id: string } {
+  const r = execute(db, admin, { type: "create_vehicle", input: { registration: reg, categoryId: catId, make: "Toyota", model: "Coaster", seatCapacity: "30", notes: "" } }, NOW);
+  if (!r.ok) throw new Error(r.message);
+  return { db: r.db, id: r.db.vehicles[r.db.vehicles.length - 1].id };
+}
+
+const requestInput = (catId: string, start: string, end: string, driverRequired = false) => ({
+  type: "create_rental" as const,
+  input: {
+    clientId: null,
+    customerName: "Acme Ltd",
+    customerPhone: "024",
+    customerEmail: "ops@acme.test",
+    purpose: "Staff retreat",
+    pickupLocation: "Accra",
+    dropoffLocation: "Kumasi",
+    startDate: start,
+    endDate: end,
+    passengers: "25",
+    vehicleCategoryId: catId,
+    driverRequired,
+    notes: "",
+  },
+});
+
+describe("rentals - settings gates", () => {
+  it("blocks quoting until currency and rental settings are configured", () => {
+    const { admin } = seeded();
+    let db = withCategory(seeded().db, admin);
+    const catId = db.settings.vehicleCategories[0].id;
+    const created = execute(db, admin, requestInput(catId, "2026-03-01", "2026-03-03"), NOW);
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    db = created.db;
+    const id = db.rentals[0].id;
+    const quote = execute(db, admin, { type: "quote_rental", id, input: { lines: [{ description: "3 days", quantity: "3", unitAmount: "1000" }] } }, NOW);
+    expect(quote.ok).toBe(false);
+    if (!quote.ok) expect(quote.message).toMatch(/quotation settings are incomplete/i);
+  });
+
+  it("blocks rental creation when no categories exist", () => {
+    const { db, admin } = seeded();
+    const r = execute(db, admin, requestInput("nope", "2026-03-01", "2026-03-02"), NOW);
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("rentals - full lifecycle", () => {
+  it("runs request -> quote -> confirm -> assign -> start -> complete with computed deposit and audit", () => {
+    const base = rentalReady();
+    let db = base.db;
+    const { admin, catId } = base;
+    const v = addVehicle(db, admin, catId, "GT 100-26");
+    db = v.db;
+
+    const created = execute(db, admin, requestInput(catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    db = created.db;
+    const id = db.rentals[0].id;
+    expect(db.rentals[0].reference).toBe("RR-0001");
+    expect(db.rentals[0].status).toBe("draft");
+
+    const quote = execute(db, admin, { type: "quote_rental", id, input: { lines: [{ description: "3 days hire", quantity: "3", unitAmount: "1000" }, { description: "Fuel", quantity: "1", unitAmount: "500" }] } }, NOW);
+    if (!quote.ok) throw new Error(quote.message);
+    db = quote.db;
+    const rentalQuoted = db.rentals[0];
+    expect(rentalQuoted.status).toBe("quoted");
+    expect(rentalQuoted.quote?.subtotal).toBe(3500);
+    expect(rentalQuoted.quote?.depositRequired).toBe(875); // 25% of 3500
+    expect(rentalQuoted.quote?.validUntil).toBe("2026-01-08"); // NOW + 7 days
+
+    // deposit below required is rejected
+    const low = execute(db, admin, { type: "confirm_rental", id, input: { amount: "100", method: "Bank transfer", reference: "TX1" } }, NOW);
+    expect(low.ok).toBe(false);
+    // unknown method rejected
+    const badMethod = execute(db, admin, { type: "confirm_rental", id, input: { amount: "875", method: "Cash", reference: "" } }, NOW);
+    expect(badMethod.ok).toBe(false);
+
+    const confirm = execute(db, admin, { type: "confirm_rental", id, input: { amount: "875", method: "Bank transfer", reference: "TX1" } }, NOW);
+    if (!confirm.ok) throw new Error(confirm.message);
+    db = confirm.db;
+    expect(db.rentals[0].status).toBe("confirmed");
+
+    // cannot start before assignment
+    const earlyStart = execute(db, admin, { type: "start_rental", id }, NOW);
+    expect(earlyStart.ok).toBe(false);
+
+    const assign = execute(db, admin, { type: "assign_rental", id, input: { vehicleId: v.id, driverId: "" } }, NOW);
+    if (!assign.ok) throw new Error(assign.message);
+    db = assign.db;
+
+    const start = execute(db, admin, { type: "start_rental", id }, NOW);
+    if (!start.ok) throw new Error(start.message);
+    db = start.db;
+    expect(db.rentals[0].status).toBe("in_progress");
+
+    const complete = execute(db, admin, { type: "complete_rental", id, input: { lines: [{ description: "3 days hire", quantity: "3", unitAmount: "1000" }, { description: "Extra day", quantity: "1", unitAmount: "1000" }] } }, NOW);
+    if (!complete.ok) throw new Error(complete.message);
+    db = complete.db;
+    expect(db.rentals[0].status).toBe("completed");
+    expect(db.rentals[0].finalInvoice?.total).toBe(4000);
+    expect(db.audit.some((a) => a.action === "rentals:complete")).toBe(true);
+  });
+
+  it("prevents double-booking a vehicle over overlapping dates", () => {
+    const base = rentalReady();
+    let db = base.db;
+    const { admin, catId } = base;
+    const v = addVehicle(db, admin, catId, "GT 200-26");
+    db = v.db;
+
+    // First rental assigned for 1-5 March
+    const mkConfirmedAssigned = (start: string, end: string) => {
+      const c = execute(db, admin, requestInput(catId, start, end), NOW);
+      if (!c.ok) throw new Error(c.message);
+      db = c.db;
+      const id = db.rentals[db.rentals.length - 1].id;
+      const q = execute(db, admin, { type: "quote_rental", id, input: { lines: [{ description: "hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
+      if (!q.ok) throw new Error(q.message);
+      db = q.db;
+      const cf = execute(db, admin, { type: "confirm_rental", id, input: { amount: "1000", method: "Mobile money", reference: "" } }, NOW);
+      if (!cf.ok) throw new Error(cf.message);
+      db = cf.db;
+      return id;
+    };
+
+    const first = mkConfirmedAssigned("2026-03-01", "2026-03-05");
+    const a1 = execute(db, admin, { type: "assign_rental", id: first, input: { vehicleId: v.id, driverId: "" } }, NOW);
+    if (!a1.ok) throw new Error(a1.message);
+    db = a1.db;
+
+    const second = mkConfirmedAssigned("2026-03-04", "2026-03-08");
+    const clash = execute(db, admin, { type: "assign_rental", id: second, input: { vehicleId: v.id, driverId: "" } }, NOW);
+    expect(clash.ok).toBe(false);
+    if (!clash.ok) expect(clash.errors.vehicleId).toMatch(/already assigned/);
+  });
+
+  it("requires a driver when the request demands one, and rejects expired licences", () => {
+    const base = rentalReady();
+    let db = base.db;
+    const { admin, catId } = base;
+    const v = addVehicle(db, admin, catId, "GT 300-26");
+    db = v.db;
+    // driver whose licence expires before rental end
+    const expiring = execute(db, admin, { type: "create_driver", input: { fullName: "Old Licence", phone: "020", licenceNumber: "EXP1", licenceExpiry: "2026-03-02", status: "active" } }, NOW);
+    if (!expiring.ok) throw new Error(expiring.message);
+    db = expiring.db;
+    const driverId = db.drivers[0].id;
+
+    const created = execute(db, admin, requestInput(catId, "2026-03-01", "2026-03-10", true), NOW);
+    if (!created.ok) throw new Error(created.message);
+    db = created.db;
+    const id = db.rentals[0].id;
+    const q = execute(db, admin, { type: "quote_rental", id, input: { lines: [{ description: "hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
+    if (!q.ok) throw new Error(q.message);
+    db = q.db;
+    const cf = execute(db, admin, { type: "confirm_rental", id, input: { amount: "1000", method: "Bank transfer", reference: "" } }, NOW);
+    if (!cf.ok) throw new Error(cf.message);
+    db = cf.db;
+
+    const noDriver = execute(db, admin, { type: "assign_rental", id, input: { vehicleId: v.id, driverId: "" } }, NOW);
+    expect(noDriver.ok).toBe(false);
+    const expiredLic = execute(db, admin, { type: "assign_rental", id, input: { vehicleId: v.id, driverId } }, NOW);
+    expect(expiredLic.ok).toBe(false);
+    if (!expiredLic.ok) expect(expiredLic.errors.driverId).toMatch(/licence expires/i);
+  });
+
+  it("migrates a schema-1 backup (no rentals) on import", () => {
+    const { db, admin } = seeded();
+    const legacy = { ...db, schemaVersion: 1 } as unknown as Database;
+    delete (legacy as unknown as Record<string, unknown>).rentals;
+    const r = execute(db, admin, { type: "import_backup", database: legacy }, NOW);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(Array.isArray(r.db.rentals)).toBe(true);
+  });
+
+  it("blocks expired-quote renewal when Q-24 policy is not configured", () => {
+    const { db, admin } = rentalReady();
+    const catId = db.settings.vehicleCategories[0].id;
+    const created = execute(db, admin, requestInput(catId, "2026-03-01", "2026-03-02"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const quoted = execute(created.db, admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
+    if (!quoted.ok) throw new Error(quoted.message);
+    const expiredAt = "2026-01-10T00:00:00.000Z";
+
+    const notExpired = execute(quoted.db, admin, { type: "requote_rental", id, input: { lines: [{ description: "New hire", quantity: "1", unitAmount: "1200" }] } }, "2026-01-05T00:00:00.000Z");
+    expect(notExpired.ok).toBe(false);
+    if (!notExpired.ok) expect(notExpired.message).toMatch(/not expired yet/);
+
+    const blocked = execute(quoted.db, admin, { type: "requote_rental", id, input: { lines: [{ description: "New hire", quantity: "1", unitAmount: "1200" }] } }, expiredAt);
+    expect(blocked.ok).toBe(false);
+    if (!blocked.ok) expect(blocked.message).toMatch(/policy in Settings/);
+    expect(quoted.db.rentals[0].quoteHistory).toEqual([]);
+  });
+
+  it("honours the cancel-and-reraise policy without mutating the expired quote", () => {
+    const { db: startingDb, admin } = rentalReady();
+    let db = startingDb;
+    const settings = execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: { ...db.settings.rental, requotePolicy: "new_request" } } }, NOW);
+    if (!settings.ok) throw new Error(settings.message);
+    db = settings.db;
+    const catId = db.settings.vehicleCategories[0].id;
+    const created = execute(db, admin, requestInput(catId, "2026-03-01", "2026-03-02"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const quoted = execute(created.db, admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
+    if (!quoted.ok) throw new Error(quoted.message);
+    const quoteBefore = quoted.db.rentals[0].quote;
+
+    const renewal = execute(quoted.db, admin, { type: "requote_rental", id, input: { lines: [{ description: "Replacement", quantity: "1", unitAmount: "1200" }] } }, "2026-01-10T00:00:00.000Z");
+    expect(renewal.ok).toBe(false);
+    if (!renewal.ok) expect(renewal.message).toMatch(/new request/);
+    expect(quoted.db.rentals[0].quote).toEqual(quoteBefore);
+    expect(quoted.db.rentals[0].status).toBe("quoted");
+
+    const cancelled = execute(quoted.db, admin, { type: "cancel_rental", id, reason: "Expired quote; new request required by policy." }, "2026-01-10T00:00:00.000Z");
+    expect(cancelled.ok).toBe(true);
+    if (cancelled.ok) expect(cancelled.db.rentals[0].status).toBe("cancelled");
+  });
+
+  it("revises only an expired quote in place and preserves each immutable quote snapshot", () => {
+    const { db: startingDb, admin } = rentalReady();
+    let db = startingDb;
+    const settings = execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: { ...db.settings.rental, requotePolicy: "revise_in_place" } } }, NOW);
+    if (!settings.ok) throw new Error(settings.message);
+    db = settings.db;
+    const catId = db.settings.vehicleCategories[0].id;
+    const created = execute(db, admin, requestInput(catId, "2026-03-01", "2026-03-02"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const first = execute(created.db, admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "2", unitAmount: "500" }] } }, NOW);
+    if (!first.ok) throw new Error(first.message);
+    const firstQuote = first.db.rentals[0].quote!;
+
+    const second = execute(first.db, admin, { type: "requote_rental", id, input: { lines: [{ description: "Hire revised", quantity: "2", unitAmount: "700" }] } }, "2026-01-10T00:00:00.000Z");
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    let rental = second.db.rentals[0];
+    expect(rental.status).toBe("quoted");
+    expect(rental.quote?.subtotal).toBe(1400);
+    expect(rental.quote?.depositRequired).toBe(350); // configured deposit percentage still applies
+    expect(rental.quote?.validUntil).toBe("2026-01-17");
+    expect(rental.quoteHistory).toEqual([firstQuote]);
+
+    const third = execute(second.db, admin, { type: "requote_rental", id, input: { lines: [{ description: "Hire final", quantity: "1", unitAmount: "900" }] } }, "2026-01-20T00:00:00.000Z");
+    expect(third.ok).toBe(true);
+    if (!third.ok) return;
+    rental = third.db.rentals[0];
+    expect(rental.quoteHistory).toEqual([firstQuote, second.db.rentals[0].quote]);
+    expect(rental.quote?.subtotal).toBe(900);
+    expect(third.db.audit.some((entry) => entry.action === "rentals:requote")).toBe(true);
+
+    // The new validity window, not the old one, governs confirmation.
+    const confirm = execute(third.db, admin, { type: "confirm_rental", id, input: { amount: "225", method: "Bank transfer", reference: "TX-RENEW" } }, "2026-01-21T00:00:00.000Z");
+    expect(confirm.ok).toBe(true);
+  });
+
+  it("migrates schema-7 rentals with an empty quote history and no policy default", () => {
+    const { db: startingDb, admin } = rentalReady();
+    let db = startingDb;
+    const configured = execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: { ...db.settings.rental, requotePolicy: "revise_in_place" } } }, NOW);
+    if (!configured.ok) throw new Error(configured.message);
+    db = configured.db;
+    const created = execute(db, admin, requestInput(db.settings.vehicleCategories[0].id, "2026-03-01", "2026-03-02"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const quoted = execute(created.db, admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
+    if (!quoted.ok) throw new Error(quoted.message);
+    const legacy = { ...quoted.db, schemaVersion: 7, rentals: quoted.db.rentals.map((rental) => { const copy = { ...rental } as Record<string, unknown>; delete copy.quoteHistory; return copy; }), settings: { ...quoted.db.settings, rental: { ...quoted.db.settings.rental, requotePolicy: undefined } } } as unknown as Database;
+    // rentalReady historically builds its database using a second fresh fixture; use the
+    // administrator identity from the actual database for the anti-lockout import check.
+    const importer: Actor = { id: quoted.db.users[0].id, fullName: quoted.db.users[0].fullName, role: "administrator" };
+    const imported = execute(quoted.db, importer, { type: "import_backup", database: legacy }, NOW);
+    expect(imported.ok).toBe(true);
+    if (imported.ok) {
+      expect(imported.db.schemaVersion).toBe(10);
+      expect(imported.db.rentals[0].quote).toEqual(quoted.db.rentals[0].quote);
+      expect(imported.db.rentals[0].quoteHistory).toEqual([]);
+      expect(imported.db.settings.rental.requotePolicy).toBeNull();
+    }
+  });
+});
