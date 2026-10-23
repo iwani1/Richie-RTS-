@@ -1,5 +1,6 @@
-import { useTms } from "../tms/useTms";
 import { readinessReport } from "../tms/maintenance";
+import { setupProgress } from "../tms/setup";
+import { useTms } from "../tms/useTms";
 import {
   DIRECTION_LABELS,
   RENTAL_STATUS_LABELS,
@@ -41,16 +42,11 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
   const s = db.settings;
   const today = todayYmd();
 
-  // ---- setup checklist ------------------------------------------------------------------------
-  const checklist = [
-    { label: "Company name", done: !!s.companyName },
-    { label: "Billing currency", done: !!s.currencyCode },
-    { label: "Vehicle categories (at least one)", done: s.vehicleCategories.length > 0 },
-    { label: "Shift definitions", done: s.shifts.length > 0 },
-    { label: "On-time threshold (minutes)", done: s.onTimeThresholdMinutes !== null },
-  ];
-  const outstanding = checklist.filter((c) => !c.done).length;
-  const done = checklist.length - outstanding;
+  // ---- setup checklist (shared with the Settings screen, one source of truth) -----------------
+  const setup = setupProgress(s);
+  const checklist = setup.items;
+  const outstanding = setup.outstanding;
+  const done = setup.done;
 
   // ---- exceptions ------------------------------------------------------------------------------
   const expiredLicences = db.drivers.filter((d) => d.status === "active" && d.licenceExpiry < today);
@@ -375,7 +371,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
           </div>
           <div className="rts-band-body">
             <div className="rts-progress" role="img" aria-label={`${done} of ${checklist.length} setup items complete`}>
-              <span className="rts-progress-fill" style={{ width: `${(done / checklist.length) * 100}%` }} />
+              <span className="rts-progress-fill" style={{ width: `${setup.percent}%` }} />
             </div>
             <p className="rts-progress-caption">
               {done} of {checklist.length} complete

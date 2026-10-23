@@ -8,17 +8,21 @@ export function AuditPage() {
   const [entity, setEntity] = useState("all");
   const entities = useMemo(() => Array.from(new Set(db.audit.map((a) => a.entity))).sort(), [db.audit]);
 
-  const rows = useMemo(() => {
+  const matching = useMemo(() => {
     const q = query.trim().toLowerCase();
     return db.audit
       .filter((a) => entity === "all" || a.entity === entity)
-      .filter((a) => !q || `${a.actorName} ${a.action} ${a.summary}`.toLowerCase().includes(q))
-      .slice(0, 500);
+      .filter((a) => !q || `${a.actorName} ${a.action} ${a.summary} ${a.entity}`.toLowerCase().includes(q));
   }, [db.audit, query, entity]);
+  const rows = useMemo(() => matching.slice(0, 500), [matching]);
 
   return (
     <div>
       <PageHeader eyebrow="Governance" title="Audit log" description={`Append-only record of every change made through the service layer. ${db.audit.length} entries; the most recent 500 matching entries are shown.`} />
+      <p className="rts-resultcount" role="status">
+        Showing {rows.length} of {matching.length} matching {matching.length === 1 ? "entry" : "entries"}
+        {matching.length > rows.length && " — narrow the search to see earlier ones"}
+      </p>
       <div className="mb-3 flex flex-wrap gap-2">
         <TextInput className="max-w-xs" placeholder="Search actor, action or summary" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search audit log" />
         <Select className="max-w-[180px]" value={entity} onChange={(e) => setEntity(e.target.value)} aria-label="Filter by entity">
@@ -31,9 +35,10 @@ export function AuditPage() {
         rowKey={(a) => a.id}
         emptyState={<EmptyState title="No audit entries" body="Changes will appear here as soon as they are made." />}
         columns={[
-          { key: "at", header: "When", render: (a) => <span className="whitespace-nowrap text-xs text-stone-500">{formatDateTime(a.at)}</span> },
+          { key: "at", header: "When", className: "whitespace-nowrap", render: (a) => <span className="rts-mono text-stone-600">{formatDateTime(a.at)}</span> },
           { key: "actor", header: "Actor", render: (a) => a.actorName },
-          { key: "action", header: "Action", render: (a) => <code className="rounded-sm bg-stone-100 px-1 py-0.5 font-mono text-[11px]">{a.action}</code> },
+          { key: "action", header: "Action", render: (a) => <code className="rts-code">{a.action}</code> },
+          { key: "entity", header: "Record", render: (a) => <span className="text-stone-600">{a.entity}</span> },
           { key: "summary", header: "Summary", render: (a) => <span className="text-xs">{a.summary}</span> },
         ]}
       />

@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
+import { setupProgress } from "../tms/setup";
 import { useTms } from "../tms/useTms";
 import type { Settings } from "../tms/types";
 import { PRICING_BASES, PRICING_BASIS_LABELS, REQUOTE_POLICIES } from "../tms/types";
-import { Button, Card, Field, Notice, PageHeader, Select, TextInput } from "../ui/primitives";
+import { Badge, Band, Button, Field, Notice, PageHeader, Select, TextInput } from "../ui/primitives";
 
 export function SettingsPage() {
   const { db, allowed, dispatch, setFlash } = useTms();
@@ -31,6 +32,9 @@ export function SettingsPage() {
   };
 
   const usedCategoryIds = new Set(db.vehicles.map((v) => v.categoryId));
+  // The same checklist the dashboard uses, read against the saved settings (not the draft), so a
+  // half-typed form never tells management a rule is in place.
+  const setup = setupProgress(db.settings);
 
   return (
     <form onSubmit={submit} className="space-y-5">
@@ -49,7 +53,27 @@ export function SettingsPage() {
 
       {!editable && <Notice tone="info">You can view settings but only administrators can change them.</Notice>}
 
-      <Card title="Company" description="Shown on screens and, later, on quotations and invoices.">
+      <section className="rts-band" aria-labelledby="rules-heading">
+        <div className="rts-band-label">
+          <h2 id="rules-heading" className="rts-band-title">Rules to supply</h2>
+          <p className="rts-band-note">Straight from the saved record. A rule counts only once it is stored.</p>
+        </div>
+        <div className="rts-band-body">
+          <ul className="rts-rules">
+            {setup.items.map((item) => (
+              <li key={item.key} className="rts-rule">
+                <span className="rts-rule-label">
+                  {item.label}
+                  <span className="rts-rule-consequence">{item.consequence}</span>
+                </span>
+                <Badge tone={item.done ? "success" : "warning"}>{item.done ? "Set" : "Not set"}</Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <Band label="Company" note="Shown on screens and, later, on quotations and invoices.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Company name" error={errors.companyName}>
             <TextInput value={draft.companyName ?? ""} onChange={(e) => update({ companyName: e.target.value || null })} disabled={!editable} placeholder="Not set" />
@@ -58,9 +82,9 @@ export function SettingsPage() {
             <TextInput value={draft.currencyCode ?? ""} onChange={(e) => update({ currencyCode: e.target.value.toUpperCase() || null })} disabled={!editable} placeholder="Not set" maxLength={3} />
           </Field>
         </div>
-      </Card>
+      </Band>
 
-      <Card title="Operations" description="Used by trip planning and KPI calculations in later phases.">
+      <Band label="Operations" note="Used by trip planning and KPI calculations in later phases.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="On-time threshold (minutes late still counted on time)" error={errors.onTimeThresholdMinutes}>
             <TextInput
@@ -74,11 +98,10 @@ export function SettingsPage() {
             />
           </Field>
         </div>
-      </Card>
+      </Band>
 
-      <Card
-        title="Vehicle categories"
-        description="Required before any vehicle can be registered. Categories in use by a vehicle cannot be removed."
+      <Band label="Vehicle categories"
+        note="Required before any vehicle can be registered. Categories in use by a vehicle cannot be removed."
         actions={editable ? <Button onClick={() => update({ vehicleCategories: [...draft.vehicleCategories, { id: "", name: "" }] })}>Add category</Button> : undefined}
       >
         {errors.vehicleCategories && <Notice tone="error" className="mb-3">{errors.vehicleCategories}</Notice>}
@@ -111,11 +134,10 @@ export function SettingsPage() {
             ))}
           </ul>
         )}
-      </Card>
+      </Band>
 
-      <Card
-        title="Shifts"
-        description="Staff-busing shift names and times. Required before recurring routes can be scheduled (next phase)."
+      <Band label="Shifts"
+        note="Staff-busing shift names and times. Required before recurring routes can be scheduled (next phase)."
         actions={editable ? <Button onClick={() => update({ shifts: [...draft.shifts, { id: "", name: "", startTime: "", endTime: "" }] })}>Add shift</Button> : undefined}
       >
         {draft.shifts.length === 0 ? (
@@ -142,9 +164,9 @@ export function SettingsPage() {
             ))}
           </ul>
         )}
-      </Card>
+      </Band>
 
-      <Card title="Bus rentals" description="Required before a quotation can be issued. No values are assumed; quoting stays blocked until these are set (OPEN_QUESTIONS Q-07, Q-08, Q-09, Q-11, Q-15).">
+      <Band label="Bus rentals" note="Required before a quotation can be issued. No values are assumed; quoting stays blocked until these are set (OPEN_QUESTIONS Q-07, Q-08, Q-09, Q-11, Q-15).">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Pricing basis" hint="How rental charges are calculated. Rates themselves are entered per quotation." error={errors["rental.pricingBasis"]}>
             <Select value={draft.rental.pricingBasis ?? ""} onChange={(e) => update({ rental: { ...draft.rental, pricingBasis: (e.target.value || null) as typeof draft.rental.pricingBasis } })} disabled={!editable} invalid={!!errors["rental.pricingBasis"]}>
@@ -197,11 +219,10 @@ export function SettingsPage() {
             </ul>
           )}
         </div>
-      </Card>
+      </Band>
 
-      <Card
-        title="Compliance document types"
-        description="Required before any vehicle or driver document can be recorded (OPEN_QUESTIONS Q-16). The company names its own document types; none is assumed."
+      <Band label="Compliance document types"
+        note="Required before any vehicle or driver document can be recorded (OPEN_QUESTIONS Q-16). The company names its own document types; none is assumed."
         actions={editable ? <Button onClick={() => update({ documentTypes: [...draft.documentTypes, { id: "", name: "", appliesTo: "vehicle" }] })}>Add document type</Button> : undefined}
       >
         {errors.documentTypes && <Notice tone="error" className="mb-3">{errors.documentTypes}</Notice>}
@@ -267,11 +288,10 @@ export function SettingsPage() {
             />
           </Field>
         </div>
-      </Card>
+      </Band>
 
-      <Card
-        title="Service schedules"
-        description="Service intervals per vehicle category. Leave a field blank to say that basis is not used; add no schedule at all to say it is unknown. Nothing is scheduled by default (OPEN_QUESTIONS Q-17, Q-37)."
+      <Band label="Service schedules"
+        note="Service intervals per vehicle category. Leave a field blank to say that basis is not used; add no schedule at all to say it is unknown. Nothing is scheduled by default (OPEN_QUESTIONS Q-17, Q-37)."
         actions={
           editable && draft.vehicleCategories.filter((c) => c.id && !draft.maintenance.schedules.some((s) => s.categoryId === c.id)).length > 0 ? (
             <Button
@@ -324,9 +344,9 @@ export function SettingsPage() {
         <p className="mt-3 text-xs text-stone-500">
           A service counts as &ldquo;done&rdquo; only when a work order is completed and marked as resetting the interval. The system never infers that from a repair.
         </p>
-      </Card>
+      </Band>
 
-      <Card title="Planned settings (not yet modelled)" description="These are open questions for management and will become settings in the phases that need them.">
+      <Band label="Planned settings (not yet modelled)" note="These are open questions for management and will become settings in the phases that need them.">
         <ul className="grid gap-1 text-xs text-stone-600 sm:grid-cols-2">
           {["Cancellation windows and refund rules", "VAT, levies and GRA e-VAT", "Retention periods", "Boarding-code policy", "Contract billing frequency and payment terms"].map((q) => (
             <li key={q} className="flex items-center gap-2">
@@ -335,7 +355,7 @@ export function SettingsPage() {
             </li>
           ))}
         </ul>
-      </Card>
+      </Band>
 
       {editable && dirty && <Notice tone="warning">You have unsaved changes.</Notice>}
     </form>

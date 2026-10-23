@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { readinessReport, type OdometerInput, type ReadinessStatus } from "../tms/maintenance";
 import type { OdometerReading } from "../tms/types";
 import { useTms } from "../tms/useTms";
-import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 
 type Tab = "readiness" | "odometer";
 type Errors = Record<string, string>;
@@ -57,9 +57,9 @@ function ReadinessTab() {
 
   return (
     <div className="space-y-5">
-      <Card title="As of" description="Readiness is evaluated for this date. Coverage is the share of non-retired vehicles this build can actually evaluate.">
+      <Band label="As of" note="Readiness is evaluated for this date. Coverage is the share of non-retired vehicles this build can actually evaluate.">
         <Field label="Evaluate as of"><TextInput type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></Field>
-      </Card>
+      </Band>
 
       {report.status === "not_configured" && (
         <Notice tone="warning" title="No service schedules configured">
@@ -80,7 +80,7 @@ function ReadinessTab() {
         <Stat label="Not evaluable" value={report.counts.no_data + report.counts.no_schedule} caption={`${report.counts.no_data} missing data, ${report.counts.no_schedule} no schedule`} />
       </div>
 
-      <Card title="Vehicles">
+      <Band label="Vehicles">
         <DataTable
           rows={report.vehicles}
           rowKey={(row) => row.vehicleId}
@@ -96,13 +96,21 @@ function ReadinessTab() {
                   <span className="text-xs text-stone-500">{row.reasons[0] ?? "Not evaluable"}</span>
                 ) : (
                   <ul className="space-y-0.5 text-xs">
-                    {row.bases.map((basis) => (
-                      <li key={basis.basis}>
-                        <span className="font-semibold">{basis.basis === "km" ? `${basis.consumed} / ${basis.interval} km` : `${basis.consumed} / ${basis.interval} days`}</span>
-                        {basis.dueDate ? <span className="text-stone-500"> · due {formatDate(basis.dueDate)}</span> : null}
-                        {basis.lead !== null ? <span className="text-stone-500"> · warn {basis.lead} {basis.basis === "km" ? "km" : "days"} before</span> : null}
-                      </li>
-                    ))}
+                    {row.bases.map((basis) => {
+                      // How much of the interval has been used. The bar is decorative: the same
+                      // numbers are set beside it, so the bar never carries information alone.
+                      const used = basis.interval > 0 ? Math.min(100, Math.round((basis.consumed / basis.interval) * 100)) : 0;
+                      return (
+                        <li key={basis.basis} className="rts-interval-row">
+                          <span className="font-semibold">{basis.basis === "km" ? `${basis.consumed} / ${basis.interval} km` : `${basis.consumed} / ${basis.interval} days`}</span>
+                          <span className="rts-interval" aria-hidden="true">
+                            <span className={`rts-interval-fill rts-interval-fill--${row.status}`} style={{ width: `${used}%` }} />
+                          </span>
+                          {basis.dueDate ? <span className="text-stone-500"> due {formatDate(basis.dueDate)}</span> : null}
+                          {basis.lead !== null ? <span className="text-stone-500"> · warn {basis.lead} {basis.basis === "km" ? "km" : "days"} before</span> : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ),
             },
@@ -124,9 +132,9 @@ function ReadinessTab() {
             </ul>
           </div>
         )}
-      </Card>
+      </Band>
 
-      <Card title="Schedules in use" description="Service intervals are recorded per vehicle category in Settings.">
+      <Band label="Schedules in use" note="Service intervals are recorded per vehicle category in Settings.">
         {db.settings.maintenance.schedules.length === 0 ? (
           <p className="text-sm text-stone-500">None configured.</p>
         ) : (
@@ -152,7 +160,7 @@ function ReadinessTab() {
         <p className="mt-3 text-xs text-stone-500">
           A blank lead time means no &ldquo;due soon&rdquo; warning for that basis: only overdue is reported. No reminder is implied by an empty cell.
         </p>
-      </Card>
+      </Band>
     </div>
   );
 }

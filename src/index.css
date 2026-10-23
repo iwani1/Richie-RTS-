@@ -4210,3 +4210,125 @@ select.rts-input {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
+
+/* A rule's consequence sits under its name: the reason a blank field matters, in the same row. */
+.rts-rule-consequence {
+  display: block;
+  margin-top: 1px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--rts-muted);
+}
+
+.rts-rule-label {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+/* ---- in-flight state ---------------------------------------------------------------------
+   Commands are serialised on the server; while one is in flight the shell says so, because a
+   control that silently waits looks like a control that did nothing. The moving rule is the only
+   indeterminate animation in the product, and it is removed under reduced motion. */
+
+.rts-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--rts-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rts-ink-2);
+}
+
+.rts-busy-bar {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  width: 34px;
+  height: 3px;
+  background: var(--rts-line);
+}
+
+.rts-busy-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 12px;
+  background: var(--rts-amber);
+  animation: rts-busy-slide 900ms ease-in-out infinite;
+}
+
+@keyframes rts-busy-slide {
+  0% { transform: translateX(-12px); }
+  100% { transform: translateX(34px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rts-busy-bar::after {
+    animation: none;
+    width: 100%;
+  }
+}
+
+/* A code-shaped value (action names, permission strings, references). Reads as machine data
+   without the grey pill that Tailwind's `bg-stone-100` implied. */
+.rts-code {
+  font-family: var(--rts-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+  padding: 1px 4px;
+  border: 1px solid var(--rts-line);
+  background: var(--rts-paper-3);
+  color: var(--rts-ink-2);
+  white-space: nowrap;
+}
+
+.rts-resultcount {
+  margin: 0 0 10px;
+  font-family: var(--rts-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--rts-muted);
+}
+
+.rts-resultcount-alert {
+  color: var(--rts-rust);
+}
+
+/* ---- service interval bar ---------------------------------------------------------------
+   One rule per basis (km, days) filled to the share of the interval already used. It exists so a
+   dispatcher can see "nearly due" across ten vehicles without reading ten fractions; the fraction
+   itself stays in the row. */
+.rts-interval-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.rts-interval {
+  position: relative;
+  display: inline-block;
+  width: 72px;
+  height: 4px;
+  background: var(--rts-paper-3);
+  border: 1px solid var(--rts-line);
+}
+
+.rts-interval-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--rts-green);
+}
+
+.rts-interval-fill--due,
+.rts-interval-fill--no_data,
+.rts-interval-fill--no_schedule {
+  background: var(--rts-amber);
+}
+
+.rts-interval-fill--overdue {
+  background: var(--rts-rust);
+}

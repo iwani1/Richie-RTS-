@@ -157,6 +157,13 @@ Three things carry a *hard, un-blurred* offset — the sign-in sheet, the wordma
 rule on a selected nav item — because a printed shadow is a register of paper on paper, not elevation.
 No content card casts a shadow, because there are no content cards.
 
+**Bands are the page.** `Band` is the primitive every screen section now uses: a label column on the
+left (190px at desktop, 160px under 1180px, stacked under 1024px) and the work on the right, separated
+by a hairline. The label sits sticky so the reader always knows which rule of the form they are in
+while scrolling a long table. `Card` survived only for detail panels that share a row in a two-column
+layout (a rental's quotation beside its request), because a label column inside a half-width column
+crushes the content it labels.
+
 **Shared grammar across the product.** Three primitives carry the system, so screens written before
 the redesign inherit it rather than being restyled one by one: `Card` became a ruled section (2px ink
 rule on top, heading, no box, no shadow), `Stat` became an unboxed figure with a 2px left rule, and
@@ -185,14 +192,16 @@ archive. Meaning first; they sit left of the nav label, never instead of it.
 | Rentals / Busing / Logistics | Move a record through its states | The state machine of the selected record | Two-pane: list/tabs + detail with next actions |
 | Compliance / Readiness | Prevent an unroadworthy dispatch | Expiry and overdue, soonest first | Band summary + urgency-sorted table with a plain-language Timing column ("14 days overdue", "expires today") |
 | A rental's state | Know what happens next and who must act | The current state and the blocked next step | Five-stamp strip (done = tick, current = amber bar with `aria-current="step"`), then request/quotation detail, then the action for that state |
-| Settings | Supply the company's real rules | Nothing prefilled; what is still missing | Long form, grouped by rule, saved once |
-| Audit | Prove who changed what | Chronology and the actor | Dense reverse-chronological table |
+| Settings | Supply the company's real rules | Nothing prefilled; what is still missing | Long form of bands, one per rule; a "Rules to supply" band at the top reads the *saved* record (not the draft) and states what each missing rule blocks |
+| Audit | Prove who changed what | Chronology and the actor | Dense reverse-chronological table: mono timestamps, the action as a code chip, the affected record named, plus "showing 17 of 412" so the 500-row cap is never silent |
 | Command palette | Jump without the mouse | Destinations and their captions | Overlay, keyboard-driven, role/label aware |
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint src` are clean; `npm test` is **166 passed, 5 skipped** across 22 test
-  files (one file skipped by design); `next build` completes (First Load JS 168 kB, fonts self-hosted).
+- `tsc --noEmit` and `eslint src` are clean; `npm test` is **170 passed, 5 skipped** across 23 test
+  files (one file skipped by design); `next build` completes (First Load JS 169 kB, fonts self-hosted).
+- The setup checklist is computed once (`src/tms/setup.ts`, 4 unit tests) and read by both the
+  operations board and Settings, so the two screens cannot disagree about what is still missing.
 - Every text colour was measured against all three paper surfaces with the WCAG formula; the muted
   step was darkened from `#6F7568` (4.04:1) to `#5E6659` (4.58–5.57:1) because it failed AA. See §5.
 - No colour is the only carrier of meaning: status chips have a word plus a bar, the rental strip has
@@ -213,11 +222,14 @@ archive. Meaning first; they sit left of the nav label, never instead of it.
 2. No dark mode, so night-shift use relies on OS-level contrast settings.
 3. The command palette navigates and searches registers; it does not yet execute commands
    ("create rental…"), which would need a wider action model on the server.
-4. Charts are absent by design; if RPT-02/RPT-03 are later agreed, they need history this
+4. The in-flight indicator is a single shell-level "Saving" state, not a per-button spinner: commands
+   are serialised, so one honest signal is enough, but a slow form cannot say *which* field it is
+   waiting on.
+5. Charts are absent by design; if RPT-02/RPT-03 are later agreed, they need history this
    installation does not yet collect.
-5. The rental strip is the only place that shows sequence; busing and logistics still express state
+6. The rental strip is the only place that shows sequence; busing and logistics still express state
    through chips and next-action buttons, which is correct for those flows (a trip is dispatched,
    completed or cancelled — it does not pass through five ordered gates).
-6. The driver and client portals keep their existing compact layout; they were re-skinned with the
+7. The driver and client portals keep their existing compact layout; they were re-skinned with the
    same tokens but not restructured, because their tasks (one run, one account) are already single-
    purpose.

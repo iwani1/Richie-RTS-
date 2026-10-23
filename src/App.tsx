@@ -112,7 +112,7 @@ function BootScreen({ message, error, onRetry }: { message: string; error?: bool
 }
 
 function Shell() {
-  const { db, actor, allowed, signOut, flash, setFlash, connectionError } = useTms();
+  const { db, actor, allowed, signOut, flash, setFlash, connectionError, busy } = useTms();
   // Record-bound roles (driver, client_contact) are confined to their own portal.
   // The internal screens read company-wide records, so those roles must not reach them.
   const portalRoute: Route | null =
@@ -301,6 +301,12 @@ function Shell() {
               <span className="rts-palette-trigger-text">Jump to a screen</span>
               <kbd className="rts-kbd">Ctrl K</kbd>
             </button>
+            {busy && (
+              <span className="rts-busy" role="status">
+                <span className="rts-busy-bar" aria-hidden="true" />
+                Saving
+              </span>
+            )}
             <span className="rts-date">{today}</span>
           </div>
         </header>

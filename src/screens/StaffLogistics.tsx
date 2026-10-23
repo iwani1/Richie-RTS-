@@ -22,7 +22,7 @@ import { useTms } from "../tms/useTms";
 import {
   Badge,
   Button,
-  Card,
+  Band,
   DataTable,
   EmptyState,
   Field,
@@ -789,17 +789,17 @@ function CostsTab() {
 
   return (
     <div className="space-y-5">
-      <Card title="Reporting period" description="Costs are shown for the dates they were incurred. Records in scope are incidents and work orders raised in the period.">
+      <Band label="Reporting period" note="Costs are shown for the dates they were incurred. Records in scope are incidents and work orders raised in the period.">
         <div className="flex flex-wrap gap-3">
           <Field label="From"><TextInput type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
           <Field label="To"><TextInput type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
         </div>
         {!validRange && <Notice tone="error" className="mt-3">"From" must be on or before "To".</Notice>}
-      </Card>
+      </Band>
 
       {report && (
         <>
-          <Card title="Recorded maintenance and incident costs" description="These are amounts entered by your team. They are not prices the system calculated, and they are not a complete cost of operations.">
+          <Band label="Recorded maintenance and incident costs" note="These are amounts entered by your team. They are not prices the system calculated, and they are not a complete cost of operations.">
             {report.status !== "ok" && <Notice tone="warning" title={report.status === "currency_not_set" ? "Currency not set" : "No costs recorded"}>{report.message}</Notice>}
             {report.status === "ok" && <Notice tone="info" className="mb-3">{report.message}</Notice>}
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -812,9 +812,9 @@ function CostsTab() {
               <Stat label="Work orders with no cost" value={report.workOrdersWithoutCosts} caption={`${report.workOrdersCostsConfirmed} confirmed complete (including zero)`} />
               <Stat label="Incidents with no cost" value={report.incidentsWithoutCosts} caption={`${report.incidentsWithCosts} with at least one entry`} />
             </div>
-          </Card>
+          </Band>
 
-          <Card title="Cost entries" description="Every entry is an audited, editable record until the incident or work order is closed.">
+          <Band label="Cost entries" note="Every entry is an audited, editable record until the incident or work order is closed.">
             {report.lines.length === 0 ? (
               <EmptyState title="No cost entries" body="Nothing was recorded in this period. This is not a statement that the cost was zero." />
             ) : (
@@ -832,13 +832,13 @@ function CostsTab() {
                 ]}
               />
             )}
-          </Card>
+          </Band>
 
-          <Card title="RPT-03 Cost per trip and RPT-02 Fleet utilisation">
+          <Band label="RPT-03 Cost per trip and RPT-02 Fleet utilisation">
             <Notice tone="warning" title="Not configured">
               Cost per trip needs a definition for which costs belong to a trip, and fleet utilisation needs available hours per vehicle. Neither has been supplied (OPEN_QUESTIONS Q-29), so no figure is shown here. Total recorded cost is a different, narrower thing and is not a cost per trip.
             </Notice>
-          </Card>
+          </Band>
         </>
       )}
     </div>

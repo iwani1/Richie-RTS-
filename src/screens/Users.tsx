@@ -3,7 +3,7 @@ import { PASSWORD_MIN_LENGTH, type UserInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { ROLES, ROLE_LABELS, type User } from "../tms/types";
 import { ROLE_PERMISSIONS } from "../tms/permissions";
-import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, TextInput, formatDateTime } from "../ui/primitives";
+import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, TextInput, formatDateTime } from "../ui/primitives";
 
 type Errors = Record<string, string>;
 type PanelState = { mode: "create" } | { mode: "edit"; user: User } | { mode: "reset"; user: User } | null;
@@ -65,7 +65,7 @@ export function UsersPage() {
         ]}
       />
 
-      <Card title="Role permissions" description="resource:action strings enforced by the service layer. All Phase 1A permissions are company-scoped.">
+      <Band label="Role permissions" note="resource:action strings enforced by the service layer. All Phase 1A permissions are company-scoped.">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-xs">
             <thead className="text-[10px] uppercase tracking-wider text-stone-500">
@@ -87,17 +87,17 @@ export function UsersPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </Band>
 
       {allowed("backup:export") && (
-        <Card
-          title="Data export"
-          description="Downloads a redacted JSON copy of every record (no password hashes) and records the export in the audit log. Restoring is a server operation: run `npm run db:restore -- <file>` on the host that runs the application, because a browser must not be able to overwrite a shared database."
+        <Band
+          label="Data export"
+          note="Downloads a redacted JSON copy of every record (no password hashes) and records the export in the audit log. Restoring is a server operation: run `npm run db:restore -- <file>` on the host that runs the application, because a browser must not be able to overwrite a shared database."
         >
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => void download()}>Download export (JSON)</Button>
           </div>
-        </Card>
+        </Band>
       )}
 
       {panel?.mode === "create" && (

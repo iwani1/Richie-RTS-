@@ -22,6 +22,8 @@ export function DriversPage() {
     return db.drivers.filter((d) => !q || `${d.fullName} ${d.phone} ${d.licenceNumber}`.toLowerCase().includes(q)).sort((a, b) => a.fullName.localeCompare(b.fullName));
   }, [db.drivers, query]);
 
+  const expiredCount = rows.filter((d) => d.licenceExpiry < today).length;
+
   const handle = async (input: DriverInput): Promise<Errors> => {
     if (!panel) return {};
     const result = panel.mode === "edit" ? await dispatch({ type: "update_driver", id: panel.driver.id, input }) : await dispatch({ type: "create_driver", input });
@@ -38,8 +40,12 @@ export function DriversPage() {
         description="Driver register with licence details. Driver assignment to trips arrives with the dispatch module."
         actions={allowed("drivers:create") ? <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add driver</Button> : undefined}
       />
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap items-end gap-3">
         <TextInput className="max-w-xs" placeholder="Search name, phone, licence" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search drivers" />
+        <p className="rts-resultcount" role="status">
+          {rows.length} of {db.drivers.length} driver{db.drivers.length === 1 ? "" : "s"}
+          {expiredCount > 0 && <span className="rts-resultcount-alert"> · {expiredCount} with an expired licence</span>}
+        </p>
       </div>
       <DataTable
         rows={rows}

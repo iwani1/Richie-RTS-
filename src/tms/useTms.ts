@@ -27,6 +27,10 @@ export interface Tms {
   actor: Actor | null;
   currentUser: User | null;
   status: LoadStatus;
+  /** True while at least one command is in flight, so the shell can say "saving" instead of
+   *  looking idle. Counted, not a boolean, because commands can overlap (a panel save while a
+   *  background refresh is running). */
+  busy: boolean;
   /** Why the app cannot reach the server, if it cannot. Shown in the shell, never swallowed. */
   connectionError: string | null;
   setupRequired: boolean;
@@ -67,6 +71,7 @@ export function useTmsState(): Tms {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
   const [status, setStatus] = useState<LoadStatus>("loading");
+  const [inFlight, setInFlight] = useState(0);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
 
@@ -128,6 +133,7 @@ export function useTmsState(): Tms {
 
   const dispatch = useCallback(
     (command: ClientCommand): Promise<CommandResult> => {
+      setInFlight((n) => n + 1);
       const run = async (): Promise<CommandResult> => {
         try {
           const { status: httpStatus, data } = await postJson<{
@@ -153,7 +159,7 @@ export function useTmsState(): Tms {
       };
       const next = queue.current.then(run, run);
       queue.current = next.catch(() => undefined);
-      return next;
+      return next.finally(() => setInFlight((n) => Math.max(0, n - 1)));
     },
     [],
   );
@@ -220,6 +226,7 @@ export function useTmsState(): Tms {
     actor,
     currentUser,
     status,
+    busy: inFlight > 0,
     connectionError,
     setupRequired,
     flash,

@@ -18,7 +18,7 @@ import {
   type Trip,
   type TripStatus,
 } from "../tms/types";
-import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 
 type Errors = Record<string, string>;
 type Tab = "routes" | "passengers" | "trips" | "performance";
@@ -810,7 +810,7 @@ function PerformanceTab() {
 
   return (
     <div className="space-y-5">
-      <Card title="Reporting period" description="Dates are service dates. Cancelled trips are excluded from the denominator.">
+      <Band label="Reporting period" note="Dates are service dates. Cancelled trips are excluded from the denominator.">
         <div className="flex flex-wrap gap-3">
           <Field label="From">
             <TextInput type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -820,13 +820,13 @@ function PerformanceTab() {
           </Field>
         </div>
         {!validRange && <Notice tone="error" className="mt-3">"From" must be on or before "To".</Notice>}
-      </Card>
+      </Band>
 
       {report && (
         <>
-          <Card
-            title="RPT-01 On-time rate"
-            description="A completed trip is on time when every stop's actual time is no later than its scheduled time plus the on-time threshold. Early arrivals count as on time. Definition pending management confirmation (docs/KPIS.md)."
+          <Band
+            label="RPT-01 On-time rate"
+            note="A completed trip is on time when every stop's actual time is no later than its scheduled time plus the on-time threshold. Early arrivals count as on time. Definition pending management confirmation (docs/KPIS.md)."
           >
             {report.status !== "ok" && (
               <Notice tone="warning" title="Insufficient data">{report.message}</Notice>
@@ -842,13 +842,13 @@ function PerformanceTab() {
               <Stat label="Data coverage" value={pct(report.coverage)} caption="Completed / scheduled in period" />
               <Stat label="Reporting period" value={formatDate(from)} caption={`to ${formatDate(to)}`} />
             </div>
-          </Card>
+          </Band>
 
-          <Card title="RPT-02 and RPT-03" description="Fleet utilisation and cost per trip.">
+          <Band label="RPT-02 and RPT-03" note="Fleet utilisation and cost per trip.">
             <Notice tone="info" title="Not configured">
               These need fleet availability hours and recorded trip costs, which are not captured yet. No figure is shown rather than an estimate.
             </Notice>
-          </Card>
+          </Band>
         </>
       )}
     </div>

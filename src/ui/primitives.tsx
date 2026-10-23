@@ -84,6 +84,25 @@ export function Card({ title, description, actions, children, className }: { tit
   );
 }
 
+/**
+ * A band is one horizontal rule of the sheet: a label column on the left, the work on the right.
+ * Screens use bands for the big sections of a page, so the page reads as a pre-printed form rather
+ * than a stack of boxes. `Card` remains for sections that need a heavier top rule inside a band.
+ */
+export function Band({ label, note, actions, id, className, children }: { label: string; note?: string; actions?: ReactNode; id?: string; className?: string; children: ReactNode }) {
+  const headingId = id ? `${id}-heading` : undefined;
+  return (
+    <section className={cn("rts-band", className)} aria-labelledby={headingId}>
+      <div className="rts-band-label">
+        <h2 id={headingId} className="rts-band-title">{label}</h2>
+        {note && <p className="rts-band-note">{note}</p>}
+        {actions && <div className="rts-band-actions">{actions}</div>}
+      </div>
+      <div className="rts-band-body">{children}</div>
+    </section>
+  );
+}
+
 export function EmptyState({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
     <div className="rts-empty">
