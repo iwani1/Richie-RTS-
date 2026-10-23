@@ -5,11 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#14231d" />
     <meta name="description" content="Richie Transport Services operations ledger: staff busing, rentals and fleet logistics." />
+    <!--
+      Content Security Policy for the single-file build.
+      The bundle is one HTML file with inline script and style, so 'unsafe-inline' is required
+      here; the stronger pattern is a per-build hash served as a header by the host (see
+      docs/ARCHITECTURE.md and audit finding L-03). Everything else is denied: this build makes
+      no network requests other than the Google Fonts stylesheet and its woff2 files.
+      'frame-ancestors' is deliberately absent: it is ignored in a meta tag and must be sent
+      as an X-Frame-Options / CSP header by the host.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
+      referrerpolicy="no-referrer"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
     />
     <title>Richie Transport Services — Operations Ledger</title>
   </head>
