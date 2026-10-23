@@ -15,15 +15,16 @@ Staff busing, bus rentals and staff logistics in one operational application.
 
 ```bash
 sudo dnf install -y nodejs npm git openssl podman podman-compose
-git clone <your-remote-url> richie-tms && cd richie-tms
+git clone https://github.com/iwani1/Richie-RTS-.git richie-tms
+cd richie-tms && git checkout arena/368c3fd2-richie-rts
 
-cp .env.example .env
-openssl rand -base64 32          # paste as SESSION_SECRET
-# set DATABASE_URL and POSTGRES_PASSWORD to the same password
-
-./run.sh setup                   # starts the database, installs, migrates, builds
+./run.sh setup                   # writes .env with generated secrets, starts PostgreSQL,
+                                 # installs, migrates, builds — one command
 ./run.sh start                   # http://localhost:3000
 ```
+
+Nothing else needs configuring: `setup` generates the database password and the session secret
+and writes them consistently. If a step fails, `./run.sh doctor` names the cause and the fix.
 
 The first page asks you to create the administrator account. Then open **Settings** and supply the
 business rules — nothing is pre-filled, and dependent features stay blocked until you do.

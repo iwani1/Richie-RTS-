@@ -26,9 +26,11 @@ services:
       # Deterministic collation/encoding: mixed locales are a classic source of "works on my machine".
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
-      # Host port, overridable from .env. Fedora often already runs its own PostgreSQL on 5432,
-      # in which case set POSTGRES_PORT=5433 (and the same port in DATABASE_URL).
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+      # Host port, from .env. The default is 5433, not 5432: Fedora workstations often already
+      # have a PostgreSQL — or a stale Podman port forwarder — holding 5432, and a first run that
+      # cannot bind its port is the least helpful error there is. Change POSTGRES_PORT and
+      # DATABASE_URL together if you want a different port.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - richie_pgdata:/var/lib/postgresql/data
     healthcheck:

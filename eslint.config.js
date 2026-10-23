@@ -50,7 +50,7 @@ export default tseslint.config(
 
   // Server-only modules run under Node, not the browser.
   {
-    files: ["src/server/**/*.ts", "src/app/api/**/*.ts", "scripts/**/*.ts"],
+    files: ["src/server/**/*.ts", "src/app/api/**/*.ts", "scripts/**/*.ts", "scripts/**/*.mjs"],
     languageOptions: { globals: { ...globals.node } },
     rules: { "no-console": "off" }, // these run in a terminal: stdout is the interface
   },

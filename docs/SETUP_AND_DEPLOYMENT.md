@@ -77,41 +77,55 @@ git clone <your-remote-url> richie-tms
 cd richie-tms
 ```
 
-### 3.2 Create the environment file
+### 3.2 Create the environment file (one command)
+
+```bash
+npm run env:init        # or: node scripts/init-env.mjs
+```
+
+This writes `.env` with a **generated database password and session secret**. The password goes
+into both `DATABASE_URL` and `POSTGRES_PASSWORD` from the same random value, so they cannot
+disagree; the port defaults to **5433**, not 5432, because Fedora workstations frequently have
+something on 5432 already. There is nothing to edit by hand.
+
+```ini
+DATABASE_URL="postgresql://richie:<generated>@127.0.0.1:5433/richie_tms"
+SESSION_SECRET="<generated, 44 characters>"
+POSTGRES_PASSWORD="<same as in DATABASE_URL>"
+POSTGRES_PORT="5433"
+NODE_ENV="development"
+```
+
+If you would rather set the password yourself, copy the example and edit both places:
 
 ```bash
 cp .env.example .env
-openssl rand -base64 32          # copy the output into SESSION_SECRET
 ```
-
-Edit `.env` and set:
 
 | Variable | What it must be |
 |---|---|
-| `DATABASE_URL` | `postgresql://richie:<password>@127.0.0.1:5432/richie_tms` |
-| `SESSION_SECRET` | the 32+ character string you generated. Changing it signs everyone out. |
-| `POSTGRES_PASSWORD` | the same password you put in `DATABASE_URL` |
-| `NODE_ENV` | `development` while you are trying it, `production` once you serve staff |
+| `DATABASE_URL` | `postgresql://richie:<password>@127.0.0.1:<port>/richie_tms` |
+| `SESSION_SECRET` | 32+ characters. `openssl rand -base64 32`. Changing it signs everyone out. |
+| `POSTGRES_PASSWORD` | the **same** password as in `DATABASE_URL` |
+| `POSTGRES_PORT` | the host port, default `5433`; must match the port in `DATABASE_URL` |
+| `NODE_ENV` | `development` while trying it, `production` once you serve staff |
 | `ALLOW_DEMO_SEED` | leave `false` unless you want the demo records |
 
-`.env` is git-ignored. Never commit it: it contains the database password and the key that
-seals session cookies.
+`.env` is git-ignored. Never commit it: it contains the database password and the cookie key.
 
 ### 3.3 Start PostgreSQL
 
 ```bash
-docker compose up -d db          # or: podman-compose up -d db
-docker compose ps                # wait until STATUS says "healthy"
+podman-compose up -d db          # or: docker compose up -d db
+podman-compose ps                # wait until STATUS says "healthy"
 ```
 
-The container publishes the database on `127.0.0.1:${POSTGRES_PORT:-5432}`. If something already
-listens there — on Fedora it is often the distribution's own `postgresql.service` — the container
-fails with `bind: address already in use`. Either stop the host service, or set
-`POSTGRES_PORT="5433"` in `.env` and use the same port in `DATABASE_URL`.
+The container publishes the database on `127.0.0.1:${POSTGRES_PORT:-5433}`. 5433 rather than the
+default 5432 is deliberate: Fedora workstations often already have a PostgreSQL, or a stale Podman
+port forwarder, on 5432. If you need a different port, change `POSTGRES_PORT` **and**
+`DATABASE_URL` together.
 
-The first start creates the `richie_pgdata` volume. Changing `POSTGRES_PASSWORD` afterwards does
-**not** change the password already stored in the volume; see
-[Troubleshooting](#10-troubleshooting).
+The first start creates the `richie_pgdata` volume.
 
 ### 3.4 Install dependencies and create the schema
 
@@ -119,6 +133,9 @@ The first start creates the `richie_pgdata` volume. Changing `POSTGRES_PASSWORD`
 npm ci
 npm run db:migrate
 ```
+
+Or do 3.2–3.5 in one step: `./run.sh setup` (it generates `.env`, installs, starts the database,
+migrates and builds), then `./run.sh start`.
 
 `db:migrate` applies every file in `db/migrations/` in filename order, each in its own
 transaction, and records it in `schema_migrations`. It creates the extensions (`btree_gist`,

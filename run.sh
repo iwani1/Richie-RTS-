@@ -39,6 +39,12 @@ require_deps() {
   [ -d node_modules ] || fail "Dependencies are not installed. Run: npm ci"
 }
 
+# Installs exactly the lockfile. `npm ci` also cleans a half-populated node_modules, which is what
+# a failed first attempt tends to leave behind, so it is always the right call here.
+require_deps_install() {
+  npm ci || fail "npm ci failed. Check your network, then run it again."
+}
+
 require_db() {
   require_env
   if ! node -e '
@@ -56,13 +62,19 @@ require_db() {
 
 # Explains the two failures a first run actually hits on Fedora: the port taken by the distro's
 # own PostgreSQL, and the container coming up with a password that does not match DATABASE_URL.
+# The published database port from .env, defaulting to 5433.
+env_port() {
+  local port
+  port=$(env_port)
+  printf '%s' "$port"
+}
+
 # Finds out who holds the database port and how to get it back. Podman leaves a "rootlessport"
 # forwarder behind when a container fails to start, and that orphan keeps the port bound across
 # `down`/`up`, which is the most confusing first-run failure on Fedora.
 port_hint() {
   local port
-  port=$(sed -n 's/^POSTGRES_PORT="\{0,1\}\([0-9]*\)"\{0,1\}.*/\1/p' .env 2>/dev/null | tail -1)
-  [ -n "$port" ] || port=5432
+  port=$(env_port)
   say "The database container could not start."
   local holder
   holder=$(ss -ltnp 2>/dev/null | grep -E "[:.]$port[[:space:]]" | head -1)
@@ -110,25 +122,23 @@ case "${1:-help}" in
   setup)
     require_node
     if [ ! -f .env ]; then
-      cp .env.example .env
-      say "Created .env. Generating a session secret..."
-      secret=$(openssl rand -base64 32)
-      # Portable in-place edit: BSD sed and GNU sed disagree about -i.
-      node -e '
-        const { readFileSync, writeFileSync } = require("node:fs");
-        const file = ".env";
-        const text = readFileSync(file, "utf8").replace(/SESSION_SECRET=.*/, `SESSION_SECRET="${process.argv[1]}"`);
-        writeFileSync(file, text);
-      ' "$secret"
-      say "A SESSION_SECRET was written for you."
-      say "Now set DATABASE_URL and POSTGRES_PASSWORD in .env to the same password, then re-run: ./run.sh setup"
-      exit 0
+      # Generates the database password and the session secret in one pass, so the two places
+      # that must agree (DATABASE_URL and POSTGRES_PASSWORD) are always written together.
+      node scripts/init-env.mjs || fail "Could not write .env."
+    else
+      say ".env already exists; leaving it untouched."
+      if grep -q "change-me\|replace-me" .env; then
+        fail "It still contains example values. Either run: npm run env:init -- --force
+or edit it by hand (docs/SETUP_AND_DEPLOYMENT.md §3.2)."
+      fi
     fi
+
+    # Dependencies first: everything below needs them, including the connection check.
+    require_deps_install
     compose_up || fail "Database start failed. Read the hint above, or docs/SETUP_AND_DEPLOYMENT.md §9."
-    say "Waiting for PostgreSQL..."
-    for _ in $(seq 1 30); do require_db && break; sleep 1; done
-    require_db
-    npm ci
+    say "Waiting for PostgreSQL to accept connections..."
+    for _ in $(seq 1 60); do require_db 2>/dev/null && break; sleep 1; done
+    require_db || { port_hint; fail "The database never became reachable. Run ./run.sh doctor."; }
     npm run db:migrate
     npm run build
     say "Ready. Start it with: ./run.sh start   (then open http://localhost:3000)"
@@ -180,7 +190,7 @@ case "${1:-help}" in
     (podman rm -f richie-tms-db || docker rm -f richie-tms-db) >/dev/null 2>&1 || true
     pkill -f rootlessport >/dev/null 2>&1 || true
     sleep 1
-    if ss -ltn 2>/dev/null | grep -qE ":$(sed -n 's/^POSTGRES_PORT="\{0,1\}\([0-9]*\)"\{0,1\}.*/\1/p' .env | tail -1) "; then
+    if ss -ltn 2>/dev/null | grep -qE ":$(env_port) "; then
       port_hint
       fail "The port is still held after cleanup."
     fi
