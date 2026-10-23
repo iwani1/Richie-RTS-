@@ -97,9 +97,9 @@ export async function runCommand(
 ): Promise<ServerResult> {
   // The actor is taken from the session cookie unless a caller has just established the identity
   // itself (sign-in and first-run setup, where the cookie is being minted in the same response).
-  const userId = options.userId === undefined ? await sessionUserId() : options.userId;
   const now = options.now ?? new Date().toISOString();
   try {
+    const userId = options.userId === undefined ? await sessionUserId() : options.userId;
     return await db()
       .transaction()
       .execute(async (trx) => {
@@ -114,6 +114,10 @@ export async function runCommand(
         return { ok: true as const, status: 200, message: result.message, database: result.db };
       });
   } catch (error) {
+    if (isConfigurationError(error)) {
+      // Still the operator's to fix: do not bury it under "the change could not be saved".
+      return { ok: false, status: 503, message: error.message.replace(/\n/g, " "), errors: {} };
+    }
     if (process.env.NODE_ENV !== "production") {
       // Development only: make constraint failures diagnosable without a debugger.
       console.error("[command]", command.type, error instanceof Error ? error.message : error);
@@ -139,13 +143,24 @@ async function sessionUserId(): Promise<string | null> {
 }
 
 /** Reads the current snapshot for the signed-in user without mutating anything. */
+/** A configuration error is the operator's to fix, and is worth showing verbatim. */
+function isConfigurationError(error: unknown): error is Error {
+  return error instanceof Error && error.message.startsWith("Invalid server configuration");
+}
+
 export async function readSnapshot(): Promise<{ ok: true; database: Database; actor: Actor | null } | { ok: false; status: number; message: string }> {
-  const userId = await sessionUserId();
   try {
+    // Reading the session needs SESSION_SECRET, so this belongs inside the guard: outside it, a
+    // misconfigured deployment threw past the caller and reached the browser as an HTML 500 that
+    // the application could only report as "cannot reach the server".
+    const userId = await sessionUserId();
     const database = await loadDatabase();
     const { actor } = findActor(database, userId);
     return { ok: true, database, actor };
   } catch (error) {
+    if (isConfigurationError(error)) {
+      return { ok: false, status: 503, message: error.message.replace(/\n/g, " ") };
+    }
     const described = describeDatabaseError(error);
     return { ok: false, status: described.status === 500 ? 503 : described.status, message: described.status === 500 ? "The database is not reachable. Check docs/SETUP_AND_DEPLOYMENT.md." : described.message };
   }

@@ -64,12 +64,19 @@ export default function App() {
  * when the truth was "no server".
  */
 function BootScreen({ message, error, onRetry }: { message: string; error?: boolean; onRetry?: () => void }) {
+  // A configuration error is not a reachability problem: say which it is, so the reader does not
+  // go looking for a stopped server when the answer is in .env.
+  const title = /Invalid server configuration|must be at least|is required/i.test(message)
+    ? "The server needs configuration"
+    : error
+      ? "Cannot reach the ledger"
+      : "Opening the ledger";
   return (
     <main className="rts-auth">
       <section className="rts-auth-side">
         <div className="rts-auth-card" role="status" aria-live="polite">
           <p className="rts-auth-eyebrow">Richie Transport Services</p>
-          <h1 className="rts-auth-title">{error ? "Cannot reach the ledger" : "Opening the ledger"}</h1>
+          <h1 className="rts-auth-title">{title}</h1>
           <p className="rts-auth-intro">{message}</p>
           {error && onRetry && (
             <Button variant="primary" onClick={() => void onRetry()} className="mt-4">

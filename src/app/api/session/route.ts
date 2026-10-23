@@ -8,7 +8,11 @@ import { redact, redactUser } from "../../../server/snapshot";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const snapshot = await readSnapshot();
+  const snapshot = await readSnapshot().catch((error: unknown) => ({
+    ok: false as const,
+    status: 503,
+    message: error instanceof Error ? error.message : "The server could not read the ledger.",
+  }));
   if (!snapshot.ok) {
     return NextResponse.json(
       { ok: false, database: null, setupRequired: false, user: null, message: snapshot.message },

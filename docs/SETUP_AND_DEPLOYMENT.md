@@ -80,6 +80,21 @@ to start with a volume on the older `/var/lib/postgresql/data`.
 
 **Hosted PostgreSQL:** create a database and paste its connection string into `DATABASE_URL`.
 
+### If it does not start
+
+The application refuses to run on an invalid configuration rather than misbehaving later, and now
+says which value is wrong on the page itself:
+
+| Message | Meaning |
+|---|---|
+| `SESSION_SECRET must be at least 32 characters` | `.env` still holds the example value. Run `openssl rand -base64 32` and paste the result. |
+| `connect ECONNREFUSED 127.0.0.1:5432` from `npm run db:migrate` | PostgreSQL is not running, or `DATABASE_URL` points at the wrong port. |
+| `password authentication failed for user "richie"` | the password in `DATABASE_URL` is not the one the database was created with. |
+| `relation "schema_migrations" does not exist` | migrations were never applied. Run `npm run db:migrate`. |
+
+A change to `.env` takes effect only after the server is restarted: a running process keeps the
+values it started with.
+
 ## 6. Migrate
 
 ```bash
