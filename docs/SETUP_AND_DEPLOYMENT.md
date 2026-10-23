@@ -111,7 +111,7 @@ fails with `bind: address already in use`. Either stop the host service, or set
 
 The first start creates the `richie_pgdata` volume. Changing `POSTGRES_PASSWORD` afterwards does
 **not** change the password already stored in the volume; see
-[Troubleshooting](#9-troubleshooting).
+[Troubleshooting](#10-troubleshooting).
 
 ### 3.4 Install dependencies and create the schema
 
@@ -334,7 +334,62 @@ sudo systemctl --user restart richie-tms     # or Ctrl-C and `npm start`
 
 ---
 
-## 9. Troubleshooting
+## 9. If the first run goes wrong: run the diagnostics
+
+```bash
+./run.sh doctor          # or: npm run doctor
+```
+
+It checks, in the order problems actually occur, and stops being vague:
+
+```
+Richie TMS — first-run diagnostics
+
+✓ Node 22.23.1
+✓ .env found
+✓ SESSION_SECRET is set (32+ characters)
+✓ DATABASE_URL points at 127.0.0.1:5432/richie_tms
+✓ DATABASE_URL password matches POSTGRES_PASSWORD
+✓ Compose runtime: podman-compose
+✗ Container is not running: Created
+✗ Port 5432 is held by a leftover Podman port forwarder (rootlessport)
+    This is an orphan from an earlier container that failed to start; it is not PostgreSQL.
+    Fix: podman rm -f richie-tms-db && pkill -f rootlessport
+    Then: podman-compose up -d db — or just ./run.sh db-reset-container, which does both.
+```
+
+It only reads; it never starts, stops or deletes anything. Exit code is non-zero when something
+blocks the application.
+
+### The `rootlessport` trap (Fedora, Podman)
+
+When a rootless Podman container fails to start, its **port forwarder can stay behind**, still
+holding `127.0.0.1:5432`. `podman-compose down` does not remove that orphan, so every later
+`up` fails with `bind: address already in use`, and — because *something* is listening on 5432 —
+`npm run db:migrate` connects to that dead endpoint (or to a host PostgreSQL) and reports
+`password authentication failed for user "richie"`, which looks like a password problem and is not.
+
+One command clears all of it:
+
+```bash
+./run.sh db-reset-container      # asks for confirmation; deletes the container AND its volume
+npm run db:migrate
+./run.sh start
+```
+
+It removes the container, kills a stale `rootlessport`, checks the port is free before starting,
+waits for the healthcheck, and verifies the database answers — instead of leaving you to guess.
+
+Doing it by hand is the same three steps:
+
+```bash
+podman-compose down -v
+pkill -f rootlessport            # the orphan that holds the port
+sudo ss -ltnp | grep 5432        # must now print nothing
+podman-compose up -d db
+```
+
+## 10. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -345,7 +400,9 @@ sudo systemctl --user restart richie-tms     # or Ctrl-C and `npm start`
 | `password authentication failed for user "richie"` | password in `DATABASE_URL` and `POSTGRES_PASSWORD` disagree, or the volume was created with the old password | make them match; if the volume was created with a different password, either change it in SQL (`ALTER USER richie PASSWORD '...'`) or remove the volume (destroys data) |
 | Podman asks *"Please select an image"* | the compose file used a short image name, or a local `~/.config/containers/registries.conf` has no default | pick `docker.io/library/postgres:18-alpine`; or `git pull` (the file now names the registry) |
 | `rootlessport listen tcp 127.0.0.1:5432: bind: address already in use` (or `port is already allocated`) | Fedora ships a PostgreSQL service that is already listening on 5432, so the container never started | `sudo systemctl disable --now postgresql` then `podman-compose up -d db`. Or keep it and set `POSTGRES_PORT="5433"` in `.env` **and** the same port in `DATABASE_URL`, then `podman-compose up -d db` |
-| `password authentication failed for user "richie"` while 5432 is taken | the migration connected to the **host** PostgreSQL, which has no `richie` role | that is the symptom of the row above, not a password problem: free or move the port first, then `npm run db:migrate` |
+| `password authentication failed for user "richie"` while 5432 is taken | the migration connected to something that is not your container — the **host** PostgreSQL, or a dead `rootlessport` endpoint left by a failed container | that is the symptom of the row above, not a password problem: `./run.sh doctor`, then `./run.sh db-reset-container` |
+| Port 5432 held by `rootlessport` (`ss -ltnp` shows it, `postgresql.service` does not exist) | orphaned Podman port forwarder from a container that failed to start; survives `compose down` | `pkill -f rootlessport`, or just `./run.sh db-reset-container` |
+| Container is `Up` but login fails and the volume is old | the volume was created with an earlier `POSTGRES_PASSWORD`; changing `.env` afterwards does not change it | `ALTER USER richie PASSWORD '...'` inside the container, or `./run.sh db-reset-container` to start fresh (destroys data) |
 | `Cannot find module './chunks/vendor-chunks/next.js'` | `npm run build` ran while `npm run dev` was running | stop dev, `rm -rf .next`, start again |
 | `EADDRINUSE :3000` | another process on 3000 | `ss -ltnp \| grep 3000`, stop it, or `npm start -- -p 3100` |
 | Sign-in succeeds then bounces back | `NODE_ENV=production` over plain HTTP: the cookie is `Secure` | use HTTPS (§5) or `NODE_ENV=development` while evaluating |
@@ -358,7 +415,7 @@ to `docker compose logs db`.
 
 ---
 
-## 10. Running the checks yourself
+## 11. Running the checks yourself
 
 ```bash
 npm run typecheck         # TypeScript, no emit
@@ -379,7 +436,7 @@ Without `TEST_DATABASE_URL` the integration tests are **skipped, not passed** �
 
 ---
 
-## 11. Known limits, stated plainly
+## 12. Known limits, stated plainly
 
 These are deliberate cuts for this stage, recorded so nobody discovers them in production:
 
@@ -402,7 +459,7 @@ These are deliberate cuts for this stage, recorded so nobody discovers them in p
 
 ---
 
-## 12. What was verified, and what was not
+## 13. What was verified, and what was not
 
 Verified by running, in the development environment (Node 22.22.3, PostgreSQL 18.4, npm 10.9.8):
 
@@ -434,4 +491,4 @@ Not verified here:
 - **HTTPS and the reverse-proxy snippet**, and the systemd unit — both are standard configurations
   but were not executed in this environment.
 - **Email, backups to remote storage, and multi-instance operation**, none of which are
-  implemented (see §11).
+  implemented (see §12).

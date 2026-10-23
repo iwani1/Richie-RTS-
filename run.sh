@@ -5,10 +5,14 @@
 #   ./run.sh start     run the production build on http://localhost:3000
 #   ./run.sh dev       run the development server with hot reload
 #   ./run.sh check     typecheck, lint, tests, production build
+#   ./run.sh doctor    diagnose a first run: config, port, container, connection, migrations
 #   ./run.sh health    ask the running server whether it can reach PostgreSQL
 #   ./run.sh backup    write a full backup to ./backups/
 #   ./run.sh seed      load demo records (needs ALLOW_DEMO_SEED + DEMO_ADMIN_PASSWORD)
 #   ./run.sh reset     empty every table (keeps the schema)
+#   ./run.sh db-reset-container
+#                      delete the database container and its volume, clear a stale port forwarder,
+#                      and start a clean one. Destroys the database.
 #
 # Full instructions, including systemd and HTTPS: docs/SETUP_AND_DEPLOYMENT.md
 set -euo pipefail
@@ -52,17 +56,36 @@ require_db() {
 
 # Explains the two failures a first run actually hits on Fedora: the port taken by the distro's
 # own PostgreSQL, and the container coming up with a password that does not match DATABASE_URL.
+# Finds out who holds the database port and how to get it back. Podman leaves a "rootlessport"
+# forwarder behind when a container fails to start, and that orphan keeps the port bound across
+# `down`/`up`, which is the most confusing first-run failure on Fedora.
 port_hint() {
   local port
   port=$(sed -n 's/^POSTGRES_PORT="\{0,1\}\([0-9]*\)"\{0,1\}.*/\1/p' .env 2>/dev/null | tail -1)
   [ -n "$port" ] || port=5432
   say "The database container could not start."
-  if ss -ltn 2>/dev/null | grep -q ":$port "; then
-    say "Port $port is already in use. On Fedora this is usually the distribution's PostgreSQL:"
-    say "    sudo systemctl disable --now postgresql"
-    say "or keep the host database and move the container instead: set POSTGRES_PORT=\"5433\" in .env,"
-    say "put the same port in DATABASE_URL, then re-run: ./run.sh setup"
-  fi
+  local holder
+  holder=$(ss -ltnp 2>/dev/null | grep -E "[:.]$port[[:space:]]" | head -1)
+  case "$holder" in
+    *rootlessport*)
+      say "Port $port is held by a leftover Podman port forwarder (rootlessport), not by PostgreSQL."
+      say "That is an orphan from an earlier container that failed. Clear it with:"
+      say "    ./run.sh db-reset-container        (deletes the container and its data, then starts clean)"
+      ;;
+    *postgres*)
+      say "Port $port is held by another PostgreSQL on this machine."
+      say "Either stop it, or keep it and move the container: set POSTGRES_PORT=\"5433\" in .env,"
+      say "put the same port in DATABASE_URL, then re-run: ./run.sh setup"
+      ;;
+    "")
+      say "Nothing is listening on port $port. Check: podman-compose logs db"
+      ;;
+    *)
+      say "Port $port is held by another process:"
+      say "    $holder"
+      say "Free it, or set POSTGRES_PORT to a free port and match DATABASE_URL to it."
+      ;;
+  esac
 }
 
 compose_up() {
@@ -140,6 +163,37 @@ case "${1:-help}" in
   reset)
     require_env; require_deps
     npm run db:reset
+    ;;
+  db-reset-container)
+    require_env
+    say "This deletes the PostgreSQL container and its volume, then starts a clean one."
+    read -r -p "Type 'yes' to continue: " answer
+    [ "$answer" = "yes" ] || fail "Cancelled."
+    local up=""
+    if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then up="docker compose";
+    elif command -v podman-compose >/dev/null; then up="podman-compose";
+    elif command -v podman >/dev/null; then up="podman compose";
+    else fail "No docker/podman compose found."
+    fi
+    # Order matters: remove the container, then kill the forwarder it left behind, then start.
+    $up down -v || true
+    (podman rm -f richie-tms-db || docker rm -f richie-tms-db) >/dev/null 2>&1 || true
+    pkill -f rootlessport >/dev/null 2>&1 || true
+    sleep 1
+    if ss -ltn 2>/dev/null | grep -qE ":$(sed -n 's/^POSTGRES_PORT="\{0,1\}\([0-9]*\)"\{0,1\}.*/\1/p' .env | tail -1) "; then
+      port_hint
+      fail "The port is still held after cleanup."
+    fi
+    $up up -d db || { port_hint; fail "The database still will not start."; }
+    say "Waiting for PostgreSQL to become healthy..."
+    for _ in $(seq 1 60); do require_db 2>/dev/null && break; sleep 1; done
+    require_db || fail "The container is up but the database is not answering. Check: podman-compose logs db"
+    say "Database is up. Now create the schema and start the app:"
+    say "    npm run db:migrate && ./run.sh start"
+    ;;
+  doctor)
+    require_deps
+    npx tsx scripts/doctor.ts
     ;;
   *)
     sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
