@@ -303,12 +303,12 @@ there, validated there, applied in a transaction there, and checked again by Pos
 | Zod validation at every route boundary; database errors mapped to operator language | Done | `src/app/api/**`, `describeDatabaseError` |
 | Concurrency: serialised writes via `pg_advisory_xact_lock` in one transaction | Done (verified) | 10 parallel `create_client` requests → 10 `ok:true`, 10 rows stored (no lost update) |
 | Scripts: `db:migrate`, `db:seed`, `db:reset`, `db:backup`, `db:restore` | Done (verified) | all five executed against a real database; backup/restore round-tripped 1 user, 2 vehicles, 8 audit rows |
-| Fedora run guide, `run.sh`, docker-compose, `.env.example` | Done (authored; the container and Fedora steps **not executed** here) | `docs/SETUP_AND_DEPLOYMENT.md` §13 |
+| Fedora run guide, `run.sh`, docker-compose, `.env.example` | Done (authored; the container and Fedora steps **not executed** here) | `docs/SETUP_AND_DEPLOYMENT.md` §14 |
 | UI tests drive the app through a request/response boundary instead of `localStorage` | Done (verified) | `src/test/fakeServer.ts`, 130 UI/domain tests still green |
 | Integration suite against a real PostgreSQL, skipped without `TEST_DATABASE_URL` | Done (verified) | 5 tests pass against PostgreSQL 18.4 |
 | CI updated for the new gates | Done (authored, not executed) | `.github/workflows/ci.yml`: quality-gates job + an integration job against a `postgres:18-alpine` service. Never run on a GitHub runner from here. |
 | HTTPS / reverse proxy, systemd unit, TLS, multi-instance operation | Authored, **not verified** | `docs/SETUP_AND_DEPLOYMENT.md` §4, §5 |
-| Row-level pagination of reads | Not started | The whole redacted workload is returned per request; documented as limit §12.2 |
+| Row-level pagination of reads | Not started | The whole redacted workload is returned per request; documented as limit §13.2 |
 | Request-level scoping in SQL (own-record rows filtered in the database) | Not started | Scope is applied in the domain layer today; the snapshot is redacted but not per-row filtered for portal users beyond `scopedView` |
 
 Gates run at the end of this phase:

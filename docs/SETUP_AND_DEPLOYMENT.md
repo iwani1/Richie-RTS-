@@ -358,7 +358,44 @@ sudo systemctl --user restart richie-tms     # or Ctrl-C and `npm start`
 
 ---
 
-## 9. If the first run goes wrong: run the diagnostics
+## 9. Starting completely over
+
+If an earlier attempt left the machine in a state you do not trust — a container that died, a
+volume created with the wrong password, a port held by something you cannot identify — clear all
+of it and begin again. Nothing from an evaluation install is worth keeping.
+
+```bash
+./run.sh nuke            # asks you to type 'nuke'; then:
+                         #   compose down -v, remove the container, its volume and the postgres
+                         #   image, kill a stale rootlessport, delete .env, node_modules, .next
+./run.sh setup
+./run.sh start
+```
+
+It does not touch the git checkout or your source files, so `git status` stays clean and
+`git pull` still works afterwards. Afterwards `npm run doctor` should be green.
+
+To go further and remove the checkout itself:
+
+```bash
+cd ..
+rm -rf richie-tms
+git clone https://github.com/iwani1/Richie-RTS-.git richie-tms
+cd richie-tms && git checkout arena/368c3fd2-richie-rts
+```
+
+The same effect by hand, if you prefer to see each step:
+
+```bash
+podman-compose down -v
+podman rm -f richie-tms-db
+podman volume rm -f richie-tms_richie_pgdata
+pkill -f rootlessport
+podman rmi docker.io/library/postgres:18-alpine
+rm -rf .env node_modules .next
+```
+
+## 10. If the first run goes wrong: run the diagnostics
 
 ```bash
 ./run.sh doctor          # or: npm run doctor
@@ -414,7 +451,7 @@ sudo ss -ltnp | grep 5432        # must now print nothing
 podman-compose up -d db
 ```
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -443,7 +480,7 @@ to `docker compose logs db`.
 
 ---
 
-## 11. Running the checks yourself
+## 12. Running the checks yourself
 
 ```bash
 npm run typecheck         # TypeScript, no emit
@@ -464,7 +501,7 @@ Without `TEST_DATABASE_URL` the integration tests are **skipped, not passed** �
 
 ---
 
-## 12. Known limits, stated plainly
+## 13. Known limits, stated plainly
 
 These are deliberate cuts for this stage, recorded so nobody discovers them in production:
 
@@ -487,7 +524,7 @@ These are deliberate cuts for this stage, recorded so nobody discovers them in p
 
 ---
 
-## 13. What was verified, and what was not
+## 14. What was verified, and what was not
 
 Verified by running, in the development environment (Node 22.22.3, PostgreSQL 18.4, npm 10.9.8):
 
@@ -519,4 +556,4 @@ Not verified here:
 - **HTTPS and the reverse-proxy snippet**, and the systemd unit — both are standard configurations
   but were not executed in this environment.
 - **Email, backups to remote storage, and multi-instance operation**, none of which are
-  implemented (see §12).
+  implemented (see §13).

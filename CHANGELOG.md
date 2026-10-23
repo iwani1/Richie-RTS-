@@ -18,6 +18,9 @@ The application now runs as the brief specifies: Next.js + PostgreSQL, with auth
 - Scripts: `db:migrate`, `db:seed` (three locks; no default password), `db:reset`, `db:backup`,
   `db:restore`.
 - `docs/SETUP_AND_DEPLOYMENT.md` (Fedora run book), `run.sh`, `docker-compose.yml`, `.env.example`.
+- `./run.sh nuke`: one confirmed command to start over — compose down -v, the container, its
+  volume, the postgres image, a stale rootlessport, `.env`, `node_modules` and `.next`. The git
+  checkout and source files are untouched. Run book §9 documents it, with the by-hand equivalent.
 - `npm run doctor` reports a missing schema once, with the two commands that fix it, instead of
   also flagging the application's health check as a second, unrelated problem.
 - `npm run doctor` / `./run.sh doctor`: reads the configuration, the container state, who holds

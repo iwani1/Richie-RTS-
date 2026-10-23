@@ -13,6 +13,8 @@
 #   ./run.sh db-reset-container
 #                      delete the database container and its volume, clear a stale port forwarder,
 #                      and start a clean one. Destroys the database.
+#   ./run.sh nuke     start from nothing: remove the container, volume, image, .env, node_modules
+#                      and build output. The checkout itself survives; git is untouched.
 #
 # Full instructions, including systemd and HTTPS: docs/SETUP_AND_DEPLOYMENT.md
 set -euo pipefail
@@ -234,11 +236,45 @@ or edit it by hand (docs/SETUP_AND_DEPLOYMENT.md §3.2)."
     say "Database is up. Now create the schema and start the app:"
     say "    npm run db:migrate && ./run.sh start"
     ;;
+  nuke)
+    say "This deletes, on this machine:"
+    say "  - the database container 'richie-tms-db' and its volume (all records)"
+    say "  - the postgres image, .env, node_modules and the .next build output"
+    say "It does not touch the git checkout or your source files."
+    read -r -p "Type 'nuke' to continue: " answer
+    [ "$answer" = "nuke" ] || fail "Cancelled. Nothing was deleted."
+
+    up=$(compose_cmd)
+    if [ -n "$up" ]; then
+      $up down -v --remove-orphans >/dev/null 2>&1 || true
+      say "Compose project removed."
+    fi
+    if command -v podman >/dev/null; then
+      podman rm -f -v richie-tms-db >/dev/null 2>&1 || true
+      podman volume rm -f richie-tms_richie_pgdata >/dev/null 2>&1 || true
+      podman image rm -f docker.io/library/postgres:18-alpine >/dev/null 2>&1 || true
+      say "Container, volume and image removed."
+    elif command -v docker >/dev/null; then
+      docker rm -f -v richie-tms-db >/dev/null 2>&1 || true
+      docker volume rm -f richie-tms_richie_pgdata >/dev/null 2>&1 || true
+      docker image rm -f docker.io/library/postgres:18-alpine >/dev/null 2>&1 || true
+      say "Container, volume and image removed."
+    fi
+    # A forwarder outlives the container it was created for, and keeps the port bound.
+    pkill -f rootlessport >/dev/null 2>&1 || true
+    rm -rf .env node_modules .next
+    say "Removed .env, node_modules and .next."
+    say ""
+    say "The checkout is clean. Start again with:"
+    say "    ./run.sh setup"
+    say "    ./run.sh start"
+    ;;
+
   doctor)
     require_deps
     npx tsx scripts/doctor.ts
     ;;
   *)
-    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac

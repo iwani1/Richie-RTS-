@@ -8,7 +8,7 @@ Staff busing, bus rentals and staff logistics in one operational application.
 > a redacted copy of the data your role may see and never holds a credential.
 >
 > It is still an evaluation-stage system: there is no 2FA, no email, no HTTPS inside the app, and
-> no self-service password reset. `docs/SETUP_AND_DEPLOYMENT.md` §12 lists every limit before you
+> no self-service password reset. `docs/SETUP_AND_DEPLOYMENT.md` §13 lists every limit before you
 > put real people's data in it.
 
 ## Run it (Fedora workstation)
@@ -36,6 +36,7 @@ Other commands:
 
 ```bash
 ./run.sh doctor     # if anything is wrong on first run, this says what
+./run.sh nuke       # start completely over: remove container, volume, image, .env, build output
 ./run.sh dev        # development server with hot reload
 ./run.sh check      # typecheck, lint, tests with coverage thresholds, production build
 ./run.sh health     # is the app up, and can it reach PostgreSQL?

@@ -106,7 +106,7 @@ Known limits:
 1. **The snapshot is coarse.** Each command returns the whole redacted workload for the role, and
    scope filtering for portal users happens in the domain layer (`src/tms/scope.ts`) rather than in
    SQL. Correct for a single operator's ledger; pagination and row-level filtering are the next
-   step (§12 of the run guide).
+   step (§13 of the run guide).
 2. **The sign-in throttle is in-process memory**, so it does not coordinate across instances.
    Writes themselves are safe (advisory lock in the database), so this is a rate-limiting limit,
    not a correctness one.
