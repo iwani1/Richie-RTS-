@@ -55,11 +55,10 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       # Dev dependencies run on the runner and in every contributor's shell, so they are
-      # audited too. Today this fails until vitest/vite are upgraded (see audit M-01);
-      # remove continue-on-error once that upgrade lands.
-      - name: Audit all dependencies (informational until upgraded)
-        run: npm run audit:dev
-        continue-on-error: true
+      # audited too. This is a hard gate: after the Phase 12 upgrade the tree carries one low
+      # advisory (esbuild dev server, Windows only), well below the threshold.
+      - name: Audit all dependencies
+        run: npm run audit:dev -- --audit-level=high
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

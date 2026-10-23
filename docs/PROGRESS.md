@@ -264,7 +264,8 @@ unpacked demo 2 at the repository root and closed the defects an independent aud
 | Authoritative standing brief installed as `AGENTS.md`; condensed variant archived | Done | D-42, `docs/archive/AGENTS-condensed.md` |
 | README, SECURITY.md, .gitignore, .nvmrc | Done | repository root |
 | Licence, repository visibility | Blocked | Owner decision, Q-49 |
-| Browser visual verification of the rebuilt bundle | Not verified | No browser in this environment; build and jsdom tests only |
+| Built artifact executes and mounts | Done (verified) | `dist/index.html` served over HTTP (200, 573,566 B); the inlined bundle evaluated in jsdom mounts the auth screen |
+| Browser visual verification of the rebuilt bundle | Not verified | jsdom parses no modern CSS and cannot run module scripts; no browser is available here |
 
 Gates run in this session, in the brief's order:
 
