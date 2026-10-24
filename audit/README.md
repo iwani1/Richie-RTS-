@@ -1,10 +1,27 @@
 # Audit pack — Richie Transport Services TMS
 
-Independent security and code-quality review of
-`https://github.com/iwani1/Richie-RTS-` at commit `030197e5c80eb7e09adef734f6398cc811e37242`
-(branch `main`), carried out 2026-10-23.
+## Current review — 2026-10-24, commit `08d7177`
 
-## Start here
+**[`AUDIT-2026-10-24.md`](AUDIT-2026-10-24.md)** reviews the running system: server, PostgreSQL,
+sealed sessions, 17 findings, all reproduced against the production build.
+Machine-readable: [`findings-2026-10-24.json`](findings-2026-10-24.json).
+
+Headline: the write path is strong and the read path is not. A driver account receives the entire
+database (F-01), and the sign-in throttle can be switched off with a request header (F-02).
+
+| If you are… | Read |
+|---|---|
+| deciding what to fix first | `AUDIT-2026-10-24.md` §3 (table) and §7 (plan) |
+| a security reviewer | `AUDIT-2026-10-24.md` §4 — the two high findings, with reproductions |
+| checking a claim | `AUDIT-2026-10-24.md` §6 — every measurement as a command |
+
+---
+
+## Historical review — 2026-10-23, commit `030197e` (superseded)
+
+Everything below reviews the **browser-local prototype**, before the server existed. It is kept
+because the reasoning about governance and governance gaps still applies; its description of the
+architecture does not. Do not read `AUDIT-REPORT.md` as a description of the current build.
 
 | If you are… | Read |
 |---|---|

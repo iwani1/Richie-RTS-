@@ -1,0 +1,240 @@
+{
+  "target": {
+    "repo": "https://github.com/iwani1/Richie-RTS-",
+    "branch": "arena/368c3fd2-richie-rts",
+    "commit": "08d7177",
+    "date": "2026-10-24"
+  },
+  "gates": {
+    "typecheck": "0 errors",
+    "eslint": "0 errors, 0 warnings",
+    "tests": "177 passed, 5 skipped",
+    "coverage": {
+      "statements": 72.71,
+      "branches": 65.55,
+      "functions": 68.56,
+      "lines": 77.08
+    },
+    "build": "ok",
+    "npm_audit": "0 vulnerabilities",
+    "bundles": {
+      "first_load_js_shared_kb": 103
+    }
+  },
+  "measurements": {
+    "session_payload_bytes": 791877,
+    "session_latency_ms": "35-47",
+    "trips": 1500,
+    "driver_session_bytes": 795770
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "area": "authorisation",
+      "title": "Read authorisation missing: every signed-in account receives the whole database",
+      "evidence": "GET /api/session as a driver -> 795770 bytes; users 2, vehicles 41, clients 2, routes 30, trips 1500, audit 2012",
+      "files": [
+        "src/app/api/session/route.ts",
+        "src/app/api/commands/route.ts",
+        "src/tms/scope.ts"
+      ],
+      "fix": "Apply scopedView() server-side in both snapshot responses, with a per-role test."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "area": "authentication",
+      "title": "Sign-in throttle bypassed with a forged X-Forwarded-For",
+      "evidence": "8 attempts -> 401 x8, 429 on 9th; 9 attempts rotating XFF -> 401 x9",
+      "files": [
+        "src/server/api.ts",
+        "src/app/api/auth/login/route.ts"
+      ],
+      "fix": "Bucket on email as well as address; trust XFF only with TRUST_PROXY=1."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "area": "robustness",
+      "title": "Command payloads are not validated; malformed input returns 500",
+      "evidence": "TypeError: input.seatCapacity.trim is not a function (service.ts:269); reproduced for create_vehicle, create_user, update_settings, record_odometer",
+      "files": [
+        "src/app/api/commands/route.ts",
+        "src/tms/service.ts"
+      ],
+      "fix": "Zod schema per command type before the transaction opens."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "area": "operations",
+      "title": "Production 500s are never logged",
+      "evidence": "commands.ts:203 logs only when NODE_ENV !== production; 'The server log has the detail' points at an empty log",
+      "files": [
+        "src/server/commands.ts"
+      ],
+      "fix": "Log command type + error class/message at error level in every environment."
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "area": "performance",
+      "title": "Full-snapshot API: 792 kB per request at 1500 trips, unbounded",
+      "evidence": "GET /api/session 791877 bytes / 35-47 ms; every command returns the same snapshot; AUDIT_LIMIT 5000 caps only audit",
+      "files": [
+        "src/server/repository.ts",
+        "src/app/api/session/route.ts",
+        "src/app/api/commands/route.ts"
+      ],
+      "fix": "Scoped payload (F-01), then return the changed record instead of the snapshot; page collections."
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "area": "process",
+      "title": "No CI run has ever executed",
+      "evidence": "gh api repos/iwani1/Richie-RTS-/actions/runs -> total_count 0; ci.yml triggers on push to main and on PRs only",
+      "files": [
+        ".github/workflows/ci.yml"
+      ],
+      "fix": "Trigger on all branches or open the PR; fix what the first run reports."
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "area": "product",
+      "title": "Scaffold screen 'Project brief' ships in the nav for every role",
+      "evidence": "routes.ts:46 permission null; BriefDesk.tsx 512 lines, 8% covered, old class names absent from index.css, writes localStorage",
+      "files": [
+        "src/routes.ts",
+        "src/App.tsx",
+        "src/docs/BriefDesk.tsx"
+      ],
+      "fix": "Delete the route, nav item and component."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "area": "security",
+      "title": "No Origin check on state-changing requests",
+      "evidence": "POST /api/commands with Origin: https://evil.example processed (refused for a business reason, not a security one)",
+      "files": [
+        "src/app/api/commands/route.ts",
+        "src/app/api/setup/route.ts"
+      ],
+      "fix": "Reject mismatched Origin when the header is present."
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "area": "security",
+      "title": "Password reset does not revoke existing sessions",
+      "evidence": "cookie TTL 8h; reset updates hash only; Users.tsx:238 notice still says 'browser-local build'",
+      "files": [
+        "src/server/session.ts",
+        "src/app/api/commands/route.ts"
+      ],
+      "fix": "Per-user session epoch checked per request."
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "area": "security",
+      "title": "HSTS absent though the config comment promises it",
+      "evidence": "response headers on / contain no Strict-Transport-Security",
+      "files": [
+        "next.config.ts"
+      ],
+      "fix": "Add when TLS is terminated; gate on an explicit env flag."
+    },
+    {
+      "id": "F-11",
+      "severity": "low",
+      "area": "security",
+      "title": "CSP allows unsafe-inline scripts and two unused Google font origins",
+      "evidence": "script-src 'self' 'unsafe-inline'; style-src ... https://fonts.googleapis.com; fonts are self-hosted via @fontsource",
+      "files": [
+        "next.config.ts",
+        "src/app/layout.tsx"
+      ],
+      "fix": "Drop the Google origins now; add a nonce later."
+    },
+    {
+      "id": "F-12",
+      "severity": "low",
+      "area": "deployment",
+      "title": "Secure cookie makes plain-HTTP LAN access unusable",
+      "evidence": "Set-Cookie includes Secure in production; localhost is exempt in browsers, a LAN IP is not",
+      "files": [
+        "src/server/session.ts"
+      ],
+      "fix": "Document TLS-in-front or a deliberate development posture."
+    },
+    {
+      "id": "F-13",
+      "severity": "low",
+      "area": "accessibility",
+      "title": "Panel dialogs lack focus trap, Escape and focus restore",
+      "evidence": "Panel sets role=dialog/aria-modal only; scrim is a button labelled 'Close panel' duplicating the header close",
+      "files": [
+        "src/ui/primitives.tsx"
+      ],
+      "fix": "Focus first control, trap Tab, close on Escape, restore focus."
+    },
+    {
+      "id": "F-14",
+      "severity": "low",
+      "area": "documentation",
+      "title": "Docs and code comments describe things that no longer exist",
+      "evidence": "README: Docker/Podman Compose (deleted), 169 tests (177), 'Zod at every request boundary' (false); PROGRESS.md:19 compose; rateLimit.ts cites missing docs/SECURITY-NOTES.md; scope.ts says 'this build has no server'",
+      "files": [
+        "README.md",
+        "docs/PROGRESS.md",
+        "src/server/rateLimit.ts",
+        "src/tms/scope.ts"
+      ],
+      "fix": "Documentation sweep."
+    },
+    {
+      "id": "F-15",
+      "severity": "low",
+      "area": "tests",
+      "title": "Coverage uneven; route handlers untested",
+      "evidence": "Users.tsx 0%, Registers.tsx 4.08%, BriefDesk.tsx 8.13%, Settings.tsx 65.51%; no tests under src/app/api",
+      "files": [
+        "src/screens/Users.tsx",
+        "src/screens/Registers.tsx"
+      ],
+      "fix": "Start with the per-role snapshot test required by F-01."
+    },
+    {
+      "id": "F-16",
+      "severity": "low",
+      "area": "database",
+      "title": "Application role owns the schema and can disable the append-only trigger",
+      "evidence": "migrations run as the connecting role; audit_append_only_trg is disableable by the table owner",
+      "files": [
+        "db/migrations/001_init.sql"
+      ],
+      "fix": "Split owner and app roles if the deployment grows."
+    },
+    {
+      "id": "F-17",
+      "severity": "info",
+      "area": "information",
+      "title": "/api/health discloses PostgreSQL version and extensions unauthenticated",
+      "evidence": "{\"database\":\"PostgreSQL 18.6 (PGlite 0.5.11); extensions: btree_gist, pgcrypto; migrations applied: 2\"}",
+      "files": [
+        "src/app/api/health/route.ts"
+      ],
+      "fix": "Return the detail only outside production."
+    }
+  ],
+  "counts": {
+    "high": 2,
+    "medium": 5,
+    "low": 9,
+    "info": 1
+  }
+}
