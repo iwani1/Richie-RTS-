@@ -3,9 +3,10 @@ import { VEHICLE_TRANSITIONS, type VehicleInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { VEHICLE_STATUS_LABELS, VEHICLE_STATUSES, type Vehicle, type VehicleStatus } from "../tms/types";
 import { Badge, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDateTime } from "../ui/primitives";
+import { ImportPanel } from "../ui/ImportPanel";
 import type { Route } from "../routes";
 
-type PanelState = { mode: "create" } | { mode: "edit"; vehicle: Vehicle } | { mode: "transition"; vehicle: Vehicle } | null;
+type PanelState = { mode: "create" } | { mode: "edit"; vehicle: Vehicle } | { mode: "transition"; vehicle: Vehicle } | { mode: "import" } | null;
 
 const statusTone: Record<VehicleStatus, "success" | "warning" | "error" | "neutral"> = {
   available: "success",
@@ -44,9 +45,12 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
         description="Fleet register. Status changes follow the vehicle state machine and are written to the audit log."
         actions={
           allowed("vehicles:create") ? (
-            <Button variant="primary" onClick={() => setPanel({ mode: "create" })} disabled={blocked} title={blocked ? "Add vehicle categories in Settings first" : undefined}>
-              Add vehicle
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setPanel({ mode: "import" })}>Import CSV</Button>
+              <Button variant="primary" onClick={() => setPanel({ mode: "create" })} disabled={blocked} title={blocked ? "Add vehicle categories in Settings first" : undefined}>
+                Add vehicle
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -105,7 +109,9 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
         />
       </TableCard>
 
-      {panel && panel.mode !== "transition" && (
+      {panel && panel.mode === "import" && <ImportPanel kind="vehicles" onClose={() => setPanel(null)} />}
+
+      {panel && panel.mode !== "transition" && panel.mode !== "import" && (
         <VehicleForm
           key={panel.mode === "edit" ? panel.vehicle.id : "create"}
           initial={panel.mode === "edit" ? toInput(panel.vehicle) : emptyInput()}

@@ -5,14 +5,16 @@
 
 import { executeBusing, isBusingCommand, type BusingCommand } from "./busing";
 import { executeCompliance, isComplianceCommand, type ComplianceCommand } from "./compliance";
+import { executeImport, isImportCommand, type ImportCommand } from "./import";
 import { executeLogistics, isLogisticsCommand, type LogisticsCommand } from "./logistics";
 import { executeMaintenance, isMaintenanceCommand, type MaintenanceCommand } from "./maintenance";
 import { execute, type Actor, type Command, type CommandResult } from "./service";
 import type { Database } from "./types";
 
-export type AnyCommand = Command | BusingCommand | LogisticsCommand | ComplianceCommand | MaintenanceCommand;
+export type AnyCommand = Command | BusingCommand | LogisticsCommand | ComplianceCommand | MaintenanceCommand | ImportCommand;
 
 export function executeCommand(db: Database, actor: Actor | null, command: AnyCommand, now?: string): CommandResult {
+  if (isImportCommand(command)) return executeImport(db, actor, command, now);
   if (isBusingCommand(command)) return executeBusing(db, actor, command, now);
   if (isLogisticsCommand(command)) return executeLogistics(db, actor, command, now);
   if (isComplianceCommand(command)) return executeCompliance(db, actor, command, now);

@@ -52,6 +52,12 @@ D-60). Hiding a control is a convenience, never the control.
 
 Rental separation of duties: operations runs the request/dispatch/completion steps; finance issues quotations and records deposits (confirm). Administrators can do everything.
 
+**CSV import (MIG-01).** There is no separate import permission: importing vehicles needs
+`vehicles:create`, drivers need `drivers:create`, clients need `clients:create`. Each imported row
+runs through the same command as a typed one, so a role that cannot add a vehicle by hand cannot
+add one by file either. The preview is a read: it changes nothing and is refused for a role without
+the same permission.
+
 **Employee roster.** `passengers:read` is held by administrator, operations and
 client_contact (own client). Finance does not hold it, so the roster — names, employee
 references and phone numbers — never reaches a finance session. This is a server-side filter on

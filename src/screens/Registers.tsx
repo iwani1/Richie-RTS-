@@ -3,6 +3,7 @@ import type { ClientInput, DriverInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { CLIENT_STATUSES, DRIVER_STATUSES, type Client, type Driver } from "../tms/types";
 import { Badge, Button, DataTable, EmptyState, Field, PageHeader, Panel, SearchInput, Select, TableCard, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { ImportPanel } from "../ui/ImportPanel";
 
 type Errors = Record<string, string>;
 
@@ -13,7 +14,7 @@ const driverToInput = (d: Driver): DriverInput => ({ fullName: d.fullName, phone
 
 export function DriversPage() {
   const { db, allowed, dispatch, setFlash } = useTms();
-  const [panel, setPanel] = useState<{ mode: "create" } | { mode: "edit"; driver: Driver } | null>(null);
+  const [panel, setPanel] = useState<{ mode: "create" } | { mode: "edit"; driver: Driver } | { mode: "import" } | null>(null);
   const [query, setQuery] = useState("");
   const today = todayYmd();
 
@@ -38,7 +39,14 @@ export function DriversPage() {
         eyebrow="Master data"
         title="Drivers"
         description="Driver register with licence details. Driver assignment to trips arrives with the dispatch module."
-        actions={allowed("drivers:create") ? <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add driver</Button> : undefined}
+        actions={
+          allowed("drivers:create") ? (
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setPanel({ mode: "import" })}>Import CSV</Button>
+              <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add driver</Button>
+            </div>
+          ) : undefined
+        }
       />
       <TableCard
         title="Driver register"
@@ -84,8 +92,9 @@ export function DriversPage() {
         ]}
         />
       </TableCard>
-      {panel && (
-        <DriverForm key={panel.mode === "edit" ? panel.driver.id : "create"} title={panel.mode === "edit" ? `Edit ${panel.driver.fullName}` : "Add driver"} initial={panel.mode === "edit" ? driverToInput(panel.driver) : emptyDriver()} onClose={() => setPanel(null)} onSubmit={handle} />
+      {panel && panel.mode === "import" && <ImportPanel kind="drivers" onClose={() => setPanel(null)} />}
+      {panel && panel.mode !== "import" && (
+          <DriverForm key={panel.mode === "edit" ? panel.driver.id : "create"} title={panel.mode === "edit" ? `Edit ${panel.driver.fullName}` : "Add driver"} initial={panel.mode === "edit" ? driverToInput(panel.driver) : emptyDriver()} onClose={() => setPanel(null)} onSubmit={handle} />
       )}
     </div>
   );
@@ -127,7 +136,7 @@ const clientToInput = (c: Client): ClientInput => ({ name: c.name, contactName: 
 
 export function ClientsPage() {
   const { db, allowed, dispatch, setFlash } = useTms();
-  const [panel, setPanel] = useState<{ mode: "create" } | { mode: "edit"; client: Client } | null>(null);
+  const [panel, setPanel] = useState<{ mode: "create" } | { mode: "edit"; client: Client } | { mode: "import" } | null>(null);
   const [query, setQuery] = useState("");
 
   const rows = useMemo(() => {
@@ -149,7 +158,14 @@ export function ClientsPage() {
         eyebrow="Master data"
         title="Corporate clients"
         description="Organisations served by staff busing and bus rentals. Contracts, routes and billing attach to these records in later phases."
-        actions={allowed("clients:create") ? <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add client</Button> : undefined}
+        actions={
+          allowed("clients:create") ? (
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setPanel({ mode: "import" })}>Import CSV</Button>
+              <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add client</Button>
+            </div>
+          ) : undefined
+        }
       />
       <TableCard
         title="Client register"
@@ -177,8 +193,9 @@ export function ClientsPage() {
         ]}
         />
       </TableCard>
-      {panel && (
-        <ClientForm key={panel.mode === "edit" ? panel.client.id : "create"} title={panel.mode === "edit" ? `Edit ${panel.client.name}` : "Add client"} initial={panel.mode === "edit" ? clientToInput(panel.client) : emptyClient()} onClose={() => setPanel(null)} onSubmit={handle} />
+      {panel && panel.mode === "import" && <ImportPanel kind="clients" onClose={() => setPanel(null)} />}
+      {panel && panel.mode !== "import" && (
+          <ClientForm key={panel.mode === "edit" ? panel.client.id : "create"} title={panel.mode === "edit" ? `Edit ${panel.client.name}` : "Add client"} initial={panel.mode === "edit" ? clientToInput(panel.client) : emptyClient()} onClose={() => setPanel(null)} onSubmit={handle} />
       )}
     </div>
   );

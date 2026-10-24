@@ -363,11 +363,12 @@ four defects in behaviour, not in documentation. These are the fixes, with the e
 | Finance read scope (no roster, documents, accounts or audit) | Done (verified) | Live finance session: `users:0 passengers:0 documents:0 audit:0`, rentals and trips intact. Tests: `visibility.test.ts`, permission matrix test in `service.test.ts` |
 | Client contact no longer receives staff phone numbers | Done (verified) | Tests: `visibility.test.ts` "withholds staff phone numbers from a client contact but keeps the manifest" |
 | Read permissions enforced on the payload, not only on screens | Done (verified) | `src/server/visibility.ts`; D-60 |
+| **MIG-01** CSV import for vehicles, drivers and clients | Done (verified) | Live: `Imported 2 of 4 vehicles. 2 rejected: line 4 (Category "Spaceship" is not configured...); line 5 (A vehicle with this registration already exists.)`, with `import:vehicles` in the audit log and `Not permitted` for finance. Tests: `src/tms/import.test.ts` (12) and `src/Import.test.tsx` (2). Template documented in `SETUP_AND_DEPLOYMENT.md` §8 |
 
-Gates after these changes: `typecheck` clean, `lint` clean, `test` **212 passed, 5 skipped**,
+Gates after these changes: `typecheck` clean, `lint` clean, `test` **226 passed, 5 skipped**,
 `build` succeeds, and the rebuilt server was re-checked live against the same database.
 
-Still outstanding from the conformance report (Phase 1A, in the brief's order): MIG-01 CSV import,
-FIN-02/03 invoices and manual payments, RPT-01 rental reports, WEB-01 public enquiry, a Playwright
-flow for workflow C, and a parallel-request double-booking test. Phase 1B onwards is unchanged and
+Still outstanding from the conformance report (Phase 1A, in the brief's order): FIN-02/03 invoices
+and manual payments, RPT-01 rental reports, WEB-01 public enquiry, EMP-02 passenger import, a
+Playwright flow for workflow C, and a parallel-request double-booking test. Phase 1B onwards is unchanged and
 still not met.

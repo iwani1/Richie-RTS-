@@ -7,7 +7,7 @@ them against the application as it actually runs.
 **Answer, in one sentence:** no — the application is a solid, genuinely server-backed TMS that
 meets the brief's integrity rules, the rental lifecycle, fleet/compliance, work orders, route → trip
 → boarding → on-time flow and the permission/audit core, but it does **not** meet the brief as a
-whole: **8 of 78 feature IDs are met, 37 are partial, 19 are missing (all of them Phase 1A–1C
+whole: **9 of 78 feature IDs are met, 37 are partial, 18 are missing (all of them Phase 1A–1C
 obligations), 14 are later-phase and untouched**, four named stack standards are replaced or absent,
 6 of the brief's 10 roles do not exist, and 6 of the 8 end-to-end workflows in §8 cannot run end to
 end. It is also **below its own phase gates**: the Phase 1A exit criteria are not met, so starting
@@ -47,9 +47,9 @@ missing or deferred — never assumed.
 
 | Status | Count | IDs |
 |---|---|---|
-| **Met** (works; ran it) | **8** | AUTH-01, AUD-01, RNT-03, RNT-06, RNT-08, RTE-03, TRP-02, DRV-04 |
+| **Met** (works; ran it) | **9** | AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RTE-03, TRP-02, DRV-04 |
 | **Partial** (some of it exists; gaps named in §5) | **37** | AUTH-02, AUTH-03, AUTH-04, SET-01, CUS-01, RNT-01, RNT-02, RNT-04, RNT-05, RNT-07, RNT-09, FLT-01, FLT-02, FLT-03, FLT-04, FLT-05, MNT-01, MNT-02, MNT-03, CLI-01, CLI-03, EMP-01, EMP-03, RTE-01, RTE-02, TRP-01, DSP-01, DSP-02, DSP-04, DRV-01, DRV-02, INC-01, INC-02, FIN-01, FIN-03, FIN-05, RPT-02 |
-| **Missing** (nothing built, and all of these were due in Phase 1A/1B/1C) | **19** | AUTH-05, MIG-01, WEB-01, CLI-02, EMP-02, BKG-01, BKG-02, BKG-03, BKG-04, BKG-05, BKG-06, DSP-03, RTE-04, PAX-01, FIN-02, FIN-07, RPT-01, RPT-03, RPT-04 |
+| **Missing** (nothing built, and all of these were due in Phase 1A/1B/1C) | **18** | AUTH-05, WEB-01, CLI-02, EMP-02, BKG-01, BKG-02, BKG-03, BKG-04, BKG-05, BKG-06, DSP-03, RTE-04, PAX-01, FIN-02, FIN-07, RPT-01, RPT-03, RPT-04 |
 | **Deferred** (Phase 2/3, not attempted — honest) | **14** | AUTH-06, MNT-04, RTE-05, DRV-03, DRV-05, PAX-02, FIN-04, FIN-06, FIN-08, NTF-01, NTF-02, NTF-03, RPT-05, GPS-01 |
 
 ### 2.2 Everything else
@@ -127,7 +127,7 @@ Legend: **M** met · **P** partial · **X** missing · **D** deferred. "Evidence
 | AUTH-06 | **D** | Phase 2; no 2FA |
 | AUD-01 | **M** | append-only trigger (DB `on conflict do nothing`, no update/delete), viewer with search. Two caveats: `audit:read` is granted to `operations` and `finance` although the brief says the viewer is for Super Administrators, and the viewer loads only the newest 5,000 rows (older rows remain in the table) |
 | SET-01 | **P** | registry holds company name, currency, on-time threshold, vehicle categories, shifts, rental pricing basis, deposit %, quotation validity, drivers-always-included, payment methods, expired-quote policy, document types + lead days, maintenance intervals. **Missing**: tax lines, cancellation windows, boarding-code policy, the contract-expiry booking rule, contract billing frequency/terms. Anything unset blocks its dependent action (verified: `create_vehicle` refused before categories existed; quote refused before tax/deposit settings) |
-| MIG-01 | **X** | no CSV code at all (`grep -ri csv src` → only a CSS word) |
+| MIG-01 | **M** | built after the check: preview → import for vehicles, drivers and clients through the same commands as the forms. Live: `Imported 2 of 4 vehicles. 2 rejected: line 4 (Category "Spaceship" is not configured…); line 5 (A vehicle with this registration already exists.)`; finance refused. Was missing — see §15.3 |
 
 ### Customers and bus rentals
 
@@ -426,8 +426,9 @@ Phase 1B and 1C were started anyway, which the brief's §14 explicitly forbids.
 | 2 | Seat capacity refused at rental assignment and at busing assign, dispatch and start | `This vehicle seats 22; RT-001 has 25 active passengers. Use a larger vehicle or take staff off the roster first.` — refused at assign and again at dispatch · three new tests |
 | 3 | Finance no longer receives the employee roster, documents, accounts or audit trail | finance session after the rebuild: `users:0 passengers:0 documents:0 audit:0`, rentals/trips/clients intact; `visibility.test.ts` (D-60) |
 | 4 | A client contact's payload no longer carries staff phone numbers, matching the portal's own copy | `visibility.test.ts` "withholds staff phone numbers from a client contact but keeps the manifest" |
+| 5 | **MIG-01** closed: CSV import with a documented template, preview, row-level errors, duplicate detection and no silent discards | live import of 4 rows (2 created, 2 rejected by line and reason); `src/tms/import.test.ts` (12 tests) and `src/Import.test.tsx` (2 tests); template in `SETUP_AND_DEPLOYMENT.md` §8 |
 
-Gates after the fixes: `typecheck` clean · `lint` clean · **212 passed / 5 skipped** · build ✓ ·
+Gates after the fixes: `typecheck` clean · `lint` clean · **226 passed / 5 skipped** · build ✓ ·
 `/api/health` 200 on the rebuilt server, with the data seeded in this run still present.
 
 Observation, not a defect: `GET /` is served with `Cache-Control: s-maxage=31536000`. The HTML is a

@@ -32,6 +32,7 @@ const KNOWN_TYPES = [
   "record_odometer", "void_odometer",
   "create_user", "update_user", "reset_user_password",
   "record_backup_export",
+  "import_records",
 ] as const;
 
 // `setup_administrator` is deliberately absent: it is only reachable from /api/setup, which
@@ -52,6 +53,8 @@ const envelope = z.object({
   fromDate: z.string().max(40).optional(),
   toDate: z.string().max(40).optional(),
   costId: z.string().max(64).optional(),
+  kind: z.enum(["vehicles", "drivers", "clients"]).optional(),
+  csv: z.string().max(200_000).optional(),
 });
 
 // Which permission each command needs at the boundary. The service layer checks again with the

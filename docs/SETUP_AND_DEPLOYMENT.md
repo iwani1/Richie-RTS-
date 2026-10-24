@@ -52,7 +52,7 @@ Two values are required and the rest are optional:
 | `DATABASE_URL` | `postgresql://user:password@host:5432/richie_tms` |
 | `SESSION_SECRET` | 32+ characters: `openssl rand -base64 32` |
 | `NODE_ENV` | leave it out — `npm run dev` and `npm start` set their own |
-| `TRUST_PROXY` | `1` **only** when a reverse proxy is in front (see §10). Without it, `X-Forwarded-For` is ignored, because a client controls that header. |
+| `TRUST_PROXY` | `1` **only** when a reverse proxy is in front (see §11). Without it, `X-Forwarded-For` is ignored, because a client controls that header. |
 | `PUBLIC_ORIGIN` | `https://tms.example.com` behind a proxy that rewrites the Host header, so the cross-site check compares against the address staff actually use |
 | `HTTPS` | `1` when TLS is terminated in front, which is what enables `Strict-Transport-Security` |
 | `DATABASE_POOL_MAX` | `1` on a single-connection database (the preview harness); default elsewhere |
@@ -222,11 +222,53 @@ For development with hot reload: `npm run dev`.
 
 **Reaching the app from another machine over plain HTTP.** The session cookie is `Secure` in
 production, so a browser will not store it over `http://` — sign-in appears to succeed and returns
-you to the sign-in screen. Browsers exempt `localhost` only. Either put TLS in front (§10), or reach
+you to the sign-in screen. Browsers exempt `localhost` only. Either put TLS in front (§11), or reach
 the workstation on its own address with `NODE_ENV=development` on a network you trust, knowing the
 cookie then travels unencrypted. There is no third option that is safe.
 
-## 8. Backups
+## 8. Importing existing records from CSV (MIG-01)
+
+Vehicles, drivers and corporate clients can be imported instead of typed. Open the register
+(Vehicles, Drivers or Clients), press **Import CSV**, load the file, press **Check file**, and read
+the preview: every row is listed as *will import* or *rejected* with the line number and the reason.
+Only after that does **Import N rows** save anything.
+
+The header row names the columns. Headers are matched case-insensitively, may appear in any order,
+and columns the importer does not use are reported, not silently ignored.
+
+```
+vehicles   registration,category,make,model,seats,notes
+           GT 1234-26,Coaster,Toyota,Coaster,22,
+
+drivers    name,phone,licence number,licence expiry,status
+           Kofi Mensah,+233201234567,DL-001,2031-05-01,active
+
+clients    name,contact name,contact phone,contact email,status
+           Volta Foods Ltd,Efua Owusu,+233244000111,ops@example.test,active
+
+passengers name,employee ref,phone,route,stop,status        (template only - see the note)
+```
+
+Rules that hold for every import:
+
+- **Required columns** are named in the error if they are missing (`category` and `seats` for
+  vehicles, `licence number` and `licence expiry` for drivers). `status` defaults to `active`.
+- **Category names must already exist** in Settings; an unknown name is a row error that lists the
+  configured categories.
+- **Duplicates are rejected, never merged** — a registration or licence number that already exists,
+  or that appears twice in the same file, fails on that row.
+- **Rows are saved through the ordinary commands**, so validation, permissions and the audit entry
+  are identical to typing the record by hand. Each created record gets its own audit entry, plus one
+  summary entry (`import:vehicles`, `import:drivers`, `import:clients`).
+- **No silent discards:** if any row is rejected, the message names it by line; if every row is
+  rejected nothing is written at all.
+- **Limits:** 200 kB and 500 rows per file. The tail beyond 500 rows is reported, not imported.
+
+Passengers/employees are **not** importable yet (EMP-02): the template is shown here so the shape is
+agreed, but the importer for it is still to be built, and the roster screen is the only way to add a
+passenger today.
+
+## 9. Backups
 
 ```bash
 npm run db:backup -- ./backups/2026-10-23.json     # full export, contains password hashes
@@ -236,7 +278,7 @@ npm run db:restore -- ./backups/2026-10-23.json    # replaces the current conten
 The export is unencrypted and includes Argon2 hashes: store it encrypted and treat it as personal
 data. A PostgreSQL-native alternative is `pg_dump --format=custom`.
 
-## 9. Checks
+## 10. Checks
 
 ```bash
 npm run typecheck        # tsc --noEmit
@@ -248,7 +290,7 @@ npm run build            # production build
 
 `npm run check` runs typecheck, lint, tests with coverage thresholds and the build in one go.
 
-## 10. Deploying beyond one machine
+## 11. Deploying beyond one machine
 
 - Run a single application process. Writes are serialised with a PostgreSQL advisory lock, but the
   sign-in throttle is per-process memory.
