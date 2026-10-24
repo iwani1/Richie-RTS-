@@ -200,10 +200,19 @@ suite("concurrent dispatch, against PostgreSQL", () => {
 
   it("refuses the second of two overlapping writes with no application lock in the way", async () => {
     const base = emptyDatabase();
-    const before: Database = { ...base, vehicles: [vehicleRow("veh-race")] };
+    // The vehicle is already in the database, so both writers see the same starting state and
+    // neither is inserting it: the only thing left to race on is the booking itself.
+    const seeded: Database = { ...base, vehicles: [vehicleRow("veh-race")] };
+    await db()
+      .transaction()
+      .execute(async (trx) => {
+        await sql`select pg_advisory_xact_lock(728411)`.execute(trx);
+        await saveDatabase(trx, base, seeded);
+      });
+    const before = await loadDatabase();
 
-    // Both transactions start from the same "nothing is booked" state and assign a different rental
-    // to the same vehicle over the same days. Nothing serialises them.
+    // Both transactions start from that same state and assign a different rental to the same
+    // vehicle over the same days. Nothing serialises them.
     const write = (rentalId: string) =>
       db()
         .transaction()
@@ -226,5 +235,9 @@ suite("concurrent dispatch, against PostgreSQL", () => {
       .where("active", "=", true)
       .execute();
     expect(reservations).toHaveLength(1);
+
+    // The loser was rolled back whole: no rental without a reservation.
+    const stored = await loadDatabase();
+    expect(stored.rentals).toHaveLength(1);
   }, 60_000);
 });
