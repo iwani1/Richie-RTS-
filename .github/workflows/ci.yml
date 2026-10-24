@@ -119,7 +119,23 @@ jobs:
       - name: Integration tests (real PostgreSQL)
         env:
           TEST_DATABASE_URL: postgresql://richie:ci-not-a-secret@127.0.0.1:5432/richie_tms_test
-        run: npm run test:integration
+        # `pipefail` keeps vitest's exit code through tee: without it a failed suite would be
+        # reported as a successful step whose output happens to contain failures.
+        run: |
+          set -o pipefail
+          npm run test:integration 2>&1 | tee integration.log
+
+      # Step logs sit behind a signed link that some networks cannot open, so a failing assertion
+      # arrives as "EOF". Annotations are readable through the API, which makes the difference
+      # between a failure someone can act on and a red cross. One annotation carries the tail of
+      # the log; `%0A` is how a newline travels inside it.
+      - name: Report the failing assertions
+        if: failure()
+        run: |
+          set -euo pipefail
+          [ -f integration.log ] || { echo "::error::The integration step produced no log."; exit 0; }
+          tail -n 80 integration.log | tr '\n' '\r' | sed 's/%/%25/g; s/\r/%0A/g' > escape.txt
+          echo "::error::$(tail -c 6500 escape.txt)"
 
   # Workflow C through the real HTTP surface. The brief asks for Playwright here; this is the
   # substitute recorded in D-68 and is labelled as such in the conformance report. It exercises the
