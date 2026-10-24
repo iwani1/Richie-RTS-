@@ -300,7 +300,7 @@ describe("staff busing - progressive driver run", () => {
     step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Kofi", employeeRef: "P-K", routeId, stopId: route.stops[1].id }) });
     const [ama, kofi] = [w.db.passengers[0], w.db.passengers[1]];
 
-    const tripId = generate(w, routeId, "2026-06-08");
+    const tripId = generate(w, routeId, "2026-06-01");
     step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
     step(w, "ops", { type: "dispatch_trip", id: tripId });
     const driver = actorOf(w.db, "driver");
@@ -356,7 +356,7 @@ describe("staff busing - progressive driver run", () => {
     const w = build();
     const routeId = createRoute(w);
     const route = w.db.routes.find((r) => r.id === routeId)!;
-    const tripId = generate(w, routeId, "2026-06-09");
+    const tripId = generate(w, routeId, "2026-06-01");
     step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
     step(w, "ops", { type: "dispatch_trip", id: tripId });
     const driver = actorOf(w.db, "driver");
@@ -365,6 +365,63 @@ describe("staff busing - progressive driver run", () => {
     const overwrite = attempt(w, "ops", { type: "complete_trip", id: tripId, input: { stopTimes: route.stops.map((stop) => ({ stopId: stop.id, actualTime: stop.scheduledTime })), boardings: [] } });
     expect(overwrite.ok).toBe(false);
     if (!overwrite.ok) expect(overwrite.message).toMatch(/cannot be replaced/);
+  });
+});
+
+describe("staff busing - date and capacity guards (brief 5.1, 5.5)", () => {
+  const NEW_STOP = { name: "Gate", scheduledTime: "06:00" };
+
+  it("refuses to start a run before its service day, or long after it", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    const future = generate(w, routeId, "2026-06-08");
+    step(w, "ops", { type: "assign_trip", id: future, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "dispatch_trip", id: future });
+    const tooEarly = attempt(w, "driver", { type: "start_trip", id: future });
+    expect(tooEarly.ok).toBe(false);
+    if (!tooEarly.ok) expect(tooEarly.message).toMatch(/scheduled for 2026-06-08/);
+
+    const stale = generate(w, routeId, "2026-05-20");
+    step(w, "ops", { type: "assign_trip", id: stale, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "dispatch_trip", id: stale });
+    const tooLate = attempt(w, "driver", { type: "start_trip", id: stale });
+    expect(tooLate.ok).toBe(false);
+    if (!tooLate.ok) expect(tooLate.message).toMatch(/was scheduled for 2026-05-20/);
+  });
+
+  it("refuses a vehicle that cannot seat the route's active roster", () => {
+    const w = build();
+    const minibus = w.db.settings.vehicleCategories[1].id;
+    const routeId = createRoute(w, { name: "Big roster", vehicleCategoryId: minibus });
+    const route = w.db.routes.find((r) => r.id === routeId)!;
+    for (let i = 1; i <= 15; i += 1) {
+      step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: `Rider ${i}`, employeeRef: `E-${i}`, routeId, stopId: route.stops[0].id }) });
+    }
+    const tripId = generate(w, routeId, "2026-06-01");
+    const minibusVehicle = w.db.vehicles.find((v) => v.registration === "GT 902-26")!;
+    const tooSmall = attempt(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: minibusVehicle.id, driverId: w.db.drivers[0].id } });
+    expect(tooSmall.ok).toBe(false);
+    if (!tooSmall.ok) expect(tooSmall.errors.vehicleId).toMatch(/seats 14/);
+  });
+
+  it("rechecks capacity at dispatch, so a roster that grew after assignment is caught", () => {
+    const w = build();
+    const catId = w.db.settings.vehicleCategories[0].id;
+    step(w, "ops", { type: "create_vehicle", input: { registration: "GT 903-26", categoryId: catId, make: "Toyota", model: "Mini", seatCapacity: "3", notes: "" } });
+    const small = w.db.vehicles.find((v) => v.registration === "GT 903-26")!;
+    const routeId = createRoute(w, { name: "Three seats", stops: [{ name: "A", scheduledTime: "06:00" }, NEW_STOP] });
+    const route = w.db.routes.find((r) => r.id === routeId)!;
+    for (let i = 1; i <= 2; i += 1) {
+      step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: `Rider ${i}`, employeeRef: `R-${i}`, routeId, stopId: route.stops[0].id }) });
+    }
+    const tripId = generate(w, routeId, "2026-06-01");
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: small.id, driverId: w.db.drivers[0].id } });
+    for (let i = 3; i <= 5; i += 1) {
+      step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: `Rider ${i}`, employeeRef: `R-${i}`, routeId, stopId: route.stops[0].id }) });
+    }
+    const dispatch = attempt(w, "ops", { type: "dispatch_trip", id: tripId });
+    expect(dispatch.ok).toBe(false);
+    if (!dispatch.ok) expect(dispatch.errors.vehicleId).toMatch(/seats 3/);
   });
 });
 
@@ -382,7 +439,7 @@ describe("staff busing - mid-trip passenger changes", () => {
     const route = w.db.routes.find((r) => r.id === routeId)!;
     step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Ama", employeeRef: "P-A", routeId, stopId: route.stops[0].id }) });
     step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Kofi", employeeRef: "P-K", routeId, stopId: route.stops[1].id }) });
-    const tripId = generate(w, routeId, "2026-06-08");
+    const tripId = generate(w, routeId, "2026-06-01");
     step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
     step(w, "ops", { type: "dispatch_trip", id: tripId });
     step(w, "driver", { type: "start_trip", id: tripId });
@@ -494,7 +551,7 @@ describe("staff busing - completion and on-time", () => {
     step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Old", employeeRef: "O", routeId, stopId: stops[0].id, status: "inactive" }) });
     const [ama, kofi] = [w.db.passengers[0].id, w.db.passengers[1].id];
 
-    const tripId = generate(w, routeId, "2026-06-09");
+    const tripId = generate(w, routeId, "2026-06-01");
     step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
     step(w, "ops", { type: "dispatch_trip", id: tripId });
 

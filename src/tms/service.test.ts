@@ -40,6 +40,16 @@ describe("permissions", () => {
     expect(can(null, "vehicles:read")).toBe(false);
   });
 
+  it("keeps finance out of employee records, documents and the audit trail (brief section 6)", () => {
+    for (const permission of ["passengers:read", "documents:read", "audit:read"] as const) {
+      expect(can("finance", permission)).toBe(false);
+    }
+    // It keeps what billing needs.
+    for (const permission of ["rentals:read", "clients:read", "costs:read", "vehicles:read"] as const) {
+      expect(can("finance", permission)).toBe(true);
+    }
+  });
+
   it("finance cannot create vehicles; operations cannot change settings", () => {
     const { db, ops, finance } = seeded();
     const v = execute(db, finance, { type: "create_vehicle", input: { registration: "GT 1-26", categoryId: "x", make: "", model: "", seatCapacity: "14", notes: "" } }, NOW);
@@ -289,7 +299,12 @@ describe("rentals - full lifecycle", () => {
     if (!assign.ok) throw new Error(assign.message);
     db = assign.db;
 
-    const start = execute(db, admin, { type: "start_rental", id }, NOW);
+    // A hire cannot be started before the date it was booked from (brief 5.5, RNT-05).
+    const tooEarly = execute(db, admin, { type: "start_rental", id }, NOW);
+    expect(tooEarly.ok).toBe(false);
+    if (!tooEarly.ok) expect(tooEarly.message).toMatch(/booked from 2026-03-01/);
+
+    const start = execute(db, admin, { type: "start_rental", id }, "2026-03-01T07:00:00.000Z");
     if (!start.ok) throw new Error(start.message);
     db = start.db;
     expect(db.rentals[0].status).toBe("in_progress");
@@ -300,6 +315,63 @@ describe("rentals - full lifecycle", () => {
     expect(db.rentals[0].status).toBe("completed");
     expect(db.rentals[0].finalInvoice?.total).toBe(4000);
     expect(db.audit.some((a) => a.action === "rentals:complete")).toBe(true);
+  });
+
+  describe("date and capacity guards (brief 5.1, 5.5)", () => {
+    function booking(start: string, end: string, passengers = "25") {
+      const base = rentalReady();
+      let db = base.db;
+      const small = execute(db, base.admin, { type: "create_vehicle", input: { registration: "GT 300-26", categoryId: base.catId, make: "Toyota", model: "Hiace", seatCapacity: "14", notes: "" } }, NOW);
+      if (!small.ok) throw new Error(small.message);
+      db = small.db;
+      const big = execute(db, base.admin, { type: "create_vehicle", input: { registration: "GT 301-26", categoryId: base.catId, make: "Toyota", model: "Coaster", seatCapacity: "30", notes: "" } }, NOW);
+      if (!big.ok) throw new Error(big.message);
+      db = big.db;
+
+      const created = execute(db, base.admin, {
+        type: "create_rental",
+        input: { clientId: null, customerName: "Acme Ltd", customerPhone: "024", customerEmail: "", purpose: "Staff retreat", pickupLocation: "Accra", dropoffLocation: "Kumasi", startDate: start, endDate: end, passengers, vehicleCategoryId: base.catId, driverRequired: false, notes: "" },
+      }, NOW);
+      if (!created.ok) throw new Error(created.message);
+      db = created.db;
+      const id = db.rentals[0].id;
+      const quote = execute(db, base.admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
+      if (!quote.ok) throw new Error(quote.message);
+      db = quote.db;
+      const confirm = execute(db, base.admin, { type: "confirm_rental", id, input: { amount: "250", method: "Bank transfer", reference: "TX" } }, NOW);
+      if (!confirm.ok) throw new Error(confirm.message);
+      db = confirm.db;
+      return { db, admin: base.admin, id, smallId: db.vehicles.find((v) => v.registration === "GT 300-26")!.id, bigId: db.vehicles.find((v) => v.registration === "GT 301-26")!.id };
+    }
+
+    it("refuses a vehicle with fewer seats than the request", () => {
+      const b = booking("2026-03-01", "2026-03-03");
+      const tooSmall = execute(b.db, b.admin, { type: "assign_rental", id: b.id, input: { vehicleId: b.smallId, driverId: "" } }, NOW);
+      expect(tooSmall.ok).toBe(false);
+      if (!tooSmall.ok) expect(tooSmall.errors.vehicleId).toMatch(/seats 14/);
+
+      const fits = execute(b.db, b.admin, { type: "assign_rental", id: b.id, input: { vehicleId: b.bigId, driverId: "" } }, NOW);
+      expect(fits.ok).toBe(true);
+    });
+
+    it("refuses to start a hire before its booked date or after its return date", () => {
+      const b = booking("2026-03-01", "2026-03-03");
+      const assigned = execute(b.db, b.admin, { type: "assign_rental", id: b.id, input: { vehicleId: b.bigId, driverId: "" } }, NOW);
+      if (!assigned.ok) throw new Error(assigned.message);
+      const early = execute(assigned.db, b.admin, { type: "start_rental", id: b.id }, NOW);
+      expect(early.ok).toBe(false);
+      if (!early.ok) expect(early.message).toMatch(/booked from 2026-03-01/);
+
+      const onTheDay = execute(assigned.db, b.admin, { type: "start_rental", id: b.id }, "2026-03-02T08:00:00.000Z");
+      expect(onTheDay.ok).toBe(true);
+
+      const late = booking("2025-12-01", "2025-12-02");
+      const lateAssigned = execute(late.db, late.admin, { type: "assign_rental", id: late.id, input: { vehicleId: late.bigId, driverId: "" } }, NOW);
+      if (!lateAssigned.ok) throw new Error(lateAssigned.message);
+      const afterWindow = execute(lateAssigned.db, late.admin, { type: "start_rental", id: late.id }, NOW);
+      expect(afterWindow.ok).toBe(false);
+      if (!afterWindow.ok) expect(afterWindow.message).toMatch(/due back on 2025-12-02/);
+    });
   });
 
   it("prevents double-booking a vehicle over overlapping dates", () => {

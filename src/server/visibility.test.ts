@@ -167,6 +167,16 @@ describe("snapshot scope", () => {
     expect(visible.audit).toEqual([]);
   });
 
+  it("withholds staff phone numbers from a client contact but keeps the manifest", () => {
+    const w = world();
+    w.passengers = [
+      { id: "p1", clientId: "c1", fullName: "Ama Boateng", employeeRef: "E-1", phone: "+233200000001", routeId: "r1", stopId: null, status: "active", createdAt: at, updatedAt: at },
+    ];
+    const visible = scopeDatabase(w, actor("client-user", "client_contact"))!;
+    expect(visible.passengers.map((p) => p.fullName)).toEqual(["Ama Boateng"]);
+    expect(visible.passengers.every((p) => p.phone === "")).toBe(true);
+  });
+
   it("gives a client contact their own client and the trips run for it", () => {
     const visible = scopeDatabase(world(), actor("client-user", "client_contact"))!;
     expect(visible.clients.map((c) => c.id)).toEqual(["c1"]);
@@ -175,6 +185,36 @@ describe("snapshot scope", () => {
     expect(visible.drivers).toEqual([]);
     expect(visible.vehicles).toEqual([]);
     expect(visible.audit).toEqual([]);
+  });
+
+  it("gives finance rentals and costs but not the employee roster, documents, accounts or audit", () => {
+    const w = world();
+    w.passengers = [
+      { id: "p1", clientId: "c1", fullName: "Ama Boateng", employeeRef: "E-1", phone: "+233200000001", routeId: "r1", stopId: null, status: "active", createdAt: at, updatedAt: at },
+    ];
+    w.documents = [
+      { id: "doc1", ownerType: "driver", ownerId: "d1", documentTypeId: "t1", documentNumber: "DL-1", issuedDate: "2026-01-01", expiryDate: "2030-01-01", notes: "", createdAt: at, updatedAt: at },
+    ];
+    const visible = scopeDatabase(w, actor("fin", "finance"))!;
+    // Billing context stays.
+    expect(visible.clients.map((c) => c.id)).toEqual(["c1", "c2"]);
+    expect(visible.trips).toHaveLength(2);
+    expect(visible.vehicles).toHaveLength(2);
+    // Personal and restricted records do not travel at all (brief section 6).
+    expect(visible.passengers).toEqual([]);
+    expect(visible.documents).toEqual([]);
+    expect(visible.users).toEqual([]);
+    expect(visible.audit).toEqual([]);
+  });
+
+  it("keeps the employee roster and audit trail for operations", () => {
+    const w = world();
+    w.passengers = [
+      { id: "p1", clientId: "c1", fullName: "Ama Boateng", employeeRef: "E-1", phone: "+233200000001", routeId: "r1", stopId: null, status: "active", createdAt: at, updatedAt: at },
+    ];
+    const visible = scopeDatabase(w, actor("ops", "operations"))!;
+    expect(visible.passengers.map((p) => p.id)).toEqual(["p1"]);
+    expect(visible.audit).toHaveLength(SNAPSHOT_AUDIT_LIMIT);
   });
 
   it("keeps company-wide access for internal staff, and bounds the audit window", () => {

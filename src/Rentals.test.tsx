@@ -72,8 +72,11 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     dialog = screen.getByRole("dialog");
     setField(/Customer \/ organisation name/i, "Acme Ltd", within(dialog));
     fireEvent.change(within(dialog).getByLabelText(/Vehicle category/i), { target: { value: (within(dialog).getAllByRole("option").find((o) => (o as HTMLOptionElement).text === "Coaster") as HTMLOptionElement).value } });
-    setField(/Start date/i, "2026-05-01", within(dialog));
-    setField(/End date/i, "2026-05-03", within(dialog));
+    // Dates are relative to the day the test runs: the server refuses to start a hire before its
+    // booked date, so a fixed past date would be testing the guard rather than the happy path.
+    const dayFromNow = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+    setField(/Start date/i, dayFromNow(0), within(dialog));
+    setField(/End date/i, dayFromNow(2), within(dialog));
     setField(/Passengers/i, "25", within(dialog));
     fireEvent.click(within(dialog).getByRole("button", { name: /Save request/i }));
 

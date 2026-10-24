@@ -901,6 +901,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       else if (!vehicle) errors.vehicleId = "Unknown vehicle.";
       else if (vehicle.status === "retired" || vehicle.status === "out_of_service") errors.vehicleId = `Vehicle is ${vehicle.status.replace("_", " ")} and cannot be assigned.`;
       else if (vehicle.categoryId !== existing.vehicleCategoryId) errors.vehicleId = "Vehicle category does not match the requested category.";
+      else if (vehicle.seatCapacity < existing.passengers)
+        errors.vehicleId = `This vehicle seats ${vehicle.seatCapacity}; the request is for ${existing.passengers} passengers. Choose a larger vehicle or book two.`;
 
       const needsDriver = existing.driverRequired || db.settings.rental.driversAlwaysIncluded === true;
       const driver = db.drivers.find((d) => d.id === command.input.driverId);
@@ -946,6 +948,13 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (!existing.assignedVehicleId) return fail("Assign a vehicle before starting the rental.");
       const needsDriver = existing.driverRequired || db.settings.rental.driversAlwaysIncluded === true;
       if (needsDriver && !existing.assignedDriverId) return fail("Assign a driver before starting the rental.");
+      // Ghana has no daylight saving, so the UTC calendar day is the business day (brief 5.5).
+      // A hire cannot start before its booked date, nor after the day it was due back.
+      const today = now.slice(0, 10);
+      if (today < existing.startDate)
+        return fail(`${existing.reference} is booked from ${existing.startDate}. It cannot be started before that date.`);
+      if (today > existing.endDate)
+        return fail(`${existing.reference} was due back on ${existing.endDate}. Cancel it or record a new booking instead.`);
       const updated: Rental = { ...existing, status: "in_progress", updatedAt: now };
       const next = audit({ ...db, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
         action: "rentals:start",

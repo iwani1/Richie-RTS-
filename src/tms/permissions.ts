@@ -121,6 +121,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "settings:read",
     "audit:read",
   ],
+  // Finance bills and reconciles; it does not read employee records, licence/insurance documents
+  // or the audit trail. Brief section 6: "Finance Officers have no unrestricted access to
+  // operational or personal data." The read filter in src/server/visibility.ts enforces the same
+  // boundary on the payload, so the screen gates and the snapshot cannot disagree (D-60).
   finance: [
     "clients:read",
     "clients:create",
@@ -131,17 +135,14 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "rentals:quote",
     "rentals:confirm",
     "routes:read",
-    "passengers:read",
     "trips:read",
     "incidents:read",
     "incidents:cost",
     "maintenance:read",
     "maintenance:cost",
     "costs:read",
-    "documents:read",
     "kpis:read",
     "settings:read",
-    "audit:read",
   ],
   // Own-record scope: a driver sees only the runs and incidents for the vehicle and
   // trips assigned to their linked driver record. See PERMISSIONS.md "Own-record scope".

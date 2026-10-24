@@ -610,3 +610,44 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 - **Why.** CSRF rested on a browser default rather than a server check (audit F-08); a blanket
   `includeSubDomains` on a workstation that also answers on a LAN address would lock its operator
   out of their own address (audit F-10).
+
+## D-60 (spec check 2026-10-24) A read permission decides what leaves the server
+
+- **Context.** Screen gates were treated as the read boundary. The snapshot endpoint sent every
+  collection to every internal role, so a Finance Officer session contained the full employee
+  roster with phone numbers, licence and insurance documents, every account's e-mail address and
+  the audit trail — while §6 of the brief says finance "has no unrestricted access to operational
+  or personal data". A client contact's payload also carried its staff's phone numbers although
+  the portal says contact details are held by the account manager.
+- **Decision.** `src/server/visibility.ts` maps each collection to the read permission that
+  governs it (`passengers:read`, `documents:read`, `audit:read`, `users:read`, …). A collection
+  whose permission the actor lacks is sent as an empty array — for internal roles too, not just
+  record-bound ones. Bound roles keep the collections their portal needs and additionally have
+  passenger phone numbers blanked for `client_contact`.
+- **Role change.** `finance` loses `passengers:read`, `documents:read` and `audit:read`. It keeps
+  rentals, clients, trips, vehicles, costs, maintenance and KPIs.
+- **Trade-off.** A screen that assumed a collection was present must handle an empty one. All
+  screens already render empty states, so the visible effect is a narrower app for finance, not a
+  broken one.
+- **Why not row-level security now.** Single-company deployment with five roles; the collection is
+  the unit of access. RLS becomes worth its complexity when tenants exist (see PROGRESS).
+
+## D-61 (spec check 2026-10-24) Dates and seats are preconditions, not warnings
+
+- **Context.** Driving the running app showed a rental dated 2 November started on 24 October, a
+  run dated 26 October started on 24 October, and 25 passengers assigned to a 22-seat Coaster.
+  None of these were warnings the operator could dismiss; they were simply unchecked.
+- **Decision.**
+  - `start_rental` refuses before the booked date and after the scheduled return date.
+  - `start_trip` refuses before the service date and more than one day after it (an overnight
+    shift may finish after midnight; the following day is tolerated so a late run can still be
+    recorded, and a stale one must be cancelled instead).
+  - Seat capacity is checked wherever a vehicle is bound to people: `assign_rental` against the
+    requested passenger count, and `assessResources` (assign, dispatch and start) against the
+    route's active roster. Dispatch and start re-check, so a roster that grew after assignment is
+    caught before the vehicle leaves.
+- **Why the calendar day and not a timestamp.** Ghana has no daylight saving, so the UTC calendar
+  day is the business day; this keeps the rule independent of the server's locale (brief 5.5).
+- **Not done.** Capacity is not reserved transactionally at booking, because bookings do not exist
+  yet (BKG-01..06); the check is at resource assignment, which is the only point a vehicle is
+  committed today.

@@ -349,3 +349,25 @@ Gates run at the end of this phase:
 - `npm run lint` - clean.
 - `npm test` - **169 passed, 5 skipped** (one test fewer: the `ALLOW_DEMO_SEED` case went with the flag).
 - `npm run build` - production build compiles.
+
+## Phase 15 - Spec conformance fixes (24 October 2026)
+
+Cross-checking the brief against the running build (`audit/SPEC-CONFORMANCE-2026-10-24.md`) found
+four defects in behaviour, not in documentation. These are the fixes, with the evidence that ran.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Service-date guard on `start_rental` | Done (verified) | Live: `RR-0004 is booked from 2026-11-02. It cannot be started before that date.` Tests: `service.test.ts` "refuses to start a hire before its booked date or after its return date" |
+| Service-date guard on `start_trip` | Done (verified) | Live: `TR-0013 is scheduled for 2026-10-27. It cannot be started before that day.` Tests: `busing.test.ts` "refuses to start a run before its service day, or long after it" |
+| Seat capacity at assignment and dispatch | Done (verified) | Live: `This vehicle seats 22; RT-001 has 25 active passengers.` Tests: rental guard in `service.test.ts`, roster guard and the dispatch re-check in `busing.test.ts` |
+| Finance read scope (no roster, documents, accounts or audit) | Done (verified) | Live finance session: `users:0 passengers:0 documents:0 audit:0`, rentals and trips intact. Tests: `visibility.test.ts`, permission matrix test in `service.test.ts` |
+| Client contact no longer receives staff phone numbers | Done (verified) | Tests: `visibility.test.ts` "withholds staff phone numbers from a client contact but keeps the manifest" |
+| Read permissions enforced on the payload, not only on screens | Done (verified) | `src/server/visibility.ts`; D-60 |
+
+Gates after these changes: `typecheck` clean, `lint` clean, `test` **212 passed, 5 skipped**,
+`build` succeeds, and the rebuilt server was re-checked live against the same database.
+
+Still outstanding from the conformance report (Phase 1A, in the brief's order): MIG-01 CSV import,
+FIN-02/03 invoices and manual payments, RPT-01 rental reports, WEB-01 public enquiry, a Playwright
+flow for workflow C, and a parallel-request double-booking test. Phase 1B onwards is unchanged and
+still not met.

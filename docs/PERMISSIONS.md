@@ -25,8 +25,9 @@ settings and audit. An account whose linked record is missing sees **nothing** �
 derived from the role on the actor and fails closed.
 
 Enforcement lives in `src/tms/scope.ts` (reads) and in the service layer (writes). HONEST
-LIMIT: without a server this runs in the same process as the caller, so a production
-deployment must enforce the same rules in its API. See ARCHITECTURE.md.
+Enforcement is in two places and both are tested: the service refuses the command, and the
+snapshot endpoint refuses to send a collection the role cannot read (`src/server/visibility.ts`,
+D-60). Hiding a control is a convenience, never the control.
 
 | Permission | administrator | operations | finance | driver | client_contact |
 |---|:-:|:-:|:-:|:-:|:-:|
@@ -46,24 +47,29 @@ deployment must enforce the same rules in its API. See ARCHITECTURE.md.
 | rentals:dispatch | x | x | | | |
 | rentals:complete | x | x | | | |
 | rentals:cancel | x | x | | | |
-| audit:read | x | x | x | | |
+| audit:read | x | x | | | |
 | backup:export / import | x | | | | |
 
 Rental separation of duties: operations runs the request/dispatch/completion steps; finance issues quotations and records deposits (confirm). Administrators can do everything.
+
+**Employee roster.** `passengers:read` is held by administrator, operations and
+client_contact (own client). Finance does not hold it, so the roster — names, employee
+references and phone numbers — never reaches a finance session. This is a server-side filter on
+the payload, not only a hidden tab (D-60).
 
 ## Compliance documents (Phase 6)
 
 | Permission | administrator | operations | finance | driver | client_contact |
 |---|:-:|:-:|:-:|:-:|:-:|
-| documents:read | x | x | x | own only | — |
+| documents:read | x | x | — | own only | — |
 | documents:create | x | x | — | — | — |
 | documents:update | x | x | — | — | — |
 
 A driver's `documents:read` is own-record: it returns documents for its own driver record and
 for vehicles assigned to it, and the driver portal renders them read-only. A driver can never
-write a document record. Finance can read (expiry affects costing and availability) but cannot
-create or edit. Document types themselves are edited under `settings:update` (administrator
-only).
+write a document record. Finance cannot read licence or insurance documents at all: those are
+personal/compliance records and billing does not need them (brief section 6, D-60). Document
+types themselves are edited under `settings:update` (administrator only).
 
 ## Fleet readiness and odometer (Phase 8)
 
@@ -101,13 +107,13 @@ traceable to the same event. Drivers and client contacts have no staff logistics
 |---|:-:|:-:|:-:|:-:|:-:|
 | routes:read | x | x | x | | |
 | routes:create / update | x | x | | | |
-| passengers:read | x | x | x | | |
+| passengers:read | x | x | — | | |
 | passengers:create / update | x | x | | | |
 | trips:read | x | x | x | | |
 | trips:generate / assign / dispatch / start / record / complete / cancel | x | x | | | |
 | kpis:read | x | x | x | | |
 
-Separation of duties: operations runs routes, rosters and trips. Finance can read rosters and KPIs but cannot change operational records. Drivers can start and progressively record only trips assigned to their linked driver record. Client contacts retain the client-scoped route/roster portal.
+Separation of duties: operations runs routes, rosters and trips. Finance reads KPIs and trip records for costing but never the employee roster, and cannot change operational records. Drivers can start and progressively record only trips assigned to their linked driver record. Client contacts retain the client-scoped route/roster portal.
 
 Additional invariants enforced by the service:
 

@@ -20,9 +20,11 @@
 // screen renders the most recent 500 matches, so sending 5 000 was paying for rows the browser
 // discards. The full count travels separately as `auditTotal`, so the screen can still say how many
 // there are without carrying them.
+import { can } from "../tms/permissions";
 import { scopedView } from "../tms/scope";
 import type { Actor } from "../tms/service";
 import type { Database } from "../tms/types";
+import type { Permission } from "../tms/permissions";
 import { redact } from "./snapshot";
 
 /** How many audit rows travel with a snapshot. The screen shows at most this many. */
@@ -35,13 +37,49 @@ export interface VisibleSnapshot {
   auditTotal: number;
 }
 
+/**
+ * Which collection is behind which read permission.
+ *
+ * Screen gates are not a control: the browser already holds the payload by the time a screen
+ * decides what to draw. So an internal role that lacks a read permission does not receive that
+ * collection at all — a Finance Officer gets rentals and costs, not the employee roster, licence
+ * documents or the audit trail (brief section 6, D-60). Record-bound roles are narrowed further
+ * by `scopedView` before this runs, and keep the collections their portal needs.
+ */
+const SECTION_PERMISSIONS: { [K in keyof Database]?: Permission } = {
+  audit: "audit:read",
+  clients: "clients:read",
+  documents: "documents:read",
+  drivers: "drivers:read",
+  incidents: "incidents:read",
+  odometerReadings: "fleet:read",
+  passengers: "passengers:read",
+  rentals: "rentals:read",
+  routes: "routes:read",
+  settings: "settings:read",
+  trips: "trips:read",
+  users: "users:read",
+  vehicles: "vehicles:read",
+  workOrders: "maintenance:read",
+};
+
+function byPermission(database: Database, actor: Actor): Database {
+  const visible: Database = { ...database };
+  for (const [section, permission] of Object.entries(SECTION_PERMISSIONS) as [keyof Database, Permission][]) {
+    if (!can(actor.role, permission)) (visible as unknown as Record<string, unknown>)[section] = [];
+  }
+  return visible;
+}
+
 /** The database narrowed to what `actor` may read, credentials removed. */
 export function scopeDatabase(database: Database, actor: Actor | null): Database | null {
   if (!actor) return null;
 
   const view = scopedView(database, actor);
   const { link } = view;
-  let visible: Database = database;
+  // Internal roles read company-wide *within their permissions*; bound roles read their own
+  // records. Neither branch is allowed to hand back a collection the role cannot read.
+  let visible: Database = link.bound ? database : byPermission(database, actor);
 
   if (link.bound) {
     const vehicleIds = new Set(view.vehicles.map((vehicle) => vehicle.id));
@@ -54,7 +92,11 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       trips: view.trips,
       incidents: view.incidents,
       routes: view.routes,
-      passengers: view.passengers,
+      // A corporate contact sees which of its staff travel and from which stop — the manifest it
+      // needs to answer "where is my team?" — but not their phone numbers: the portal's own copy
+      // says contact details are held by the account manager, and the payload must match it
+      // (brief section 6, D-60).
+      passengers: link.client ? view.passengers.map((passenger) => ({ ...passenger, phone: "" })) : view.passengers,
       rentals: view.rentals,
       vehicles: view.vehicles,
       workOrders: view.workOrders,

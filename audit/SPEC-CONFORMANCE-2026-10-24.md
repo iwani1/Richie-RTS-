@@ -7,7 +7,7 @@ them against the application as it actually runs.
 **Answer, in one sentence:** no — the application is a solid, genuinely server-backed TMS that
 meets the brief's integrity rules, the rental lifecycle, fleet/compliance, work orders, route → trip
 → boarding → on-time flow and the permission/audit core, but it does **not** meet the brief as a
-whole: **7 of 78 feature IDs are met, 38 are partial, 19 are missing (all of them Phase 1A–1C
+whole: **8 of 78 feature IDs are met, 37 are partial, 19 are missing (all of them Phase 1A–1C
 obligations), 14 are later-phase and untouched**, four named stack standards are replaced or absent,
 6 of the brief's 10 roles do not exist, and 6 of the 8 end-to-end workflows in §8 cannot run end to
 end. It is also **below its own phase gates**: the Phase 1A exit criteria are not met, so starting
@@ -16,6 +16,11 @@ phase's exit criteria are unmet").
 
 This run changed no application code. Everything below was executed against a live production build
 (`next build` + `next start`) on a real PostgreSQL instance.
+
+> **Update, same day.** The four behavioural defects in §15.2 were fixed and re-verified against a
+> rebuilt server (commit `Phase 15` in `docs/PROGRESS.md`, decisions D-60 and D-61). RNT-03 moved
+> from partial to met because capacity is now checked wherever a vehicle is bound to people; the
+> counts above include that change. Nothing else in this report has been fixed or withdrawn.
 
 ---
 
@@ -42,8 +47,8 @@ missing or deferred — never assumed.
 
 | Status | Count | IDs |
 |---|---|---|
-| **Met** (works; ran it) | **7** | AUTH-01, AUD-01, RNT-06, RNT-08, RTE-03, TRP-02, DRV-04 |
-| **Partial** (some of it exists; gaps named in §5) | **38** | AUTH-02, AUTH-03, AUTH-04, SET-01, CUS-01, RNT-01, RNT-02, RNT-03, RNT-04, RNT-05, RNT-07, RNT-09, FLT-01, FLT-02, FLT-03, FLT-04, FLT-05, MNT-01, MNT-02, MNT-03, CLI-01, CLI-03, EMP-01, EMP-03, RTE-01, RTE-02, TRP-01, DSP-01, DSP-02, DSP-04, DRV-01, DRV-02, INC-01, INC-02, FIN-01, FIN-03, FIN-05, RPT-02 |
+| **Met** (works; ran it) | **8** | AUTH-01, AUD-01, RNT-03, RNT-06, RNT-08, RTE-03, TRP-02, DRV-04 |
+| **Partial** (some of it exists; gaps named in §5) | **37** | AUTH-02, AUTH-03, AUTH-04, SET-01, CUS-01, RNT-01, RNT-02, RNT-04, RNT-05, RNT-07, RNT-09, FLT-01, FLT-02, FLT-03, FLT-04, FLT-05, MNT-01, MNT-02, MNT-03, CLI-01, CLI-03, EMP-01, EMP-03, RTE-01, RTE-02, TRP-01, DSP-01, DSP-02, DSP-04, DRV-01, DRV-02, INC-01, INC-02, FIN-01, FIN-03, FIN-05, RPT-02 |
 | **Missing** (nothing built, and all of these were due in Phase 1A/1B/1C) | **19** | AUTH-05, MIG-01, WEB-01, CLI-02, EMP-02, BKG-01, BKG-02, BKG-03, BKG-04, BKG-05, BKG-06, DSP-03, RTE-04, PAX-01, FIN-02, FIN-07, RPT-01, RPT-03, RPT-04 |
 | **Deferred** (Phase 2/3, not attempted — honest) | **14** | AUTH-06, MNT-04, RTE-05, DRV-03, DRV-05, PAX-02, FIN-04, FIN-06, FIN-08, NTF-01, NTF-02, NTF-03, RPT-05, GPS-01 |
 
@@ -131,7 +136,7 @@ Legend: **M** met · **P** partial · **X** missing · **D** deferred. "Evidence
 | CUS-01 | **P** | client: name, contact name/email/phone, status. **No** reference, billing details, type, notes, branches, history |
 | RNT-01 | **P** | customer, dates, pickup/destination, passenger count, purpose, vehicle category, driver required, notes. **No** departure/return time, intermediate stops, luggage/special needs, trip contact, request source |
 | RNT-02 | **P** | `draft → quoted → confirmed → in_progress → completed`, plus `declined`/`cancelled`; invalid transitions rejected and tested. **7 states, not 12** — no Submitted/Under Review/Awaiting Quotation/Quotation Sent/Awaiting Customer Confirmation/Dispatched; no separate quotation or booking entity |
-| RNT-03 | **P** | live: wrong category refused, overlapping vehicle/driver refused, expired licence refused, availability computed from reservations. **Capacity is not checked** (see 5.1) |
+| RNT-03 | **M** | live: wrong category refused, overlapping vehicle/driver refused, expired licence refused, availability computed from reservations; capacity now refused at assignment and dispatch (`This vehicle seats 22; RT-001 has 25 active passengers.`). Was partial — see §15.3 |
 | RNT-04 | **P** | line items, subtotal, deposit %, valid-until, currency, quote history on requote, expired quote cannot be confirmed (`The quotation has expired…`) nor renewed without the configured policy. **No** quotation number, no version field (revision number is derived from history length), **no tax lines**, no terms and conditions, no approval record |
 | RNT-05 | **P** | confirmation validates quote, resources, deposit floor (`Deposit must be at least GHS 420.00` → refused `GHS 300.00`), writes reservations; cancelled rentals release them. **No** customer acceptance record, **no notification**, no payment beyond the deposit |
 | RNT-06 | **M** | assign/reassign with validation; every assignment is an audit entry (`RR-0004 assigned vehicle GT-1001 and driver Kofi Mensah.`) |
@@ -412,6 +417,18 @@ Phase 1B and 1C were started anyway, which the brief's §14 explicitly forbids.
 | 6 | **No pagination on any table** | `grep -rn "pagination\|pageSize"` → 0 hits | §11 unmet; the app will not hold a real fleet's data |
 | 7 | **Stale documentation of the shipped interface** | `docs/PROGRESS.md` Phase 14 still describes "bright editorial", "front page", "numbered contents strip", "masthead", "rubric"; `src/index.css` keeps a "ledger tables" comment and per-route `--rubric` colours; `package.json` description and the README title say **"Transport Management Ledger"** | The owner banned that vocabulary and the editorial direction; docs and metadata still carry it |
 | 8 | **Dead dependency** | `@fontsource-variable/fraunces` is installed but nothing imports it | Unused install weight |
+
+### 15.3 Fixed since this report (same day, re-verified live)
+
+| # | Fix | Evidence |
+|---|---|---|
+| 1 | `start_rental` refuses before the booked date and after the return date; `start_trip` refuses before the service date and more than a day after it | `RR-0004 is booked from 2026-11-02. It cannot be started before that date.` · `TR-0013 is scheduled for 2026-10-27. It cannot be started before that day.` · tests in `service.test.ts` and `busing.test.ts` (D-61) |
+| 2 | Seat capacity refused at rental assignment and at busing assign, dispatch and start | `This vehicle seats 22; RT-001 has 25 active passengers. Use a larger vehicle or take staff off the roster first.` — refused at assign and again at dispatch · three new tests |
+| 3 | Finance no longer receives the employee roster, documents, accounts or audit trail | finance session after the rebuild: `users:0 passengers:0 documents:0 audit:0`, rentals/trips/clients intact; `visibility.test.ts` (D-60) |
+| 4 | A client contact's payload no longer carries staff phone numbers, matching the portal's own copy | `visibility.test.ts` "withholds staff phone numbers from a client contact but keeps the manifest" |
+
+Gates after the fixes: `typecheck` clean · `lint` clean · **212 passed / 5 skipped** · build ✓ ·
+`/api/health` 200 on the rebuilt server, with the data seeded in this run still present.
 
 Observation, not a defect: `GET /` is served with `Cache-Control: s-maxage=31536000`. The HTML is a
 shell and all data is fetched after authentication, so this is not a data leak — but any future

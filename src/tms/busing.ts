@@ -277,6 +277,16 @@ function midTripPassengerErrors(
 }
 
 // Vehicle and driver checks for a trip, including same-day time overlaps and rental clashes.
+/**
+ * How many people the run must carry: every active passenger on the route. A passenger outside
+ * the vehicle's seats is a refusal, never a warning — capacity is a safety limit, not a metric
+ * (brief 5.1 and 12). The number is recomputed at assign, dispatch and start, so a roster that
+ * grew after the vehicle was chosen cannot slip through.
+ */
+function activeRoster(db: Database, routeId: string): number {
+  return db.passengers.filter((passenger) => passenger.routeId === routeId && passenger.status === "active").length;
+}
+
 function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: string, driverId: string): Errors {
   const errors: Errors = {};
 
@@ -285,6 +295,8 @@ function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: s
   else if (!vehicle) errors.vehicleId = "Unknown vehicle.";
   else if (vehicle.categoryId !== route.vehicleCategoryId) errors.vehicleId = "Vehicle category does not match the route.";
   else if (vehicle.status !== "available") errors.vehicleId = `Vehicle must be Available to be assigned (currently ${VEHICLE_STATUS_LABELS[vehicle.status].toLowerCase()}).`;
+  else if (vehicle.seatCapacity < activeRoster(db, route.id))
+    errors.vehicleId = `This vehicle seats ${vehicle.seatCapacity}; ${route.reference} has ${activeRoster(db, route.id)} active passengers. Use a larger vehicle or take staff off the roster first.`;
 
   const driver = db.drivers.find((d) => d.id === driverId);
   if (!driverId) errors.driverId = "Select a driver.";
@@ -513,6 +525,14 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       const route = db.routes.find((r) => r.id === existing.routeId);
       if (!route) return fail("Route not found.");
       if (route.status !== "active") return fail(`Route is ${route.status}; its trip cannot be started.`);
+      // A run is worked on its service day (an overnight shift may finish after midnight, so the
+      // following day is tolerated). Starting a future run — or reviving a stale one — is refused;
+      // the record stays honest about when the work actually happened (brief 5.5, TRP-01).
+      const today = now.slice(0, 10);
+      if (today < existing.serviceDate)
+        return fail(`${existing.reference} is scheduled for ${existing.serviceDate}. It cannot be started before that day.`);
+      if (new Date(today).getTime() - new Date(existing.serviceDate).getTime() > 86_400_000)
+        return fail(`${existing.reference} was scheduled for ${existing.serviceDate}. Cancel it and generate the run you actually worked.`);
       if (!existing.vehicleId || !existing.driverId) return fail("The trip has no assigned vehicle and driver.");
       const errors = assessResources(db, route, existing, existing.vehicleId, existing.driverId);
       if (Object.keys(errors).length) return fail("Start blocked: the assigned resources are no longer valid.", errors);
