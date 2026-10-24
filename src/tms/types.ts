@@ -456,6 +456,9 @@ export interface WorkOrder {
   costEntries: CostEntry[];
   costsConfirmedComplete: boolean;
   completionNote: string | null;
+  /** Who signed the vehicle back into service, and when. Required by brief MNT-02 and never inferred. */
+  releasedBy: string | null;
+  releasedAt: string | null;
   log: LogEntry[];
   createdAt: string;
   updatedAt: string;
@@ -597,7 +600,7 @@ export interface ReferenceCounter {
   last: number;
 }
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -665,7 +668,7 @@ export function emptyDatabase(): Database {
 export function migrate(value: unknown): Database | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(v.schemaVersion as number)) return null;
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(v.schemaVersion as number)) return null;
   if (!Array.isArray(v.users) || !Array.isArray(v.vehicles) || !Array.isArray(v.drivers) || !Array.isArray(v.clients) || !Array.isArray(v.audit)) return null;
   if (typeof v.settings !== "object" || v.settings === null) return null;
   const settings = v.settings as Record<string, unknown>;
@@ -692,6 +695,10 @@ export function migrate(value: unknown): Database | null {
           // Legacy records were never marked as a service; do not invent that decision.
           completedAt: order.completedAt ?? null,
           resetsServiceInterval: order.resetsServiceInterval ?? false,
+          // Orders recorded before the release field existed were closed without one; do not
+          // invent a releaser.
+          releasedBy: order.releasedBy ?? null,
+          releasedAt: order.releasedAt ?? null,
         }))
       : [],
     documents: Array.isArray(v.documents) ? (v.documents as ComplianceDocument[]) : [],

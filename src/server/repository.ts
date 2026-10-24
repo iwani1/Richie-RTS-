@@ -313,7 +313,7 @@ async function auditRows(trx: Kysely<KyselyDatabase>, limit: number): Promise<Se
 
 /** Reads the whole working set. Audit is capped for the in-memory snapshot; the table keeps all. */
 export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Promise<Database> {
-  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, incidents, workOrders, documents, odometer, invoices, payments, audit, settings] =
+  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, incidents, workOrders, documents, odometer, invoices, payments, counters, audit, settings] =
     await Promise.all([
       rows(executor, "app_user"),
       rows(executor, "vehicle"),
@@ -329,6 +329,11 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
       rows(executor, "odometer_reading"),
       rows(executor, "invoice"),
       rows(executor, "payment"),
+      // Number series are what stop a second invoice or payment reusing INV-2026-0001. They are
+      // stored outside the JSON snapshot, so this read is the only thing that carries them into
+      // the next command (found by the workflow C integration test: without it every payment took
+      // PAY-…-0001 and the second one was refused by payment_reference_key).
+      executor.selectFrom("reference_counter").select(["scope", "period", "last"]).execute(),
       auditRows(executor, AUDIT_LIMIT),
       executor.selectFrom("app_settings").select(["data"]).where("id", "=", "singleton").executeTakeFirst(),
     ]);
@@ -349,6 +354,11 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
     odometerReadings: odometer.map((r) => r.data),
     invoices: invoices.map((r) => r.data),
     payments: payments.map((r) => r.data),
+    referenceCounters: counters.map((counter) => ({
+      scope: counter.scope as Database["referenceCounters"][number]["scope"],
+      period: counter.period,
+      last: Number(counter.last),
+    })),
     settings: (settings?.data as Database["settings"]) ?? emptyDatabase().settings,
     // Audit has no `data` column: it is a typed, append-only ledger precisely so that the rows
     // cannot be rewritten as opaque JSON (migration 001, trigger audit_append_only_trg).

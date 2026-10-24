@@ -432,3 +432,19 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **255 passed, 5 
 Still open from the conformance report: `PROGRESS.md` as a per-feature-ID table (§13.6), WEB-01,
 AUTH-05, the Playwright proof for workflow C and a real parallel double-booking test. Phase 1B
 (contracts, employees, bookings) and Phases 2–3 are unchanged and still not met.
+
+## Phase 19 - The approved hardening list (in progress)
+
+| Item | Status | Evidence |
+|---|---|---|
+| Integration tests run against PostgreSQL in CI, not skipped | Done (verified locally against Postgres 18 semantics via PGlite) | `.github/workflows/ci.yml` job `integration` (postgres:18-alpine, `db:migrate`, `npm run test:integration`); `src/server/repository.integration.test.ts` (5) + `src/server/commandFlow.integration.test.ts` (3), all 8 green |
+| Workflow C proved end to end, with a reload in the middle | Done (verified) | `commandFlow.integration.test.ts` "runs a rental from request to a paid invoice, and the records survive a reload": `INV-2026-0001` GHS 3,450 due 2026-06-17, two payments to `paid`, `referenceCounters` persisted, audit rows re-read from the table (D-68 notes this is HTTP/command-level, not Playwright) |
+| Parallel double-booking: six operators, one vehicle | Done (verified) | Same file: six concurrent `assign_rental` calls → 1 success, 5 × 409 with "already assigned to RR-…", exactly one `resource_reservation` row |
+| A refusal caused by a clash returns 409, not 400 | Done (verified) | `Failure.kind = "conflict"` (`service.ts`), mapped in `runCommand`; only the assignment clash sets it today |
+| **Defect fixed:** number series were written but never read back | Done (verified) | `loadDatabase` now reads `reference_counter`; without it the second payment of the day reused `PAY-…-0001` and was refused by `payment_reference_key` (the integration test caught it) |
+| Vehicle release is a separate permission, and the releaser is recorded | Done (verified) | `maintenance:release` in `permissions.ts`; `advance_work_order` gate + `releasedBy`/`releasedAt`; audit action `maintenance:release`; tests "records who released the vehicle…" and "refuses to release a vehicle for an account that may advance work but not release it"; schema 12 (D-64) |
+| **Still open** | — | AUTH-05 (profile + login history), WEB-01 (public enquiry form), `PROGRESS.md` as a per-feature-ID table (§13.6), and the Playwright substitute being labelled in the report |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **257 passed, 8 skipped** (the 8 are
+the two integration suites, which only run with `TEST_DATABASE_URL`), integration **8 passed**,
+`build` succeeds.

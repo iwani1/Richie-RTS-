@@ -148,7 +148,9 @@ export type Command =
   // The export itself stays client-side (it is a serialisation of the local database).
   | { type: "record_backup_export" };
 
-export type Failure = { ok: false; message: string; errors: Record<string, string> };
+// `kind` separates a clash with existing records (two dispatchers, one vehicle) from a field that
+// needs correcting. The API maps a conflict to 409 and everything else to 400 (docs/API.md).
+export type Failure = { ok: false; message: string; errors: Record<string, string>; kind?: "conflict" };
 export type Success = { ok: true; db: Database; message: string };
 export type CommandResult = Success | Failure;
 
@@ -213,7 +215,8 @@ export function makeId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export const fail = (message: string, errors: Errors = {}): Failure => ({ ok: false, message, errors });
+export const fail = (message: string, errors: Errors = {}, kind?: Failure["kind"]): Failure =>
+  kind ? { ok: false, message, errors, kind } : { ok: false, message, errors };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -947,19 +950,26 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       }
 
       // Double-booking prevention (the exclusion-constraint rule from Phase 0 section 5.1).
+      let conflict = false;
       if (!errors.vehicleId && vehicle) {
         const clash = db.rentals.find(
           (r) => r.id !== existing.id && ACTIVE_RENTAL_STATUSES.includes(r.status) && r.assignedVehicleId === vehicle.id && datesOverlap(existing.startDate, existing.endDate, r.startDate, r.endDate),
         );
-        if (clash) errors.vehicleId = `Vehicle is already assigned to ${clash.reference} over overlapping dates.`;
+        if (clash) {
+          errors.vehicleId = `Vehicle is already assigned to ${clash.reference} over overlapping dates.`;
+          conflict = true;
+        }
       }
       if (!errors.driverId && command.input.driverId && driver) {
         const clash = db.rentals.find(
           (r) => r.id !== existing.id && ACTIVE_RENTAL_STATUSES.includes(r.status) && r.assignedDriverId === driver.id && datesOverlap(existing.startDate, existing.endDate, r.startDate, r.endDate),
         );
-        if (clash) errors.driverId = `Driver is already assigned to ${clash.reference} over overlapping dates.`;
+        if (clash) {
+          errors.driverId = `Driver is already assigned to ${clash.reference} over overlapping dates.`;
+          conflict = true;
+        }
       }
-      if (Object.keys(errors).length) return fail("Please correct the assignment.", errors);
+      if (Object.keys(errors).length) return fail("Please correct the assignment.", errors, conflict ? "conflict" : undefined);
       const updated: Rental = { ...existing, assignedVehicleId: command.input.vehicleId, assignedDriverId: command.input.driverId || null, updatedAt: now };
       const next = audit({ ...db, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
         action: "rentals:assign",

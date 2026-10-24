@@ -520,6 +520,8 @@ export function executeLogistics(
         costEntries: [],
         costsConfirmedComplete: false,
         completionNote: null,
+        releasedBy: null,
+        releasedAt: null,
         log: [],
         createdAt: now,
         updatedAt: now,
@@ -585,6 +587,16 @@ export function executeLogistics(
       }
       if (Object.keys(errors).length) return fail("This work order cannot move to that status yet.", errors);
 
+      // Closing returns a vehicle to service. That is a release, not a status change, so it needs
+      // its own permission and it records who signed the vehicle back in (brief MNT-02). A
+      // workshop account can be given maintenance:advance to move work along and still be unable
+      // to declare the vehicle roadworthy.
+      if (to === "closed") {
+        const releaseDenied = authorise(actor, "maintenance:release");
+        if (releaseDenied) return releaseDenied;
+      }
+
+      const releaser = actor?.fullName ?? "System";
       const updated: WorkOrder = {
         ...existing,
         status: to,
@@ -592,6 +604,8 @@ export function executeLogistics(
         costsConfirmedComplete: to === "completed" || to === "closed" ? true : existing.costsConfirmedComplete,
         completionNote: to === "completed" ? command.input.note.trim() : existing.completionNote,
         completedAt: to === "completed" ? now : existing.completedAt,
+        releasedBy: to === "closed" ? releaser : existing.releasedBy,
+        releasedAt: to === "closed" ? now : existing.releasedAt,
         updatedAt: now,
         log: [...existing.log, logEntry(actor, command.input.note || `Status set to ${to}.`, from, to, now)],
       };
@@ -612,10 +626,10 @@ export function executeLogistics(
       }
 
       next = audit(next, actor, {
-        action: "maintenance:advance",
+        action: to === "closed" ? "maintenance:release" : "maintenance:advance",
         entity: "work_order",
         entityId: updated.id,
-        summary: `${updated.reference}: ${from} -> ${to}.${vehicleNote}`,
+        summary: `${updated.reference}: ${from} -> ${to}.${vehicleNote}${to === "closed" ? ` Released by ${releaser}.` : ""}`,
       }, now);
       return { ok: true, db: next, message: `${updated.reference} is now ${to.replace("_", " ")}.${vehicleNote}` };
     }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { costReport } from "./costs";
 import { executeCommand, type AnyCommand } from "./commands";
 import { INCIDENT_TRANSITIONS, WORK_ORDER_TRANSITIONS, type IncidentInput, type WorkOrderInput } from "./logistics";
+import { ROLE_PERMISSIONS, can, type Permission } from "./permissions";
 import type { Actor, Credential } from "./service";
 import { emptyDatabase, type Database, type Incident, type WorkOrder } from "./types";
 
@@ -302,6 +303,56 @@ describe("costs", () => {
     step(w, w.finance, { type: "remove_work_order_cost", id, costId: order.costEntries[0].id });
     expect(lastOrder(w.db).costEntries).toHaveLength(0);
     expect(w.db.audit[0].summary).toMatch(/Cost removed/);
+  });
+
+  it("records who released the vehicle back into service, and audits the release as a release", () => {
+    const w = world();
+    step(w, w.ops, { type: "create_work_order", input: workOrderInput(w.vehicleId) });
+    const id = lastOrder(w.db).id;
+    step(w, w.ops, { type: "advance_work_order", id, input: { to: "in_progress", note: "", costsConfirmedComplete: false, vehicleRestoredTo: "unchanged" } });
+    step(w, w.ops, { type: "advance_work_order", id, input: { to: "completed", note: "Radiator replaced.", costsConfirmedComplete: true, vehicleRestoredTo: "unchanged" } });
+    expect(lastOrder(w.db).releasedBy).toBeNull();
+
+    step(w, w.ops, { type: "advance_work_order", id, input: { to: "closed", note: "Costs reviewed.", costsConfirmedComplete: true, vehicleRestoredTo: "available" } });
+
+    const order = lastOrder(w.db);
+    expect(order.releasedBy).toBe("Ops");
+    expect(order.releasedAt).toBe(NOW);
+    expect(w.db.vehicles[0].status).toBe("available");
+    const entry = w.db.audit.find((record) => record.action === "maintenance:release");
+    expect(entry?.summary).toMatch(/Released by Ops/);
+  });
+
+  it("refuses to release a vehicle for an account that may advance work but not release it", () => {
+    const w = world();
+    step(w, w.ops, { type: "create_work_order", input: workOrderInput(w.vehicleId) });
+    const id = lastOrder(w.db).id;
+    step(w, w.ops, { type: "advance_work_order", id, input: { to: "in_progress", note: "", costsConfirmedComplete: false, vehicleRestoredTo: "unchanged" } });
+    step(w, w.ops, { type: "advance_work_order", id, input: { to: "completed", note: "Done.", costsConfirmedComplete: true, vehicleRestoredTo: "unchanged" } });
+
+    // A workshop account is the permission set that can move work along but not sign a vehicle
+    // back into service. There is no such role yet, so the set is simulated here by removing the
+    // one permission under test; everything else stays as operations holds it.
+    const permissions = ROLE_PERMISSIONS.operations as Permission[];
+    const at = permissions.indexOf("maintenance:release");
+    expect(at).toBeGreaterThanOrEqual(0);
+    permissions.splice(at, 1);
+    try {
+      const blocked = attempt(w, w.ops, {
+        type: "advance_work_order",
+        id,
+        input: { to: "closed", note: "Reviewed.", costsConfirmedComplete: true, vehicleRestoredTo: "available" },
+      });
+      expect(blocked.ok).toBe(false);
+      if (!blocked.ok) expect(blocked.message).toMatch(/lacks maintenance:release/);
+      expect(lastOrder(w.db).status).toBe("completed");
+      expect(w.db.vehicles[0].status).toBe("maintenance");
+    } finally {
+      permissions.splice(at, 0, "maintenance:release");
+    }
+
+    expect(can("operations", "maintenance:release")).toBe(true);
+    expect(can("finance", "maintenance:release")).toBe(false);
   });
 
   it("locks costs once the work order or incident is closed", () => {

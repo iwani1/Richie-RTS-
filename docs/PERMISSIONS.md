@@ -139,11 +139,18 @@ administrators change them (`settings:update`).
 | incidents:cost | x | | x | | |
 | maintenance:read | x | x | x | | |
 | maintenance:create / maintenance:update / maintenance:advance | x | x | | | |
+| maintenance:release | x | x | | | |
 | maintenance:cost | x | | x | | |
 | costs:read | x | x | x | | |
 
 Separation of duties: operations runs the response and the maintenance work; finance records and
-reviews costs. The two roles can read each other's records so the work and the bill stay
+reviews costs. **Releasing a vehicle is a separate permission from advancing the work.**
+`maintenance:advance` moves a work order through open, in progress, on hold and completed;
+`maintenance:release` is what closing the work order needs, because closing is the act that
+returns the vehicle to service. The person who releases it is recorded on the work order
+(`releasedBy`, `releasedAt`) and the audit entry is `maintenance:release`, not
+`maintenance:advance` (brief MNT-02). Administrator and operations hold both today; a workshop
+account would be given advance without release, which is the reason the two were split. The two roles can read each other's records so the work and the bill stay
 traceable to the same event. Drivers and client contacts have no staff logistics access yet
 (see OPEN_QUESTIONS Q-33 and Q-35).
 

@@ -763,7 +763,8 @@ function WorkOrderForm({ defaults, order, onClose }: { defaults: { vehicleId: st
 function WorkOrderDetail({ order, onClose }: { order: WorkOrder; onClose: () => void }) {
   const { db, allowed, dispatch, setFlash } = useTms();
   const current = db.workOrders.find((w) => w.id === order.id) ?? order;
-  const allowedTransitions = WORK_ORDER_TRANSITIONS[current.status];
+  // Closing is the release, so it is offered only to an account that may release the vehicle.
+  const allowedTransitions = WORK_ORDER_TRANSITIONS[current.status].filter((status) => status !== "closed" || allowed("maintenance:release"));
   const [to, setTo] = useState<WorkOrderStatus>(allowedTransitions[0] ?? "closed");
   const [note, setNote] = useState("");
   const [costsConfirmed, setCostsConfirmed] = useState(current.costEntries.length > 0);
@@ -802,6 +803,12 @@ function WorkOrderDetail({ order, onClose }: { order: WorkOrder; onClose: () => 
         </div>
         {current.holdReason && <p className="rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm"><span className="font-medium">On hold: </span>{current.holdReason}</p>}
         {current.completionNote && <p className="rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm"><span className="font-medium">Work done: </span>{current.completionNote}</p>}
+        {current.releasedBy && (
+          <p className="rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm">
+            <span className="font-medium">Released for service by </span>{current.releasedBy}
+            {current.releasedAt ? ` · ${formatDateTime(current.releasedAt)}` : ""}
+          </p>
+        )}
 
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Activity log</h3>
@@ -865,12 +872,21 @@ function WorkOrderDetail({ order, onClose }: { order: WorkOrder; onClose: () => 
               </label>
             )}
             {errors.costsConfirmedComplete && <p className="mt-2 text-xs font-medium text-red-700">{errors.costsConfirmedComplete}</p>}
+            {to === "closed" && (
+              <p className="mt-2 text-xs text-stone-500">
+                Closing the work order returns the vehicle to service and records your name as the person who released it.
+              </p>
+            )}
             <div className="mt-3 flex justify-end">
               <Button type="submit" variant="primary">Record change</Button>
             </div>
           </form>
         ) : (
-          <p className="border-t border-stone-200 pt-4 text-sm text-stone-500">This work order is closed. No further status changes are allowed.</p>
+          <p className="border-t border-stone-200 pt-4 text-sm text-stone-500">
+            {current.status === "closed"
+              ? "This work order is closed. No further status changes are allowed."
+              : "The work is complete. Releasing the vehicle back into service is a separate control: an administrator or operations user must close the work order and sign the release."}
+          </p>
         )}
       </div>
     </Panel>

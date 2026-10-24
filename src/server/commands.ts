@@ -191,7 +191,12 @@ export async function runCommand(
         const { actor } = await resolveActor(before, userId ?? null, fromCookie);
         const result: CommandResult = executeCommand(before, actor, command, now);
         if (!result.ok) {
-          return { ok: false as const, status: statusForFailure(result.message), message: result.message, errors: result.errors };
+          return {
+            ok: false as const,
+            status: result.kind === "conflict" ? 409 : statusForFailure(result.message),
+            message: result.message,
+            errors: result.errors,
+          };
         }
         await saveDatabase(trx, before, result.db);
         return { ok: true as const, status: 200, message: result.message, database: result.db };

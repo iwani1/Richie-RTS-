@@ -1,0 +1,232 @@
+// The two proofs the Phase 1A gate asks for that no unit test can give.
+//
+//   1. Workflow C end to end, through the same command path the HTTP route uses, against real
+//      PostgreSQL — including a reload in the middle, so "it survived a restart" is demonstrated
+//      rather than assumed.
+//   2. Parallel assignment: six operators asking for the same vehicle for the same days at the same
+//      moment. Exactly one may win, the rest must be refused with a sentence rather than a 500.
+//
+// Run with:
+//   TEST_DATABASE_URL="postgresql://richie:…@127.0.0.1:5432/richie_tms_test" npm run test:integration
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { sql } from "kysely";
+import { closeDb, db } from "./db";
+import { loadDatabase, truncateAll } from "./repository";
+import { runCommand } from "./commands";
+import type { AnyCommand } from "../tms/commands";
+import type { Database } from "../tms/types";
+
+const connectionString = process.env.TEST_DATABASE_URL;
+const suite = connectionString ? describe : describe.skip;
+
+const cred = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
+
+async function wipe(): Promise<void> {
+  await db()
+    .transaction()
+    .execute(async (trx) => {
+      await sql`select pg_advisory_xact_lock(728411)`.execute(trx);
+      await truncateAll(trx);
+    });
+}
+
+async function command<T extends AnyCommand>(
+  type: T["type"],
+  body: Partial<T>,
+  userId: string | null,
+  now: string,
+): Promise<{ ok: boolean; message: string; status: number; database?: Database; errors: Record<string, string> }> {
+  return (await runCommand({ type, ...body } as T, { userId, now })) as {
+    ok: boolean;
+    message: string;
+    status: number;
+    database?: Database;
+    errors: Record<string, string>;
+  };
+}
+
+/** Fails loudly: a fixture that silently did not run would make every later assertion a lie. */
+async function step<T extends AnyCommand>(type: T["type"], body: Partial<T>, userId: string | null, now: string): Promise<Database> {
+  const result = await command(type, body, userId, now);
+  if (!result.ok || !result.database) throw new Error(`${type} failed (${result.status}): ${result.message} ${JSON.stringify(result.errors)}`);
+  return result.database;
+}
+
+const TODAY = "2026-06-01T07:00:00.000Z";
+
+/** An administrator, one category, one vehicle and the settings a rental needs. */
+async function world(): Promise<{ adminId: string; vehicleId: string; settings: Database["settings"] }> {
+  const setup = await step("setup_administrator", { input: { fullName: "Admin", email: "admin@example.test" }, credential: cred } as never, null, TODAY);
+  const adminId = setup.users[0].id;
+  const configured = await step(
+    "update_settings",
+    {
+      input: {
+        ...setup.settings,
+        companyName: "Richie Transport Services",
+        currencyCode: "GHS",
+        vehicleCategories: [{ id: "", name: "Coaster" }],
+        rental: {
+          ...setup.settings.rental,
+          pricingBasis: "per_day",
+          depositPercent: 20,
+          quotationValidityDays: 14,
+          paymentMethods: ["Cash", "Bank transfer"],
+        },
+        taxPosition: "registered",
+        taxLines: [{ id: "", name: "VAT", ratePercent: 15 }],
+        invoiceDueDays: 14,
+      },
+    } as never,
+    adminId,
+    TODAY,
+  );
+  const created = await step(
+    "create_vehicle",
+    { input: { registration: "GT 1000-26", categoryId: configured.settings.vehicleCategories[0].id, make: "Toyota", model: "Coaster", seatCapacity: "30", notes: "" } } as never,
+    adminId,
+    TODAY,
+  );
+  return { adminId, vehicleId: created.vehicles[0].id, settings: created.settings };
+}
+
+async function confirmedRental(adminId: string, start: string, end: string): Promise<string> {
+  const created = await step(
+    "create_rental",
+    {
+      input: {
+        clientId: null,
+        customerName: "Acme Ltd",
+        customerPhone: "0244000000",
+        customerEmail: "ops@acme.test",
+        purpose: "Staff retreat",
+        pickupLocation: "Accra",
+        dropoffLocation: "Kumasi",
+        startDate: start,
+        endDate: end,
+        passengers: "12",
+        vehicleCategoryId: (await loadDatabase()).settings.vehicleCategories[0].id,
+        driverRequired: false,
+        notes: "",
+      },
+    } as never,
+    adminId,
+    TODAY,
+  );
+  const id = created.rentals[created.rentals.length - 1].id;
+  await step("quote_rental", { id, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } } as never, adminId, TODAY);
+  await step("confirm_rental", { id, input: { amount: "600", method: "Cash", reference: "DEP-1" } } as never, adminId, TODAY);
+  return id;
+}
+
+suite("workflow C and concurrency, against PostgreSQL", () => {
+  beforeAll(async () => {
+    if (!connectionString) return;
+    process.env.DATABASE_URL = connectionString;
+    const { migrate } = await import("../../scripts/migrate");
+    await migrate(connectionString, () => undefined);
+  });
+
+  beforeEach(async () => {
+    if (!connectionString) return;
+    await wipe();
+  });
+
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("runs a rental from request to a paid invoice, and the records survive a reload", async () => {
+    const { adminId, vehicleId } = await world();
+    const rentalId = await confirmedRental(adminId, "2026-06-01", "2026-06-03");
+
+    // A reload here is the stand-in for a restart: nothing in memory may be carrying this.
+    const afterConfirm = await loadDatabase();
+    expect(afterConfirm.rentals.map((rental) => rental.status)).toEqual(["confirmed"]);
+
+    const assigned = await step("assign_rental", { id: rentalId, input: { vehicleId, driverId: "" } } as never, adminId, TODAY);
+    expect(assigned.rentals[0].assignedVehicleId).toBe(vehicleId);
+
+    await step("start_rental", { id: rentalId } as never, adminId, "2026-06-01T09:00:00.000Z");
+    await step(
+      "complete_rental",
+      { id: rentalId, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } } as never,
+      adminId,
+      "2026-06-03T18:00:00.000Z",
+    );
+
+    const invoiced = await step("issue_rental_invoice", { input: { rentalId, issuedOn: "2026-06-03", discountAmount: "", discountReason: "", notes: "Thank you" } } as never, adminId, "2026-06-03T18:30:00.000Z");
+    const invoice = invoiced.invoices[0];
+    expect(invoice.reference).toBe("INV-2026-0001");
+    expect(invoice.total).toBe(3450); // 3,000 plus 15% VAT
+    expect(invoice.dueOn).toBe("2026-06-17");
+
+    await step("record_payment", { input: { invoiceId: invoice.id, amount: "1000", method: "Cash", paidOn: "2026-06-04", externalReference: "RCPT-1", note: "" } } as never, adminId, "2026-06-04T10:00:00.000Z");
+    const paid = await step("record_payment", { input: { invoiceId: invoice.id, amount: "2450", method: "Bank transfer", paidOn: "2026-06-10", externalReference: "SLIP-77", note: "" } } as never, adminId, "2026-06-10T10:00:00.000Z");
+    expect(paid.invoices[0].status).toBe("paid");
+    expect(paid.invoices[0].amountPaid).toBe(3450);
+
+    // What a restart would see.
+    const reloaded = await loadDatabase();
+    expect(reloaded.rentals[0].status).toBe("completed");
+    expect(reloaded.invoices[0]).toMatchObject({ reference: "INV-2026-0001", status: "paid", amountPaid: 3450, total: 3450 });
+    expect(reloaded.payments.map((payment) => payment.reference)).toEqual(["PAY-2026-0001", "PAY-2026-0002"]);
+    expect(reloaded.referenceCounters).toEqual(
+      expect.arrayContaining([
+        { scope: "invoice", period: "2026", last: 1 },
+        { scope: "payment", period: "2026", last: 2 },
+      ]),
+    );
+    // The audit trail is in the database, not just in the returned snapshot.
+    const audit = await db().selectFrom("audit_entry").select(["action"]).orderBy("at", "asc").execute();
+    expect(audit.map((row) => row.action)).toEqual(
+      expect.arrayContaining(["finance:invoice_issue", "finance:payment_record", "rentals:complete"]),
+    );
+  }, 60_000);
+
+  it("refuses a second invoice for the same rental at the database level, not just in the service", async () => {
+    const { adminId, vehicleId } = await world();
+    const rentalId = await confirmedRental(adminId, "2026-06-01", "2026-06-03");
+    await step("assign_rental", { id: rentalId, input: { vehicleId, driverId: "" } } as never, adminId, TODAY);
+    await step("start_rental", { id: rentalId } as never, adminId, "2026-06-01T09:00:00.000Z");
+    await step("complete_rental", { id: rentalId, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } } as never, adminId, TODAY);
+    const first = await step("issue_rental_invoice", { input: { rentalId, issuedOn: TODAY.slice(0, 10), discountAmount: "", discountReason: "", notes: "" } } as never, adminId, TODAY);
+
+    // A direct insert that the service layer would never attempt: the partial unique index on
+    // billable_event is what must stop it.
+    await expect(
+      sql`
+        insert into invoice (id, reference, kind, rental_id, client_id, customer_name, currency_code,
+          subtotal, total, amount_paid, status, billable_event, issued_on, due_on, created_at, updated_at, data)
+        values ('dupe', 'INV-2026-0099', 'rental', ${rentalId}, null, 'Acme Ltd', 'GHS',
+          1000, 1000, 0, 'issued', ${first.invoices[0].billableEvent}, '2026-06-03'::date, '2026-06-17'::date, now(), now(), '{}'::jsonb)
+      `.execute(db()),
+    ).rejects.toThrow(/invoice_billable_event_uq|duplicate key/);
+  }, 60_000);
+
+  it("cannot double-book one vehicle from six parallel requests", async () => {
+    const { adminId, vehicleId } = await world();
+    const rentals: string[] = [];
+    for (let i = 0; i < 6; i += 1) rentals.push(await confirmedRental(adminId, "2026-07-01", "2026-07-03"));
+
+    const attempts = await Promise.all(
+      rentals.map((id) => command("assign_rental", { id, input: { vehicleId, driverId: "" } } as never, adminId, TODAY)),
+    );
+
+    const wins = attempts.filter((attempt) => attempt.ok);
+    const losses = attempts.filter((attempt) => !attempt.ok);
+    expect(wins).toHaveLength(1);
+    expect(losses).toHaveLength(5);
+    // A refused booking is a readable 409, never a 500 leaking a constraint name.
+    for (const loss of losses) {
+      expect(loss.status).toBe(409);
+      expect(loss.errors.vehicleId).toMatch(/already assigned to RR-/);
+    }
+
+    const assigned = await db().selectFrom("resource_reservation").select(["resource_id"]).where("resource_id", "=", vehicleId).execute();
+    expect(assigned).toHaveLength(1);
+
+    const stored = await loadDatabase();
+    expect(stored.rentals.filter((rental) => rental.assignedVehicleId === vehicleId)).toHaveLength(1);
+  }, 60_000);
+});

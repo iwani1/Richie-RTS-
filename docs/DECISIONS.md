@@ -707,3 +707,70 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 - **Known gap.** There is no adjustment/credit entry yet, so a payment recorded in error stays on
   record. That is deliberate — deleting money is worse — but it means correction is currently
   "record a compensating entry as a new invoice", not a first-class adjustment.
+
+## D-64 Releasing a vehicle is its own permission, and the releaser is recorded
+
+- **Context.** Closing a maintenance work order is the step that puts a vehicle back into service, and
+  it also flips the vehicle's status. Brief MNT-02 asks for the release decision to be attributable;
+  the audit log showed who closed the order but the order itself did not say who released the vehicle.
+  Anyone who could advance a work order could also sign it off.
+- **Decision.**
+  - `maintenance:release` is a separate permission from `maintenance:advance`. Administrator and
+    operations hold both today; the split exists so a workshop account can be given advance without
+    the power to declare a vehicle roadworthy.
+  - Closing a work order requires `maintenance:release`, writes `releasedBy`/`releasedAt` on the
+    order, and audits the change as `maintenance:release` with the releaser named in the summary.
+  - The UI removes "closed" from the status list for an account without the permission and explains
+    why, rather than showing a button that fails.
+- **Rejected.** A sixth "technician" role for one permission: the five-role model is the owner's
+  choice, and the permission split gives the same control without a role that has nothing else to do.
+- **Migration.** Schema 12. Orders closed before this change keep `releasedBy: null`; the release is
+  not invented for them.
+
+## D-65 Single company, one database: multi-tenancy is a recorded gap
+
+- **Context.** Brief 5.2 asks for tenant isolation at every layer. The product serves one transport
+  operator; there is no second company, no owner decision to onboard one, and no hosted multi-tenant
+  deployment.
+- **Decision.** One company per installation. The read path still funnels every payload through
+  `src/server/visibility.ts`, so the seam where a tenant predicate would go exists in one place.
+  Building `company_id` columns, row-level security, tenant-aware indexes and a cross-tenant test
+  matrix now would add cost to every query and every test for a requirement nobody has.
+- **Trigger to revisit.** A second operator on the same installation, or a hosted offering.
+- **Consequence.** The brief's isolation requirement is **not met**; it is met *by construction*
+  (one installation, one company) rather than by enforcement, and this is recorded as an accepted gap
+  rather than a finished item.
+
+## D-66 Five roles, not ten
+
+- **Decision.** `administrator`, `operations`, `finance`, `driver`, `client_contact`. The brief's ten
+  job titles map onto these as scopes: a Dispatcher or Fleet Manager works as `operations`; a
+  Corporate HR Administrator works as `operations` with `clients:*`; an Employee or Rental Customer
+  is not a user account at all (they are passengers and customers, not sign-ins).
+- **Exception.** Where the brief describes a real control rather than a job title, the control is
+  kept: releasing a vehicle is a permission (D-64), and driver/client scope is own-record
+  (`scope.ts`, `visibility.ts`).
+- **Rejected.** Ten roles with near-identical permission sets, which reads as a design document
+  rather than a control.
+
+## D-67 No background worker yet; documents and services surface in-app
+
+- **Context.** Brief 4 lists pg-boss for scheduled work: document-expiry reminders, service-due
+  reminders, report emails.
+- **Decision.** No queue and no scheduler. There is no SMS or email provider, account or budget, so a
+  worker would have nothing to send. Expiring documents and due services are computed and surfaced
+  in the application (Compliance screen, fleet readiness, dashboard).
+- **Consequence.** NTF-01…03 stay unbuilt. The trigger to revisit is a provider account; the worker
+  then reads the same computed lists rather than inventing a second source of truth.
+
+## D-68 The end-to-end proof is HTTP-level, not a browser
+
+- **Context.** Brief 12 asks for Playwright workflows. Browser binaries cannot be installed in this
+  build environment and a headless browser would not exercise anything the HTTP path does not.
+- **Decision.** The end-to-end proof runs commands through the same server module the API route uses
+  (`runCommand`) against real PostgreSQL in CI: workflow C from rental request to a paid invoice,
+  with a reload in the middle, plus six parallel `assign_rental` calls proving one winner and five
+  readable refusals.
+- **Consequence.** This is a **substitute**, not the brief's requirement: it proves the command,
+  persistence and concurrency path, not the browser rendering or the click path. Screens are covered
+  separately by jsdom tests.
