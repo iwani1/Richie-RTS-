@@ -14,7 +14,7 @@ production build **✓**.
 | F-03 unvalidated payloads | **fixed** | malformed `create_user` → `400`, not `500` |
 | F-04 silent production 500s | **fixed** | one log line per failure, in every environment |
 | F-05 snapshot size | **reduced + documented** | admin snapshot 792 kB → 492 kB; the rest is D-56 |
-| F-06 no CI runs | **fixed** | CI now triggers on every branch |
+| F-06 no CI runs | **fixed** | `ci` and `codeql` both green on `e9f399e` |
 | F-07 scaffold screen | **deleted** | route, nav item, icon and 512 lines of `BriefDesk` |
 | F-08 no Origin check | **fixed** | cross-site `POST` → `403`; same-origin → `200` |
 | F-09 reset leaves sessions | **fixed** | old cookie dead after reset; old password `401`, new `200` |
@@ -104,7 +104,14 @@ change and is recorded in `docs/PROGRESS.md` and §12 of the setup guide rather 
 
 `ci.yml` triggered only on `push` to `main` and on pull requests, and every commit in this project has
 been pushed to a branch with no pull request — so no workflow had ever executed. The trigger is now
-`push` (all branches) and `pull_request`.
+`push` (all branches) and `pull_request`; CodeQL had the same problem and was changed the same way.
+
+The first execution then failed for a reason worth recording: every gate passed — typecheck, lint,
+coverage thresholds, build, both dependency audits, and the integration job against real PostgreSQL —
+and the job died on its artifact upload, because `actions/upload-artifact` v4 skips hidden files and
+`.next/` begins with a dot. `include-hidden-files: true` fixed the step that was meant to work.
+
+Both workflows are green on `e9f399e`.
 
 ## F-07 · The scaffold screen is gone
 
