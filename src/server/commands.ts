@@ -39,6 +39,42 @@ export function findActor(database: Database, userId: string | null): { user: Us
   return { user, actor: actorFromUser(user) };
 }
 
+/**
+ * What the operator needs to fix a rejected password, and nothing they already know.
+ *
+ * The credentials at fault are named from DATABASE_URL — user, host, port and database, never the
+ * secret itself — because "the password is wrong" does not say *which* of the two places to change.
+ * The two causes that actually happen are spelled out: a password that differs between .env and the
+ * database, and a password containing a character that has to be percent-encoded inside a URL.
+ */
+function passwordRejectedMessage(): string {
+  let target = "";
+  try {
+    const url = new URL(process.env.DATABASE_URL ?? "");
+    const user = decodeURIComponent(url.username);
+    if (user) {
+      target = ` for user "${user}" at ${url.hostname || "the configured host"}${
+        url.port ? `:${url.port}` : ""
+      }${url.pathname && url.pathname !== "/" ? ` (database "${url.pathname.slice(1)}")` : ""}`;
+    }
+  } catch {
+    // A malformed URL is reported by the configuration check, not here.
+  }
+  return [
+    `The database rejected the password in DATABASE_URL${target}.`,
+    "",
+    "Either the password in .env is not the one the database was created with, or it contains a",
+    "character that must be percent-encoded inside a URL:",
+    "  @ -> %40    : -> %3A    / -> %2F    ? -> %3F    # -> %23    % -> %25",
+    "",
+    "Set the same password on both sides. For the podman container in the README:",
+    '  podman exec -it richie-db psql -U richie -d postgres -c "ALTER USER richie WITH PASSWORD \'new-password\';"',
+    "then put that identical password in DATABASE_URL and restart the server (Ctrl+C, then npm start).",
+    "",
+    "docs/SETUP_AND_DEPLOYMENT.md §5 has the full sequence.",
+  ].join("\n");
+}
+
 /** Maps a PostgreSQL error to the operator-facing result. Never leaks SQL or internals (§5.10). */
 export function describeDatabaseError(error: unknown): ServerFailure {
   const pg = error as { code?: string; constraint?: string; message?: string };
@@ -47,14 +83,7 @@ export function describeDatabaseError(error: unknown): ServerFailure {
     // Connection-level failures. These are the operator's to fix, so they are reported as a
     // deployment problem (503) with the value at fault, never as "the change could not be saved".
     case "28P01":
-      return {
-        ok: false,
-        status: 503,
-        message:
-          "The database rejected the password in DATABASE_URL. Set the same password in .env and the " +
-          "database, then restart the server (docs/SETUP_AND_DEPLOYMENT.md §5).",
-        errors: {},
-      };
+      return { ok: false, status: 503, message: passwordRejectedMessage(), errors: {} };
     case "28000":
       return {
         ok: false,

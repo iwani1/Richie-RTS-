@@ -16,6 +16,36 @@ describe("database error messages", () => {
     expect(result.message).toContain("restart");
   });
 
+  it("says which credentials were rejected, and never repeats the password", () => {
+    const previous = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = "postgresql://richie:s3cret@db.local:5433/richie_tms";
+    try {
+      const result = describeDatabaseError(pgError("28P01"));
+      expect(result.message).toContain('user "richie"');
+      expect(result.message).toContain("db.local:5433");
+      expect(result.message).toContain('database "richie_tms"');
+      expect(result.message).not.toContain("s3cret");
+      // The character class that has to be percent-encoded is the second real cause.
+      expect(result.message).toContain("%40");
+    } finally {
+      if (previous === undefined) delete (process.env as Record<string, string | undefined>).DATABASE_URL;
+      else process.env.DATABASE_URL = previous;
+    }
+  });
+
+  it("still explains itself when DATABASE_URL cannot be parsed", () => {
+    const previous = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = "not a url";
+    try {
+      const result = describeDatabaseError(pgError("28P01"));
+      expect(result.message).toContain("rejected the password");
+      expect(result.status).toBe(503);
+    } finally {
+      if (previous === undefined) delete (process.env as Record<string, string | undefined>).DATABASE_URL;
+      else process.env.DATABASE_URL = previous;
+    }
+  });
+
   it("says the database is missing rather than blaming the password", () => {
     const result = describeDatabaseError(pgError("3D000"));
     expect(result.status).toBe(503);

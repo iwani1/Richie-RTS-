@@ -91,17 +91,29 @@ export default function App() {
 function BootScreen({ message, error, onRetry }: { message: string; error?: boolean; onRetry?: () => void }) {
   // A configuration error is not a reachability problem: say which it is, so the reader does not
   // go looking for a stopped server when the answer is in .env.
-  // A configuration error is a list of lines meant to be read as they were written, so it is
-  // rendered as preformatted text rather than reflowed into a paragraph.
+  // Each failure this screen can show has its own cause, and the title says which one it is rather
+  // than a generic "cannot reach". A message written as a list of steps is rendered as preformatted
+  // text so its indentation survives; a one-line message stays a paragraph.
   const misconfigured = /Invalid server configuration|must be at least|is required/i.test(message);
-  const title = misconfigured ? "The server needs configuration" : error ? "Cannot reach the server" : "Opening the workspace";
+  const title = misconfigured
+    ? "The server needs configuration"
+    : /rejected the password/i.test(message)
+      ? "The database rejected the password"
+      : /database named in DATABASE_URL does not exist/i.test(message)
+        ? "The database does not exist"
+        : /schema has not been created|schema is incomplete/i.test(message)
+          ? "The database needs migrating"
+          : error
+            ? "Cannot reach the server"
+            : "Opening the workspace";
+  const preformatted = misconfigured || message.includes("\n");
   return (
     <main className="rts-auth rts-auth--solo">
       <section className="rts-auth-side">
         <div className="rts-auth-card" role="status" aria-live="polite">
           <p className="rts-auth-eyebrow">Richie Transport Services</p>
           <h1 className="rts-auth-title">{title}</h1>
-          {misconfigured ? <pre className="rts-auth-config">{message}</pre> : <p className="rts-auth-intro">{message}</p>}
+          {preformatted ? <pre className="rts-auth-config">{message}</pre> : <p className="rts-auth-intro">{message}</p>}
           {error && onRetry && (
             <Button variant="primary" onClick={() => void onRetry()} className="mt-4">
               Try again

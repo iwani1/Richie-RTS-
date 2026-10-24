@@ -121,11 +121,44 @@ says which value is wrong on the page itself:
 |---|---|
 | `SESSION_SECRET must be at least 32 characters` | `.env` still holds the example value. Run `openssl rand -base64 32` and paste the result. |
 | `connect ECONNREFUSED 127.0.0.1:5432` from `npm run db:migrate` | PostgreSQL is not running, or `DATABASE_URL` points at the wrong port. |
-| `password authentication failed for user "richie"` | the password in `DATABASE_URL` is not the one the database was created with. |
+| `password authentication failed for user "richie"` | the password in `DATABASE_URL` is not the one the database was created with. See below. |
 | `relation "schema_migrations" does not exist` | migrations were never applied. Run `npm run db:migrate`. |
 
 A change to `.env` takes effect only after the server is restarted: a running process keeps the
 values it started with.
+
+#### The password is rejected
+
+Two causes, and only two. Find out which one you have before changing anything:
+
+```bash
+grep '^DATABASE_URL' .env                                  # what the app is sending
+podman inspect richie-db --format '{{json .Config.Env}}'   # what the container was created with
+```
+
+1. **The two do not match.** Either correct `.env`, or set the database to the password you want:
+
+   ```bash
+   podman exec -it richie-db psql -U richie -d postgres \
+     -c "ALTER USER richie WITH PASSWORD 'the-same-password';"
+   ```
+
+   Editing `.env` never changes a password already stored in the container's volume.
+
+2. **The password contains a character that is not safe in a URL** — `@ : / ? # %` and a few others
+   must be percent-encoded, or the address is parsed at the wrong point and the wrong text becomes
+   the password:
+
+   | character | in `DATABASE_URL` |
+   |---|---|
+   | `@` | `%40` |
+   | `:` | `%3A` |
+   | `/` | `%2F` |
+   | `?` | `%3F` |
+   | `#` | `%23` |
+   | `%` | `%25` |
+
+   The simplest fix is a password made of letters and digits only.
 
 ## 6. Migrate
 
