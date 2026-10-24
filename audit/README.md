@@ -6,6 +6,9 @@
 sealed sessions, 17 findings, all reproduced against the production build.
 Machine-readable: [`findings-2026-10-24.json`](findings-2026-10-24.json).
 
+**[`REMEDIATION-2026-10-24.md`](REMEDIATION-2026-10-24.md)** records what was done about each one, how
+it was verified, and the single item left as a documented limit.
+
 Headline: the write path is strong and the read path is not. A driver account receives the entire
 database (F-01), and the sign-in throttle can be switched off with a request header (F-02).
 

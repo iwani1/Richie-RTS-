@@ -1180,6 +1180,8 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   cursor: pointer;
 }
 
+.rts-panel:focus { outline: none; }
+
 .rts-panel {
   position: relative;
   display: flex;

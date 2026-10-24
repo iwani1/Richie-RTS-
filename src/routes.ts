@@ -14,7 +14,6 @@ export type Route =
   | "settings"
   | "audit"
   | "compliance"
-  | "documents"
   | "driver_portal"
   | "client_portal";
 
@@ -43,5 +42,4 @@ export const NAV_ITEMS: NavItem[] = [
   { route: "users", label: "Users", caption: "Accounts and roles", permission: "users:read" },
   { route: "settings", label: "Settings", caption: "Business rules", permission: "settings:read" },
   { route: "audit", label: "Audit log", caption: "Who changed what", permission: "audit:read" },
-  { route: "documents", label: "Project brief", caption: "Source documents", permission: null },
 ];

@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { json } from "../../../server/api";
+import { CROSS_SITE, json, sameOrigin } from "../../../server/api";
 import { runCommand } from "../../../server/commands";
 import { WeakPasswordError, hashPassword } from "../../../server/password";
-import { redact } from "../../../server/snapshot";
 import { currentUserId } from "../../../server/session";
+import { visibleSnapshot } from "../../../server/visibility";
 import { can } from "../../../tms/permissions";
 import { db } from "../../../server/db";
+import { findActor } from "../../../server/commands";
 import { loadDatabase } from "../../../server/repository";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,8 @@ const PERMISSION_FOR: Record<string, Parameters<typeof can>[1]> = {
 };
 
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return json(403, CROSS_SITE);
+
   const userId = await currentUserId();
   if (!userId) return json(401, { ok: false, message: "Sign in is required." });
 
@@ -103,5 +106,14 @@ export async function POST(request: Request) {
   const command = (credential ? { ...rest, credential } : rest) as unknown as Parameters<typeof runCommand>[0];
   const result = await runCommand(command, { userId });
   if (!result.ok) return json(result.status, { ok: false, message: result.message, errors: result.errors });
-  return json(200, { ok: true, message: result.message, database: redact(result.database) });
+  // The same scope as the read endpoint: what a command returns must never be more than what the
+  // account may see (audit F-01).
+  const { actor } = findActor(result.database, userId);
+  const visible = visibleSnapshot(result.database, actor);
+  return json(200, {
+    ok: true,
+    message: result.message,
+    database: visible.database,
+    auditTotal: visible.auditTotal,
+  });
 }

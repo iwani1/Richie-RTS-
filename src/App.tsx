@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { BriefDesk } from "./docs/BriefDesk";
 import { AuditPage } from "./screens/Audit";
 import { SetupPage, SignInPage } from "./screens/Auth";
 import { DashboardPage } from "./screens/Dashboard";
@@ -32,7 +31,6 @@ const NAV_GROUPS: { label: string; routes: Route[] }[] = [
   { label: "Service desk", routes: ["dashboard", "rentals", "busing", "logistics", "fleetReadiness"] },
   { label: "Fleet & clients", routes: ["compliance", "vehicles", "drivers", "clients"] },
   { label: "Administration", routes: ["users", "settings", "audit"] },
-  { label: "Archive", routes: ["documents"] },
 ];
 
 const ROUTE_ICONS: Record<Route, IconName> = {
@@ -48,7 +46,6 @@ const ROUTE_ICONS: Record<Route, IconName> = {
   users: "user",
   settings: "settings",
   audit: "audit",
-  documents: "archive",
   driver_portal: "busing",
   client_portal: "client",
 };
@@ -140,7 +137,7 @@ function Shell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const items =
     bound && portalRoute
-      ? NAV_ITEMS.filter((item) => item.route === portalRoute || item.route === "documents")
+      ? NAV_ITEMS.filter((item) => item.route === portalRoute)
       : NAV_ITEMS.filter((item) => !item.permission || allowed(item.permission));
 
   // Derive the route actually shown during render, rather than correcting state after the
@@ -176,8 +173,6 @@ function Shell() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
-
-  if (route === "documents") return <BriefDesk onExit={() => navigate("dashboard")} />;
 
   const page = (() => {
     switch (route) {

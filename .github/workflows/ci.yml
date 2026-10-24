@@ -11,9 +11,10 @@
 
 name: ci
 
+# Every branch, not just main: work on a feature branch is exactly when the gates are worth
+# running, and until this changed no run had ever executed (audit F-06).
 on:
   push:
-    branches: [main]
   pull_request:
 
 # Superseded runs on the same ref are cancelled; only the newest one matters.

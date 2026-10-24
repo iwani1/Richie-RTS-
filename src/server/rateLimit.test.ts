@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { attempt, clear, resetThrottle } from "./rateLimit";
+import { attempt, check, clear, recordFailure, resetThrottle } from "./rateLimit";
 
 describe("sign-in throttle", () => {
   beforeEach(resetThrottle);
@@ -29,5 +29,17 @@ describe("sign-in throttle", () => {
     for (let i = 0; i < 8; i += 1) attempt("k");
     clear("k");
     expect(attempt("k").allowed).toBe(true);
+  });
+
+  it("asks without counting, so a successful sign-in never consumes the budget", () => {
+    // A first run with a mistyped field used to lock the installation: every arrival counted.
+    for (let i = 0; i < 20; i += 1) expect(check("setup:local").allowed).toBe(true);
+  });
+
+  it("counts only failures, and refuses once they reach the limit", () => {
+    const start = 1_000_000;
+    for (let i = 0; i < 8; i += 1) recordFailure("account:a@b.test", start);
+    expect(check("account:a@b.test", start).allowed).toBe(false);
+    expect(check("account:a@b.test", start + 15 * 60 * 1000 + 1).allowed).toBe(true);
   });
 });

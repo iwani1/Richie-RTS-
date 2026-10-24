@@ -6,11 +6,11 @@
 //   client_contact -> its corporate client, and therefore that client's routes, roster
 //                     and rental requests
 //
-// HONEST LIMIT (Integrity rules 1 and 7): this build has no server. Reads are served
-// from the browser's own database, so this module is the *only* thing standing between
-// a role and data it should not see, and it runs in the same process as the caller.
-// It is enforced consistently and covered by tests, but a production deployment must
-// enforce the same rules in the API layer, where the caller cannot rewrite them.
+// This module is the single definition of that scope, and it is applied twice: on the
+// server in `src/server/visibility.ts`, so the payload an account receives already
+// excludes what it may not read, and again in the portals, which is why a portal can
+// render straight from `scopedView()` without its own filtering. The server-side call is
+// the control; the client-side one is what keeps the two views in step.
 // Writes are checked separately in the service layer and are testable end to end.
 
 import { isRecordBound } from "./permissions";

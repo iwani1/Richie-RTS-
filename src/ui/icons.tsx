@@ -15,7 +15,6 @@ type IconName =
   | "user"
   | "settings"
   | "audit"
-  | "archive"
   | "search"
   | "chevron"
   | "alert"
@@ -108,12 +107,6 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <path d="M5 3h10v14H5z" />
       <path d="M7.5 7h5M7.5 10h5M7.5 13h3" />
-    </>
-  ),
-  archive: (
-    <>
-      <path d="M3.5 5.5h13v3h-13zM4.5 8.5v8h11v-8" />
-      <path d="M8 11.5h4" />
     </>
   ),
   search: (

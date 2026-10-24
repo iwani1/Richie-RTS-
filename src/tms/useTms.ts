@@ -33,6 +33,8 @@ export interface Tms {
   busy: boolean;
   /** Why the app cannot reach the server, if it cannot. Shown in the shell, never swallowed. */
   connectionError: string | null;
+  /** How many audit entries exist. The snapshot carries only the most recent window of them. */
+  auditTotal: number;
   setupRequired: boolean;
   flash: Flash | null;
   setFlash: (flash: Flash | null) => void;
@@ -50,6 +52,7 @@ interface SessionPayload {
   setupRequired?: boolean;
   user?: User | null;
   database?: Database | null;
+  auditTotal?: number;
   message?: string;
 }
 
@@ -74,6 +77,7 @@ export function useTmsState(): Tms {
   const [inFlight, setInFlight] = useState(0);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
+  const [auditTotal, setAuditTotal] = useState(0);
 
   // Commands are serialised: the server applies them one at a time, and replies in the same order,
   // so the newest response is always the newest state. Sending them concurrently would let an
@@ -83,7 +87,10 @@ export function useTmsState(): Tms {
   const applySession = useCallback((session: SessionPayload) => {
     setSetupRequired(Boolean(session.setupRequired));
     setCurrentUser(session.user ?? null);
-    if (session.database) setDb(session.database);
+    if (session.database) {
+      setDb(session.database);
+      setAuditTotal(session.auditTotal ?? session.database.audit.length);
+    }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -141,6 +148,7 @@ export function useTmsState(): Tms {
             message?: string;
             errors?: Record<string, string>;
             database?: Database;
+            auditTotal?: number;
           }>("/api/commands", command);
           if (httpStatus === 401) {
             setCurrentUser(null);
@@ -149,7 +157,10 @@ export function useTmsState(): Tms {
           }
           if (!data) return { ok: false, message: NETWORK_ERROR, errors: {} };
           if (!data.ok) return { ok: false, message: data.message ?? "The change was not saved.", errors: data.errors ?? {} };
-          if (data.database) setDb(data.database);
+          if (data.database) {
+            setDb(data.database);
+            setAuditTotal(data.auditTotal ?? data.database.audit.length);
+          }
           return { ok: true, db: data.database ?? emptyDatabase(), message: data.message ?? "Saved." };
         } catch {
           setConnectionError(NETWORK_ERROR);
@@ -228,6 +239,7 @@ export function useTmsState(): Tms {
     status,
     busy: inFlight > 0,
     connectionError,
+    auditTotal,
     setupRequired,
     flash,
     setFlash,

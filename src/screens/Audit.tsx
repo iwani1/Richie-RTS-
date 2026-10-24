@@ -3,7 +3,7 @@ import { useTms } from "../tms/useTms";
 import { DataTable, EmptyState, PageHeader, SearchInput, Select, TableCard, formatDateTime } from "../ui/primitives";
 
 export function AuditPage() {
-  const { db } = useTms();
+  const { db, auditTotal } = useTms();
   const [query, setQuery] = useState("");
   const [entity, setEntity] = useState("all");
   const entities = useMemo(() => Array.from(new Set(db.audit.map((a) => a.entity))).sort(), [db.audit]);
@@ -18,7 +18,7 @@ export function AuditPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Governance" title="Audit log" description={`Append-only record of every change made through the service layer. ${db.audit.length} entries; the most recent 500 matching entries are shown.`} />
+      <PageHeader eyebrow="Governance" title="Audit log" description={`Append-only record of every change made through the service layer. ${auditTotal} entries; the most recent ${db.audit.length} are loaded, and the newest 500 matches are shown.`} />
       <TableCard
         title="Change log"
         summary={`Showing ${rows.length} of ${matching.length} matching ${matching.length === 1 ? "entry" : "entries"}${matching.length > rows.length ? " — narrow the search to see earlier ones" : ""}`}
@@ -30,7 +30,7 @@ export function AuditPage() {
               {entities.map((e) => <option key={e} value={e}>{e}</option>)}
             </Select>
             <p className="rts-filter-bar-note" role="status">
-              {db.audit.length} recorded · append-only
+              {auditTotal} recorded · append-only
             </p>
           </>
         }

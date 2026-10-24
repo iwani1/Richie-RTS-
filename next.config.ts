@@ -28,8 +28,9 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
+      // Fonts are self-hosted (@fontsource), so no third-party origin is allowed to serve them.
+      "style-src 'self' 'unsafe-inline'",
+      "font-src 'self'",
       "img-src 'self' data:",
       "connect-src 'self'",
       "base-uri 'none'",
@@ -38,6 +39,13 @@ const securityHeaders = [
     ].join("; "),
   },
 ];
+
+// HSTS only where TLS is actually terminated in front of this server. A blanket
+// `includeSubDomains` on a workstation that also serves plain HTTP over the LAN would lock the
+// operator out of their own address, so it is opt-in and documented (audit F-10).
+if (process.env.HTTPS === "1") {
+  securityHeaders.push({ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" });
+}
 
 // A hosted preview is shown inside someone else's frame, which the production policy forbids on
 // purpose. PREVIEW_EMBED relaxes exactly two directives and nothing else; it is never set on a real

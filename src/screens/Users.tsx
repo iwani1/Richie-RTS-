@@ -235,7 +235,7 @@ function ResetForm({ user, onClose, onSubmit }: { user: User; onClose: () => voi
         }}
         className="space-y-4"
       >
-        <Notice tone="info">The user's existing sessions are not revoked automatically in this browser-local build.</Notice>
+        <Notice tone="info">Saving a new password ends every session this user has open. They will be asked to sign in again.</Notice>
         <Field label="New password" hint={`At least ${PASSWORD_MIN_LENGTH} characters.`} error={errors.password}><PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus /></Field>
         <Field label="Confirm" error={errors.confirm}><PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" /></Field>
         <div className="flex justify-end gap-2 pt-2">

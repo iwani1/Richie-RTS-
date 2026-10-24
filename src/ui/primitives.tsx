@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { cn } from "../utils/cn";
 import { Icon } from "./icons";
@@ -270,11 +270,64 @@ export function DataTable<T>({ columns, rows, rowKey, emptyState }: { columns: C
   );
 }
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * A side panel that behaves like a dialog.
+ *
+ * `role="dialog" aria-modal="true"` describes an intent the browser does not enforce on its own:
+ * without a focus trap, Tab walked out of the open panel into the page behind it, and without
+ * Escape or a focus restore a keyboard user could not get back to the control they came from
+ * (audit F-13). The scrim keeps its click-to-close behaviour but is no longer a second, invisible
+ * "Close" button in the tab order — Escape and the header button are the accessible paths.
+ */
 export function Panel({ title, description, onClose, children }: { title: string; description?: string; onClose: () => void; children: ReactNode }) {
+  const panel = useRef<HTMLDivElement>(null);
+  const restoreTo = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    restoreTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const node = panel.current;
+    const focusable = () =>
+      Array.from(node?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter(
+        // Not `offsetParent`: layout is not available in every environment this runs in, and an
+        // element inside a hidden subtree is excluded by the attribute check instead.
+        (element) => !element.hasAttribute("hidden") && element.closest('[hidden],[aria-hidden="true"]') === null,
+      );
+
+    (focusable()[0] ?? node)?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      restoreTo.current?.focus();
+    };
+  }, [onClose]);
+
   return (
     <div className="rts-panel-wrap" role="dialog" aria-modal="true" aria-label={title}>
-      <button type="button" className="rts-panel-scrim" aria-label="Close panel" onClick={onClose} />
-      <div className="rts-panel">
+      <div className="rts-panel-scrim" aria-hidden="true" onClick={onClose} />
+      <div className="rts-panel" ref={panel} tabIndex={-1}>
         <header className="rts-panel-head">
           <div className="min-w-0">
             <h2 className="rts-panel-title">{title}</h2>

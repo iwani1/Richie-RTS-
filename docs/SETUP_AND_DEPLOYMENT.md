@@ -45,13 +45,17 @@ npm ci
 cp .env.example .env
 ```
 
-Then set four values in `.env`:
+Two values are required and the rest are optional:
 
 | Variable | What to put |
 |---|---|
 | `DATABASE_URL` | `postgresql://user:password@host:5432/richie_tms` |
 | `SESSION_SECRET` | 32+ characters: `openssl rand -base64 32` |
-| `NODE_ENV` | `development` while evaluating, `production` when serving staff |
+| `NODE_ENV` | leave it out — `npm run dev` and `npm start` set their own |
+| `TRUST_PROXY` | `1` **only** when a reverse proxy is in front (see §10). Without it, `X-Forwarded-For` is ignored, because a client controls that header. |
+| `PUBLIC_ORIGIN` | `https://tms.example.com` behind a proxy that rewrites the Host header, so the cross-site check compares against the address staff actually use |
+| `HTTPS` | `1` when TLS is terminated in front, which is what enables `Strict-Transport-Security` |
+| `DATABASE_POOL_MAX` | `1` on a single-connection database (the preview harness); default elsewhere |
 
 `.env` is git-ignored. It contains the database password and the cookie-sealing key; never commit it.
 
@@ -216,6 +220,12 @@ stay blocked until you do.
 
 For development with hot reload: `npm run dev`.
 
+**Reaching the app from another machine over plain HTTP.** The session cookie is `Secure` in
+production, so a browser will not store it over `http://` — sign-in appears to succeed and returns
+you to the sign-in screen. Browsers exempt `localhost` only. Either put TLS in front (§10), or reach
+the workstation on its own address with `NODE_ENV=development` on a network you trust, knowing the
+cookie then travels unencrypted. There is no third option that is safe.
+
 ## 8. Backups
 
 ```bash
@@ -248,8 +258,36 @@ npm run build            # production build
 - Restrict `DATABASE_URL` to the application host; the database should not be reachable from the
   internet.
 - Schedule `npm run db:backup` and test restoring from it.
+- Set `HTTPS=1` so the application sends `Strict-Transport-Security` (it is not sent otherwise: a
+  workstation that also answers on a LAN address would lock itself out of it). If the proxy already
+  sets the header, leave `HTTPS` unset and let the proxy own it.
+- Set `TRUST_PROXY=1` so the sign-in throttle can see the real address. Without it every request
+  looks like it came from `local`, and the per-account bucket is the only thing limiting guesses —
+  which still bounds an attack on one account, but not spraying across many.
+- **Separate the schema owner from the application role** if more than one person administers the
+  database. Migrations run as whoever `DATABASE_URL` names, so that role can drop tables and
+  disable the append-only trigger on `audit_entry`. For a single workstation this costs more than
+  it protects; for a shared server:
+
+  ```sql
+  create role richie_owner login password '…';
+  create role richie_app   login password '…';
+  grant usage on schema public to richie_app;
+  grant select, insert, update, delete on all tables in schema public to richie_app;
+  alter default privileges in schema public
+    grant select, insert, update, delete on tables to richie_app;
+  ```
+
+  Then run `npm run db:migrate` with the owner's URL and serve with the app's.
 
 ## 12. Known limits, stated plainly
+
+- **The API is snapshot-shaped.** Every read and every write returns the rows the account may see,
+  not a page of them. Role scope keeps that small for a driver or a client contact; an administrator
+  receives the fleet's working set (about 400 kB at 1 500 trips) with the newest 500 audit entries
+  and the true count in `auditTotal`. At several years of daily busing this becomes the slowest part
+  of the application. Paging per screen is the next structural change, and `docs/PROGRESS.md` says
+  so.
 
 Deliberate cuts for this stage, recorded so nobody discovers them in production:
 

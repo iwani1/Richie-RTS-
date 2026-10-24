@@ -11,7 +11,9 @@ export async function GET() {
   const body = {
     ok: database.ok,
     service: "richie-tms",
-    database: database.detail,
+    // The version and extension list are useful to the operator at the terminal and mildly useful
+    // to a stranger with a browser, so they are reported only outside production (audit F-17).
+    database: process.env.NODE_ENV === "production" ? (database.ok ? "reachable" : "not reachable") : database.detail,
     time: new Date().toISOString(),
   };
   return NextResponse.json(body, {

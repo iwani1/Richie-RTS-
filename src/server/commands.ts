@@ -179,13 +179,16 @@ export async function runCommand(
   // itself (sign-in and first-run setup, where the cookie is being minted in the same response).
   const now = options.now ?? new Date().toISOString();
   try {
-    const userId = options.userId === undefined ? await sessionUserId() : options.userId;
+    // `undefined` means "read the cookie". An explicit id (sign-in, first-run setup) has just been
+    // established by the caller in this request and has no cookie to check.
+    const fromCookie = options.userId === undefined;
+    const userId = fromCookie ? await sessionUserId() : options.userId;
     return await db()
       .transaction()
       .execute(async (trx) => {
         await sql`select pg_advisory_xact_lock(${WRITE_LOCK})`.execute(trx);
         const before = await loadDatabase(trx);
-        const { actor } = findActor(before, userId);
+        const { actor } = await resolveActor(before, userId ?? null, fromCookie);
         const result: CommandResult = executeCommand(before, actor, command, now);
         if (!result.ok) {
           return { ok: false as const, status: statusForFailure(result.message), message: result.message, errors: result.errors };
@@ -194,16 +197,49 @@ export async function runCommand(
         return { ok: true as const, status: 200, message: result.message, database: result.db };
       });
   } catch (error) {
+    // Logged in every environment. This used to run only outside production, so the message an
+    // operator saw — "the server log has the detail" — pointed at a log that had nothing in it
+    // (audit F-04). The payload is never logged: it can contain names, emails and phone numbers.
+    logFailure(command.type, error);
+
     if (isConfigurationError(error)) {
       // Still the operator's to fix: do not bury it under "the change could not be saved".
       return { ok: false, status: 503, message: error.message.replace(/\n/g, " "), errors: {} };
     }
-    if (process.env.NODE_ENV !== "production") {
-      // Development only: make constraint failures diagnosable without a debugger.
-      console.error("[command]", command.type, error instanceof Error ? error.message : error);
+    if (error instanceof TypeError) {
+      // A body that reached validation without the fields it needs. That is the caller's mistake,
+      // not a server fault, and it must not read as one (audit F-03).
+      // A property name is worth reporting only when it names a field of the request. `reading 'trim'`
+      // names a string method, which tells the caller nothing they can act on.
+      const property = /reading '([^']+)'/.exec(error.message)?.[1] ?? /reading "([^"]+)"/.exec(error.message)?.[1];
+      const field = property && !BUILTIN.has(property) ? property : null;
+      return {
+        ok: false,
+        status: 400,
+        message: field
+          ? `The request was missing a value the change needs (${field}). Nothing was saved.`
+          : "The request was missing a value the change needs, or sent one of the wrong type. Nothing was saved.",
+        errors: {},
+      };
     }
     return describeDatabaseError(error);
   }
+}
+
+/** Property names a TypeError reports that are language members, not request fields. */
+const BUILTIN = new Set([
+  "trim", "map", "filter", "length", "split", "toString", "toLowerCase", "toUpperCase", "startsWith",
+  "includes", "some", "every", "slice", "replace", "join", "push", "find", "reduce", "value",
+]);
+
+/** One line per failure: what was attempted, what class of error, never the values. */
+function logFailure(commandType: string, error: unknown): void {
+  const e = error as { name?: string; code?: string; constraint?: string; message?: string };
+  const detail = [e?.name ?? "Error", e?.code, e?.constraint].filter(Boolean).join(" ");
+  // A TypeError message names a property on the input, which is safe and useful; anything else may
+  // carry a value from the request, so only the class is logged.
+  const message = e?.name === "TypeError" && typeof e?.message === "string" ? ` ${e.message}` : "";
+  console.error(`[command] ${commandType} failed: ${detail}${message}`);
 }
 
 function statusForFailure(message: string): number {
@@ -222,6 +258,28 @@ async function sessionUserId(): Promise<string | null> {
   return currentUserId();
 }
 
+/**
+ * The actor for a request, or nobody.
+ *
+ * A cookie is only as good as the credential it was minted with: when the session came from a
+ * cookie, its stored digest must still match the account's current password hash. Resetting a
+ * password therefore ends every existing session for that account (audit F-09), and a cookie minted
+ * before this field existed is treated as ended too — signing in again is one action, and guessing
+ * whether an untagged cookie is still valid is not worth the risk.
+ */
+async function resolveActor(
+  database: Database,
+  userId: string | null,
+  checkCredential: boolean,
+): Promise<{ user: User | null; actor: Actor | null }> {
+  const found = findActor(database, userId);
+  if (!found.user || !checkCredential) return found;
+  const { sessionCredentialTag, credentialTag } = await import("./session");
+  const tag = await sessionCredentialTag();
+  if (!tag || tag !== credentialTag(found.user.passwordHash)) return { user: null, actor: null };
+  return found;
+}
+
 /** Reads the current snapshot for the signed-in user without mutating anything. */
 /** A configuration error is the operator's to fix, and is worth showing verbatim. */
 function isConfigurationError(error: unknown): error is Error {
@@ -235,7 +293,7 @@ export async function readSnapshot(): Promise<{ ok: true; database: Database; ac
     // the application could only report as "cannot reach the server".
     const userId = await sessionUserId();
     const database = await loadDatabase();
-    const { actor } = findActor(database, userId);
+    const { actor } = await resolveActor(database, userId, true);
     return { ok: true, database, actor };
   } catch (error) {
     if (isConfigurationError(error)) {

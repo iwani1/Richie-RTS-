@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { clientKey, json } from "../../../server/api";
+import { CROSS_SITE, clientKey, json, sameOrigin } from "../../../server/api";
 import { runCommand } from "../../../server/commands";
 import { WeakPasswordError, hashPassword } from "../../../server/password";
-import { attempt } from "../../../server/rateLimit";
+import { check, clear, recordFailure } from "../../../server/rateLimit";
 import { signInAs } from "../../../server/session";
-import { redact } from "../../../server/snapshot";
+import { visibleSnapshot } from "../../../server/visibility";
 import { db } from "../../../server/db";
 import { loadDatabase } from "../../../server/repository";
 
@@ -20,11 +20,16 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const throttle = attempt(`setup:${clientKey(request)}`);
+  if (!sameOrigin(request)) return json(403, CROSS_SITE);
+
+  // Counted on failure only: a first run with a mistyped password must not lock the installation.
+  const throttleKey = `setup:${clientKey(request)}`;
+  const throttle = check(throttleKey);
   if (!throttle.allowed) return json(429, { ok: false, message: "Too many attempts. Try again later." });
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
+    recordFailure(throttleKey);
     const errors: Record<string, string> = {};
     for (const issue of parsed.error.issues) {
       const field = issue.path[0];
@@ -37,6 +42,7 @@ export async function POST(request: Request) {
   if (current.users.length > 0) {
     return json(409, { ok: false, message: "Setup has already been completed. Sign in instead." });
   }
+  clear(throttleKey);
 
   let credential;
   try {
@@ -60,12 +66,14 @@ export async function POST(request: Request) {
 
   const admin = result.database.users.find((user) => user.email.toLowerCase() === parsed.data.email);
   if (!admin) return json(500, { ok: false, message: "The administrator account could not be read back." });
-  await signInAs(admin.id);
+  await signInAs(admin);
+  const visible = visibleSnapshot(result.database, { id: admin.id, fullName: admin.fullName, role: admin.role });
   return json(201, {
     ok: true,
     message: "Administrator account created.",
     user: { ...admin, passwordHash: "", passwordSalt: "" },
-    database: redact(result.database),
+    database: visible.database,
+    auditTotal: visible.auditTotal,
     setupRequired: false,
   });
 }

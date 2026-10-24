@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — the read path catches up with the write path
+
+An independent audit of the running system (`audit/AUDIT-2026-10-24.md`) found seventeen issues, two
+of them high. All are addressed; `audit/REMEDIATION-2026-10-24.md` maps each one to its fix and the
+measurement that confirms it.
+
+- **Read authorisation.** `GET /api/session`, `POST /api/commands`, sign-in and first-run setup now
+  return a **role-scoped** snapshot (`src/server/visibility.ts`, D-56). A driver's payload went from
+  795 770 to 1 740 bytes: their own record, their trips and the vehicles those trips used — no fleet,
+  no client book, no audit log. Previously own-record scope existed only in the browser, on a payload
+  the caller had already been given.
+- **Sign-in throttle.** Two buckets, one per account (unforgeable) and one per address (only with
+  `TRUST_PROXY=1`), counting failures rather than arrivals (D-57). Rotating `X-Forwarded-For` no
+  longer resets the limit.
+- **Sessions end on password reset.** The sealed cookie carries a digest of the account's credential
+  (D-58); a reset invalidates every existing session for that user.
+- **The snapshot is bounded.** The newest 500 audit rows travel with it, with the true count in
+  `auditTotal`. An administrator's payload fell from 792 kB to 492 kB. The remaining ceiling — the
+  snapshot is not paged — is documented rather than hidden.
+- **Requests.** State-changing endpoints refuse a cross-origin `Origin` (D-59); malformed bodies are
+  refused as 400 with a description instead of surfacing as 500; every failure is logged in
+  production, where previously nothing was.
+- **Headers.** HSTS when `HTTPS=1`; CSP no longer allows two Google font origins for fonts that are
+  self-hosted.
+- **The scaffold screen is gone.** The "Project brief" (`src/docs/BriefDesk.tsx`, 512 lines, visible to
+  every role, still writing `localStorage`) is deleted along with its route and nav entry.
+- **Dialogs.** Panels trap focus, close on Escape and restore focus to the trigger.
+- **CI** runs on every branch; it had never executed.
+- Tests: 177 → 203, line coverage 77.08 % → 80.8 %.
+
+
 ## Unreleased — a new interface, and no demo data
 
 **Changed — the whole interface.** The previous dark "departure board" was discarded at the owner's

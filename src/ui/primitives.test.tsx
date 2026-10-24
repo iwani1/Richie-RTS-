@@ -3,8 +3,9 @@
 // submitted: this application has no self-service reset, so a failed sign-in costs the operator an
 // administrator's time.
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import { Field, PasswordInput } from "./primitives";
+import { useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Field, Panel, PasswordInput } from "./primitives";
 
 afterEach(cleanup);
 
@@ -48,5 +49,74 @@ describe("password reveal", () => {
     expect(field.className).toContain("rts-input--invalid");
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(screen.getByRole("alert").textContent).toBe("Too short.");
+  });
+});
+
+describe("panel dialog", () => {
+  function Harness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>Record a vehicle</button>
+        {open && (
+          <Panel title="New vehicle" onClose={() => setOpen(false)}>
+            <label>
+              Registration
+              <input />
+            </label>
+            <p>Written straight to the register.</p>
+          </Panel>
+        )}
+      </>
+    );
+  }
+
+  it("moves focus into the panel and restores it to the trigger on close", () => {
+    render(<Harness />);
+    const trigger = screen.getByRole("button", { name: "Record a vehicle" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole("dialog", { name: "New vehicle" })).toBeTruthy();
+    // The first control inside the panel takes focus, not the page behind it.
+    expect(document.activeElement?.textContent).toBe("Close");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("closes on Escape", () => {
+    const onClose = vi.fn();
+    render(
+      <Panel title="New vehicle" onClose={onClose}>
+        <input aria-label="Registration" />
+      </Panel>,
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("keeps Tab inside the panel", () => {
+    render(
+      <Panel title="New vehicle" onClose={() => {}}>
+        <input aria-label="Registration" />
+        <input aria-label="Notes" />
+      </Panel>,
+    );
+    const close = screen.getByRole("button", { name: "Close" });
+    const notes = screen.getByLabelText("Notes");
+    notes.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(close);
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(notes);
+  });
+
+  it("does not put a second invisible Close in the tab order", () => {
+    render(
+      <Panel title="New vehicle" onClose={() => {}}>
+        <input aria-label="Registration" />
+      </Panel>,
+    );
+    expect(screen.getAllByRole("button", { name: /close/i })).toHaveLength(1);
   });
 });

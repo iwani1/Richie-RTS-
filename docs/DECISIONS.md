@@ -567,3 +567,46 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
   scripts import the server layer.
 - **Trade-off.** A build-time guarantee became a lint-time one. `npm run lint` is a hard gate in CI
   and in `npm run check`, so the rule is still mechanical.
+
+## D-56 (audit 2026-10-24) Read scope is applied on the server, in one place
+
+- **Decision.** `src/server/visibility.ts` narrows the database to the signed-in account before it
+  leaves the process, using the same `scopedView()` the portals already used. Record-bound roles
+  (driver, client contact) receive their own record and what hangs off it; internal roles receive
+  the working set. Credentials are removed last, so no branch can reintroduce one. The audit log is
+  sent only to roles that can read it, and only the newest 500 rows, with the true count in
+  `auditTotal`.
+- **Why.** Authorisation stopped at the write path: the snapshots returned every row to any cookie
+  (audit F-01). Client-side filtering is a display choice, not a control, because the caller already
+  holds the payload.
+- **Rejected.** Per-screen endpoints. Correct, and the next structural change, but it is a rewrite
+  of every screen's data access; one scoping function at the boundary fixes the disclosure now.
+
+## D-57 (audit 2026-10-24) The throttle keys on the account, and trusts a proxy only when told to
+
+- **Decision.** Sign-in has two buckets: one per account (unforgeable) and one per address, the
+  latter only when `TRUST_PROXY=1` declares a proxy. Failures are counted, successes clear the
+  buckets, and only failures increment — so a mistyped first run cannot lock the installation.
+- **Why.** The bucket key was `X-Forwarded-For`, a header the caller controls on a directly exposed
+  server, so rotating it defeated the throttle entirely (audit F-02). Account lockout is a denial of
+  service against someone who knows the address; that is the accepted trade against unlimited
+  guessing, and the window is fifteen minutes.
+
+## D-58 (audit 2026-10-24) A password reset ends existing sessions
+
+- **Decision.** The sealed cookie carries a truncated SHA-256 of the account's Argon2 hash. Every
+  request that resolves an actor compares it with the stored hash; a reset changes the hash and the
+  old cookies stop matching. Cookies minted before the field existed are treated as ended.
+- **Why.** A reset left up to eight hours of access in place (audit F-09), which is exactly the
+  window in which a reset is usually happening.
+- **Rejected.** A `sessions` table. This needs no schema change and no cleanup job; if individual
+  session listing is ever wanted, that is when a table earns its keep.
+
+## D-59 (audit 2026-10-24) Origin check, HSTS by opt-in
+
+- **Decision.** `POST` handlers that change state refuse an `Origin` that is not one of the
+  addresses the request arrived on (`PUBLIC_ORIGIN` covers a rewriting proxy). `Strict-Transport-
+  Security` is sent only when `HTTPS=1`.
+- **Why.** CSRF rested on a browser default rather than a server check (audit F-08); a blanket
+  `includeSubDomains` on a workstation that also answers on a LAN address would lock its operator
+  out of their own address (audit F-10).

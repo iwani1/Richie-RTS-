@@ -25,7 +25,7 @@ export function CommandPalette({
   const listRef = useRef<HTMLUListElement>(null);
 
   const items = useMemo(
-    () => NAV_ITEMS.filter((item) => item.route !== "documents").filter((item) => !item.permission || allowed(item.permission)),
+    () => NAV_ITEMS.filter((item) => !item.permission || allowed(item.permission)),
     [allowed],
   );
 

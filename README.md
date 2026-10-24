@@ -84,16 +84,18 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Driver and client portals (own-record scope) | Works |
 | Contracts, bookings, CSV import, notifications, payments, offline | **Not built** — see `docs/PROGRESS.md` |
 
-169 unit/UI tests plus 5 integration tests against a real PostgreSQL; coverage thresholds are
-enforced in CI. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
+The unit/UI suite plus 5 integration tests against a real PostgreSQL; coverage thresholds are
+enforced by `npm run check`. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.
 
 ## Stack
 
 Next.js 15 (App Router) · React 19 · TypeScript strict · Tailwind 4 · PostgreSQL 18 ·
-Kysely + `pg` (typed SQL, no ORM engine binary) · Zod at every request boundary ·
+Kysely + `pg` (typed SQL, no ORM engine binary) · Zod at the HTTP boundary, role scope applied to
+every response ·
 `iron-session` for sealed cookies · `@node-rs/argon2` (Argon2id) for passwords ·
-Vitest + Testing Library · Docker/Podman Compose.
+Vitest + Testing Library. The database runs in a container or on the host; there is no Compose
+file, because one command per service was easier to read than a YAML file.
 
 `docs/DECISIONS.md` records why each of these was chosen, including the ORM decision (D-50) and
 the session/password decision (D-51).

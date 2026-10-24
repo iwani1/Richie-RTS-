@@ -16,7 +16,7 @@ Status values: Not Started / In Progress / Done (verified) / Done (authored) / B
 | DATA_PROTECTION.md | Done (draft) | Requires legal review. Retention periods unset (Q-18). |
 | DECISIONS.md | Done | D-01 to D-15. |
 | OPEN_QUESTIONS.md | Done | Q-01 to Q-32. |
-| Docker Compose, migrations, /health | Done (verified) | `docker-compose.yml`, `db/migrations/*`, `/api/health`; the compose file itself was not executed here (no container runtime). |
+| Migrations, `/health` | Done (verified) | `db/migrations/*`, `/api/health`; the database is a container started by hand (see `docs/SETUP_AND_DEPLOYMENT.md` §5). |
 | CI workflow file | Done (authored, **not executed**) | `.github/workflows/ci.yml` runs the four gates. No git remote or runner exists here, so its execution has not been observed (Phase 7). |
 | Lint | Done (verified) | `eslint.config.js`; `npm run lint` clean across the whole codebase (Phase 7). Closes the Phase 0 "confirm lint runs" deliverable. |
 

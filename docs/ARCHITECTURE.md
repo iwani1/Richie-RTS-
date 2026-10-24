@@ -11,8 +11,9 @@
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
 - Session: `iron-session` sealed cookie; passwords Argon2id (`@node-rs/argon2`) — D-51.
-- The browser receives a **redacted snapshot** and holds no credentials; it posts commands to
-  `POST /api/commands` (D-52).
+- The browser receives a **redacted, role-scoped snapshot** and holds no credentials; it posts
+  commands to `POST /api/commands` (D-52, D-56). A driver's payload contains their own record, their
+  trips and the vehicles those trips used — not the fleet, the client book or the audit log.
 - Quality gates: `npm run check` runs typecheck, lint, tests with coverage thresholds, and build,
   in that order. `npm run test:integration` runs the PostgreSQL suite (skipped without
   `TEST_DATABASE_URL`). `.github/workflows/ci.yml` runs both on a runner; the integration job has
@@ -83,8 +84,9 @@ Dependency direction: pages depend on `useTms`, which depends on `commands`, whi
       resource conflicts, audit entry;
    7. the difference is written back (reservations first, then children-first deletes,
       parents-first upserts, settings, insert-only audit);
-   8. the new state is **redacted** and returned. A database error is mapped to an operator
-      message (conflict, constraint, unknown) rather than leaking SQL.
+   8. the new state is **redacted, scoped to the actor and returned**. A database error is mapped to
+      an operator message (conflict, constraint, unknown) rather than leaking SQL; a body whose
+      shape the command cannot read is refused as a 400, not reported as a server fault.
 3. The browser replaces its snapshot with the response. `useTms` serialises commands, so an older
    response can never overwrite a newer one on screen.
 
