@@ -5,8 +5,10 @@ There is no REST resource API. The browser holds no database and cannot write on
 is deliberately small — every rule lives in one place, one endpoint is one place to test, and a role
 cannot be widened by finding an endpoint nobody thought about (brief §5.1, §5.3, §5.10).
 
-All endpoints are same-origin only. A request whose `Origin` does not match the host is refused with
-`403` and a generic message before any work happens (`src/server/api.ts`, `sameOrigin`).
+Everything that acts with a session is same-origin only. A request whose `Origin` does not match the
+host is refused with `403` and a generic message before any work happens (`src/server/api.ts`,
+`sameOrigin`). The one exception is `/api/enquiry`, which holds no session and is meant to be posted
+from the company's own website (WEB-01, below).
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
@@ -15,6 +17,8 @@ All endpoints are same-origin only. A request whose `Origin` does not match the 
 | `POST` | `/api/auth/logout` | cookie | Sign out; clears the cookie |
 | `POST` | `/api/setup` | none, first run only | Create the first administrator |
 | `POST` | `/api/commands` | cookie | Every state change |
+| `GET` | `/api/enquiry` | none | The vehicle types the public form offers, and a signed time-trap token (WEB-01) |
+| `POST` | `/api/enquiry` | none, throttled | Record a public enquiry as a draft request; answers with a reference and nothing else (WEB-01) |
 | `GET` | `/api/health` | none | Database reachability and migration state, for a monitor |
 
 Responses are JSON and always `no-store`. The shape of a failure is the same everywhere:
@@ -154,6 +158,52 @@ Two actions, both about the caller's own account, both `sameOrigin`-checked.
 Errors use the same shape as `/api/commands`: `400` with `{ errors: { field: message } }`, `401` when
 signed out, `403` for a cross-origin POST, `429` after repeated wrong current passwords.
 
+## `GET /api/enquiry` and `POST /api/enquiry` (WEB-01)
+
+The only unauthenticated write in the application, and the only endpoint that is not same-origin
+restricted: it exists to be embedded in the company's existing website, which will not share this
+origin. It is safe to expose because it carries no session and gives nothing back.
+
+`GET` — what the form needs to render:
+
+```json
+{ "ok": true, "token": "1780000000.…", "categories": [ { "id": "…", "name": "Coaster" } ], "open": true }
+```
+
+`token` is `<unix seconds>.<HMAC-SHA256>`, signed with `SESSION_SECRET`
+(`src/server/enquiryToken.ts`). A submission is accepted only when the token is at least 3 seconds old
+and less than 2 hours old.
+
+`POST` — one enquiry:
+
+```json
+{ "token": "1780000000.…", "customerName": "Akosua Boateng", "customerPhone": "+233 24 123 4567",
+  "customerEmail": "", "organization": "", "purpose": "Wedding party transport",
+  "pickupLocation": "East Legon", "dropoffLocation": "Aburi",
+  "startDate": "2026-07-01", "endDate": "2026-07-02", "passengers": "18",
+  "vehicleCategoryId": "…", "notes": "" }
+```
+
+Success is `200` with exactly three keys — `ok`, `message`, `reference` — and nothing else:
+
+```json
+{ "ok": true, "message": "Thank you. Your request is recorded as RR-0007, and the office will call +233 24 123 4567 to confirm it.", "reference": "RR-0007" }
+```
+
+What it creates is a **draft** rental request with no client, no vehicle, no quote and no money, plus
+an audit entry (`rentals:enquiry`, actor `System`) and a note that says it came from the public form.
+The office still quotes and confirms it.
+
+Guard rails, in the order they are applied: a honeypot field that answers `200` and writes nothing;
+the signed time-trap (`400`); eight enquiries per address per ten minutes (`429` with
+`retryAfterSeconds`); then field validation from the same rules the desk form uses (`400` with
+`errors`). Every free-text field has a length ceiling. `TRUST_PROXY=1` must be set for the throttle to
+use `x-forwarded-for`, exactly as for sign-in (audit F-02).
+
+The page is `/enquiry`; `/enquiry?embed=1` is the variant to frame. It is the only path that may be
+framed — `next.config.ts` gives it `frame-ancestors *` and omits `X-Frame-Options`, while every other
+path keeps `frame-ancestors 'none'`.
+
 ## `GET /api/health`
 
 ```json
@@ -167,8 +217,9 @@ database returns `503`, which is what a monitor should alert on. Used by
 
 ## What is deliberately absent
 
-- No token API, no CORS, no public write endpoint: a browser cannot be tricked into posting a command
-  from another site, and no third party can write.
+- No token API, no CORS, and no public write endpoint beyond `/api/enquiry`, which holds no session
+  and returns no records: a browser cannot be tricked into posting a command from another site, and
+  no third party can read anything.
 - No pagination parameters: the snapshot is scoped and the screens filter locally. This is a stated
   limit (`PROGRESS.md`, "Not started"), not an oversight.
 - No webhooks or provider callbacks. When FIN-04 arrives it will need its own signature check and an

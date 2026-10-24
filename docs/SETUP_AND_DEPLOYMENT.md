@@ -285,12 +285,37 @@ data. A PostgreSQL-native alternative is `pg_dump --format=custom`.
 ```bash
 npm run typecheck        # tsc --noEmit
 npm run lint             # eslint
-npm test                 # 147 unit and component tests
+npm test                 # 288 unit and component tests
 npm run test:integration # against a real database; needs TEST_DATABASE_URL
 npm run build            # production build
 ```
 
 `npm run check` runs typecheck, lint, tests with coverage thresholds and the build in one go.
+
+## 10a. Putting the enquiry form on the company website (WEB-01)
+
+The form lives at `/enquiry` on this server and is meant to be framed by the existing website:
+
+```html
+<iframe
+  src="https://tms.example.com/enquiry?embed=1"
+  title="Request a vehicle"
+  style="width:100%;max-width:720px;height:900px;border:0"
+></iframe>
+```
+
+- `/enquiry` is the only path served with `frame-ancestors *` and without `X-Frame-Options`; every
+  other path refuses to be framed (`next.config.ts`). `/enquiry?embed=1` drops the card's border and
+  padding so it does not look like a second page inside a box.
+- The page must be served over **https** if the host page is https, or the browser will block the
+  frame as mixed content.
+- Submissions arrive as draft rental requests, marked as coming from the public form, with
+  `rentals:enquiry` in the audit log. Nothing is booked, quoted or charged by the form.
+- Eight enquiries per ten minutes are accepted per address. If the server sits behind a reverse proxy,
+  set `TRUST_PROXY=1` so the limit applies per visitor rather than to everyone at once — the same
+  setting sign-in uses (audit F-02).
+- The vehicle types offered come from Settings → vehicle categories. With none configured the form
+  says enquiries are not open rather than accepting a request nobody can fulfil.
 
 ## 11. Deploying beyond one machine
 

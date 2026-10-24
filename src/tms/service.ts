@@ -97,6 +97,29 @@ export interface RentalRequestInput {
   notes: string;
 }
 
+/**
+ * The public enquiry form (WEB-01).
+ *
+ * Deliberately narrower than `RentalRequestInput`: a member of the public may not name an internal
+ * client, request a driver, or send anything that is not a plain string of a bounded length. Every
+ * field is text from an HTML form, and the office turns the enquiry into a real request when it
+ * calls back — which is why the record it creates is a draft and nothing more.
+ */
+export interface EnquiryInput {
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  organization: string;
+  purpose: string;
+  pickupLocation: string;
+  dropoffLocation: string;
+  startDate: string;
+  endDate: string;
+  passengers: string;
+  vehicleCategoryId: string;
+  notes: string;
+}
+
 export interface QuoteLineInput {
   id?: string;
   description: string;
@@ -138,6 +161,7 @@ export type Command =
   | { type: "create_client"; input: ClientInput }
   | { type: "update_client"; id: string; input: ClientInput }
   | { type: "create_rental"; input: RentalRequestInput }
+  | { type: "submit_enquiry"; input: EnquiryInput }
   | { type: "update_rental"; id: string; input: RentalRequestInput }
   | { type: "quote_rental"; id: string; input: QuoteInput }
   | { type: "requote_rental"; id: string; input: QuoteInput }
@@ -537,6 +561,84 @@ export function validateRentalRequest(db: Database, input: RentalRequestInput, e
   };
 }
 
+/**
+ * Validation for the public form.
+ *
+ * Stricter than the desk form in the two places that matter for an unauthenticated caller: every
+ * string has a ceiling, and the start date may not be in the past. It reuses `validateRentalRequest`
+ * for the rules that are genuinely the same, so a public enquiry cannot slip a value past a check
+ * the office would have caught.
+ */
+export function validateEnquiry(db: Database, input: EnquiryInput, today: string) {
+  const errors: Errors = {};
+  const customerName = input.customerName.trim();
+  if (customerName.length < 2) errors.customerName = "Enter the name the vehicle is for.";
+  else if (customerName.length > 120) errors.customerName = "Keep the name to 120 characters.";
+
+  const customerPhone = input.customerPhone.trim();
+  const digits = customerPhone.replace(/[^0-9]/g, "");
+  if (!customerPhone) errors.customerPhone = "A phone number is needed so the office can call you back.";
+  else if (digits.length < 7 || digits.length > 20) errors.customerPhone = "Enter a phone number the office can reach you on.";
+  else if (customerPhone.length > 40) errors.customerPhone = "Keep the phone number to 40 characters.";
+
+  const customerEmail = input.customerEmail.trim().toLowerCase();
+  if (customerEmail && !EMAIL_RE.test(customerEmail)) errors.customerEmail = "Enter a valid email address, or leave it blank.";
+  else if (customerEmail.length > 200) errors.customerEmail = "Keep the email address to 200 characters.";
+
+  const organization = input.organization.trim();
+  if (organization.length > 160) errors.organization = "Keep the organisation to 160 characters.";
+  if (input.purpose.trim().length > 300) errors.purpose = "Keep the purpose to 300 characters.";
+  if (input.pickupLocation.trim().length > 160) errors.pickupLocation = "Keep the pickup point to 160 characters.";
+  if (input.dropoffLocation.trim().length > 160) errors.dropoffLocation = "Keep the destination to 160 characters.";
+  if (input.notes.trim().length > 1000) errors.notes = "Keep the note to 1000 characters.";
+
+  if (!isValidDate(input.startDate)) errors.startDate = "Enter the first day you need the vehicle.";
+  else if (input.startDate < today) errors.startDate = "Choose a date from today onwards.";
+  if (!isValidDate(input.endDate)) errors.endDate = "Enter the last day you need the vehicle.";
+  else if (!errors.startDate && input.endDate < input.startDate) errors.endDate = "The last day cannot be before the first.";
+
+  const passengers = Number(input.passengers);
+  if (input.passengers.trim() === "" || !Number.isInteger(passengers) || passengers < 1) {
+    errors.passengers = "Passengers must be a whole number of at least 1.";
+  } else if (passengers > 100) {
+    errors.passengers = "Enter 100 or fewer passengers per vehicle.";
+  }
+
+  const categoryId = input.vehicleCategoryId;
+  if (!categoryId) errors.vehicleCategoryId = "Choose the kind of vehicle you need.";
+  else if (!db.settings.vehicleCategories.some((category) => category.id === categoryId)) {
+    errors.vehicleCategoryId = "That vehicle type is not offered. Pick one from the list, or call the office.";
+  }
+
+  // The office needs to see, at a glance, that this did not arrive at the desk.
+  const notes = [
+    "Received from the public enquiry form.",
+    organization ? `Organisation: ${organization}` : "",
+    input.notes.trim(),
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return {
+    errors,
+    value: {
+      clientId: null,
+      customerName,
+      customerPhone,
+      customerEmail,
+      purpose: input.purpose.trim(),
+      pickupLocation: input.pickupLocation.trim(),
+      dropoffLocation: input.dropoffLocation.trim(),
+      startDate: input.startDate,
+      endDate: input.endDate,
+      passengers,
+      vehicleCategoryId: categoryId,
+      driverRequired: false,
+      notes,
+    },
+  };
+}
+
 export function validateQuoteLines(input: QuoteInput) {
   const errors: Errors = {};
   const lines: QuoteLine[] = [];
@@ -865,6 +967,45 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         summary: `Rental request ${reference} created for ${rental.customerName}.`,
       }, now);
       return { ok: true, db: next, message: `Rental request ${reference} created.` };
+    }
+
+    // The one command a member of the public can reach (WEB-01). It carries no authority: whoever
+    // calls it gets a draft request and nothing else — no list, no quote, no confirmation, no way to
+    // read another enquiry back. The route in front of it (src/app/api/enquiry) adds the throttling
+    // and the time-trap; this case is the write.
+    case "submit_enquiry": {
+      if (db.settings.vehicleCategories.length === 0) {
+        return fail("Enquiries are not open yet: no vehicle types are configured. Call the office instead.");
+      }
+      const { errors, value } = validateEnquiry(db, command.input, now.slice(0, 10));
+      if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
+      const reference = `RR-${String(db.rentals.length + 1).padStart(4, "0")}`;
+      const rental: Rental = {
+        id: makeId(),
+        reference,
+        ...value,
+        status: "draft",
+        quote: null,
+        quoteHistory: [],
+        assignedVehicleId: null,
+        assignedDriverId: null,
+        deposit: null,
+        finalInvoice: null,
+        resolutionReason: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const next = audit({ ...db, rentals: [...db.rentals, rental] }, actor, {
+        action: "rentals:enquiry",
+        entity: "rental",
+        entityId: rental.id,
+        summary: `Website enquiry ${reference} from ${rental.customerName}.`,
+      }, now);
+      return {
+        ok: true,
+        db: next,
+        message: `Thank you. Your request is recorded as ${reference}, and the office will call ${rental.customerPhone} to confirm it.`,
+      };
     }
 
     case "update_rental": {

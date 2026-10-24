@@ -777,7 +777,7 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
     second with `23P01`. If that second case ever passes with two winners, the constraint is gone.
   - `scripts/e2e-workflow-c.ts` (`npm run e2e`, CI job `e2e`) starts the built application, signs in
     over HTTP with a real cookie, and repeats the workflow through the public endpoints, including
-    the 401, 403 and validation paths and the AUTH-05 profile endpoints (29 checks).
+    the 401, 403 and validation paths and the AUTH-05 profile endpoints (39 checks, the first thirteen of them the public form and its page).
 - **Consequence.** This is a **substitute**, not the brief's requirement: it proves the command,
   persistence and concurrency path, not the browser rendering or the click path. Screens are covered
   separately by jsdom tests.
@@ -802,3 +802,31 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 - **Known gap.** No address, browser or device is recorded, and no "sign out everywhere" button exists
   yet. The screen says the first plainly; the second is unnecessary while the credential digest ends
   the other sessions.
+
+## D-70 The public form is its own route, and it may be framed
+
+- **Context.** WEB-01 asks for an enquiry endpoint and an embeddable form for the company's existing
+  website, "creating a Submitted request and exposing no data". Every other path in this application
+  is same-origin, cookie-bearing and `frame-ancestors 'none'` (D-49). A form on someone else's page
+  is, by construction, the opposite of both.
+- **Decision.**
+  - The form is a separate route (`/enquiry`) with no session, no snapshot and no navigation into the
+    application, and one endpoint (`/api/enquiry`) that returns a reference and a sentence.
+  - It is not same-origin restricted. It carries no cookie, so a cross-site post has nothing to ride;
+    refusing the origin would only stop the form working where it is meant to live.
+  - It is the one path allowed to be framed: `next.config.ts` gives `/enquiry` `frame-ancestors *`
+    and drops `X-Frame-Options` for it, while `/:path*` keeps `frame-ancestors 'none'`.
+  - "Submitted" is a **draft** in the status vocabulary this application already has. A new status
+    would have meant a new branch in every transition, for a record the office has not yet accepted.
+  - Spam protection is three cheap layers, none of which is a third-party captcha (this deployment has
+    no outbound network and no desire to send visitors' addresses to one): a honeypot field, a signed
+    timestamp token that a person cannot beat but a script can, and a per-address throttle.
+  - The vehicle types are the only thing published. They are what the form needs to ask a useful
+    question; vehicles, prices, customers and counts are not sent.
+- **Rejected.** Making the public form part of the signed-in shell (it would have exposed the app's
+  client code and a session check to a stranger). Reusing `/api/commands` (it requires a cookie by
+  design). A captcha service (external dependency, visitor data leaving the server, and unusable on a
+  workstation with no route to the internet).
+- **Consequence.** The endpoint accepts anonymous writes, so it is throttled and every submission is a
+  draft that a person still has to act on. `TRUST_PROXY=1` matters here for the same reason it matters
+  at sign-in: without it every visitor shares one bucket.

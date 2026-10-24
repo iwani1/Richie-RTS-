@@ -176,3 +176,19 @@ Additional invariants enforced by the service:
 - Backup import is refused if the importing administrator is absent from the backup.
 
 The role list and assignments are a proposal pending Q-21 in `OPEN_QUESTIONS.md`.
+
+## The public enquiry form (WEB-01)
+
+One command and two endpoints need no permission at all, because they are reached by people who have
+no account: `submit_enquiry` in `src/tms/service.ts`, and `GET`/`POST /api/enquiry`. They confer no
+authority — the only thing an anonymous caller can do is create a **draft** rental request, which
+then sits in the same queue as one taken at the desk and still needs `rentals:update`, `rentals:quote`,
+`rentals:confirm` and the rest to go anywhere.
+
+| Actor | May reach `/api/enquiry` | Effect |
+|---|:-:|---|
+| Nobody (no cookie) | yes | Creates a draft request attributed to `System` in the audit log |
+| Any signed-in role | yes | The same draft, attributed to that account — the route never reads the cookie |
+
+Hiding it is not part of the model: it is deliberately public. What keeps it safe is that it can do
+exactly one thing, that it returns no records, and that it is throttled per address.

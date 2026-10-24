@@ -11,7 +11,7 @@
 // In CI:      the `e2e` job starts `next start` against a PostgreSQL service, then runs this file.
 //
 // It asserts, in order: health, an unauthenticated command is refused, first-run setup, sign-in,
-// settings, a vehicle, a rental request, a quotation, the deposit, assignment, start, completion,
+// settings, the public enquiry form (WEB-01), a vehicle, a rental request, a quotation, the deposit, assignment, start, completion,
 // an invoice with the configured tax, two payments that settle it, that the reload shows the same
 // records, and that a cross-origin write is refused.
 
@@ -124,6 +124,107 @@ async function main() {
   });
   let db = await request("/api/session", {}, 200).then((r) => r.body.database);
   ok(db.settings.currencyCode === "GHS" && db.settings.taxPosition === "registered", "settings saved through the API");
+
+  // 4b. WEB-01: a stranger can open the public form and send an enquiry, and gets nothing back
+  //     but a reference. Sent with no cookie and from the website's own origin, which is the
+  //     situation the embeddable form is built for.
+  const publicForm = await request("/api/enquiry", { headers: { cookie: "" } }, 200);
+  ok(
+    typeof publicForm.body?.token === "string" && Array.isArray(publicForm.body?.categories),
+    "GET /api/enquiry hands out a form token and the vehicle types",
+  );
+  ok(
+    Object.keys(publicForm.body ?? {}).sort().join(",") === "categories,ok,open,token",
+    "the public form endpoint exposes no records and no counts",
+  );
+  const categoryId = db.settings.vehicleCategories[0].id;
+  const enquiryName = `Enquiry ${stamp}`;
+  const enquiry = await request(
+    "/api/enquiry",
+    {
+      method: "POST",
+      headers: { cookie: "", origin: "https://richietransport.example" },
+      body: JSON.stringify({
+        token: publicForm.body.token,
+        customerName: enquiryName,
+        customerPhone: "+233 24 555 0100",
+        customerEmail: "",
+        organization: "",
+        purpose: "Staff outing",
+        pickupLocation: "Osu",
+        dropoffLocation: "Ada",
+        startDate: inDays(21),
+        endDate: inDays(22),
+        passengers: "24",
+        vehicleCategoryId: categoryId,
+        notes: "",
+      }),
+    },
+    400,
+  );
+  // The token was issued milliseconds ago, so the time-trap refuses it — which is the point: a
+  // script that fetches a token and posts in the same breath is not a person.
+  ok(/open too long|finished loading/.test(String(enquiry.body?.message)), "a token used too fast is refused");
+
+  // Wait until that same token is unmistakably a few seconds old, then send the real enquiry with
+  // it: one token, refused at zero seconds and accepted at five, which is the whole mechanism.
+  await new Promise((resolve) => setTimeout(resolve, 4_500));
+  const submitted = await request(
+    "/api/enquiry",
+    {
+      method: "POST",
+      headers: { cookie: "", origin: "https://richietransport.example" },
+      body: JSON.stringify({
+        token: publicForm.body.token,
+        customerName: enquiryName,
+        customerPhone: "+233 24 555 0100",
+        customerEmail: "",
+        organization: "",
+        purpose: "Staff outing",
+        pickupLocation: "Osu",
+        dropoffLocation: "Ada",
+        startDate: inDays(21),
+        endDate: inDays(22),
+        passengers: "24",
+        vehicleCategoryId: categoryId,
+        notes: "Two pickups.",
+      }),
+    },
+    200,
+  );
+  ok(
+    Object.keys(submitted.body ?? {}).sort().join(",") === "message,ok,reference" &&
+      /^RR-\d{4,}$/.test(String(submitted.body?.reference)),
+    `an anonymous enquiry is accepted and answered with ${submitted.body?.reference} and nothing else`,
+  );
+  const hostile = await request(
+    "/api/enquiry",
+    { method: "POST", headers: { cookie: "" }, body: JSON.stringify({ token: "forged.0000", customerName: enquiryName }) },
+    400,
+  );
+  ok(hostile.body?.ok === false, "an enquiry with no usable token is refused");
+
+  const withEnquiry = await request("/api/session", {}, 200).then((r) => r.body.database);
+  const enquiryRental = withEnquiry.rentals.find((rental: any) => rental.reference === submitted.body.reference);
+  ok(
+    enquiryRental?.status === "draft" && /public enquiry form/i.test(enquiryRental?.notes ?? ""),
+    "the enquiry reaches the office as a draft, marked as having come from the website",
+  );
+  ok(
+    withEnquiry.audit.some((entry: any) => entry.action === "rentals:enquiry" && entry.entityId === enquiryRental?.id),
+    "the enquiry is in the audit log",
+  );
+
+  // 4c. The page itself, and the one header that makes it embeddable.
+  const embedPage = await fetch(`${BASE}/enquiry?embed=1`);
+  const embedHtml = await embedPage.text();
+  ok(embedPage.status === 200 && embedHtml.includes("Request a vehicle"), "the public enquiry page renders");
+  ok(
+    !embedPage.headers.get("x-frame-options") && /frame-ancestors \*/.test(embedPage.headers.get("content-security-policy") ?? ""),
+    "the enquiry page may be framed by the company's own website",
+  );
+  const shell = await fetch(`${BASE}/`);
+  ok(shell.headers.get("x-frame-options") === "DENY", "the application itself still refuses to be framed");
 
   // 5. A vehicle in the configured category.
   db = await command("create_vehicle", {

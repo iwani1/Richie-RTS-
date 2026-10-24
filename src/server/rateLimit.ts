@@ -52,6 +52,35 @@ export function attempt(key: string, now = Date.now()): ThrottleResult {
   return result;
 }
 
+// A second, general window for endpoints that are public rather than credential-checking: the
+// enquiry form counts arrivals, not failures, because every arrival is work the office has to read.
+// Kept apart from BUCKETS so a burst of enquiries cannot lock anyone out of signing in.
+type Window = { count: number; resetAt: number };
+const WINDOWS = new Map<string, Window>();
+
+/**
+ * Counts one arrival against a key and says whether it is within the limit.
+ *
+ * The clock is taken per call and windows are fixed rather than sliding: a caller cannot nudge the
+ * boundary by spacing attempts, and the state stays one integer per key.
+ */
+export function take(key: string, limit: number, windowMs: number, now = Date.now()): ThrottleResult {
+  const current = WINDOWS.get(key);
+  if (!current || current.resetAt <= now) {
+    // Cheap sweep: without it a long-running server keeps one entry per address it has ever seen.
+    if (WINDOWS.size > 1_000) {
+      for (const [existing, window] of WINDOWS) if (window.resetAt <= now) WINDOWS.delete(existing);
+    }
+    WINDOWS.set(key, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+  if (current.count >= limit) {
+    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((current.resetAt - now) / 1000)) };
+  }
+  current.count += 1;
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
 export function clear(key: string): void {
   BUCKETS.delete(key);
 }
@@ -59,4 +88,5 @@ export function clear(key: string): void {
 /** Test seam. */
 export function resetThrottle(): void {
   BUCKETS.clear();
+  WINDOWS.clear();
 }

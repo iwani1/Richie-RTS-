@@ -65,7 +65,28 @@ const nextConfig: NextConfig = {
   // Native/server-only packages must not be bundled by the client compiler.
   serverExternalPackages: ["@node-rs/argon2", "pg", "kysely"],
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      // The public enquiry form is the single exception to "no framing at all" (WEB-01): it exists
+      // to be embedded in the company's own website. Only that one path is frameable, and only for
+      // that reason — every other path keeps `frame-ancestors 'none'`. Browsers that understand CSP
+      // ignore X-Frame-Options when frame-ancestors is present, so the frameable route omits it
+      // rather than contradicting itself.
+      {
+        source: "/enquiry",
+        headers: [
+          ...securityHeaders.filter((header) => header.key !== "X-Frame-Options").map((header) =>
+            header.key === "Content-Security-Policy"
+              ? { ...header, value: header.value.replace("frame-ancestors 'none'", "frame-ancestors *") }
+              : header,
+          ),
+        ],
+      },
+      // Everything else: the whole application, including `/`. The enquiry path is excluded by the
+      // pattern rather than overridden afterwards, because Next applies every matching rule and two
+      // CSP headers would leave the browser honouring the stricter of the two.
+      { source: "/:path((?!enquiry).*)", headers: securityHeaders },
+      { source: "/", headers: securityHeaders },
+    ];
   },
 };
 

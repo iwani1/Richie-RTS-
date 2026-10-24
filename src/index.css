@@ -2047,6 +2047,110 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   .rts-auth-card { padding: 20px; }
 }
 
+/* ---------------------------------------------------------------- public enquiry form (WEB-01)
+   The one screen that is not part of the application shell. It is also the one screen meant to
+   live inside somebody else's page, so it is a single column that never assumes a viewport it did
+   not get: no fixed sidebar, no sticky header, no minimum width. Flat surfaces and one accent —
+   the same rules as the rest of the product, with none of the density. */
+.rts-public {
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 18px 56px;
+  background: var(--canvas);
+}
+
+.rts-public[data-embedded] {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.rts-public-card {
+  width: 100%;
+  max-width: 640px;
+  padding: 32px 34px 34px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  align-self: flex-start;
+}
+
+.rts-public[data-embedded] .rts-public-card { border: 0; padding: 4px 2px 8px; }
+
+.rts-public-head { display: flex; align-items: center; gap: 11px; margin-bottom: 22px; }
+.rts-public-head .rts-wordmark span { max-width: none; letter-spacing: 0.06em; font-size: 9.5px; margin-top: 2px; }
+
+.rts-public-eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.rts-public-title {
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: clamp(24px, 3.4vw, 30px);
+  font-weight: 660;
+  line-height: 1.14;
+  letter-spacing: -0.03em;
+}
+
+.rts-public-intro {
+  margin: 0 0 20px;
+  max-width: 62ch;
+  color: var(--muted-2);
+  font-size: 13.5px;
+  line-height: 1.62;
+}
+
+.rts-public-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+.rts-public-wide { grid-column: 1 / -1; }
+.rts-public-textarea { min-height: 74px; resize: vertical; }
+
+.rts-public-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding-top: 4px;
+}
+
+.rts-public-foot {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* Off-screen rather than hidden: `display: none` is a signal to a form-filling script that the
+   field is not worth completing. */
+.rts-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+@media (max-width: 620px) {
+  .rts-public { padding: 16px 12px 32px; }
+  .rts-public-card { padding: 22px 18px 24px; border-radius: 12px; }
+  .rts-public-form { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .rts-busy-bar::after { animation: none; width: 100%; }
