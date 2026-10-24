@@ -67,6 +67,7 @@ npm run check            # typecheck, lint, tests with coverage thresholds, prod
 npm test                 # unit and component tests
 npm run test:integration # against a real database (TEST_DATABASE_URL)
 npm run db:backup -- ./backups/today.json    # full export, contains password hashes
+npm run user:password -- --email you@example.com   # set a password from the terminal; prints a generated one if --password is omitted
 ```
 
 ## What is here

@@ -123,6 +123,7 @@ says which value is wrong on the page itself:
 | `connect ECONNREFUSED 127.0.0.1:5432` from `npm run db:migrate` | PostgreSQL is not running, or `DATABASE_URL` points at the wrong port. |
 | `password authentication failed for user "richie"` | the password in `DATABASE_URL` is not the one the database was created with. See below. |
 | `relation "schema_migrations" does not exist` | migrations were never applied. Run `npm run db:migrate`. |
+| `Incorrect email or password` and no other account exists | the administrator's password is forgotten. Set a new one from the terminal (below). |
 
 A change to `.env` takes effect only after the server is restarted: a running process keeps the
 values it started with.
@@ -159,6 +160,28 @@ podman inspect richie-db --format '{{json .Config.Env}}'   # what the container 
    | `%` | `%25` |
 
    The simplest fix is a password made of letters and digits only.
+
+#### A forgotten password
+
+Passwords are salted and hashed with Argon2id, so no SQL statement can set one — and the only
+in-app reset is performed by an administrator who can already sign in. For an installation whose
+last administrator is locked out:
+
+```bash
+npm run user:password -- --email admin@example.com
+```
+
+That prints a generated password. To choose your own, add `--password 'at least ten characters'`
+(it is then in your shell history). The command needs no restart and does not touch anything else;
+it refuses an email that does not exist and lists the accounts that do. With an external PostgreSQL
+it can run while the server is up.
+
+To see who exists:
+
+```bash
+podman exec -it richie-db psql -U richie -d richie_tms \
+  -c "select email, role, active from app_user order by email;"
+```
 
 ## 6. Migrate
 
