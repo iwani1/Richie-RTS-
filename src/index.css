@@ -126,13 +126,8 @@
 }
 
 /* One accent per section. The colour appears on the active destination, its icon and its badge. */
-[data-route="dashboard"], [data-route="users"], [data-route="settings"], [data-route="audit"] { --rubric: var(--accent); }
-[data-route="busing"], [data-route="driver_portal"], [data-route="client_portal"] { --rubric: var(--teal); }
-[data-route="rentals"] { --rubric: var(--blue); }
-[data-route="fleetReadiness"] { --rubric: var(--amber); }
-[data-route="logistics"] { --rubric: var(--green); }
-[data-route="vehicles"], [data-route="drivers"], [data-route="clients"] { --rubric: var(--blue); }
-[data-route="compliance"] { --rubric: var(--red); }
+/* One accent. Sections are told apart by their name and their contents, never by a colour a reader
+   has to learn; colour is not the only carrier of any state (owner direction E, brief section 10). */
 
 * { box-sizing: border-box; }
 
@@ -758,7 +753,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 
 .rts-figure--money { font-size: 24px; }
 
-/* ---------- ledger tables ------------------------------------------------------------------------ */
+/* ---------- data tables ------------------------------------------------------------------------ */
 
 .rts-table-wrap {
   overflow-x: auto;
