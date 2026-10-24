@@ -67,7 +67,11 @@ export async function POST(request: Request) {
   const admin = result.database.users.find((user) => user.email.toLowerCase() === parsed.data.email);
   if (!admin) return json(500, { ok: false, message: "The administrator account could not be read back." });
   await signInAs(admin);
-  const visible = visibleSnapshot(result.database, { id: admin.id, fullName: admin.fullName, role: admin.role });
+  // The first sign-in is a sign-in like any other: record it, so the account's own history (AUTH-05)
+  // starts with the moment it was created rather than appearing empty until the next login.
+  const signedIn = await runCommand({ type: "record_sign_in" }, { userId: admin.id });
+  const database = signedIn.ok ? signedIn.database : result.database;
+  const visible = visibleSnapshot(database, { id: admin.id, fullName: admin.fullName, role: admin.role });
   return json(201, {
     ok: true,
     message: "Administrator account created.",

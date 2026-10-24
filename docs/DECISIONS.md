@@ -770,8 +770,11 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 - **Decision.** Two proofs, both in CI:
   - `src/server/commandFlow.integration.test.ts` runs commands through the same server module the
     API route uses (`runCommand`) against real PostgreSQL: workflow C from rental request to a paid
-    invoice with a reload in the middle, plus six parallel `assign_rental` calls proving one winner
-    and five readable refusals.
+    invoice with a reload in the middle.
+  - `src/server/concurrency.integration.test.ts` proves the booking rule twice: six parallel
+    `assign_rental` commands (one winner, five 409s) and two overlapping `saveDatabase` transactions
+    with **no advisory lock in front of them**, where the exclusion constraint alone rejects the
+    second with `23P01`. If that second case ever passes with two winners, the constraint is gone.
   - `scripts/e2e-workflow-c.ts` (`npm run e2e`, CI job `e2e`) starts the built application, signs in
     over HTTP with a real cookie, and repeats the workflow through the public endpoints, including
     the 401, 403 and validation paths and the AUTH-05 profile endpoints (29 checks).

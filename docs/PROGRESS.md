@@ -532,7 +532,7 @@ AUTH-05, the Playwright proof for workflow C and a real parallel double-booking 
 |---|---|---|
 | Integration tests run against PostgreSQL in CI, not skipped | Done (verified locally against Postgres 18 semantics via PGlite) | `.github/workflows/ci.yml` job `integration` (postgres:18-alpine, `db:migrate`, `npm run test:integration`); `src/server/repository.integration.test.ts` (5) + `src/server/commandFlow.integration.test.ts` (3), all 8 green |
 | Workflow C proved end to end, with a reload in the middle | Done (verified) | `commandFlow.integration.test.ts` "runs a rental from request to a paid invoice, and the records survive a reload": `INV-2026-0001` GHS 3,450 due 2026-06-17, two payments to `paid`, `referenceCounters` persisted, audit rows re-read from the table (D-68 notes this is HTTP/command-level, not Playwright) |
-| Parallel double-booking: six operators, one vehicle | Done (verified) | Same file: six concurrent `assign_rental` calls → 1 success, 5 × 409 with "already assigned to RR-…", exactly one `resource_reservation` row |
+| Parallel double-booking: six operators, one vehicle | Done (verified in CI) | `src/server/concurrency.integration.test.ts`: six concurrent `assign_rental` calls → 1 success, 5 × 409 with "already assigned to RR-…", exactly one `resource_reservation` row; and a second case with **no advisory lock in the way** (two overlapping `saveDatabase` transactions) where the exclusion constraint rejects the loser with SQLSTATE `23P01` |
 | A refusal caused by a clash returns 409, not 400 | Done (verified) | `Failure.kind = "conflict"` (`service.ts`), mapped in `runCommand`; only the assignment clash sets it today |
 | **Defect fixed:** number series were written but never read back | Done (verified) | `loadDatabase` now reads `reference_counter`; without it the second payment of the day reused `PAY-…-0001` and was refused by `payment_reference_key` (the integration test caught it) |
 | Vehicle release is a separate permission, and the releaser is recorded | Done (verified) | `maintenance:release` in `permissions.ts`; `advance_work_order` gate + `releasedBy`/`releasedAt`; audit action `maintenance:release`; tests "records who released the vehicle…" and "refuses to release a vehicle for an account that may advance work but not release it"; schema 12 (D-64) |
@@ -541,6 +541,6 @@ AUTH-05, the Playwright proof for workflow C and a real parallel double-booking 
 | 78-ID register in `PROGRESS.md` | Done (verified) | The table at the top of this file: one row per brief ID with phase, status and evidence; closes D-02 |
 | **Still open** | — | WEB-01 (public enquiry form) and the Playwright requirement itself |
 
-Gates after this phase: `typecheck` clean, `lint` clean, `test` **257 passed, 8 skipped** (the 8 are
-the two integration suites, which only run with `TEST_DATABASE_URL`), integration **8 passed**,
-`build` succeeds.
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **263 passed, 10 skipped** (the 10 are
+the integration suites, which only run with `TEST_DATABASE_URL`), integration **10 passed**,
+`build` succeeds, CI green on `quality-gates` and `integration`.
