@@ -82,10 +82,14 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Staff logistics: incidents, work orders, cost report | Works |
 | Fleet readiness: service intervals, odometer, readiness | Works |
 | Driver and client portals (own-record scope) | Works |
-| Contracts, bookings, CSV import, notifications, payments, offline | **Not built** — see `docs/PROGRESS.md` |
+| Invoices and manual payments: numbered, voided, part-paid, settled | Works; numbers are per year and per kind |
+| Public enquiry form, embeddable on the company website | Works; throttled, spam-trapped, creates a draft only |
+| CSV import for vehicles, drivers and clients | Works; rejects a row with its line number, never merges |
+| Contracts, bookings, notifications, driver app, GPS | **Not built** — see `docs/PROGRESS.md` |
 
-The unit/UI suite plus 5 integration tests against a real PostgreSQL; coverage thresholds are
-enforced by `npm run check`. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
+288 unit and UI tests plus 10 integration tests against a real PostgreSQL; coverage thresholds are
+enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
+end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.
 
 ## Stack
@@ -108,6 +112,7 @@ the session/password decision (D-51).
 | `richie-tms-standing-brief.md` | the standing brief: how this project is built (authoritative) |
 | `docs/ARCHITECTURE.md` | modules, request flow, known limits |
 | `docs/PROGRESS.md` | what is done, what is blocked, and the evidence for each claim |
+| `docs/REAL_DATA_TRIAL.md` | the two-hour checklist to run before the first real working day |
 | `docs/PERMISSIONS.md` | role × permission matrix and own-record scope |
 | `docs/DATA_PROTECTION.md` | personal data held, and what is not yet safe |
 | `docs/OPEN_QUESTIONS.md` | business rules the owner still needs to answer |

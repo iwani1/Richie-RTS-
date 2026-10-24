@@ -376,6 +376,13 @@ Deliberate cuts for this stage, recorded so nobody discovers them in production:
 7. **Session lifetime is eight hours**, fixed in `src/server/session.ts`. Changing it is a one-line
    change, but it is a policy decision, so it is not configurable yet.
 
+## 12a. Before the first real working day
+
+`docs/REAL_DATA_TRIAL.md` is the checklist: a restorable backup, settings, CSV import, one real
+rental to a paid invoice, the release control, the reports reconciled by hand, the public form, and a
+restart. Run it against a copy of the database first (`pg_dump` + `pg_restore` into
+`richie_tms_trial`), then once against the real one.
+
 ## 13. What was verified, and what was not
 
 Verified by running:

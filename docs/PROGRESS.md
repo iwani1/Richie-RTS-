@@ -546,3 +546,19 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **288 passed, 10
 the integration suites, which only run with `TEST_DATABASE_URL`), coverage 76.9% statements / 81.5%
 lines against thresholds of 70/74, integration **10 passed**, `build` succeeds, and all three CI jobs
 are green (`quality-gates`, `integration`, `e2e` — run 40067337023 on `02e5976`).
+
+## Phase 20 - The trial on real data
+
+The Phase 1A feature register is now at **zero unbuilt IDs**, so the next gate is not another feature:
+it is the same features proved on the owner's records, prices and customers, with a backup that has
+been restored at least once.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Trial checklist | Done (authored; the run itself is the owner's) | `docs/REAL_DATA_TRIAL.md`: copy the database first, restore a backup and compare counts, settings, CSV import, one real rental from request to a paid invoice (including the double-booking refusal and an over-payment refusal), the maintenance release control, reports reconciled by hand, the public enquiry form from a signed-out browser, and a restart. §10 is the sign-off table |
+| The trial itself | **Not started** — needs the owner's machine and real records | Run it against `richie_tms_trial`, then once against `richie_tms`. Findings come back as a step number, the message on screen, and the reference in question |
+
+After the trial, the remaining open work is what the brief puts in Phase 1B/1C and what this build
+has recorded as deliberately absent: contracts, bookings, employee/passenger import (EMP-02), the
+financial reports (RPT-03), the browser automation the brief asks for (D-68), and the notification
+and GPS work that Phase 2 owns.
