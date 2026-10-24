@@ -3,7 +3,7 @@
 // a rejection is readable, and that the success panel shows the reference the office will ask for.
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PublicEnquiry } from "./PublicEnquiry";
+import { EMBED_HEIGHT_MESSAGE, PublicEnquiry } from "./PublicEnquiry";
 
 const categories = [{ id: "cat-1", name: "Coaster" }, { id: "cat-2", name: "Sprinter" }];
 
@@ -37,6 +37,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  delete (window as unknown as { parent?: unknown }).parent;
 });
 
 describe("public enquiry form", () => {
@@ -103,5 +104,33 @@ describe("public enquiry form", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send request" }));
     await waitFor(() => expect(screen.getByText(/has not finished loading/i)).toBeTruthy());
     expect(fetchMock).toHaveBeenCalledTimes(1); // the GET only
+  });
+});
+
+describe("framed on the company website", () => {
+  it("tells the host page how tall it is, and sends nothing else", async () => {
+    stubFetch({ status: 200, body: { ok: true, message: "Thank you.", reference: "RR-0007" } });
+    const postMessage = vi.fn();
+    // jsdom has no layout, so the document reports 0 high. The point of the case is the transport:
+    // a message of the right type carrying a pixel height and no field values.
+    Object.defineProperty(window, "parent", { value: { postMessage }, configurable: true });
+    Object.defineProperty(document.documentElement, "scrollHeight", { value: 641, configurable: true });
+
+    render(<PublicEnquiry embedded />);
+    await waitFor(() => expect(postMessage).toHaveBeenCalled());
+
+    const [message] = postMessage.mock.calls[0];
+    expect(message).toEqual({ type: EMBED_HEIGHT_MESSAGE, height: 641 });
+    expect(EMBED_HEIGHT_MESSAGE).toBe("richie-enquiry:height");
+  });
+
+  it("stays quiet when the page was not asked to be framed", async () => {
+    stubFetch({ status: 200, body: { ok: true, message: "Thank you.", reference: "RR-0007" } });
+    const postMessage = vi.fn();
+    Object.defineProperty(window, "parent", { value: { postMessage }, configurable: true });
+
+    render(<PublicEnquiry />);
+    await waitFor(() => expect(screen.getByRole("option", { name: "Coaster" })).toBeTruthy());
+    expect(postMessage).not.toHaveBeenCalled();
   });
 });

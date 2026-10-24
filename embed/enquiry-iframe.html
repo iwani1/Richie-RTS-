@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Request a vehicle — Richie Transport Services</title>
+    <!--
+      The embeddable enquiry form (WEB-01).
+
+      This file is a complete, working example. To put the form on the company website, copy the
+      <section class="rt-enquiry"> block and the <script> at the bottom into any page; the two lines
+      marked CHANGE ME are the only ones that need editing.
+
+      It needs no library, no build step and no framework: plain HTML, plain CSS, one small script.
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 32px 16px;
+        background: #f5f6f9;
+        color: #0f172a;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+        line-height: 1.55;
+      }
+      .rt-wrap { max-width: 720px; margin: 0 auto; }
+      h1 { font-size: 22px; letter-spacing: -0.02em; margin: 0 0 6px; }
+      .rt-lede { margin: 0 0 20px; color: #5f6a7d; font-size: 14px; }
+      .rt-enquiry iframe {
+        display: block;
+        width: 100%;
+        /* A floor, so the form is usable before the first height message arrives, and a fallback
+           for a browser with JavaScript off. The script below replaces this with the real height. */
+        height: 980px;
+        border: 0;
+        background: transparent;
+      }
+      .rt-fallback { margin: 10px 0 0; font-size: 12.5px; color: #667085; }
+      .rt-fallback a { color: #4453f0; }
+    </style>
+  </head>
+  <body>
+    <main class="rt-wrap">
+      <h1>Request a vehicle</h1>
+      <p class="rt-lede">Hire a bus or a minibus with a driver, for a day or for a week.</p>
+
+      <!-- ▼▼▼ COPY FROM HERE ▼▼▼ -->
+      <section class="rt-enquiry">
+        <iframe
+          id="richie-enquiry"
+          src="https://tms.example.com/enquiry?embed=1"
+          title="Request a vehicle from Richie Transport Services"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          scrolling="no"
+        ></iframe>
+        <p class="rt-fallback">
+          Not loading?
+          <a href="https://tms.example.com/enquiry" target="_blank" rel="noopener noreferrer">Open the form in a new tab</a>.
+        </p>
+      </section>
+
+      <script>
+        // The form reports its own height (it cannot be measured from outside the frame), so the
+        // iframe always fits its content: no clipped button on a phone, no white band underneath.
+        (function () {
+          var STIE = "richie-enquiry:height"; // the message type the form sends
+          var frame = document.getElementById("richie-enquiry");
+          if (!frame) return;
+          window.addEventListener("message", function (event) {
+            var data = event.data;
+            // Only accept the number, and only from the form's own origin.
+            if (!data || data.type !== STIE || typeof data.height !== "number") return;
+            if (event.origin !== "https://tms.example.com") return; // CHANGE ME: the TMS origin
+            if (data.height < 200 || data.height > 4000) return; // ignore nonsense
+            frame.style.height = Math.ceil(data.height) + "px";
+          });
+        })();
+      </script>
+      <!-- ▲▲▲ COPY TO HERE ▲▲▲ -->
+
+      <p style="font-size: 12px; color: #667085; margin-top: 24px">
+        Two things to change when you paste this in: the <code>src</code> and the origin check, both
+        pointing at wherever the TMS is served. If the page is served over https, the form must be
+        too, or the browser will refuse to show it.
+      </p>
+    </main>
+  </body>
+</html>

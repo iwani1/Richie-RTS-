@@ -11,6 +11,38 @@ import { Button, Field, Notice, Select, TextInput } from "../ui/primitives";
 
 type Category = { id: string; name: string };
 
+/**
+ * The message a framed form sends its host page, carrying its own height in pixels.
+ *
+ * A fixed-height iframe is the wrong shape for this form: on a phone it clips the button, on a
+ * desktop it leaves a band of white under it, and the thank-you panel is shorter than the form it
+ * replaces. The host page cannot measure inside the frame — only the frame can — so the frame says
+ * how tall it is and the host sets the height. The payload is a number and nothing else: no field
+ * value travels to the host page.
+ */
+export const EMBED_HEIGHT_MESSAGE = "richie-enquiry:height";
+
+function useEmbedHeight(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined" || window.parent === window) return;
+
+    const report = () => {
+      const height = Math.ceil(Math.max(document.body?.scrollHeight ?? 0, document.documentElement?.scrollHeight ?? 0));
+      if (height > 0) window.parent.postMessage({ type: EMBED_HEIGHT_MESSAGE, height }, "*");
+    };
+
+    report();
+    // The form grows when an error appears, and shrinks when the thank-you panel replaces it.
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", report);
+      return () => window.removeEventListener("resize", report);
+    }
+    const observer = new ResizeObserver(report);
+    observer.observe(document.body);
+    return () => observer.disconnect();
+  }, [enabled]);
+}
+
 const blank = {
   customerName: "",
   customerPhone: "",
@@ -35,6 +67,7 @@ export function PublicEnquiry({ embedded = false }: { embedded?: boolean }) {
   const [reference, setReference] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [opening, setOpening] = useState(true);
+  useEmbedHeight(embedded);
   // The honeypot. It is not in `values` on purpose: a person never touches it, and a bot that fills
   // every input it finds fills this one too.
   const [honeypot, setHoneypot] = useState("");

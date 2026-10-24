@@ -181,9 +181,10 @@ up as a difference, so write down the three numbers rather than just ticking the
    login prompt.
 2. In the application, open **Rentals**. **Expected:** a **Draft** request with that reference, a note
    saying it came from the public enquiry form, and an audit entry (`rentals:enquiry`).
-3. If you intend to embed it, put the same page in your website's `<iframe>` as
-   `SETUP_AND_DEPLOYMENT.md` §10a shows, and confirm it renders. **Expected:** it renders inside the
-   frame; every other page of the application refuses to be framed.
+3. If you intend to embed it, open `embed/enquiry-iframe.html` in this repository in a browser —
+   it is the finished snippet, with the TMS address to change marked. **Expected:** the form renders
+   inside the frame at its own height (no clipped button, no band of white underneath), and every
+   other page of the application refuses to be framed.
 4. Optional: a script posting immediately (the browser console, `fetch('/api/enquiry', {method:'POST', body:'{}'})`)
    is refused. **Expected:** a 400, and no record created.
 

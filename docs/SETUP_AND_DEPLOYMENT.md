@@ -285,7 +285,7 @@ data. A PostgreSQL-native alternative is `pg_dump --format=custom`.
 ```bash
 npm run typecheck        # tsc --noEmit
 npm run lint             # eslint
-npm test                 # 288 unit and component tests
+npm test                 # 290 unit and component tests
 npm run test:integration # against a real database; needs TEST_DATABASE_URL
 npm run build            # production build
 ```
@@ -294,15 +294,51 @@ npm run build            # production build
 
 ## 10a. Putting the enquiry form on the company website (WEB-01)
 
-The form lives at `/enquiry` on this server and is meant to be framed by the existing website:
+The form lives at `/enquiry` on this server and is meant to be framed by the existing website.
+`embed/enquiry-iframe.html` in this repository is a complete working page: open it in a browser to
+see the result, or copy the marked block and script out of it into any page on the site. The whole
+snippet, with nothing else needed:
 
 ```html
-<iframe
-  src="https://tms.example.com/enquiry?embed=1"
-  title="Request a vehicle"
-  style="width:100%;max-width:720px;height:900px;border:0"
-></iframe>
+<section class="rt-enquiry">
+  <iframe
+    id="richie-enquiry"
+    src="https://tms.example.com/enquiry?embed=1"
+    title="Request a vehicle from Richie Transport Services"
+    loading="lazy"
+    referrerpolicy="no-referrer"
+    scrolling="no"
+    style="display:block;width:100%;height:980px;border:0"
+  ></iframe>
+  <p style="font-size:12.5px;color:#667085;margin:10px 0 0">
+    Not loading?
+    <a href="https://tms.example.com/enquiry" target="_blank" rel="noopener noreferrer">Open the form in a new tab</a>.
+  </p>
+</section>
+
+<script>
+  (function () {
+    var frame = document.getElementById("richie-enquiry");
+    if (!frame) return;
+    window.addEventListener("message", function (event) {
+      var data = event.data;
+      if (!data || data.type !== "richie-enquiry:height" || typeof data.height !== "number") return;
+      if (event.origin !== "https://tms.example.com") return;   /* the TMS origin */
+      if (data.height < 200 || data.height > 4000) return;
+      frame.style.height = Math.ceil(data.height) + "px";
+    });
+  })();
+</script>
 ```
+
+Two values change when you paste this in: every `https://tms.example.com` (the `src` and the origin
+check) becomes wherever this application is served.
+
+The small script matters. A frame cannot be measured from outside, so the form posts its own height
+(`richie-enquiry:height`, a number of pixels and nothing else — no field value crosses into the host
+page) and the host sets the iframe height from it. Without the script the form still works, using the
+`980px` in the style; on a phone that will clip the button, and the thank-you panel leaves a band of
+white.
 
 - `/enquiry` is the only path served with `frame-ancestors *` and without `X-Frame-Options`; every
   other path refuses to be framed (`next.config.ts`). `/enquiry?embed=1` drops the card's border and
