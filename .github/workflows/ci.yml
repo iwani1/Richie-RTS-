@@ -70,6 +70,9 @@ jobs:
         with:
           name: next-build
           path: .next/
+          # .next starts with a dot, and upload-artifact v4 skips hidden files unless told not to.
+          # Without this the step failed with "No files were found" on a build that had succeeded.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 

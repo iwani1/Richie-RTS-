@@ -1,8 +1,9 @@
 name: codeql
 
+# Every branch: this analysis had never run, because it only listened for main and pull requests
+# (audit F-06), and security scanning is most useful on the work in progress.
 on:
   push:
-    branches: [main]
   pull_request:
   schedule:
     - cron: "0 3 * * 1"
