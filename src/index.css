@@ -1353,6 +1353,22 @@ select.rts-input option { background: var(--card); color: var(--ink); }
 .rts-auth-title { margin: 0; color: var(--ink); font-family: var(--display); font-size: 23px; font-weight: 680; letter-spacing: -0.035em; line-height: 1.2; }
 .rts-auth-intro { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .rts-auth-divider { height: 1px; margin: 16px 0; background: var(--line); }
+
+/* a configuration error, shown exactly as the server wrote it */
+.rts-auth-config {
+  margin: 10px 0 0;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  border-radius: 10px;
+  background: var(--card-2);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .rts-auth-foot { margin: 16px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.55; }
 
 /* ---------- busing: the run sheet ------------------------------------------------------------------------------- */

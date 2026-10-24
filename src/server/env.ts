@@ -25,6 +25,26 @@ export function env(): Env {
   if (missing.length) {
     throw new Error(`Invalid server configuration:\n${missing.map(([, message]) => `  - ${message}`).join("\n")}\nCopy .env.example to .env and fill it in.`);
   }
+
+  // A secret that is present but too short is the commonest first-run mistake: .env.example ships a
+  // placeholder, people copy the file and never replace that one line. Say which line, how long it
+  // is and how to make a real one, instead of reporting a rule the reader has to go and look up.
+  const secret = process.env.SESSION_SECRET ?? "";
+  if (secret.length < 32) {
+    const placeholder = /^change[-_ ]?me/i.test(secret);
+    throw new Error(
+      [
+        "Invalid server configuration:",
+        `  - SESSION_SECRET is ${secret.length} character${secret.length === 1 ? "" : "s"} long; at least 32 are required.`,
+        placeholder ? "    That value is the placeholder from .env.example; it has never been replaced." : "",
+        "    In the .env file at the root of this checkout, replace the whole SESSION_SECRET line with:",
+        "      SESSION_SECRET=\"<paste the output of: openssl rand -base64 32>\"",
+        "    Then stop the server (Ctrl+C) and start it again. Existing sessions are signed out.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
   const parsed = schema.safeParse({
     DATABASE_URL: process.env.DATABASE_URL,
     SESSION_SECRET: process.env.SESSION_SECRET,

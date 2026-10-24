@@ -91,18 +91,17 @@ export default function App() {
 function BootScreen({ message, error, onRetry }: { message: string; error?: boolean; onRetry?: () => void }) {
   // A configuration error is not a reachability problem: say which it is, so the reader does not
   // go looking for a stopped server when the answer is in .env.
-  const title = /Invalid server configuration|must be at least|is required/i.test(message)
-    ? "The server needs configuration"
-    : error
-      ? "Cannot reach the server"
-      : "Opening the workspace";
+  // A configuration error is a list of lines meant to be read as they were written, so it is
+  // rendered as preformatted text rather than reflowed into a paragraph.
+  const misconfigured = /Invalid server configuration|must be at least|is required/i.test(message);
+  const title = misconfigured ? "The server needs configuration" : error ? "Cannot reach the server" : "Opening the workspace";
   return (
     <main className="rts-auth rts-auth--solo">
       <section className="rts-auth-side">
         <div className="rts-auth-card" role="status" aria-live="polite">
           <p className="rts-auth-eyebrow">Richie Transport Services</p>
           <h1 className="rts-auth-title">{title}</h1>
-          <p className="rts-auth-intro">{message}</p>
+          {misconfigured ? <pre className="rts-auth-config">{message}</pre> : <p className="rts-auth-intro">{message}</p>}
           {error && onRetry && (
             <Button variant="primary" onClick={() => void onRetry()} className="mt-4">
               Try again
