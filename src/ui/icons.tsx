@@ -6,6 +6,7 @@ type IconName =
   | "dashboard"
   | "rental"
   | "invoice"
+  | "reports"
   | "busing"
   | "logistics"
   | "readiness"
@@ -24,6 +25,13 @@ type IconName =
   | "eyeOff";
 
 const paths: Record<IconName, ReactElement> = {
+  // Three bars, ascending: a column chart, not a sparkline.
+  reports: (
+    <>
+      <path d="M3 17h14" />
+      <path d="M5.5 17v-5M10 17V7M14.5 17v-8" />
+    </>
+  ),
   // A document with a folded corner and a ruled line — a bill, not a page of editorial text.
   invoice: (
     <>

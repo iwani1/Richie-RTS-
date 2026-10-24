@@ -402,3 +402,21 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **245 passed, 5 
 
 Also in this phase: a run already on the road can no longer take a roster addition that would put
 more passengers in the vehicle than it seats (`busing.test.ts`, D-61 follow-up).
+
+## Phase 17 - Rental report (RPT-01)
+
+| Item | Status | Evidence |
+|---|---|---|
+| Enquiries, quotations issued, acceptance rate, confirmed and completed | Done (verified) | `src/tms/rentalReport.ts`; tests: `rentalReport.test.ts` "separates enquiries, quotations and acceptance, and states its coverage" |
+| Revenue (invoiced) and received, outstanding as at the period end | Done (verified) | Same module; test "excludes voids from invoiced totals and reports outstanding as at the period end" |
+| Vehicle utilisation with a stated denominator | Done (verified) | Test "computes utilisation from committed rental vehicle-days and the acting fleet" |
+| Cancellation and decline reasons | Done (verified) | Test "groups cancellation and decline reasons, most frequent first" |
+| Coverage statement and currency guard | Done (verified) | Tests "withholds money figures when the currency is not configured…" and the Coverage panel on screen |
+| CSV export of the same figures | Done (verified) | `rentalReportCsv`, quoting-safe; test "exports the same figures as CSV" |
+| Reports screen and destination | Done (verified) | `src/screens/Reports.tsx`, nav "Reports" gated by `kpis:read`; `src/screens/Reports.test.tsx` (3) |
+| **Not built** | — | Date-range presets, filters by client/customer, PDF (RPT-05, Phase 3) |
+
+Formulas are in `docs/KPIS.md` under "Rental report (RPT-01, implemented)".
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **255 passed, 5 skipped**,
+`build` succeeds.

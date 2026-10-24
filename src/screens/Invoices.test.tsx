@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InvoicesPage } from "./Invoices";
 import { TmsContext, type Tms } from "../tms/useTms";
+import type { CommandResult } from "../tms/service";
 import { emptyDatabase, type Database, type Invoice, type Payment, type User } from "../tms/types";
 
 afterEach(cleanup);
@@ -81,16 +82,17 @@ function makeTms(db: Database, overrides: Partial<Tms> = {}): Tms {
     auditTotal: 0,
     setupRequired: false,
     flash: null,
+    busy: false,
     setFlash: () => {},
     allowed: () => true,
-    dispatch: vi.fn(async () => ({ ok: true, message: "" })),
+    dispatch: vi.fn(async () => ({ ok: true, message: "" }) as CommandResult),
     signIn: vi.fn(async () => null),
     signOut: vi.fn(async () => {}),
     setupAdministrator: vi.fn(async () => ({ ok: true, message: "" })),
     exportBackup: vi.fn(async () => null),
     refresh: vi.fn(async () => {}),
     ...overrides,
-  } as Tms;
+  } as unknown as Tms;
 }
 
 const renderInvoices = (db: Database, overrides: Partial<Tms> = {}) => {

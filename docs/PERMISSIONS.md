@@ -66,6 +66,16 @@ client_contact (own client). Finance does not hold it, so the roster — names, 
 references and phone numbers — never reaches a finance session. This is a server-side filter on
 the payload, not only a hidden tab (D-60).
 
+## Reporting (RPT-01)
+
+| Destination | Permission | Notes |
+|---|---|---|
+| Rental report (`/reports`) | `kpis:read` | administrator, operations, finance |
+| CSV download | same snapshot | the file is built from the payload the role already received, so it cannot contain a record the role cannot read |
+
+Drivers and client contacts have no reporting destination: their payload is own-record scoped, and a
+company-wide report cannot be assembled from it.
+
 ## Invoices and payments (FIN-02, FIN-03)
 
 | Permission | administrator | operations | finance | driver | client_contact |

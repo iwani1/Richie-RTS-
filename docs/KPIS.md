@@ -6,7 +6,10 @@ The uploaded brief names RPT-01 to RPT-03 but does not define them. An earlier v
 
 Every KPI on screen shows its reporting period, numerator, denominator and data coverage. A KPI with missing inputs shows "Not computed" or "Insufficient data", never a number.
 
-## RPT-01 On-time rate (implemented; definition pending confirmation)
+## On-time rate (implemented; belongs to RPT-02, definition pending confirmation)
+
+> Labelled RPT-01 in an earlier draft. In the brief, RPT-01 is the rental report (below); on-time
+> performance is part of RPT-02, the staff transport report.
 
 **Formula**
 
@@ -73,3 +76,36 @@ It is the sum of what someone typed in, and it says so.
 3. Always show data coverage.
 4. Never show a KPI as verified when an input is missing (Integrity rule 4).
 5. Do not compute profit or margin until revenue and cost inputs exist.
+
+## Rental report (RPT-01, implemented)
+
+Every figure is computed by `src/tms/rentalReport.ts` and covered by `src/tms/rentalReport.test.ts`.
+The period is inclusive of both dates, by calendar day (Africa/Accra, no daylight saving — brief 5.5).
+
+| Metric | Formula | Population and exclusions |
+|---|---|---|
+| Enquiries | count of rentals | `rental.created_at` inside the period. Every request counts, whatever its current status |
+| Quotations issued | count of rentals with a quotation | `rental.quote.quotedAt` inside the period; the latest quotation counts once, revisions do not inflate the count |
+| Accepted | quotations whose rental is `confirmed`, `in_progress` or `completed` | Quoted in the period |
+| Declined | quotations whose rental is `declined` | Quoted in the period |
+| Cancelled | rentals cancelled in the period | `updatedAt` inside the period, status `cancelled` |
+| Acceptance rate | accepted ÷ quotations issued | Null when nothing was quoted. Shown as "Not available", never 0% |
+| Invoiced | sum of `invoice.total` | Invoices issued in the period, excluding `void` |
+| Received | sum of `payment.amount` | Payments whose `paidOn` is in the period, whatever the invoice date |
+| Outstanding | sum of (invoice total − recorded payments) | Non-void invoices issued on or before the period end, including earlier periods, because money owed is a running balance |
+| Rental vehicle-days | count of days in the period on which a rental holds a vehicle | Rentals with status `confirmed`, `in_progress` or `completed` **and** an assigned vehicle, overlapping the day |
+| Available vehicle-days | vehicles in the fleet excluding `retired` × days in the period | The acting fleet, not the fleet as it was on each day — a limitation stated on screen |
+| Utilisation | rental vehicle-days ÷ available vehicle-days | Null when the period has no days or no vehicles. Can be 0%. Does not include staff-busing trips, which are RPT-02 |
+| Reasons | count by `resolutionReason` | Cancelled and declined rentals in the period; a missing reason is reported as "No reason recorded", never dropped |
+
+**Coverage shown with the report.** Requests in the period without a quotation; confirmed rentals with
+no vehicle assigned; invoices with no currency. The first explains a low quotation count, the second is
+a data-quality alarm (it should be zero), the third explains withheld money.
+
+**Money and currency.** If the company currency is not set, the money figures are not printed: the
+screen and the CSV say "Not configured"/"not available" and the report carries the reason. A bare
+number would be a guess about the unit (brief §2.3).
+
+**Permission scope.** The screen reads the snapshot the server already narrowed for the signed-in
+role, and the CSV is written from that same snapshot, so an export cannot contain a record the role
+cannot read. The destination is gated by `kpis:read`.

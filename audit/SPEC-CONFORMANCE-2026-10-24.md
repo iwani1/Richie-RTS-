@@ -11,8 +11,8 @@
 
 **The build is not spec-conformant.** It is a well-engineered, coherent application that implements a substantial part of the brief, and in places (audit immutability, conflict prevention, permission enforcement on writes) it exceeds it. But measured against the brief as written:
 
-- **10 of 78 feature IDs are met** (13%). **37 are partial**, **17 are not built**, **14 are deferred** to phases 2–3 and are correctly not attempted.
-- In **Phase 1A specifically**, **6 of 30** IDs are met (AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08). **Three Phase 1A IDs are not built at all**: AUTH-05, WEB-01, RPT-01. FIN-02/FIN-03 shipped during this pass and are partial.
+- **11 of 78 feature IDs are met** (14%). **36 are partial**, **16 are not built**, **14 are deferred** to phases 2–3 and are correctly not attempted.
+- In **Phase 1A specifically**, **7 of 30** IDs are met (AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RPT-01). **Two Phase 1A IDs are not built at all**: AUTH-05, WEB-01. FIN-02/FIN-03 shipped during this pass and are partial.
 - **None of the eight end-to-end workflows in §8 can be completed as specified, and none has ever been run in a browser.** Workflow C (bus rental) now runs from enquiry to a recorded payment in the application, but the Playwright requirement is unmet and RPT-01 is missing; workflows A, B, F and G depend on entities that do not exist (clients-as-companies, employees, contracts, bookings).
 - Several structural decisions **contradict the brief rather than adapt it**: five roles instead of ten, single-tenant instead of multi-company, one rental status instead of two entity lifecycles (12 states), and reference numbers derived from array length instead of a database sequence (fixed only for invoices and payments, which use a counter).
 - The **§13 definition of done is not being followed per feature**: `docs/PROGRESS.md` records work by *phase name*, not by feature ID, does not list the 78 IDs, and repeats "147/203 tests passing" claims that are internally inconsistent with the current suite.
@@ -27,13 +27,13 @@ What is genuinely strong and should not be rebuilt: append-only audit with a tri
 
 | Bucket | Count | Note |
 | --- | --- | --- |
-| Met | **10** | AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RTE-03, TRP-02, DRV-01, DRV-04 |
-| Partial | **37** | exists and works, but a named part of the requirement is missing |
-| Not built | **17** | no entity, command or screen |
+| Met | **11** | AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RTE-03, TRP-02, DRV-01, DRV-04, RPT-01 |
+| Partial | **36** | exists and works, but a named part of the requirement is missing |
+| Not built | **16** | no entity, command or screen |
 | Deferred (Phase 2/3) | **14** | correctly out of Phase 1 scope; listed so the count reconciles to 78 |
 | **Total** | **78** | matches the brief's backlog |
 
-Phase 1A only (`[1A]` tags): **30 IDs — 6 met, 21 partial, 3 not built** (AUTH-05, WEB-01, RPT-01).
+Phase 1A only (`[1A]` tags): **30 IDs — 7 met, 21 partial, 2 not built** (AUTH-05, WEB-01).
 
 ---
 
@@ -239,7 +239,7 @@ Legend — **M** met · **P** partial · **N** not built · **D** deferred to it
 | NTF-01 | Notification service with stored status and retries | **D** | Phase 2. No notification code exists at all. |
 | NTF-02 | SMS adapter (Ghana provider) | **D** | Phase 2. |
 | NTF-03 | Email adapter | **D** | Phase 2. |
-| RPT-01 | Rental reports: enquiries, quotations, acceptance, confirmed/completed, revenue, outstanding, utilisation, cancellation reasons | **N** | No rental report. The only computed report is on-time performance. |
+| RPT-01 | Rental reports: enquiries, quotations, acceptance, confirmed/completed, revenue, outstanding, utilisation, cancellation reasons | **M** | `src/tms/rentalReport.ts` + `src/screens/Reports.tsx` (Phase 17). All eight figures are computed from records, with coverage stated, a currency guard and a CSV of the same numbers; 7 domain tests and 3 screen tests. Formulas in `docs/KPIS.md`. |
 | RPT-02 | Staff transport and fleet reports | **P** | On-time pickup rate with data coverage (`src/tms/kpis.ts`). **No bookings, no-shows, passengers transported, route utilisation, contract performance, downtime, fuel, mileage.** |
 | RPT-03 | Financial reports | **N** | No revenue, payments or outstanding-invoice reporting. |
 | RPT-04 | Filters + CSV export, permission-scoped; formulas documented | **P** | Per-screen search and status filters; formulas documented in `docs/KPIS.md`. **No date-range filter bar, no CSV export, no coverage column on the screens.** |
@@ -254,7 +254,7 @@ Legend — **M** met · **P** partial · **N** not built · **D** deferred to it
 | --- | --- | --- |
 | **A** Recurring corporate staff transport | **Fail** | No corporate client entity, no employees with department/eligibility, no contracts, no bookings. Routes, rosters, trips, dispatch and manifests work. |
 | **B** Employee return journey | **Fail** | Depends on BKG; directions exist on routes but there is no return-journey booking. |
-| **C** Bus rental | **Partial** | Enquiry → quotation → confirmation → assignment → start → completion → **invoice → payment** now work on real records and are covered by tests (`service.test.ts`, `finance.test.ts`, `Invoices.test.tsx`). **Missing: WEB-01 (no public enquiry), RPT-01 (no rental report), and the Playwright proof.** |
+| **C** Bus rental | **Partial** | Enquiry → quotation → confirmation → assignment → start → completion → invoice → payment → **rental report** now all work on real records and are covered by tests (`service.test.ts`, `finance.test.ts`, `Invoices.test.tsx`, `rentalReport.test.ts`, `Reports.test.tsx`). **Missing: WEB-01 (no public enquiry form) and the Playwright proof.** |
 | **D** Vehicle breakdown | **Fail** | Incident creation and vehicle blocking work. **No replacement workflow, no notifications** (INC-02, NTF-01). |
 | **E** Maintenance and release | **Partial** | Work order lifecycle works with blocking; **release approval and the technician role do not exist**. |
 | **F** Corporate invoicing | **Fail** | Depends on contracts and bookings; no corporate invoice generation, no duplicate-billing protection yet. |
@@ -285,11 +285,11 @@ Legend — **M** met · **P** partial · **N** not built · **D** deferred to it
 | Rentals: enquiry, arithmetic, expired quotation, conflicts, deposit, **additional charges need approval**, cancellation frees resources | Partial — everything except "additional charges need approval" and enquiry submission; invoice arithmetic impossible (no invoices) |
 | Maintenance: lifecycle, blocking, unsafe vehicle, release approval | Partial — release approval not modelled |
 | Finance: invoice totals, repeated callbacks, balances, same billable event twice, adjustment audit trail | **Partial** — invoice totals, tax lines, discount, part payment, overpayment refusal, duplicate billable event, idempotent replay and forward-only verification are tested (`finance.test.ts`). **No adjustment trail**, because adjustments do not exist. |
-| Reporting: KPI formulas match `KPIS.md`, filters, isolation, exports | Partial — one KPI documented and implemented; no exports |
+| Reporting: KPI formulas match `KPIS.md`, filters, isolation, exports | Partial — on-time and the rental report are documented and implemented, with a CSV export of the rental report; there is no filter bar across reports and no other export |
 | End-to-end Playwright (8 scenarios) | **Fail** — no Playwright, no `e2e/` |
 | Bookings/money tests against **real PostgreSQL** | **Fail** — the domain suite runs against an in-memory `Database` object |
 
-Suite at audit time: **245 passed, 5 skipped** (250) across 32 files; typecheck and lint clean; `next build` succeeded (8 routes).
+Suite at audit time: **255 passed, 5 skipped** (260) across 34 files; typecheck and lint clean; `next build` succeeded (8 routes).
 
 ---
 
@@ -328,9 +328,9 @@ The brief's Phase 1A order is: auth/permissions/audit/settings → fleet and dri
 
 1. ~~**MIG-01** — CSV import~~ **Done** (`2a27fac`).
 2. ~~**FIN-02 / FIN-03** — invoice and payment entities~~ **Done, less adjustments** (Phase 16). The remaining gap is credit notes/adjustment records.
-3. **RPT-01** — rental report: enquiries, quotations issued, acceptance rate, confirmed/completed, revenue, outstanding, utilisation, cancellation reasons, with coverage and CSV export. *(Brief step 9.)*
+3. ~~**RPT-01** — rental report~~ **Done** (Phase 17).
 4. **Docs of record** — rewrite `docs/PROGRESS.md` as a 78-ID table with real status; add `docs/API.md`, `docs/BACKUP_AND_RECOVERY.md`, `docs/USER_ROLES_GUIDE.md` and a known-limitations section. *(§13.6, §15; fixes D-02.)*
-5. **WEB-01** — public enquiry endpoint with rate limiting and spam protection, creating a Submitted request and exposing no data. *(Brief step 9.)*
+5. **WEB-01** — public enquiry endpoint with rate limiting and spam protection, creating a Submitted request and exposing no data. *(Brief step 9; last unbuilt Phase 1A feature with AUTH-05.)*
 6. **Concurrency proof** — a test that fires parallel double-booking requests at the real database and asserts exactly one wins; and **Playwright for workflow C**. *(Phase 1A exit criteria.)*
 7. **Structural fixes** — database sequences for all references (D-03); decimal money (D-04).
 8. **Deferred by design, to be stated as such in the docs** — multi-tenancy, the ten-role model, contracts, bookings, notifications, offline driver mode, GPS. These are Phase 1B/2/3 or owner-approved simplifications, not Phase 1A defects, but they must be labelled in `PROGRESS.md` rather than left implicit.

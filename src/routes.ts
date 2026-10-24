@@ -5,6 +5,7 @@ export type Route =
   | "dashboard"
   | "rentals"
   | "invoices"
+  | "reports"
   | "busing"
   | "logistics"
   | "fleetReadiness"
@@ -34,6 +35,7 @@ export const NAV_ITEMS: NavItem[] = [
   { route: "client_portal", label: "My account", caption: "Routes, staff and rentals", permission: null, roles: ["client_contact"] },
   { route: "rentals", label: "Bus rentals", caption: "Requests to billing", permission: "rentals:read" },
   { route: "invoices", label: "Invoices", caption: "Billing and payments", permission: "invoices:read" },
+  { route: "reports", label: "Reports", caption: "Rentals, revenue, utilisation", permission: "kpis:read" },
   { route: "busing", label: "Staff busing", caption: "Routes, rosters, trips", permission: "routes:read" },
   { route: "logistics", label: "Staff logistics", caption: "Breakdowns, maintenance, costs", permission: "incidents:read" },
   { route: "fleetReadiness", label: "Fleet readiness", caption: "Service intervals, odometer", permission: "fleet:read" },
