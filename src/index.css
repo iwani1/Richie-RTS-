@@ -965,6 +965,34 @@ h1, h2, h3, h4 { text-wrap: balance; }
 .rts-input--invalid { border-color: var(--red); background: #fff8f7; }
 .rts-input--invalid:focus { box-shadow: 0 0 0 3px var(--red-soft); }
 
+/* Password reveal. The field reserves room for the control so long values never slide under it; the
+   control is a 28px square inside the input's own border, so it reads as part of the field rather
+   than a second control beside it. */
+.rts-input-wrap { position: relative; display: block; }
+.rts-input--revealable { padding-right: 36px; }
+.rts-input--revealable::-ms-reveal, .rts-input--revealable::-ms-clear { display: none; }
+
+.rts-input-reveal {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  border: 0;
+  border-radius: 0 8px 8px 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.rts-input-reveal:hover { color: var(--ink); background: var(--card-2); }
+.rts-input-reveal:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; color: var(--ink); }
+.rts-input-reveal[data-shown] { color: var(--accent); }
+.rts-input-reveal[data-shown]:hover { color: var(--accent-hover); background: var(--accent-soft); }
+
 textarea.rts-input { min-height: 80px; resize: vertical; }
 
 select.rts-input {

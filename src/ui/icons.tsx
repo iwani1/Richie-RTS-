@@ -19,7 +19,9 @@ type IconName =
   | "search"
   | "chevron"
   | "alert"
-  | "clock";
+  | "clock"
+  | "eye"
+  | "eyeOff";
 
 const paths: Record<IconName, ReactElement> = {
   // A board with a departures line — the operations desk.
@@ -131,6 +133,22 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <circle cx="10" cy="10" r="6.5" />
       <path d="M10 6.5V10l2.5 1.5" />
+    </>
+  ),
+  // An open eye, for revealing a password that is hidden.
+  eye: (
+    <>
+      <path d="M2.2 10S5.1 4.8 10 4.8 17.8 10 17.8 10 14.9 15.2 10 15.2 2.2 10 2.2 10Z" />
+      <circle cx="10" cy="10" r="2.4" />
+    </>
+  ),
+  // The same eye struck through, for hiding it again.
+  eyeOff: (
+    <>
+      <path d="M2.2 10S5.1 4.8 10 4.8c1.4 0 2.7.4 3.8 1" />
+      <path d="M17.8 10s-2.9 5.2-7.8 5.2c-1.4 0-2.7-.4-3.8-1" />
+      <path d="M8.3 8.3a2.4 2.4 0 0 0 3.4 3.4" />
+      <path d="m3.2 3.2 13.6 13.6" />
     </>
   ),
 };

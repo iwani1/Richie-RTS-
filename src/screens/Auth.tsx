@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { PASSWORD_MIN_LENGTH } from "../tms/service";
 import { useTms } from "../tms/useTms";
-import { Button, Field, Notice, TextInput } from "../ui/primitives";
+import { Button, Field, Notice, PasswordInput, TextInput } from "../ui/primitives";
 
 function AuthFrame({ eyebrow, title, intro, children }: { eyebrow: string; title: string; intro: string; children: React.ReactNode }) {
   return (
@@ -91,10 +91,10 @@ export function SetupPage() {
           <TextInput type="email" value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} invalid={!!errors.email} autoComplete="username" required />
         </Field>
         <Field label="Password" hint={`At least ${PASSWORD_MIN_LENGTH} characters.`} error={errors.password}>
-          <TextInput type="password" value={values.password} onChange={(e) => setValues({ ...values, password: e.target.value })} invalid={!!errors.password} autoComplete="new-password" required />
+          <PasswordInput value={values.password} onChange={(e) => setValues({ ...values, password: e.target.value })} invalid={!!errors.password} autoComplete="new-password" required />
         </Field>
         <Field label="Confirm password" error={errors.confirm}>
-          <TextInput type="password" value={values.confirm} onChange={(e) => setValues({ ...values, confirm: e.target.value })} invalid={!!errors.confirm} autoComplete="new-password" required />
+          <PasswordInput value={values.confirm} onChange={(e) => setValues({ ...values, confirm: e.target.value })} invalid={!!errors.confirm} autoComplete="new-password" required />
         </Field>
         <Button type="submit" variant="primary" className="rts-btn--block py-2" disabled={busy}>
           {busy ? "Creating account..." : "Create administrator"}
@@ -126,7 +126,7 @@ export function SignInPage() {
           <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
         </Field>
         <Field label="Password">
-          <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
         </Field>
         <Button type="submit" variant="primary" className="rts-btn--block py-2" disabled={busy}>
           {busy ? "Checking..." : "Sign in"}

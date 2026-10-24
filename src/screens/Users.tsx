@@ -3,7 +3,7 @@ import { PASSWORD_MIN_LENGTH, type UserInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { ROLES, ROLE_LABELS, type User } from "../tms/types";
 import { ROLE_PERMISSIONS } from "../tms/permissions";
-import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, TableCard, TextInput, formatDateTime } from "../ui/primitives";
+import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, PasswordInput, Select, TableCard, TextInput, formatDateTime } from "../ui/primitives";
 
 type Errors = Record<string, string>;
 type PanelState = { mode: "create" } | { mode: "edit"; user: User } | { mode: "reset"; user: User } | null;
@@ -206,7 +206,7 @@ function UserForm({ title, initial, withPassword, onClose, onSubmit }: { title: 
         </Field>
         {withPassword && (
           <Field label="Initial password" hint={`At least ${PASSWORD_MIN_LENGTH} characters. Share it securely; it is not stored in plain text.`} error={errors.password}>
-            <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} invalid={!!errors.password} autoComplete="new-password" />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} invalid={!!errors.password} autoComplete="new-password" />
           </Field>
         )}
         <div className="flex justify-end gap-2 pt-2">
@@ -236,8 +236,8 @@ function ResetForm({ user, onClose, onSubmit }: { user: User; onClose: () => voi
         className="space-y-4"
       >
         <Notice tone="info">The user's existing sessions are not revoked automatically in this browser-local build.</Notice>
-        <Field label="New password" hint={`At least ${PASSWORD_MIN_LENGTH} characters.`} error={errors.password}><TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus /></Field>
-        <Field label="Confirm" error={errors.confirm}><TextInput type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" /></Field>
+        <Field label="New password" hint={`At least ${PASSWORD_MIN_LENGTH} characters.`} error={errors.password}><PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus /></Field>
+        <Field label="Confirm" error={errors.confirm}><PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" /></Field>
         <div className="flex justify-end gap-2 pt-2">
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={busy}>{busy ? "Saving..." : "Reset password"}</Button>

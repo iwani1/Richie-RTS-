@@ -1,5 +1,7 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { cn } from "../utils/cn";
+import { Icon } from "./icons";
 import type { Tone } from "../tms/useTms";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -26,16 +28,86 @@ export function Field({ label, hint, error, children, className }: { label: stri
 }
 
 export function TextInput({ invalid, className, ...props }: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
-  return <input className={cn("rts-input", invalid && "rts-input--invalid", className)} {...props} />;
+  // The red border is the sighted cue; `aria-invalid` is the same fact for a screen reader, which
+  // otherwise has to infer it from an error message it may have missed.
+  return (
+    <input
+      className={cn("rts-input", invalid && "rts-input--invalid", className)}
+      aria-invalid={invalid || undefined}
+      {...props}
+    />
+  );
+}
+
+/**
+ * A password field with a reveal control.
+ *
+ * Typing a password you cannot see is where most failed sign-ins come from, and this application
+ * has no "reset it yourself" path — a wrong password means finding an administrator. The control is
+ * a real button, announced as "Show password" / "Hide password" (the eye glyph alone carries no
+ * meaning to a screen reader), and the state is carried by the glyph and its tooltip, not by colour.
+ *
+ * Toggling keeps the caret where it was: the field is re-rendered with a different `type`, which
+ * resets the selection in some browsers, and losing your place mid-typing is worse than no toggle.
+ */
+export function PasswordInput({ invalid, className, ...props }: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
+  const [shown, setShown] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const caret = useRef<{ start: number | null; end: number | null } | null>(null);
+
+  useLayoutEffect(() => {
+    const field = input.current;
+    if (!field || !caret.current) return;
+    if (caret.current.start !== null) field.setSelectionRange(caret.current.start, caret.current.end);
+    caret.current = null;
+  }, [shown]);
+
+  const toggle = () => {
+    const field = input.current;
+    // Only worth restoring when the field has focus: a blurred field has no caret to lose, and
+    // selecting its text would be a surprise.
+    caret.current = field && document.activeElement === field ? { start: field.selectionStart, end: field.selectionEnd } : null;
+    setShown((value) => !value);
+  };
+
+  return (
+    <span className="rts-input-wrap">
+      <input
+        ref={input}
+        type={shown ? "text" : "password"}
+        className={cn("rts-input", "rts-input--revealable", invalid && "rts-input--invalid", className)}
+        aria-invalid={invalid || undefined}
+        {...props}
+      />
+      <button
+        type="button"
+        className="rts-input-reveal"
+        onClick={toggle}
+        aria-label={shown ? "Hide password" : "Show password"}
+        title={shown ? "Hide password" : "Show password"}
+        data-shown={shown || undefined}
+        // A click inside a <label> would otherwise be forwarded to the field it labels.
+        onMouseDown={(event) => event.preventDefault()}
+      >
+        <Icon name={shown ? "eyeOff" : "eye"} width={16} height={16} />
+      </button>
+    </span>
+  );
 }
 
 export function TextArea({ invalid, className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean }) {
-  return <textarea className={cn("rts-input", invalid && "rts-input--invalid", className)} {...props} />;
+  return (
+    <textarea
+      className={cn("rts-input", invalid && "rts-input--invalid", className)}
+      aria-invalid={invalid || undefined}
+      {...props}
+    />
+  );
 }
 
 export function Select({ invalid, className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }) {
   return (
-    <select className={cn("rts-input", invalid && "rts-input--invalid", className)} {...props}>
+    <select className={cn("rts-input", invalid && "rts-input--invalid", className)} aria-invalid={invalid || undefined} {...props}>
       {children}
     </select>
   );
