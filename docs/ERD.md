@@ -295,3 +295,68 @@ erDiagram
 Unique `(rental_id, revision_number)`; quote and line snapshots are immutable. The initial
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous
 snapshot, so the current quote count equals history length + 1.
+
+## Phase 16 invoices and payments (implemented in `db/migrations/003_invoices_and_payments.sql`)
+
+```mermaid
+erDiagram
+  RENTAL ||--o{ INVOICE : "bills the completion"
+  CLIENT ||--o{ INVOICE : "may be the account"
+  INVOICE ||--o{ PAYMENT : "is paid by"
+  REFERENCE_COUNTER ||--o{ INVOICE : "allocates INV-nnnn-yyyy"
+  REFERENCE_COUNTER ||--o{ PAYMENT : "allocates PAY-nnnn-yyyy"
+
+  INVOICE {
+    text id PK
+    text reference UK "INV-YYYY-NNNN"
+    text kind "rental (1A)"
+    text rental_id FK
+    text client_id FK
+    text customer_name
+    text currency_code
+    numeric subtotal "14,2"
+    numeric total "14,2, >= subtotal"
+    numeric amount_paid "14,2, <= total"
+    text status "issued|part_paid|paid|void"
+    text billable_event "one live invoice per event"
+    date issued_on
+    date due_on ">= issued_on"
+    jsonb data "lines, taxLines, notes, void reason"
+  }
+
+  PAYMENT {
+    text id PK
+    text reference UK "PAY-YYYY-NNNN"
+    text invoice_id FK
+    numeric amount "14,2, > 0"
+    text currency_code
+    text method
+    date paid_on
+    text external_reference
+    text status "recorded|verified|reconciled"
+    text recorded_by
+    timestamptz recorded_at
+    jsonb data
+  }
+
+  REFERENCE_COUNTER {
+    text scope PK "invoice|payment"
+    text period PK "YYYY"
+    integer last
+  }
+```
+
+Constraints and triggers:
+
+- `invoice_billable_event_uq` — partial unique index on `billable_event` `WHERE status <> 'void'`, so
+  a service is billed once but a voided invoice can be replaced.
+- `payment_external_reference_uq` — partial unique index on `(invoice_id, external_reference)`
+  `WHERE external_reference <> ''`: the idempotency key a retried bank slip needs (brief 5.4, 5.8).
+- `invoice_frozen_trg` — refuses any change to reference, kind, rental, client, customer, currency,
+  subtotal, total, billable event, dates or the `lines`/`taxLines` JSON, and refuses to void an
+  invoice with payments.
+- `payment_frozen_trg` — refuses any change to the financial fields, and refuses a status move
+  backwards.
+- `invoice_no_delete_trg`, `payment_no_delete_trg` — delete is never allowed (brief 5.9).
+- `reference_counter` is written by the same transaction that writes the document, so two writers
+  cannot allocate the same number.

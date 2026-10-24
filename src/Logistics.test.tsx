@@ -46,6 +46,9 @@ function seed(): { vehicleId: string } {
       rental: emptyRentalSettings(),
       documentTypes: [],
       documentReminderLeadDays: null,
+      taxPosition: null,
+      taxLines: [],
+      invoiceDueDays: null,
       maintenance: { schedules: [] },
     },
   });

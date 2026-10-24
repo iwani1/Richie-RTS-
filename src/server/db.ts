@@ -203,6 +203,41 @@ export interface OdometerReadingRow {
   data: Json;
 }
 
+export interface InvoiceRow {
+  id: string;
+  reference: string;
+  kind: string;
+  rental_id: string | null;
+  client_id: string | null;
+  customer_name: string;
+  currency_code: string;
+  subtotal: string;
+  total: string;
+  amount_paid: string;
+  status: string;
+  billable_event: string;
+  issued_on: DateOnly;
+  due_on: DateOnly;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  data: Json;
+}
+
+export interface PaymentRow {
+  id: string;
+  reference: string;
+  invoice_id: string;
+  amount: string;
+  currency_code: string;
+  method: string;
+  paid_on: DateOnly;
+  external_reference: string;
+  status: string;
+  recorded_by: string;
+  recorded_at: Timestamp;
+  data: Json;
+}
+
 export interface AuditEntryRow {
   id: string;
   at: Timestamp;
@@ -249,7 +284,10 @@ export interface KyselyDatabase {
   work_order: WorkOrderRow;
   compliance_document: ComplianceDocumentRow;
   odometer_reading: OdometerReadingRow;
+  invoice: InvoiceRow;
+  payment: PaymentRow;
   audit_entry: AuditEntryRow;
+  reference_counter: { scope: string; period: string; last: number };
   app_settings: AppSettingsRow;
   resource_reservation: ResourceReservationRow;
   schema_migrations: SchemaMigrationRow;

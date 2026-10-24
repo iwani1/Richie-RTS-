@@ -546,7 +546,7 @@ describe("rentals - full lifecycle", () => {
     const imported = execute(quoted.db, importer, { type: "import_backup", database: legacy }, NOW);
     expect(imported.ok).toBe(true);
     if (imported.ok) {
-      expect(imported.db.schemaVersion).toBe(10);
+      expect(imported.db.schemaVersion).toBe(11);
       expect(imported.db.rentals[0].quote).toEqual(quoted.db.rentals[0].quote);
       expect(imported.db.rentals[0].quoteHistory).toEqual([]);
       expect(imported.db.settings.rental.requotePolicy).toBeNull();

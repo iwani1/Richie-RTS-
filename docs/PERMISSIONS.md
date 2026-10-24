@@ -47,6 +47,9 @@ D-60). Hiding a control is a convenience, never the control.
 | rentals:dispatch | x | x | | | |
 | rentals:complete | x | x | | | |
 | rentals:cancel | x | x | | | |
+| invoices:read | x | | x | | |
+| invoices:issue / void | x | | x | | |
+| payments:record / advance | x | | x | | |
 | audit:read | x | x | | | |
 | backup:export / import | x | | | | |
 
@@ -62,6 +65,33 @@ the same permission.
 client_contact (own client). Finance does not hold it, so the roster — names, employee
 references and phone numbers — never reaches a finance session. This is a server-side filter on
 the payload, not only a hidden tab (D-60).
+
+## Invoices and payments (FIN-02, FIN-03)
+
+| Permission | administrator | operations | finance | driver | client_contact |
+|---|:-:|:-:|:-:|:-:|:-:|
+| invoices:read | x | | x | | |
+| invoices:issue | x | | x | | |
+| invoices:void | x | | x | | |
+| payments:record | x | | x | | |
+| payments:advance | x | | x | | |
+
+Read scope: `invoices:read` also opens the invoice's payments, because a payment is part of its
+invoice. Record-bound roles receive neither collection, so a driver or client contact never sees a
+customer's billing (`visibility.ts`, `SECTION_PERMISSIONS`).
+
+Separation of duties: operations completes a rental and therefore produces the line items that will
+be billed, but cannot issue the invoice or record money against it. Finance issues, records payments
+and advances verification and reconciliation; only an administrator can also do it.
+
+Two rules are enforced in the service and again in the database (migration `003`):
+
+- an invoice is never edited after issue — identity, dates, lines and totals are frozen by trigger;
+- a payment is written once — only its status may advance, and only forwards
+  (recorded → verified → reconciled).
+
+Voiding needs `invoices:void` and is refused once any payment stands against the invoice. The voided
+invoice keeps its number, so a corrected invoice receives the next one and the audit trail keeps both.
 
 ## Compliance documents (Phase 6)
 

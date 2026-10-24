@@ -4,6 +4,7 @@ import { SetupPage, SignInPage } from "./screens/Auth";
 import { DashboardPage } from "./screens/Dashboard";
 import { ClientsPage, DriversPage } from "./screens/Registers";
 import { RentalsPage } from "./screens/Rentals";
+import { InvoicesPage } from "./screens/Invoices";
 import { StaffBusingPage } from "./screens/StaffBusing";
 import { StaffLogisticsPage } from "./screens/StaffLogistics";
 import { CompliancePage } from "./screens/Compliance";
@@ -28,7 +29,7 @@ import { cn } from "./utils/cn";
 
 const NAV_GROUPS: { label: string; routes: Route[] }[] = [
   { label: "My desk", routes: ["driver_portal", "client_portal"] },
-  { label: "Service desk", routes: ["dashboard", "rentals", "busing", "logistics", "fleetReadiness"] },
+  { label: "Service desk", routes: ["dashboard", "rentals", "invoices", "busing", "logistics", "fleetReadiness"] },
   { label: "Fleet & clients", routes: ["compliance", "vehicles", "drivers", "clients"] },
   { label: "Administration", routes: ["users", "settings", "audit"] },
 ];
@@ -36,6 +37,7 @@ const NAV_GROUPS: { label: string; routes: Route[] }[] = [
 const ROUTE_ICONS: Record<Route, IconName> = {
   dashboard: "dashboard",
   rentals: "rental",
+  invoices: "invoice",
   busing: "busing",
   logistics: "logistics",
   fleetReadiness: "readiness",
@@ -177,6 +179,7 @@ function Shell() {
   const page = (() => {
     switch (route) {
       case "rentals": return <RentalsPage navigate={navigate} />;
+      case "invoices": return <InvoicesPage />;
       case "busing": return <StaffBusingPage />;
       case "logistics": return <StaffLogisticsPage />;
       case "fleetReadiness": return <FleetReadinessPage />;

@@ -5,6 +5,7 @@ import type { ReactElement, SVGProps } from "react";
 type IconName =
   | "dashboard"
   | "rental"
+  | "invoice"
   | "busing"
   | "logistics"
   | "readiness"
@@ -23,6 +24,14 @@ type IconName =
   | "eyeOff";
 
 const paths: Record<IconName, ReactElement> = {
+  // A document with a folded corner and a ruled line — a bill, not a page of editorial text.
+  invoice: (
+    <>
+      <path d="M5 3h6l4 4v10H5z" />
+      <path d="M11 3v4h4" />
+      <path d="M7.5 11h5M7.5 13.5h5" />
+    </>
+  ),
   // A board with a departures line — the operations desk.
   dashboard: (
     <>

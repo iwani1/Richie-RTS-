@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { setupProgress } from "../tms/setup";
 import { useTms } from "../tms/useTms";
 import type { Settings } from "../tms/types";
-import { PRICING_BASES, PRICING_BASIS_LABELS, REQUOTE_POLICIES } from "../tms/types";
+import { PRICING_BASES, PRICING_BASIS_LABELS, REQUOTE_POLICIES, TAX_POSITIONS, TAX_POSITION_LABELS } from "../tms/types";
 import { Badge, Band, Button, Field, Notice, PageHeader, Select, TextInput } from "../ui/primitives";
 
 export function SettingsPage() {
@@ -232,6 +232,100 @@ export function SettingsPage() {
             </ul>
           )}
         </div>
+      </Band>
+
+      <Band
+        label="Invoicing"
+        note="Required before an invoice can be issued. The tax position and payment terms are never assumed: a legal document cannot carry a guessed rate or a guessed due date (brief 9, FIN-02)."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Tax position" hint="Determines whether invoices carry tax lines at all." error={errors.taxPosition}>
+            <Select
+              value={draft.taxPosition ?? ""}
+              onChange={(e) => update({ taxPosition: (e.target.value || null) as typeof draft.taxPosition })}
+              disabled={!editable}
+              invalid={!!errors.taxPosition}
+            >
+              <option value="">Not set</option>
+              {TAX_POSITIONS.map((position) => (
+                <option key={position} value={position}>
+                  {TAX_POSITION_LABELS[position]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Payment terms (days from issue)" hint="The due date on an invoice. No default." error={errors.invoiceDueDays}>
+            <TextInput
+              type="number"
+              min={0}
+              step={1}
+              value={draft.invoiceDueDays ?? ""}
+              onChange={(e) => update({ invoiceDueDays: e.target.value === "" ? null : Number(e.target.value) })}
+              disabled={!editable}
+              placeholder="Not set"
+              invalid={!!errors.invoiceDueDays}
+            />
+          </Field>
+        </div>
+        {draft.taxPosition === "registered" && (
+          <div className="mt-4">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">Tax lines</span>
+              {editable && (
+                <Button onClick={() => update({ taxLines: [...draft.taxLines, { id: "", name: "", ratePercent: 0 }] })}>
+                  Add tax line
+                </Button>
+              )}
+            </div>
+            {errors.taxLines && <Notice tone="error" className="mb-2">{errors.taxLines}</Notice>}
+            {draft.taxLines.length === 0 ? (
+              <p className="text-xs text-stone-500">
+                None configured. Invoices cannot be issued while the company is marked VAT registered without at least one line.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {draft.taxLines.map((line, index) => (
+                  <li key={index} className="flex items-center gap-2">
+                    <TextInput
+                      value={line.name}
+                      onChange={(e) =>
+                        update({ taxLines: draft.taxLines.map((candidate, i) => (i === index ? { ...candidate, name: e.target.value } : candidate)) })
+                      }
+                      disabled={!editable}
+                      placeholder="e.g. VAT"
+                      aria-label={`Tax line ${index + 1} name`}
+                      invalid={!!errors[`taxLines.${index}`]}
+                    />
+                    <TextInput
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.01"
+                      value={line.ratePercent}
+                      onChange={(e) =>
+                        update({
+                          taxLines: draft.taxLines.map((candidate, i) =>
+                            i === index ? { ...candidate, ratePercent: e.target.value === "" ? 0 : Number(e.target.value) } : candidate,
+                          ),
+                        })
+                      }
+                      disabled={!editable}
+                      placeholder="Rate %"
+                      aria-label={`Tax line ${index + 1} rate percent`}
+                      className="max-w-[120px]"
+                      invalid={!!errors[`taxLines.${index}`]}
+                    />
+                    {editable && (
+                      <Button variant="danger" onClick={() => update({ taxLines: draft.taxLines.filter((_, i) => i !== index) })}>
+                        Remove
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </Band>
 
       <Band label="Compliance document types"

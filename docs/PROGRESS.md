@@ -325,14 +325,19 @@ Gates run at the end of this phase:
 
 ## Not started (later phases)
 
-- Contracts, invoices and a payments ledger. **Blocked:** contract activation requires billing
-  frequency and payment terms (Q-CON-01), and invoice tax treatment is Q-FIN-02.
+- Contracts. **Blocked:** contract activation requires billing frequency and payment terms
+  (Q-CON-01). Rental invoices and manual payments are built (Phase 16); corporate invoice
+  generation from billable trips waits for contracts and bookings.
 - Boarding codes (Q-19) and rider self-service.
 - Document-expiry **notifications**: expiry status is now computed (Phase 6) but no reminder is
   sent, because no notification provider is configured. Notifications generally remain blocked.
 - Data retention jobs and the Act 843 subject-request workflow.
 
 ## Phase 14 - Interface redesign and empty start (unreleased)
+
+> **Superseded.** The "bright editorial" direction described below was replaced by the Direction E
+> "Daylight" interface that ships today (`docs/DESIGN.md`). The rows are kept as history; do not read
+> them as a description of the current screens.
 
 | Item | Status | Notes |
 |---|---|---|
@@ -368,7 +373,32 @@ four defects in behaviour, not in documentation. These are the fixes, with the e
 Gates after these changes: `typecheck` clean, `lint` clean, `test` **226 passed, 5 skipped**,
 `build` succeeds, and the rebuilt server was re-checked live against the same database.
 
-Still outstanding from the conformance report (Phase 1A, in the brief's order): FIN-02/03 invoices
-and manual payments, RPT-01 rental reports, WEB-01 public enquiry, EMP-02 passenger import, a
-Playwright flow for workflow C, and a parallel-request double-booking test. Phase 1B onwards is unchanged and
-still not met.
+Still outstanding from the conformance report (Phase 1A, in the brief's order): RPT-01 rental
+reports, WEB-01 public enquiry, EMP-02 passenger import, a Playwright flow for workflow C, and a
+parallel-request double-booking test. Phase 1B onwards is unchanged and still not met.
+
+## Phase 16 - Invoices and manual payments (FIN-02, FIN-03)
+
+An invoice is now a record of its own, not a field on the rental: numbered, immutable after issue, and
+unable to be raised twice for the same service. A payment is written once, can only move forwards
+through verification, and is the only thing that changes an invoice's amount paid.
+
+| Item | Status | Evidence |
+|---|---|---|
+| `invoice` and `payment` tables, reference counter, immutability triggers | Done (verified) | `db/migrations/003_invoices_and_payments.sql`; applied against PostgreSQL in the live harness |
+| Issue a rental invoice from the completion record, with tax lines snapshot and optional discount | Done (verified) | `src/tms/finance.ts`; tests: `finance.test.ts` "issues a numbered invoice from the completed rental, with configured tax lines", "applies a discount as its own line and keeps the arithmetic exact". Live: `INV-2026-0001 issued: GHS 4700.00 due 2026-06-15.` |
+| One live invoice per billable event; void keeps the number | Done (verified) | Partial unique index `invoice_billable_event_uq`; tests "refuses a second live invoice for the same service and allows one after a void" |
+| Settings that gate issuing (tax position, tax lines, payment terms, currency) | Done (verified) | `validateSettings` + `issue_rental_invoice`; tests "blocks issue until the settings that have no default are set" |
+| Record a manual payment; amount paid and status derived; overpayment refused with the balance | Done (verified) | `finance.test.ts` "records a part payment, then settles the invoice…", "refuses an overpayment and names the outstanding balance" |
+| External reference as the idempotency key (brief 5.8) | Done (verified) | Partial unique index + replay test "treats the external reference as an idempotency key" (one payment, same message) |
+| Verification and reconciliation only move forwards | Done (verified) | Service rank check + `payment_frozen_trg`; test "advances verification forwards only" |
+| Void refused once money is recorded | Done (verified) | Service check + `invoice_frozen_trg`; test "refuses to void an invoice that has money against it" |
+| Invoices screen (list, totals, detail, issue, payment, void) | Done (verified) | `src/screens/Invoices.tsx`, nav entry "Invoices"; `src/screens/Invoices.test.tsx` (4) |
+| Finance-only: operations cannot bill or record money | Done (verified) | Tests "is finance-only…", "is closed to operations…" |
+| **Not built** | — | Credit notes / adjustment records, so a paid invoice is corrected by issuing a new invoice; PDF rendering; corporate invoice generation (needs contracts) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **245 passed, 5 skipped**,
+`build` succeeds (8 routes).
+
+Also in this phase: a run already on the road can no longer take a roster addition that would put
+more passengers in the vehicle than it seats (`busing.test.ts`, D-61 follow-up).

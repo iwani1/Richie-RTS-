@@ -55,6 +55,10 @@ const SECTION_PERMISSIONS: { [K in keyof Database]?: Permission } = {
   odometerReadings: "fleet:read",
   passengers: "passengers:read",
   rentals: "rentals:read",
+  invoices: "invoices:read",
+  // A payment is part of its invoice, so the same read permission opens it.
+  payments: "invoices:read",
+  referenceCounters: "invoices:read",
   routes: "routes:read",
   settings: "settings:read",
   trips: "trips:read",
@@ -102,6 +106,9 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       workOrders: view.workOrders,
       documents: view.documents,
       odometerReadings: database.odometerReadings.filter((reading) => vehicleIds.has(reading.vehicleId)),
+      invoices: [],
+      payments: [],
+      referenceCounters: [],
       // Record-bound roles have no audit: the summaries name records that are not theirs.
       audit: [],
     };

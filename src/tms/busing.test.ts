@@ -65,6 +65,9 @@ function build(): World {
       rental: emptyRentalSettings(),
       documentTypes: [],
       documentReminderLeadDays: null,
+      taxPosition: null,
+      taxLines: [],
+      invoiceDueDays: null,
       maintenance: { schedules: [] },
     },
   });
@@ -369,8 +372,6 @@ describe("staff busing - progressive driver run", () => {
 });
 
 describe("staff busing - date and capacity guards (brief 5.1, 5.5)", () => {
-  const NEW_STOP = { name: "Gate", scheduledTime: "06:00" };
-
   it("refuses to start a run before its service day, or long after it", () => {
     const w = build();
     const routeId = createRoute(w);
@@ -409,7 +410,7 @@ describe("staff busing - date and capacity guards (brief 5.1, 5.5)", () => {
     const catId = w.db.settings.vehicleCategories[0].id;
     step(w, "ops", { type: "create_vehicle", input: { registration: "GT 903-26", categoryId: catId, make: "Toyota", model: "Mini", seatCapacity: "3", notes: "" } });
     const small = w.db.vehicles.find((v) => v.registration === "GT 903-26")!;
-    const routeId = createRoute(w, { name: "Three seats", stops: [{ name: "A", scheduledTime: "06:00" }, NEW_STOP] });
+    const routeId = createRoute(w, { name: "Three seats", stops: [{ name: "A", scheduledTime: "06:00" }, { name: "B", scheduledTime: "06:20" }] });
     const route = w.db.routes.find((r) => r.id === routeId)!;
     for (let i = 1; i <= 2; i += 1) {
       step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: `Rider ${i}`, employeeRef: `R-${i}`, routeId, stopId: route.stops[0].id }) });
@@ -460,6 +461,30 @@ describe("staff busing - mid-trip passenger changes", () => {
     if (!completed.ok) return;
     w.db = completed.db;
     expect(w.db.trips.find((t) => t.id === tripId)?.boardings).toHaveLength(3);
+  });
+
+  it("refuses a roster addition that would overflow the seats of a run already on the road", () => {
+    const w = build();
+    const catId = w.db.settings.vehicleCategories[0].id;
+    step(w, "ops", { type: "create_vehicle", input: { registration: "GT 904-26", categoryId: catId, make: "Toyota", model: "Mini", seatCapacity: "3", notes: "" } });
+    const small = w.db.vehicles.find((v) => v.registration === "GT 904-26")!;
+    const routeId = createRoute(w, { name: "Three seats", stops: [{ name: "A", scheduledTime: "06:00" }, { name: "B", scheduledTime: "06:20" }] });
+    const route = w.db.routes.find((r) => r.id === routeId)!;
+    for (let i = 1; i <= 2; i += 1) {
+      step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: `Rider ${i}`, employeeRef: `C-${i}`, routeId, stopId: route.stops[0].id }) });
+    }
+    const tripId = generate(w, routeId, "2026-06-01");
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: small.id, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "dispatch_trip", id: tripId });
+    step(w, "driver", { type: "start_trip", id: tripId });
+
+    // The third rider still fits; the fourth would put four people in a three-seat vehicle that has
+    // already left, and dispatch can no longer catch it (brief 5.1, 12).
+    step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Rider 3", employeeRef: "C-3", routeId, stopId: route.stops[1].id }) });
+    const fourth = attempt(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Rider 4", employeeRef: "C-4", routeId, stopId: route.stops[1].id }) });
+    expect(fourth.ok).toBe(false);
+    if (!fourth.ok) expect(fourth.errors.routeId).toMatch(/seats 3/);
+    expect(w.db.passengers.some((p) => p.employeeRef === "C-4")).toBe(false);
   });
 
   it("refuses passengers on already-recorded stops", () => {

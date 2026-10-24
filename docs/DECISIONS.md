@@ -651,3 +651,59 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 - **Not done.** Capacity is not reserved transactionally at booking, because bookings do not exist
   yet (BKG-01..06); the check is at resource assignment, which is the only point a vehicle is
   committed today.
+- **Follow-up (same day).** Those checks all run *before* a run starts, so a roster that grew after
+  the vehicle left was still unchecked. `create_passenger` and `update_passenger` now refuse an
+  addition that would put more active passengers on a route than the vehicle on that route's
+  running trip can seat; the message names the run and the vehicle. Test:
+  `busing.test.ts` "refuses a roster addition that would overflow the seats of a run already on
+  the road".
+
+## D-62 (FIN-02) An invoice is its own numbered, frozen record — not a field on the rental
+
+- **Context.** Phase 1A had a "final invoice" as a JSON snapshot on the rental: no number, no
+  status, no amount paid, no outstanding balance, and nothing preventing the same service being
+  billed twice. Brief FIN-02 requires a numbered document with taxes from settings, totals, amount
+  paid and outstanding balance; brief 5.4 makes an issued invoice immutable.
+- **Decision.** A separate `invoice` record and table.
+  - The number comes from `reference_counter`, keyed by scope and year, allocated inside the writing
+    transaction (`INV-2026-0001`). The counter is stored with the data so a restored backup never
+    reissues a printed number.
+  - Lines are copied from the rental's completion record. The operator does not retype amounts, so
+    the invoice always traces back to a priced quotation and a completion.
+  - Tax lines are *snapshotted* at issue (`Invoice.taxLines`), so a later rate change cannot rewrite
+    an issued document. Tax treatment is a setting with no default: until somebody states the
+    company's tax position, no invoice can be issued at all.
+  - A partial unique index on `billable_event` (`rental:<id>:final`) allows exactly one live invoice
+    per service. A voided invoice stops blocking, so a correction is possible — with its own number,
+    never by editing the old one.
+  - A trigger freezes identity, dates, lines and totals, and refuses to void an invoice that has been
+    paid. A second trigger refuses deletes entirely (brief 5.9).
+- **Alternatives rejected.** A `status` field on the rental (no number, no duplicates rule, and the
+  document would mutate); a computed view over the rental (no stable number, no independent audit).
+- **Known gap.** Credit notes and adjustment records do not exist yet, so a *paid* invoice can be
+  corrected only by recording the difference as a new invoice for the corrected service. Documented
+  in PROGRESS rather than implied.
+
+## D-63 (FIN-03) A payment is written once; the external reference is its idempotency key
+
+- **Context.** The deposit taken at confirmation recorded an amount, a method and a free-text
+  reference, but there was no payment record to reconcile, verify, or hold to account. Brief 5.4
+  makes recorded payments immutable and 5.8 asks for idempotency keys.
+- **Decision.**
+  - A `payment` record points at one invoice and carries currency, method, date, external reference,
+    the recording user and a log of status changes.
+  - `amountPaid` and the invoice status (`issued` → `part_paid` → `paid`) are **derived** from the
+    payments, never typed.
+  - The same `(invoice_id, external_reference)` cannot be recorded twice: a partial unique index
+    enforces it, and the command returns the existing payment's reference instead of adding a
+    second row. Recording a bank slip twice (a double click, a retried sync) is therefore harmless.
+  - Status only advances, recorded → verified → reconciled, in the service and by trigger. A
+    backwards move is refused with the reason.
+  - Overpayment is refused with the outstanding balance in the message; a payment cannot pre-date its
+    invoice.
+- **Alternatives rejected.** Mutable payments with an "edited" flag (destroys the audit trail);
+  integer cents in the browser (the domain layer still computes in `number`, so this would only move
+  the rounding problem — see the open item in PROGRESS).
+- **Known gap.** There is no adjustment/credit entry yet, so a payment recorded in error stays on
+  record. That is deliberate — deleting money is worse — but it means correction is currently
+  "record a compensating entry as a new invoice", not a first-class adjustment.

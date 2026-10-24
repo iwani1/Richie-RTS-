@@ -113,6 +113,31 @@ A work order becomes the "last service" for a vehicle only when it carries
 choice recorded while the work order is still editable; `completedAt` is fixed at the completion
 transition. There is no transition that retroactively marks or unmarks a service.
 
+## Invoice (`Invoice.status`, FIN-02)
+
+| From | To | Who | Preconditions |
+|---|---|---|---|
+| — | `issued` | `invoices:issue` | Rental completed (a final invoice exists); currency, tax position and payment terms configured; no other live invoice for the same billable event |
+| `issued` | `part_paid` | automatic | A payment is recorded that is less than the total |
+| `issued` / `part_paid` | `paid` | automatic | Recorded payments reach the total |
+| `issued` | `void` | `invoices:void` | A reason is given and **no payment** exists |
+
+No transition leaves `void`, and no transition edits the document: identity, dates, lines and totals
+are frozen by trigger (`003_invoices_and_payments.sql`). `amount_paid` is derived from the payment
+rows.
+
+## Payment (`Payment.status`, FIN-03)
+
+| From | To | Who | Preconditions |
+|---|---|---|---|
+| — | `recorded` | `payments:record` | Invoice not void; amount > 0 and ≤ outstanding; configured method; date not before the invoice; external reference not already used on this invoice |
+| `recorded` | `verified` | `payments:advance` | — |
+| `verified` | `reconciled` | `payments:advance` | — |
+
+Backwards transitions are refused in the service and by trigger. The financial fields are immutable
+after insert; only the status may move.
+
 ## Planned (not yet implemented)
 
-Quotation (as a standalone revisable document), booking vs trip split, contract and invoice state machines are Not Started.
+Quotation (as a standalone revisable document), booking vs trip split and contract state machines are
+still Not Started.

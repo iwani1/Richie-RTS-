@@ -12,6 +12,7 @@ import {
   DRIVER_STATUSES,
   PRICING_BASES,
   REQUOTE_POLICIES,
+  TAX_POSITIONS,
   migrate,
   type AuditEntry,
   type Client,
@@ -419,6 +420,23 @@ export function validateSettings(db: Database, input: Settings) {
   if (documentReminderLeadDays !== null && (!Number.isInteger(documentReminderLeadDays) || documentReminderLeadDays < 0))
     errors.documentReminderLeadDays = "Enter a whole number of days (0 or more).";
 
+  // Invoicing settings (FIN-02). The tax position has no default: until somebody states it, an
+  // invoice cannot be issued at all, because guessing would put a tax line on a legal document.
+  const taxPosition = input.taxPosition ?? null;
+  if (taxPosition !== null && !(TAX_POSITIONS as readonly string[]).includes(taxPosition)) errors.taxPosition = "Invalid tax position.";
+  const taxLines = (input.taxLines ?? []).map((line) => ({ id: line.id || makeId(), name: line.name.trim(), ratePercent: Number(line.ratePercent) }));
+  const seenTax = new Set<string>();
+  taxLines.forEach((line, i) => {
+    if (!line.name) errors[`taxLines.${i}`] = "Tax line name is required.";
+    else if (seenTax.has(norm(line.name))) errors[`taxLines.${i}`] = "Duplicate tax line name.";
+    else if (!Number.isFinite(line.ratePercent) || line.ratePercent < 0 || line.ratePercent > 100) errors[`taxLines.${i}`] = "Rate must be between 0 and 100 percent.";
+    seenTax.add(norm(line.name));
+  });
+  if (taxPosition === "registered" && taxLines.length === 0 && !errors.taxPosition) errors.taxLines = "A VAT-registered company needs at least one tax line.";
+  const invoiceDueDays = input.invoiceDueDays ?? null;
+  if (invoiceDueDays !== null && (!Number.isInteger(invoiceDueDays) || invoiceDueDays < 0))
+    errors.invoiceDueDays = "Enter a whole number of days (0 or more).";
+
   const maintenance = {
     schedules: input.maintenance.schedules.map((schedule) => ({
       categoryId: schedule.categoryId,
@@ -448,7 +466,20 @@ export function validateSettings(db: Database, input: Settings) {
 
   return {
     errors,
-    value: { companyName, currencyCode, onTimeThresholdMinutes: threshold, vehicleCategories: categories, shifts, rental, documentTypes, documentReminderLeadDays, maintenance },
+    value: {
+      companyName,
+      currencyCode,
+      onTimeThresholdMinutes: threshold,
+      vehicleCategories: categories,
+      shifts,
+      rental,
+      documentTypes,
+      documentReminderLeadDays,
+      taxPosition,
+      taxLines,
+      invoiceDueDays,
+      maintenance,
+    },
   };
 }
 

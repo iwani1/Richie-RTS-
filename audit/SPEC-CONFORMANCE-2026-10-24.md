@@ -1,449 +1,346 @@
-# Spec conformance check — 24 October 2026
+# Spec conformance audit — Richie RTS
 
-**Question asked:** read `richie-tms-standing-brief.md` (the brief, §1–§15) and
-`richie-tms-phase-prompts.md` (Phase 0 / 1A / 1B / 1C / 2 / 3 + utility prompts), then cross-check
-them against the application as it actually runs.
-
-**Answer, in one sentence:** no — the application is a solid, genuinely server-backed TMS that
-meets the brief's integrity rules, the rental lifecycle, fleet/compliance, work orders, route → trip
-→ boarding → on-time flow and the permission/audit core, but it does **not** meet the brief as a
-whole: **9 of 78 feature IDs are met, 37 are partial, 18 are missing (all of them Phase 1A–1C
-obligations), 14 are later-phase and untouched**, four named stack standards are replaced or absent,
-6 of the brief's 10 roles do not exist, and 6 of the 8 end-to-end workflows in §8 cannot run end to
-end. It is also **below its own phase gates**: the Phase 1A exit criteria are not met, so starting
-1B/1C was premature by the brief's own rules (§14: "Do not start the next phase while the current
-phase's exit criteria are unmet").
-
-This run changed no application code. Everything below was executed against a live production build
-(`next build` + `next start`) on a real PostgreSQL instance.
-
-> **Update, same day.** The four behavioural defects in §15.2 were fixed and re-verified against a
-> rebuilt server (commit `Phase 15` in `docs/PROGRESS.md`, decisions D-60 and D-61). RNT-03 moved
-> from partial to met because capacity is now checked wherever a vehicle is bound to people; the
-> counts above include that change. Nothing else in this report has been fixed or withdrawn.
+**Date:** 2026-10-24
+**Commit audited:** `2a27fac` (branch `arena/368c3fd2-richie-rts`) plus the uncommitted invoice/payment work in this session, noted where it differs
+**Specs:** `richie-tms-standing-brief.md` (the brief) and `richie-tms-phase-prompts.md` (the phase prompts)
+**Method:** every requirement in the brief was traced to code, a command, or a live request. Nothing here is inferred from a screen rendering. Where a claim could be checked at runtime it was checked against a running build (`next start`) with a real PostgreSQL harness, and the exact message is quoted.
 
 ---
 
-## 1. How this was verified
+## 1. Verdict
 
-| Item | Value |
-|---|---|
-| Build | `npm run build` → production build; served with `next start` on port 3000 |
-| Database | PostgreSQL-wire server (PGlite socket server) on `127.0.0.1:55432`; `npm run db:migrate` applied `001_init.sql` + `002_resource_reservations.sql` |
-| Gates re-run this session | `npm run typecheck` clean · `npm run lint` clean · `npm test` **203 passed, 5 skipped (208)** |
-| Data | created through the public API only: administrator, settings, 2 vehicles, 2 drivers, 1 corporate client, 6 rentals, 2 routes, 12 trips, 25 passengers, 2 documents, 1 incident, 1 work order, 5 users |
-| Roles exercised | administrator, operations, finance, driver, client_contact — each with its own session cookie |
-| Evidence form | command → response, quoted verbatim where it matters |
+**The build is not spec-conformant.** It is a well-engineered, coherent application that implements a substantial part of the brief, and in places (audit immutability, conflict prevention, permission enforcement on writes) it exceeds it. But measured against the brief as written:
 
-No feature below is marked "met" on the strength of a document, a screen rendering, or an untested
-claim. Where I could not exercise something (a notification provider, a map, a phone), it is marked
-missing or deferred — never assumed.
+- **10 of 78 feature IDs are met** (13%). **37 are partial**, **17 are not built**, **14 are deferred** to phases 2–3 and are correctly not attempted.
+- In **Phase 1A specifically**, **6 of 30** IDs are met (AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08). **Three Phase 1A IDs are not built at all**: AUTH-05, WEB-01, RPT-01. FIN-02/FIN-03 shipped during this pass and are partial.
+- **None of the eight end-to-end workflows in §8 can be completed as specified, and none has ever been run in a browser.** Workflow C (bus rental) now runs from enquiry to a recorded payment in the application, but the Playwright requirement is unmet and RPT-01 is missing; workflows A, B, F and G depend on entities that do not exist (clients-as-companies, employees, contracts, bookings).
+- Several structural decisions **contradict the brief rather than adapt it**: five roles instead of ten, single-tenant instead of multi-company, one rental status instead of two entity lifecycles (12 states), and reference numbers derived from array length instead of a database sequence (fixed only for invoices and payments, which use a counter).
+- The **§13 definition of done is not being followed per feature**: `docs/PROGRESS.md` records work by *phase name*, not by feature ID, does not list the 78 IDs, and repeats "147/203 tests passing" claims that are internally inconsistent with the current suite.
+
+The **Phase 1A gate is not met**, for concrete reasons listed in §3 below.
+
+What is genuinely strong and should not be rebuilt: append-only audit with a trigger, session handling, permission enforcement at the command boundary *and* on read, conflict exclusion constraints, the "no invented defaults — block the action instead" pattern, and the migration discipline.
 
 ---
 
 ## 2. Scoreboard
 
-### 2.1 Feature IDs (§7) — 78 in total
+| Bucket | Count | Note |
+| --- | --- | --- |
+| Met | **10** | AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RTE-03, TRP-02, DRV-01, DRV-04 |
+| Partial | **37** | exists and works, but a named part of the requirement is missing |
+| Not built | **17** | no entity, command or screen |
+| Deferred (Phase 2/3) | **14** | correctly out of Phase 1 scope; listed so the count reconciles to 78 |
+| **Total** | **78** | matches the brief's backlog |
 
-| Status | Count | IDs |
-|---|---|---|
-| **Met** (works; ran it) | **9** | AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RTE-03, TRP-02, DRV-04 |
-| **Partial** (some of it exists; gaps named in §5) | **37** | AUTH-02, AUTH-03, AUTH-04, SET-01, CUS-01, RNT-01, RNT-02, RNT-04, RNT-05, RNT-07, RNT-09, FLT-01, FLT-02, FLT-03, FLT-04, FLT-05, MNT-01, MNT-02, MNT-03, CLI-01, CLI-03, EMP-01, EMP-03, RTE-01, RTE-02, TRP-01, DSP-01, DSP-02, DSP-04, DRV-01, DRV-02, INC-01, INC-02, FIN-01, FIN-03, FIN-05, RPT-02 |
-| **Missing** (nothing built, and all of these were due in Phase 1A/1B/1C) | **18** | AUTH-05, WEB-01, CLI-02, EMP-02, BKG-01, BKG-02, BKG-03, BKG-04, BKG-05, BKG-06, DSP-03, RTE-04, PAX-01, FIN-02, FIN-07, RPT-01, RPT-03, RPT-04 |
-| **Deferred** (Phase 2/3, not attempted — honest) | **14** | AUTH-06, MNT-04, RTE-05, DRV-03, DRV-05, PAX-02, FIN-04, FIN-06, FIN-08, NTF-01, NTF-02, NTF-03, RPT-05, GPS-01 |
-
-### 2.2 Everything else
-
-| Brief section | Verdict |
-|---|---|
-| §2 Integrity rules | **Met** — the strongest part of the build |
-| §4 Stack | **Partly** — 5 of 11 standards met; 3 replaced (2 with a decision record); 3 omitted (1 with a record) |
-| §5 Engineering invariants | **Partly** — 5.1 (DB constraint), 5.4 (numeric type), 5.5 (timestamptz), 5.9, 5.10(partly); 5.3, 5.6, 5.7, 5.8 fail as written |
-| §6 Roles and permissions | **Partly** — 5 roles, not 10; deny-by-default matrix is real and enforced server-side |
-| §7 Feature backlog | **7 / 78 met** (see above) |
-| §8 Workflows A–G | **1 of 7** runs end to end (C is the closest; see §7 below) |
-| §9 Ghana requirements | **Partly** — GHS, +233, MoMo-as-configured-string; no timezone pinning; no coordinates/landmark/digital address |
-| §10 Security and privacy | **Largely met** for what exists; file uploads, retention jobs and monitoring not applicable/absent |
-| §11 Interface standards | **Partly** — strong forms/a11y/empty states; no pagination, no CSV export, IA ≠ the brief's nav |
-| §12 Testing requirements | **Partly** — 208 tests, real-Postgres constraint tests; no Playwright, no parallel-request test, no generated cross-tenant tests, no full from-to matrices |
-| §13 Definition of done | **Partly** — gates pass; `docs/PROGRESS.md` is **not** tracked per feature ID (only 3 IDs appear) |
-| §14 Session protocol | **Partly** — gates are run and docs updated, but by phase, not by feature ID; phases advanced with gates unmet |
-| §15 Deliverables | **Partly** — 10 of 13 named docs exist; `API.md`, `BACKUP_AND_RECOVERY.md`, `USER_ROLES_GUIDE.md` absent; no seed script (owner's instruction) |
+Phase 1A only (`[1A]` tags): **30 IDs — 6 met, 21 partial, 3 not built** (AUTH-05, WEB-01, RPT-01).
 
 ---
 
-## 3. §4 Stack and standards
+## 3. Phase 1A exit criteria (phase prompts, Phase 1A, "Exit criteria")
 
-| Standard | Status | Evidence |
-|---|---|---|
-| Next.js App Router, React, TypeScript `strict`, Tailwind | **Met** | `src/app/page.tsx` + one client shell; `tsconfig` strict; Tailwind 4 via PostCSS; `next 15.5.28` |
-| PostgreSQL 15+ with `btree_gist` | **Met** | `db/migrations/002` uses `exclude using gist`; migration creates the extension |
-| Prisma ORM + hand-written SQL migrations | **Replaced** — Kysely + `pg` | Decision **D-50** records it; reason is honest (Prisma's engine binary cannot be downloaded in the build environment) |
-| Zod at every server boundary | **Met** | `zod` at `api/commands`, `api/auth/login`, `api/setup`, `env.ts` — i.e. every route |
-| Auth: "one maintained library … never hand-roll sessions or password hashing" | **Contradicts**, but recorded | `iron-session` + `@node-rs/argon2` wired by hand in `src/server/session.ts` (D-51). No cryptography is hand-written, but the brief's examples (Auth.js / Better Auth) are not used and the brief's "one library" is two libraries |
-| `pg-boss` (or scheduled endpoints with documented limits) | **Absent** | `docs/ARCHITECTURE.md` §Job runner: "Not present… daily generation, document-expiry reminders and retention jobs are still not implemented". No scheduled endpoint exists either |
-| Vitest, integration tests against real Postgres | **Met** | 203 unit/UI + 5 integration tests (exclusion constraint, audit immutability, odometer) |
-| Playwright end-to-end | **Absent** | not a dependency; no `e2e/`, no `playwright.config`; §12's 8 flows are not automated at all |
-| Docker Compose for PostgreSQL | **Withdrawn by the owner** | README documents a single `podman run` line instead; the owner rejected compose/`run.sh` scripting |
-| One package manager | **Met** | npm only, `package-lock.json` committed |
-| `src/modules/<domain>/{service,policy,schema,repo}` | **Not followed, no decision record** | code lives in `src/tms/*` (domain) and `src/server/*` (transport/persistence). Business rules are centralised (`service.ts`, `busing.ts`, `logistics.ts`, `compliance.ts`) and route handlers are thin, so the *intent* is met; the *layout* is not |
-| Providers behind interfaces (maps, SMS, email, payments) | **Not built** | no provider module exists; ARCHITECTURE lists them as seams with "None" |
-| Quality gates before "done" | **Met** | `typecheck` 0 · `lint` 0 · `test` 203/5 · `build` ✓; CI (`ci.yml`, `codeql.yml`, `dependency-review.yml`) green on `e9f399e` |
+| Criterion | Result | Evidence |
+| --- | --- | --- |
+| Workflow C works end to end on real records, **via Playwright** | **Fail** | No Playwright dependency, no `e2e/` directory, no browser test anywhere. The flow itself now completes in the app (request → quotation → confirmation → assignment → start → completion → invoice → payment, Phase 16), but "via Playwright" is unmet. |
+| Parallel requests cannot double-book a vehicle or driver | **Fail (unproven)** | Conflict prevention exists and is correct (`db/migrations/002_resource_reservations.sql`, exclusion constraint; verified live that overlapping dates are refused), but there is **no parallel/concurrent test**. A sequential test does not demonstrate what the criterion asks. |
+| Cross-role and permission-denial tests pass | **Partial** | `src/tms/service.test.ts` and `src/server/*.test.ts` cover denial for several commands; there is no generated per-command matrix and no denial test for the newer modules (busing dispatch, compliance documents, maintenance). |
+| Quotation and invoice arithmetic tests pass | **Partial** | Quotation totals, deposit percentage and rounding are covered in `service.test.ts`. Invoice totals, tax lines, discount, overpayment and idempotent replay are covered in `src/tms/finance.test.ts` (14 tests) — but the quotation itself still carries no tax lines, so "quotation arithmetic" is only partly the arithmetic the brief describes. |
+| A safety-blocked vehicle cannot be assigned; release needs approval | **Partial** | Blocking is enforced (`vehicle.status !== "available"` on trip assignment; `maintenance`/`out_of_service` refused on rental assignment). "Release needs approval" is not modelled: there is no technician role and no approver recorded, so self-release cannot be prevented by role. |
+| Records persist after logout, login and application restart | **Met by mechanism, unproven by test** | Repository writes to PostgreSQL per command inside a transaction; `trpc`-style snapshot endpoints read from the database. No automated restart test exists; the earlier manual probe confirmed persistence. |
 
 ---
 
-## 4. §5 Engineering invariants (each must have tests)
+## 4. §2 Integrity rules
 
-| Invariant | Status | Evidence |
-|---|---|---|
-| **5.1 Double-booking, enforced in the database** | **Met** | `resource_reservation` with `exclude using gist (resource_type, resource_id, period with &&)`; integration test asserts SQLSTATE `23P01`; live: overlapping vehicle/driver refused, cancelled rental's dates released and re-used successfully, second trip for a driver that morning refused (`Driver is already on TR-0002 at an overlapping time that day.`) |
-| 5.1 seat capacity, `SELECT … FOR UPDATE` inside the booking transaction | **Fails** | **seat capacity is never compared with passenger count anywhere** (`seatCapacity` appears only in the vehicle form). Live: 25 active passengers on a 22-seat Coaster accepted; trip assigned to that vehicle |
-| 5.1 concurrency test with parallel requests | **Absent** | no parallel-request test; only a sequential "second insert fails" integration test |
-| 5.2 Tenant isolation through one scoped layer + generated cross-tenant tests | **Adapted** | single company; `scope.ts` + `visibility.ts` implement own-record scope (live: driver sees 1 vehicle/3 trips/0 clients/0 audit; client sees only its own rental). No cross-tenant tests because there are no tenants (single-tenant decision is in D-51's context) |
-| 5.3 One transition table per entity, one function, `status_history` row per change | **Partial** | transition tables exist for rental, trip, vehicle, work order, incident; but the rental machine is **7 states, not the brief's 12**; there is **no `status_history` table** — history is per-entity JSON (`log`) plus `audit_entry`, which stores no from→to; no exhaustive from-to matrix test |
-| 5.4 `NUMERIC(14,2)`, one totals function, immutable invoices, unique billable event, idempotent callbacks | **Partial** | `numeric(14,2)` columns exist for quote/deposit/invoice/cost totals ✔; all arithmetic is done in **JS floating point** (`round2`) before `toFixed(2)` ✘; there is **no invoice or payment entity**, so immutability, credit notes, unique billable event and idempotent callbacks have nothing to attach to |
-| 5.5 `timestamptz` UTC, displayed in `Africa/Accra`, recurrence in local time | **Partial** | timestamptz ✔; **the string `Africa/Accra` does not appear anywhere in `src`** — every date/time is formatted with `toLocaleString(undefined, …)`, i.e. the viewer's OS timezone |
-| 5.6 References from DB sequences (`QTE-2026-0001`) | **Fails** | no `sequence`/`nextval` in any migration; references are counters — `RR-${rentals.length+1}`, `RT-${routes.length+1}`, `TR-${counter}`, `IN-0001`, `WO-0001`; no year segment; collision-prone if a record is ever removed |
-| 5.7 Append-only audit with actor, action, entity, summary, **IP**, timestamp | **Partial** | trigger blocks update/delete (integration test) ✔; `audit_entry` has **no IP column**; live audit rows show actor/action/entity/summary/at only |
-| 5.8 Idempotency keys | **Absent** | no client event ID or idempotency key anywhere (`grep eventId|idempot` → 0 hits) |
-| 5.9 Archive/deactivate, retention schedule | **Partial** | records are deactivated (status), never hard-deleted by the UI; `docs/DATA_PROTECTION.md` proposes retention, but no retention job exists |
-| 5.10 Typed errors, no internals to clients, structured logs with request ID | **Partial** | error bodies are field-level messages, no stack traces ✔; one `console.error("[command] …")`, **no request ID, no structured logger** |
+| Rule | Status | Evidence |
+| --- | --- | --- |
+| No invented business facts; unknown policy stays empty and blocks the action | **Met** | `rentalQuotingReady()` blocks quoting until currency, pricing basis, deposit %, validity and payment methods exist; the block message was observed live: "Blocked: quotation settings are incomplete. An administrator must set: rental pricing basis." |
+| No silent fallbacks | **Met** | Guards return named messages; missing reference data produces a refusal, not a default. |
+| Money never in binary floats | **Fail** | All amounts are JavaScript `number` (`unitAmount`, `depositRequired`, `total`, cost entries). The storage column type is `numeric`-compatible but the domain layer rounds with `Math.round(x*100)/100`. Not a float *storage* problem in PostgreSQL, but arithmetic is floating point and not decimal-safe. |
+| Archived, not deleted | **Met** | Statuses (`retired`, `declined`, `cancelled`, `closed`) instead of delete; commands never remove business records. |
+| Audit records who/what/when with immutable append-only semantics | **Met** | `audit_entry` is insert-only by trigger; `audit()` prepends to the log; viewer at `src/screens/Audit.tsx`. |
+| No demo data in production paths | **Met** | `emptyDatabase()` seeds nothing; no seed script ships example records. |
+| Personal data minimised | **Met** | Passenger phone and employee reference are held; no home address field. The finance role does **not** receive the roster, documents, accounts or audit trail: `scopeDatabase` drops them and `src/server/visibility.test.ts:190` pins that behaviour. A client contact sees only its own client, and passenger phones are blanked in that payload (`visibility.test.ts:176`). |
+| No dead controls | **Partial** | The settings screen hides nothing it cannot save; but several screens contain actions that lead to missing features (see §12). No control was found that does nothing at all. |
 
 ---
 
-## 5. §7 Feature backlog — detail per ID
+## 5. §4 Technology stack
 
-Legend: **M** met · **P** partial · **X** missing · **D** deferred. "Evidence" is what I ran.
+| Item | Required | Actual | Verdict |
+| --- | --- | --- | --- |
+| Framework | Next.js with TypeScript | Next.js App Router + TS | Met |
+| Styling | Tailwind CSS and shadcn/ui | Tailwind **v4**; **no shadcn/ui**; hand-built primitives in `src/ui/primitives.tsx` | Deviated (documented as D-xx — acceptable: no pre-built component library was available to install) |
+| Validation | Zod at every server boundary | Zod on the command envelope (`src/app/api/commands/route.ts`), session and setup routes | Met |
+| Database | PostgreSQL 16 **with `btree_gist`** | PostgreSQL (PGlite-compatible migrations); `btree_gist` **is** created and used by the exclusion constraint | Met |
+| Data access | Kysely (type-safe query builder) | Kysely | Met |
+| Migrations | Versioned SQL files | `db/migrations/001…003` | Met |
+| Auth | Auth.js (NextAuth) v5, institutional credentials | **Auth.js not installed**; iron-session cookie + Argon2id + server-side credential rows (`src/server/session.ts`, `src/server/password.ts`) | Deviated — **documented** (D-51) and defensible: the brief says never hand-roll auth, and this is hand-rolled session auth. Flagged, not silently changed. |
+| Jobs | pg-boss | **Not installed**; no background job runner at all | **Missing** — nothing schedules reminders, retries or notifications. |
+| Testing | Vitest + Playwright + React Testing Library, real PostgreSQL for bookings/money | Vitest + jsdom/RTL; **no Playwright**; booking/money tests run against an **in-memory domain model**, not a real database | Partial — the brief explicitly says tests that touch bookings or money run against real PostgreSQL, not mocks |
+| Observability | structured logs with request IDs; errors with codes; `/health` | `/api/health` present; errors are typed results; no request-id correlation | Partial |
+| Module layout | vertical feature modules | Flat `src/tms/*` (domain) + `src/screens/*` (UI) + `src/server/*` (transport/persistence) | Deviated — undocumented |
+| Local dev | Docker Compose for PostgreSQL | **No compose file** (owner's instruction); README gives a `podman` one-liner and `npm run db:*` scripts | Deviated — documented and explicitly requested |
+| Deploy target | Vercel + managed Postgres | Next.js on Node; no Vercel-specific work (no cron, no serverless queues) | Partial — nothing depends on Vercel, but nothing is prepared for it either |
+
+---
+
+## 6. §5 Engineering invariants
+
+| Invariant | Status | Evidence and gap |
+| --- | --- | --- |
+| **5.1** Transactions for multi-table changes; capacity and conflict checks inside them | Partial | Every command runs inside one transaction (`saveDatabase`). Overlap prevention is a real exclusion constraint. **Capacity is checked at assignment/dispatch/start but not when a roster grows mid-run** — see defect D-01. |
+| **5.2** Multi-tenant isolation by `company_id`, auto-injected, cross-tenant tests generated per route | **Contradicted** | The product is single-tenant: no `company_id`, no tenant context. Documented as a deliberate simplification (D-xx), but it is a departure from the brief, not an implementation of it. No cross-tenant tests can exist. |
+| **5.3** `status_history` table with `changed_by`, `changed_at`, reason; no state reachable without an explicit transition | Partial | No `status_history` table; history is reconstructed from audit entries and per-entity `log` arrays. Transitions are centralised in `RENTAL_TRANSITIONS` etc. and invalid ones are rejected. |
+| **5.4** Ledger/totals derived from records — not counters; issued invoices and payments immutable; corrections via credit notes with an approver | Partial | Totals are derived from line items (good). Invoices and payments do not exist yet, so their immutability cannot be assessed. No credit-note or adjustment record exists. |
+| **5.5** Africa/Accra; no "today" computed in a component; dates validated | Met | `todayYmd()` and UTC calendar-day comparisons; guards use `now.slice(0,10)`; date validation via `isValidDate`. Verified live: "RR-0004 is booked from 2026-11-02. It cannot be started before that date." |
+| **5.6** Database sequences / counters, not array length | **Fail** | `RR-${db.rentals.length + 1}`, `IN-${db.incidents.length + 1}`, `WO-${db.workOrders.length + 1}`. Reference numbers collide after a restore or any archive-then-create sequence, and are not allocated under a lock. |
+| **5.7** Redis-backed rate limiting on auth and public endpoints with lockout and audit | Partial | Rate limiting exists for login (`src/server/rateLimit.ts`) — in-process memory, not Redis; no audit entry on lockout; **no public endpoints exist** to rate-limit. |
+| **5.8** Idempotency keys for driver events and payments | Fail | No `eventId`/`clientEventId` anywhere in the codebase. |
+| **5.9** Soft delete/archive; no destructive delete | Met | No delete commands; statuses used throughout; `audit_entry` and (new) invoice/payment rows reject deletes by trigger. |
+| **5.10** Permission enforced in the data layer or query, not only in the UI | Partial | Enforced in the service (write path) and in `src/server/visibility.ts` (read path, per-collection). Not enforced in SQL/RLS — a direct database client bypasses it. |
+
+---
+
+## 7. §6 Roles and permissions
+
+The brief names ten roles. The build implements **five**:
+
+| Brief role | Build role | Note |
+| --- | --- | --- |
+| Super Administrator | `administrator` | |
+| Transport Manager / Dispatcher | `operations` | combined |
+| Finance Officer | `finance` | narrowed read scope: no roster, documents, accounts or audit (D-60) |
+| Driver | `driver` | own-record scope |
+| Employee / Passenger | — | absent (PAX-01/02 not built) |
+| Corporate HR Administrator | — | absent (CLI contracts not built) |
+| Rental Customer | `client_contact` | own-client scope; also used for corporate contacts |
+| Maintenance Technician | — | absent; consequences: MNT-02 release cannot be restricted by role |
+| Fleet Manager | — | absent; fleet duties sit with `operations` |
+| Read-only Auditor | — | absent; `audit:read` is held by administrator, operations and finance |
+
+Verified behaviours:
+
+- Unauthenticated `/api/commands` → **401** ("Sign in is required.").
+- Write denials are enforced server-side: `finance` creating a work order → "Not permitted: your role lacks maintenance:create."
+- Read denials are enforced on the payload, not just the screen: a driver receives only their own trips (live probe `trips:3, users:1, vehicles:1`), and a client contact receives only their client and its routes (`users:1 clients:1 routes:1 rentals:2 passengers:25 trips:3`).
+- **Privilege escalation:** no non-administrator holds `users:create`/`users:update`, and the API mints credentials server-side (`hashPassword` in the route, never a client-supplied hash). No self-elevation path was found.
+- **Read narrowing is on the payload, not the tab:** finance receives rentals, trips, clients and vehicles but no passengers, documents, users or audit (`src/server/visibility.test.ts:190`).
+
+---
+
+## 8. §7 Feature matrix (78 IDs)
+
+Legend — **M** met · **P** partial · **N** not built · **D** deferred to its labelled phase.
 
 ### Foundation and administration
 
-| ID | St | Evidence / gap |
-|---|---|---|
-| AUTH-01 | **M** | Setup → login (`200`), `/api/session` scoped, `POST /api/commands` unauthenticated → **401**; sealed cookie, 8-hour TTL, `httpOnly`, `sameSite=lax`, `secure` in production; sign-in throttle 8 failures / 15 min keyed per account **and** per address |
-| AUTH-02 | **P** | suspend/reactivate exists (`active` flag, `update_user`); **no invitation or activation flow** — an administrator types the password at creation |
-| AUTH-03 | **P** | administrator-initiated `reset_user_password` (also ends existing sessions, D-58); **no self-service reset** (no email channel) |
-| AUTH-04 | **P** | role assignment works (`create_user` for operations/finance/driver/client_contact); permissions are `resource:action`, deny-by-default, checked in the service; a non-administrator cannot create or edit users, so no self-elevation path. Company association is a single `clientId` on a client-contact user. There is no dispatcher, fleet-manager, HR-admin, passenger, rental-customer or technician role |
-| AUTH-05 | **X** | no profile screen, no "my login history" (`auth:sign_in` goes to the audit log, which only administrators can read) |
-| AUTH-06 | **D** | Phase 2; no 2FA |
-| AUD-01 | **M** | append-only trigger (DB `on conflict do nothing`, no update/delete), viewer with search. Two caveats: `audit:read` is granted to `operations` and `finance` although the brief says the viewer is for Super Administrators, and the viewer loads only the newest 5,000 rows (older rows remain in the table) |
-| SET-01 | **P** | registry holds company name, currency, on-time threshold, vehicle categories, shifts, rental pricing basis, deposit %, quotation validity, drivers-always-included, payment methods, expired-quote policy, document types + lead days, maintenance intervals. **Missing**: tax lines, cancellation windows, boarding-code policy, the contract-expiry booking rule, contract billing frequency/terms. Anything unset blocks its dependent action (verified: `create_vehicle` refused before categories existed; quote refused before tax/deposit settings) |
-| MIG-01 | **M** | built after the check: preview → import for vehicles, drivers and clients through the same commands as the forms. Live: `Imported 2 of 4 vehicles. 2 rejected: line 4 (Category "Spaceship" is not configured…); line 5 (A vehicle with this registration already exists.)`; finance refused. Was missing — see §15.3 |
+| ID | Requirement | Status | Evidence / gap |
+| --- | --- | --- | --- |
+| AUTH-01 | Login/logout, secure session with expiry, rate-limited auth endpoints | **M** | `src/app/api/auth/login`, `src/server/session.ts` (signed, httpOnly, `sameSite=lax`, 8 h TTL), `rateLimit.ts` (8 attempts / 15 min observed). Logout clears the cookie. |
+| AUTH-02 | Invitation-based creation/activation; suspend and reactivate | **P** | Admin creates an account with a password and `active` flag; suspend/reactivate works. **No invitation or activation flow** (no email provider installed). |
+| AUTH-03 | Password reset | **P** | Administrator-initiated reset only (`reset_user_password`, Argon2id rehash). No self-service "forgot password" — needs mail. |
+| AUTH-04 | Role assignment, company association, escalation protection | **P** | Role assignment and escalation protection present; **no company association** (single-tenant). |
+| AUTH-05 | Profile management; login history | **N** | No profile screen (name/email are read-only in the shell). Login events exist only in the administrator-visible audit log. |
+| AUTH-06 | Two-factor authentication for privileged roles | **D** | Phase 2. |
+| AUD-01 | Audit log and viewer for Super Administrators | **M** | Insert-only table + trigger, viewer screen with filters. Caveats: no IP address; `audit:read` is also held by operations (dispatch needs to see who changed what), which is wider than "Super Administrators". Finance does not hold it. |
+| SET-01 | Settings registry for all configurable policy | **P** | Present: pricing basis, deposit %, quote validity, payment methods, shifts, vehicle categories, document types, reminder lead days, maintenance intervals, on-time threshold. **Missing: tax lines, cancellation windows/refund rules, boarding-code policy, the expired/suspended-contract booking rule, contract billing.** |
+| MIG-01 | CSV import of vehicles, drivers, customers with preview and row-level errors | **M** | `src/tms/import.ts` + `src/ui/ImportPanel.tsx`; 12 domain tests and 2 screen tests; template documented in `SETUP_AND_DEPLOYMENT.md` §8. Live: `Imported 2 of 4 vehicles. 2 rejected: line 4 (Category "Spaceship" is not configured…); line 5 (A vehicle with this registration already exists.)`; the preview is read-only and each row runs the same command as a typed one. |
 
 ### Customers and bus rentals
 
-| ID | St | Evidence / gap |
-|---|---|---|
-| CUS-01 | **P** | client: name, contact name/email/phone, status. **No** reference, billing details, type, notes, branches, history |
-| RNT-01 | **P** | customer, dates, pickup/destination, passenger count, purpose, vehicle category, driver required, notes. **No** departure/return time, intermediate stops, luggage/special needs, trip contact, request source |
-| RNT-02 | **P** | `draft → quoted → confirmed → in_progress → completed`, plus `declined`/`cancelled`; invalid transitions rejected and tested. **7 states, not 12** — no Submitted/Under Review/Awaiting Quotation/Quotation Sent/Awaiting Customer Confirmation/Dispatched; no separate quotation or booking entity |
-| RNT-03 | **M** | live: wrong category refused, overlapping vehicle/driver refused, expired licence refused, availability computed from reservations; capacity now refused at assignment and dispatch (`This vehicle seats 22; RT-001 has 25 active passengers.`). Was partial — see §15.3 |
-| RNT-04 | **P** | line items, subtotal, deposit %, valid-until, currency, quote history on requote, expired quote cannot be confirmed (`The quotation has expired…`) nor renewed without the configured policy. **No** quotation number, no version field (revision number is derived from history length), **no tax lines**, no terms and conditions, no approval record |
-| RNT-05 | **P** | confirmation validates quote, resources, deposit floor (`Deposit must be at least GHS 420.00` → refused `GHS 300.00`), writes reservations; cancelled rentals release them. **No** customer acceptance record, **no notification**, no payment beyond the deposit |
-| RNT-06 | **M** | assign/reassign with validation; every assignment is an audit entry (`RR-0004 assigned vehicle GT-1001 and driver Kofi Mensah.`) |
-| RNT-07 | **P** | completion produces a final invoice snapshot with additional charge lines (`GHS 2250.00` = 1800 + 300 + 150 waiting). **No** actual departure/return time, distance, damage/incident notes, customer feedback, outstanding balance, or staff review step |
-| RNT-08 | **M** | cancellation records a reason and frees the reservation (verified by re-using the same vehicle/dates afterwards) |
-| RNT-09 | **P** | client portal lists own requests, quotation, status; can raise a request (live `RR-0005`). **Cannot accept or cancel**, cannot see payment status as a record (no payments exist) |
-| WEB-01 | **X** | no public enquiry endpoint, no embeddable form, no spam protection, no rate-limited public route |
+| ID | Requirement | Status | Evidence / gap |
+| --- | --- | --- | --- |
+| CUS-01 | Customer register: reference, contact, phone, email, billing details, type, status, notes, history | **P** | `Client` has name, contact name/phone/email, status. **No reference number, no billing details, no type (individual/organisation), no notes, no history view.** |
+| RNT-01 | Rental request with dates, times, stops, passengers, luggage, source, etc. | **P** | Has customer, start/end date, pickup, drop-off, passengers, purpose, category, driver requirement, notes. **Missing departure/return times, intermediate stops, luggage/special needs, trip contact, request source.** |
+| RNT-02 | 12-state workflow with tested transition table | **P** | 7 states (`draft → quoted → confirmed → in_progress → completed`, plus `declined`, `cancelled`) with an explicit transition table and rejection of invalid moves. **No separate quotation/booking entities and no Submitted/Under Review/Awaiting Quotation/Dispatched states.** |
+| RNT-03 | Availability by category, capacity, status, time range; driver availability | **M** | Live: wrong-category vehicle refused; overlapping assignment refused; driver licence expiry checked. Capacity checked at assignment against `passengers` (see D-01 for the mid-run gap). |
+| RNT-04 | Quotation builder: numbered, versioned, line items, discount, tax lines, terms, approval, expiry rule | **P** | Line items, deposit, validity, currency, requote history (`quoteHistory`). **No quotation number, no tax lines, no discount line, no terms and conditions, no approval record.** Expiry is enforced on confirmation (live). |
+| RNT-05 | Confirmation: validate, conflict-check, acceptance, deposit, reservation, notify | **P** | Validation, conflict check, deposit-per-policy recorded, reservation created via constraint. **No customer acceptance record; no notification.** |
+| RNT-06 | Assign and reassign vehicle and driver, with history | **M** | Reassignment allowed while confirmed/in progress; each assignment writes an audit entry. History lives in the audit log, not a dedicated table. |
+| RNT-07 | Completion with actual times, distance, additional charges approval, damage notes, feedback, balance | **P** | Completion captures final line items (including extra charges). **No actual departure/return times, distance, damage notes, feedback, or balance** (no payments). |
+| RNT-08 | Cancellation releases resources; reasons recorded | **M** | Verified live: a cancelled rental's dates were reusable immediately; reason required. |
+| RNT-09 | Rental customer portal: own requests, quotations, payment status; accept/cancel | **P** | Client portal lists own requests and quotations. **No accept/cancel action and no payment status** (no payments). |
+| WEB-01 | Public enquiry endpoint + embeddable form, rate-limited, spam-protected | **N** | No public route. |
 
 ### Fleet and drivers
 
-| ID | St | Evidence / gap |
-|---|---|---|
-| FLT-01 | **P** | registration, make, model, category, seats, status, notes; odometer readings; insurance/roadworthiness as documents. **No** photo, fuel type, ownership/leasing, usual driver |
-| FLT-02 | **P** | statuses `available / maintenance / out_of_service / retired`; blocked vehicle cannot be assigned (live: `Vehicle must be Available to be assigned (currently under maintenance).`). **The brief's 7 states are not modelled** (no reserved/assigned/on-trip/pending-inspection), and no per-date maintenance scheduling (D-15/D-16 say so) |
-| FLT-03 | **P** | documents created live with expiry + configurable lead; status computed as valid/expiring/expired. **No reminder is ever sent** (no job, no notification channel) |
-| FLT-04 | **P** | licence number, expiry, phone, status. **No** licence class, qualifications, availability calendar |
-| FLT-05 | **P** | readiness counts (ready/due/overdue/no-reading) and maintenance-due computation. **No** utilisation, downtime, assigned/on-trip counts, expiring-document total on the fleet view |
+| ID | Requirement | Status | Evidence / gap |
+| --- | --- | --- | --- |
+| FLT-01 | Vehicle register incl. photo, fuel, ownership, documents, service dates, usual driver | **P** | Registration, make, model, category, seats, status, notes, odometer readings. **No photo, fuel type, ownership/leasing, usual driver.** Insurance/roadworthiness exist as compliance documents. |
+| FLT-02 | 7 statuses; maintenance/out-of-service cannot be assigned | **P** | 4 statuses (`available`, `maintenance`, `out_of_service`, `retired`); blocking enforced and observed. Reserved/Assigned/On Trip/Pending Inspection do not exist. |
+| FLT-03 | Vehicle documents with expiry and configurable reminders | **P** | Document register with expiry and configurable lead time; status computed per day. **Reminders are not sent** (no job runner, no notifications). |
+| FLT-04 | Driver register: licence class, qualifications, availability, status | **P** | Name, phone, licence number, expiry, status. **No licence class, qualifications or availability.** |
+| FLT-05 | Fleet dashboard: totals, availability, assigned/on trip, maintenance, expiring docs, utilisation, downtime | **P** | Readiness and compliance screens give counts by status, overdue service and expiring documents. **No utilisation or downtime.** |
 
 ### Maintenance
 
-| ID | St | Evidence / gap |
-|---|---|---|
-| MNT-01 | **P** | live: `WO-0001` raised from an incident with vehicle, work type, priority, date, odometer, workshop, required work, cost lines; transitions `open → in_progress → completed`; completion **refuses** until costs are confirmed (`Confirm the cost position…`). **Statuses are 5, not the brief's 8**; no parts list, inspection results, release information |
-| MNT-02 | **P** | live: safety incident took `GT-1001` out of service; work order moved it to maintenance; assignment blocked; completion requires a note and cost confirmation. **No maintenance-technician role exists**, so "a technician cannot self-release" is satisfied only because that role does not exist |
-| MNT-03 | **P** | interval rules (km / days / lead) per category, computed from odometer; a passed date never marks work done. **No reminder job** |
-| MNT-04 | **D** | Phase 3 |
+| ID | Requirement | Status | Evidence / gap |
+| --- | --- | --- | --- |
+| MNT-01 | Work orders with parts, labour, inspection results, release info; 8 statuses | **P** | Reference, vehicle, fault, type, priority, date, odometer, workshop, assignee, costs, log. **Statuses are 5, not 8; no parts list, inspection results or release record.** |
+| MNT-02 | Safety defects block; release by an authorised person; technician cannot self-release | **P** | Blocking works and is tested. **No technician role and no release approval**, so "cannot self-release" is unenforceable. |
+| MNT-03 | Preventive maintenance by date, mileage, interval; passed date never marks complete | **P** | Interval rules per category, due/overdue computed from odometer and last service; a passed date never completes anything. **No reminders** (no scheduler). Phase 2. |
+| MNT-04 | Maintenance cost analytics | **D** | Phase 3. |
 
 ### Corporate clients, contracts, employees
 
-| ID | St | Evidence / gap |
-|---|---|---|
-| CLI-01 | **P** | name, contact, phone, email, status. **No** registration details, billing address, branches, notes, history |
-| CLI-02 | **X** | no contract entity, no contract status machine, no attachments, no renewal reminders |
-| CLI-03 | **P** | client portal limited to own routes, roster (names/stop), rental requests. **No** invoices, contracts, bookings |
-| EMP-01 | **P** | "passengers" register: name, phone, employee reference, company, route, stop, status. **No** department, work location, shift, drop-off point, eligibility, accessibility needs, restricted-field marking |
-| EMP-02 | **X** | no CSV import, no template, no preview, no duplicate detection |
-| EMP-03 | **P** | status toggle and route/stop reassignment. **No** location/shift management, eligibility rules, permitted exports |
+| ID | Requirement | Status | Evidence / gap |
+| --- | --- | --- | --- |
+| CLI-01 | Corporate records: registration details, billing address, branches, type, notes | **P** | Name, contact name/phone/email, status only. |
+| CLI-02 | Contracts with lifecycle, pricing model, billing frequency, renewals, amendments | **N** | No contract entity. |
+| CLI-03 | Corporate dashboard limited to own records | **P** | Client portal shows own routes, roster and rentals. **No contracts, invoices or payment status.** |
+| EMP-01 | Employee register: reference, department, work location, shift, approved stops, eligibility, accessibility | **P** | Passenger record: name, phone, employee reference, client, route, stop, status. **No department, work location, shift, eligibility, accessibility or drop-off.** |
+| EMP-02 | CSV import with template, validation, duplicates, preview, row errors | **N** | Not present. |
+| EMP-03 | Employee management: shifts, locations, eligibility toggle, permitted exports | **P** | Route/stop assignment and status changes; no shifts, locations, eligibility or export. |
 
-### Routes, bookings, trips, dispatch
+### Routes, bookings, trips and dispatch
 
-| ID | St | Evidence / gap |
-|---|---|---|
-| RTE-01 | **P** | stops have a name and a scheduled time only. **No coordinates, landmark description or Ghana digital address** — an explicit §9 requirement |
-| RTE-02 | **P** | reference (`RT-001`), name, client, direction, shift, category, weekdays, date range, ordered stops with monotonic times, status. **No** capacity requirement, expected duration, origin/destination fields |
-| RTE-03 | **M** | live: 10 trips generated for a Mon–Fri route across a fortnight, one row per service date, duplicate generation refused by a unique constraint |
-| RTE-04 | **X** | no planning aid, no map estimates, no approved stop-order record |
-| BKG-01…06 | **X** | there is no booking entity. Journeys are implied by a passenger's route membership; there is no request, approval, cut-off, cancellation window, waiting list, or history of booking changes |
-| TRP-01 | **P** | reference, route, service date, ordered stop logs, boardings, driver, vehicle, status, threshold snapshot, completion. **No** service type/rental link, no `ready_for_dispatch` / `delayed` / `interrupted` states |
-| TRP-02 | **M** | manifest = route roster with per-stop boarding outcomes; live completion recorded boarded/no-show per passenger |
-| DSP-01 | **P** | dashboard shows today's departures and unassigned work; trips tab lists and filters by status. **No** calendar, no capacity warnings, no maintenance-block panel, no full filter set (date/service/company/route/driver/vehicle) |
-| DSP-02 | **P** | assign/reassign validates availability, category, licence expiry and time conflicts (all verified live). **No** override-with-reason path |
-| DSP-03 | **X** | no emergency one-off trip creation command |
-| DSP-04 | **P** | no-show recorded per passenger; `cancel_trip` with reason. **No** delay recording, no interrupt state |
-
-### Driver and passenger interfaces
-
-| ID | St | Evidence / gap |
-|---|---|---|
-| DRV-01 | **P** | mobile-first driver home: today's/upcoming runs, next departure, route + stops, passenger count, vehicle, history, own documents, own incidents. **No** alerts |
-| DRV-02 | **P** | start, record each stop with boarding outcomes, complete. **No** "mark ready", external navigation, report delay, confirm drop-off; **events are not idempotent** (no client event ID, §5.8) |
-| DRV-03 | **D** | no boarding codes/OTP (Phase 2) |
-| DRV-04 | **M** | driver can report a defect/breakdown/incident; live incident `IN-0001` created |
-| DRV-05 | **D** | no offline/PWA queue (Phase 2) |
-| PAX-01 | **X** | there is no passenger/employee role or portal. `client_contact` is a corporate contact, not a passenger |
-| PAX-02 | **D** | Phase 2 |
-
-### Incidents
-
-| ID | St | Evidence / gap |
-|---|---|---|
-| INC-01 | **P** | reference, type, severity, vehicle, trip, description, assignment, status, log, costs. **No** driver field, time-of-day, location, restricted "people affected", attachments, responder/resolution fields (partial) |
-| INC-02 | **P** | vehicle taken out of service, work order raised, incident stays open. **No** affected-trip/passenger identification, no eligible-replacement listing, no confirmation/swap step, no passenger notification, no assignment history for the replacement |
+| ID | Requirement | Status | Evidence / gap |
+| --- | --- | --- | --- |
+| RTE-01 | Locations and stops with coordinates, landmark, Ghana digital address | **P** | Stops have a name and a scheduled time only. |
+| RTE-02 | Routes with origin/destination, ordered stops, operating days, shifts, duration, capacity requirement, active flag | **P** | Reference, name, client, direction, shift, category, weekdays, date range, ordered stops, status. **No expected duration or capacity requirement.** |
+| RTE-03 | Recurring schedules, one-time trips, conflict detection | **M** | Live: 10 trips generated across weekdays for a date range; duplicate guard in the trip unique constraint. "Copy previous schedule" is absent. |
+| RTE-04 | Explainable planning aid with overrides stored | **N** | No planning aid; dispatchers choose manually. |
+| RTE-05 | VRO interface | **D** | Phase 3. |
+| BKG-01 … BKG-06 | Booking types, validation, workflow, assignment, cancellation/waiting list, history | **N** | **No booking entity exists.** Journeys are modelled only as trips with a route roster. |
+| TRP-01 | Trip records with service type, booking/rental link, ordered stops, times, manifest, statuses (9), incidents | **P** | Reference, route, date, planned/actual stop times, manifest, driver, vehicle, status (5), completion. **No service type, rental link, delayed/interrupted states, notification or incident reference.** |
+| TRP-02 | Passenger manifests | **M** | Per-trip manifest from the route roster with boarding outcomes. |
+| DSP-01 | Daily dispatch board with calendar, capacity warnings, maintenance blocks, filters | **P** | Today's departures on the dashboard plus a filterable trip table. **No calendar, no unassigned list, no capacity-warning panel, no maintenance-block view.** |
+| DSP-02 | Assign/reassign with availability, qualification, condition, capacity, conflict; overrides need permission and reason | **P** | Validation of category, status, roster capacity, licence expiry, time overlaps, rental clashes, vehicle/driver double-booking. **No permission-and-reason override.** |
+| DSP-03 | Emergency trip creation | **N** | A trip exists only if a route generates it. |
+| DSP-04 | Record no-shows and delays; cancel or interrupt trips | **P** | No-show recorded per passenger; trips can be cancelled with a reason. **No delay recording, no interruption, no repair transition.** |
+| DRV-01 | Mobile-first driver home | **M** | Driver portal: today's assignments, next departure, route and stops, passenger count, vehicle, history. |
+| DRV-02 | Driver actions incl. navigation, ready, delay report; idempotent event IDs | **P** | Open trip, manifest, start, board, no-show, complete. **No external navigation, no mark-ready, no delay report, and no idempotency key (5.8).** |
+| DRV-03 | Boarding verification codes/OTP | **D** | Phase 2. |
+| DRV-04 | Defect and breakdown report | **M** | Driver can raise an incident which blocks the vehicle and creates a work order. |
+| DRV-05 | Offline PWA with queued events | **D** | Phase 2. |
+| PAX-01 | Passenger portal | **N** | No passenger role or screen. |
+| PAX-02 | Trip updates | **D** | Phase 2. |
+| INC-01 | Incident record with type, severity, location, people affected, attachments, responder, status | **P** | Reference, vehicle, trip, type, severity, description, assignee, status, costs, log. **No driver, time, location, people affected, attachments.** |
+| INC-02 | Breakdown workflow with replacement vehicle, passenger notification, history | **P** | Vehicle blocked, work order created, incident stays open. **No affected-passenger identification, no replacement listing, no notification.** |
 
 ### Finance
 
-| ID | St | Evidence / gap |
-|---|---|---|
-| FIN-01 | **P** | rental pricing basis (per day / per km / per trip), free line items, deposit %, discounts? — **no discount field, no tax lines, no waiting/overtime rules, no contract pricing models** |
-| FIN-02 | **X** | **no invoice entity at all** — no number, no status, no paid/outstanding, no itemised invoice table, no duplicate-billing constraint. A rental carries a `finalInvoice` JSON snapshot |
-| FIN-03 | **P** | the confirmation deposit records amount, method, reference and date. **No** standalone payment register, no verification/reconciliation status, no immutability, no adjustment/correction path |
-| FIN-04 | **D** | Phase 3; no provider integration |
-| FIN-05 | **P** | cost lines on work orders and incidents (category, description, amount, date). **No** expense register, supplier, method, receipt, approval |
-| FIN-06 | **D** | Phase 3 |
-| FIN-07 | **X** | no finance dashboard; the finance role sees the general dashboard, with no outstanding invoices, payments or reconciliation |
-| FIN-08 | **D** | Phase 3 |
+| ID | Requirement | Status | Evidence / gap |
+| --- | --- | --- | --- |
+| FIN-01 | Configurable pricing models (monthly, per trip, per passenger, distance, time, fixed quotation, waiting, extra stops, discounts) | **P** | Rental pricing basis (`per_day`, `per_km`, `per_trip`) with line items and a deposit rule; quotations are gated on the basis, currency, deposit %, validity and payment methods. **Quotations carry no tax lines and no discount line** (invoices do); **no waiting/overtime, extra-stop or discount policy; no contract pricing.** |
+| FIN-02 | Invoices: number, customer, rental, dates, lines, taxes from settings, discounts, totals, paid, outstanding, status; no duplicate billing | **P** | Built in Phase 16: `invoice` table and `src/tms/finance.ts`, `InvoicesPage`. Number from `reference_counter`, lines copied from the completion record, tax lines snapshotted from settings, discount as its own line, amount paid and outstanding derived from payments, status `issued → part_paid → paid → void`, partial unique index on `billable_event` so a service is billed once, immutability triggers. **No credit notes/adjustment records, no PDF, no corporate invoice generation** (needs contracts). |
+| FIN-03 | Manual payments: reference, invoice, amount, currency, method, date, external reference, verification/reconciliation status; immutable | **P** | Built in Phase 16: `payment` table; reference from the counter; method must be a configured one; external reference is the idempotency key (partial unique index + replay returns the existing payment); status only advances recorded → verified → reconciled; financial fields immutable by trigger; overpayment refused with the balance. **No adjustment records**, so a wrong payment cannot yet be corrected in-app. The deposit at confirmation remains a rental field, separate from the payment ledger. |
+| FIN-04 | Payment provider integration | **D** | Phase 3. |
+| FIN-05 | Expenses with supplier, receipt, approval status | **P** | Cost entries on incidents/work orders (category, amount, date, description). **No supplier, method, receipt or approval.** |
+| FIN-06 | Driver allowances, payroll export | **D** | Phase 3. |
+| FIN-07 | Finance dashboard reconciling to transaction records | **N** | Finance sees the operations dashboard; there is no money view. |
+| FIN-08 | Payment reconciliation records | **D** | Phase 3. |
 
 ### Notifications, reporting, location
 
-| ID | St | Evidence / gap |
-|---|---|---|
-| NTF-01…03 | **D** | **no notification code of any kind** (`grep -ri notification|sms|nodemailer src` → 0 hits). "Not configured" is claimed in the architecture doc, which is honest, but Phase 2 is untouched |
-| RPT-01 | **X** | no rental report (enquiries, quotations, acceptance rate, revenue, outstanding, utilisation, cancellation reasons) |
-| RPT-02 | **P** | one KPI: on-time rate with reporting period, coverage and `insufficient_data` status — correct in spirit (integrity rule 4). Nothing else: no bookings, no-shows, passengers transported, route utilisation, contract performance, downtime, fuel, mileage, document expiry |
-| RPT-03 | **X** | no financial reports |
-| RPT-04 | **X** | no report filters and **no CSV export anywhere** (the only CSV string in `src` is inside a CSS comment) |
-| RPT-05 | **D** | Phase 3 |
-| GPS-01 | **D** | no provider interface; correctly not fabricated, but the "provider interface + Not configured" half is also absent |
+| ID | Requirement | Status | Evidence / gap |
+| --- | --- | --- | --- |
+| NTF-01 | Notification service with stored status and retries | **D** | Phase 2. No notification code exists at all. |
+| NTF-02 | SMS adapter (Ghana provider) | **D** | Phase 2. |
+| NTF-03 | Email adapter | **D** | Phase 2. |
+| RPT-01 | Rental reports: enquiries, quotations, acceptance, confirmed/completed, revenue, outstanding, utilisation, cancellation reasons | **N** | No rental report. The only computed report is on-time performance. |
+| RPT-02 | Staff transport and fleet reports | **P** | On-time pickup rate with data coverage (`src/tms/kpis.ts`). **No bookings, no-shows, passengers transported, route utilisation, contract performance, downtime, fuel, mileage.** |
+| RPT-03 | Financial reports | **N** | No revenue, payments or outstanding-invoice reporting. |
+| RPT-04 | Filters + CSV export, permission-scoped; formulas documented | **P** | Per-screen search and status filters; formulas documented in `docs/KPIS.md`. **No date-range filter bar, no CSV export, no coverage column on the screens.** |
+| RPT-05 | PDF reports | **D** | Phase 3. |
+| GPS-01 | Provider interface, labelled "Not configured" | **D** | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
 
 ---
 
-## 6. §6 Roles and permissions
+## 9. §8 Core workflows
 
-| Requirement | Status | Evidence |
-|---|---|---|
-| Ten named roles | **Fails** | `ROLES = administrator · operations · finance · driver · client_contact` — 5. No dispatcher, fleet manager, corporate HR administrator, passenger, rental customer, maintenance technician |
-| `resource:action`, deny-by-default | **Met** | 69 permissions; `can()` fails closed on an unknown role |
-| Checks in the service layer, not middleware/UI | **Met** | live: operations `settings:update` → `Not permitted.`; finance `vehicles:create` → `Not permitted: your role lacks vehicles:create.`; driver `assign_trip` → `Not permitted: your role lacks trips:assign.`; client `confirm_rental`/`update_rental` → not permitted |
-| Users cannot grant themselves roles | **Met** | only `administrator` holds `users:create`/`users:update`; last-administrator guard tested |
-| Corporate HR sees only own company | **Partly** | client_contact sees only own client's routes/roster/rentals ✔ (live) |
-| Rental customers see only their own data | **Partly** | there is no rental-customer role; client_contact's own rental only ✔ |
-| Drivers see only their own trips; cannot self-assign or change prices | **Met** | live driver session: 3 of 12 trips, 1 vehicle, 0 clients, 0 audit; no assign/quote permissions |
-| Dispatchers cannot change finance settings | **Met** | operations lacks `settings:update` (and there is no finance-settings permission) |
-| **Finance has no unrestricted access to operational or personal data** | **Fails** | `finance` holds `passengers:read`, `incidents:read`, `documents:read`, `audit:read`. Live finance session returned **25 passengers with names, employee references and phone numbers** |
-| Maintenance technicians cannot release a safety-blocked vehicle without approval | **Not applicable in form** | no technician role; the release path exists for operations/administrator |
-| 2FA for privileged roles | **X** | no 2FA |
+| Workflow | Status | Where it breaks |
+| --- | --- | --- |
+| **A** Recurring corporate staff transport | **Fail** | No corporate client entity, no employees with department/eligibility, no contracts, no bookings. Routes, rosters, trips, dispatch and manifests work. |
+| **B** Employee return journey | **Fail** | Depends on BKG; directions exist on routes but there is no return-journey booking. |
+| **C** Bus rental | **Partial** | Enquiry → quotation → confirmation → assignment → start → completion → **invoice → payment** now work on real records and are covered by tests (`service.test.ts`, `finance.test.ts`, `Invoices.test.tsx`). **Missing: WEB-01 (no public enquiry), RPT-01 (no rental report), and the Playwright proof.** |
+| **D** Vehicle breakdown | **Fail** | Incident creation and vehicle blocking work. **No replacement workflow, no notifications** (INC-02, NTF-01). |
+| **E** Maintenance and release | **Partial** | Work order lifecycle works with blocking; **release approval and the technician role do not exist**. |
+| **F** Corporate invoicing | **Fail** | Depends on contracts and bookings; no corporate invoice generation, no duplicate-billing protection yet. |
+| **G** Emergency transport | **Fail** | No emergency trip creation (DSP-03). |
 
 ---
 
-## 7. §8 Core workflows
+## 10. §9 Ghana requirements, §10 design constraints, §11 UI
 
-| Workflow | Verdict | What actually runs |
-|---|---|---|
-| **A. Recurring corporate staff transport** | **Does not run end to end** | client → route with stops → roster → generate trips → assign → dispatch → start → per-stop boarding → complete, with on-time result, all live ✔. **Missing**: contracts (CLI-02), employee eligibility (EMP-01/03), bookings (BKG-01..04), capacity check (BKG-04), corporate invoicing (FIN-02), staff transport reports (RPT-02) |
-| **B. Employee return journey** | **Does not run** | no booking, no return-journey concept; a return leg would be a second hand-built route |
-| **C. Bus rental** | **Closest to complete; still not end to end** | request → quote → deposit/confirm → assign → start → complete → final invoice snapshot, all live ✔. **Missing**: public enquiry (WEB-01), invoice entity + payment records (FIN-02/03), approval of additional charges (RNT-07), rental reports (RPT-01), Playwright proof |
-| **D. Vehicle breakdown** | **Partial** | driver/ops reports incident → vehicle out of service → work order → maintenance blocked from assignment, live ✔. **Missing**: affected-trip/passenger identification, replacement proposal, passenger notification (INC-02, NTF-01) |
-| **E. Maintenance and release** | **Largely works** | work order, blocking, costs, completion, restore to available; audit record of the move. **Missing**: separate approval role, inspection record, MNT-03 reminders |
-| **F. Corporate invoicing** | **Does not run** | no contracts, no billable-service records, no invoice entity, no duplicate-billing check, no financial reports |
-| **G. Emergency transport** | **Does not run** | no emergency trip creation (DSP-03); a one-off route could be hand-built but that is not the workflow |
-
----
-
-## 8. §9 Ghana requirements
-
-| Requirement | Status |
-|---|---|
-| GHS currency | **Met** — `Intl.NumberFormat` with the currency from settings; live amounts `GHS 2250.00` |
-| `+233` phone numbers | **Stored as typed**, validated loosely; no format enforcement |
-| `Africa/Accra` | **Fails** — no timezone is pinned anywhere; display uses the viewer's OS zone (§5.5) |
-| Mobile money as a first-class payment record type | **Partly** — MoMo is a configurable free-text payment method and a deposit method (`momo_mtn` in my seeded data); there is no payment record to be "first class" |
-| Configurable tax lines, no hard-coded rates | **Fails** — no tax lines exist |
-| Coordinates, landmark, Ghana digital address | **Fails** — stops are name + time |
-| Data Protection Act documentation | **Met** — `docs/DATA_PROTECTION.md` (marked draft, needs legal review) |
-| Low-end Android / flaky connections | **Partly** — driver portal is mobile-first and light; no offline mode |
-| Website enquiry link | **Fails** — no WEB-01 |
-
----
-
-## 9. §10 Security and privacy
-
-| Requirement | Status |
-|---|---|
-| HTTPS in production, HSTS | **Adapted** — HSTS is opt-in via `HTTPS=1` (D-59); TLS itself is terminated by the host |
-| Secure, expiring sessions; auth abuse protection | **Met** — sealed `httpOnly` cookie, 8 h TTL, throttle per account and address |
-| Server-side validation; XSS/CSRF | **Met** — Zod at the boundary, React escaping, same-origin check on commands (D-59) |
-| Security headers | **Met** — CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` all observed on `GET /` |
-| File uploads restricted | **Not applicable** — no upload feature |
-| Protect home addresses, contacts, driver data, incident records | **Partly** — own-record redaction works; **finance and operations receive the full roster with phone numbers**; the client portal's own copy says "Contact details are held by your account manager" while the payload contains them |
-| No internals in errors | **Met** |
-| Dependency audit in CI, secrets in env | **Met** — `npm audit` in CI (0 findings), `dependency-review`, CodeQL; `.env.example`, no secrets in git |
-| Health check, monitoring, backup/restore | **Partly** — `/api/health` returns DB reachability; `db:backup`/`db:restore` scripts exist; no monitoring, no failed-job monitoring (no jobs), no documented restore rehearsal |
-
----
-
-## 10. §11 Interface standards
-
-| Requirement | Status |
-|---|---|
-| Navy primary, white/neutral, subtle teal | **Contradicts by owner instruction** — the shipped "Daylight" system is a neutral surface with **one indigo accent `#4453f0`** (owner's Direction E). Recorded here so the deviation is not mistaken for drift |
-| Navigation sections (Overview, Corporate Clients, Contracts, Employees, Customers, Rental Requests, Quotations, Bookings, Routes and Schedules, Trips and Dispatch, Drivers, Fleet, Maintenance, Incidents, Finance, Reports, Notifications, User Management, Settings) | **Different IA** — 14 destinations: Dashboard, My runs, My account, Bus rentals, Staff busing, Staff logistics, Fleet readiness, Compliance, Vehicles, Drivers, Clients, Users, Settings, Audit log. **No Contracts, Employees, Bookings, Finance, Reports or Notifications sections** because those features do not exist |
-| Role-specific dashboards | **Partial** — one dashboard whose content is permission-filtered and which changes for a driver/client (they get portals); there are no distinct dispatcher / finance / fleet-manager dashboards |
-| Every table: loading, empty, error; pagination; search; filters | **Partial** — loading/empty/error states and search are implemented and tested; **no table has pagination**; filters are thin (status/date only) |
-| Every form: client+server validation, input preserved, double-submit prevention, destructive confirmation | **Met** — verified in the audit and re-verified live (field-level errors, disabled submits) |
-| WCAG 2.1 AA, keyboard, labels | **Met** — skip link, focus trap, 4.5:1 body contrast, tests; the earlier two interface rejections were design, not accessibility |
-| Responsive; driver/passenger pages mobile-first | **Met** for driver; no passenger pages |
+| Area | Status | Evidence |
+| --- | --- | --- |
+| GHS currency, `+233`, `Africa/Accra` | Partial | Currency comes from settings and is displayed with amounts; timezone is handled as UTC calendar days. **No phone-format validation for `+233`; no Ghana digital address or landmark on stops** (§9 asks for both). |
+| Palette, typography, accessibility (WCAG AA) | Met in kind | Indigo accent, stone neutrals, focus rings, skip link, labelled controls found in the shell and screens. A contrast audit has not been run in this pass. |
+| Responsive tables, mobile-first operation | Partial | Data tables and panels are responsive; several wide tables require horizontal scroll on a phone. The driver portal is mobile-first. |
+| Nav sections: Dashboard, Contracts, Employees, Customers, Bookings, Bus Rentals, Dispatch, Finance, Reports, Settings, Audit, Notifications | **Contradicted** | 14 destinations exist, but they are: Dashboard, Bus rentals, Staff busing, Staff logistics, Fleet readiness, Compliance, Vehicles, Drivers, Clients, Users, Settings, Audit, plus two portals. **No Contracts, Employees, Customers, Bookings, Dispatch, Finance, Reports or Notifications destinations.** |
+| Table conventions (pagination, search, filters, bulk actions) | Partial | Search and status filters exist; **no pagination anywhere**; no bulk actions. |
+| Empty, loading and error states | Met | Every screen checked shows an explicit empty state and error notice. |
 
 ---
 
 ## 11. §12 Testing requirements
 
-| Requirement | Status | Evidence |
-|---|---|---|
-| Unauthenticated access rejected | **Met** | `POST /api/commands` → 401 live; `api.test.ts` |
-| No self-granted roles; cross-company denied on direct API calls (generated per route) | **Partly** | privilege guard tested; **no generated per-route cross-tenant suite** (single tenant) |
-| Drivers cannot touch other drivers' trips | **Met** | `visibility.test.ts`; live scoped session |
-| Finance permissions behave as defined | **Partly** | writes denied ✔; read scope wider than §6 allows ✘ |
-| Full from-to matrix for every stateful entity | **Absent** | per-transition tests only; no exhaustive matrix |
-| Valid/invalid/duplicate bookings; capacity never exceeded; conflicting assignments rejected; **parallel requests cannot double-book** | **Partly** | conflicts and duplicates ✔ live; **capacity not enforced**; **no parallel-request test** |
-| Rentals: enquiry, arithmetic, expired quote, conflicts, deposit rule, additional-charge approval, cancellation frees resources | **Partly** | arithmetic ✔ (2250 = 1800+300+150), expired quote refused ✔, conflicts ✔, deposit floor ✔, cancellation frees ✔; **enquiry missing, approval missing** |
-| Maintenance: lifecycle, blocking, unsafe vehicle not dispatched, release approval | **Met in substance** | live work-order lifecycle, blocking and refusal to complete without cost confirmation |
-| Finance: invoice totals, repeated callbacks, balances, no double invoicing, adjustments audited | **Absent** | no invoice/payment entities |
-| Reporting: KPIs match `docs/KPIS.md`, filters, isolation, exports | **Absent** | one KPI (on-time) matching its documented formula; no filters/exports |
-| Playwright, the 8 listed flows | **Absent** | Playwright is not installed; zero E2E tests |
+| Requirement | Status |
+| --- | --- |
+| Authn/authz tests: unauth rejected, no self-granted roles, cross-company denied per route, drivers confined | Partial — authn, role denial and driver containment are tested; cross-company is not applicable (single-tenant) and is therefore **not satisfied** |
+| Full from-to state matrix for every entity | Partial — rental transitions are tested; trips, work orders and incidents are tested less exhaustively; no `status_history` |
+| Bookings/scheduling: valid, invalid, duplicate, capacity, conflicts, **parallel double-booking** | Partial — all except "parallel"; capacity covered by two tests, conflicts by several |
+| Rentals: enquiry, arithmetic, expired quotation, conflicts, deposit, **additional charges need approval**, cancellation frees resources | Partial — everything except "additional charges need approval" and enquiry submission; invoice arithmetic impossible (no invoices) |
+| Maintenance: lifecycle, blocking, unsafe vehicle, release approval | Partial — release approval not modelled |
+| Finance: invoice totals, repeated callbacks, balances, same billable event twice, adjustment audit trail | **Partial** — invoice totals, tax lines, discount, part payment, overpayment refusal, duplicate billable event, idempotent replay and forward-only verification are tested (`finance.test.ts`). **No adjustment trail**, because adjustments do not exist. |
+| Reporting: KPI formulas match `KPIS.md`, filters, isolation, exports | Partial — one KPI documented and implemented; no exports |
+| End-to-end Playwright (8 scenarios) | **Fail** — no Playwright, no `e2e/` |
+| Bookings/money tests against **real PostgreSQL** | **Fail** — the domain suite runs against an in-memory `Database` object |
+
+Suite at audit time: **245 passed, 5 skipped** (250) across 32 files; typecheck and lint clean; `next build` succeeded (8 routes).
 
 ---
 
-## 12. §13 Definition of done
+## 12. §13 Definition of done and §15 deliverables
 
-| Criterion | Status |
-|---|---|
-| 1. Interface, server logic, validation, persistence, permissions | **Met** for built features |
-| 2. Automated tests that passed in this session | **Met** — 203 passed / 5 skipped, re-run today |
-| 3. `typecheck`, `lint`, `test`, `build` | **Met** — all four clean |
-| 4. Cross-company and permission-denial tests | **Partly** — permission denial yes, cross-company not applicable/absent |
-| 5. No dead controls | **Met** in the areas I exercised; unavailable capabilities are labelled ("Not configured", "blocked until management supplies them") |
-| 6. `docs/PROGRESS.md` updated **with the feature ID** and real status | **Fails** — PROGRESS is organised by phase and by feature *name*; only three brief IDs (RPT-01, RPT-02, RPT-03) appear anywhere. A reader cannot map the brief to progress |
-
----
-
-## 13. §15 Deliverables
-
-| Required | Status |
-|---|---|
-| `docs/ARCHITECTURE.md`, `ERD.md`, `PERMISSIONS.md`, `STATE_MACHINES.md`, `KPIS.md`, `SETUP_AND_DEPLOYMENT.md`, `DATA_PROTECTION.md`, `PROGRESS.md`, `DECISIONS.md`, `OPEN_QUESTIONS.md` | **Present** |
+| Item | Status |
+| --- | --- |
+| 1. Interface, server logic, validation, persistence, permissions all exist per feature | Partial — true for the features that exist; five Phase 1A features have none |
+| 2. Automated tests for its rules, run in this session | Partial — most modules have them; invoices do not exist to be tested |
+| 3. Typecheck, lint, test, build pass | **Met** — verified in this session |
+| 4. Cross-company/permission-denial tests | Partial — cross-company impossible (single-tenant) |
+| 5. No dead controls | Partial |
+| 6. `PROGRESS.md` updated **per feature ID** with real status | **Fail** — PROGRESS is written by *phase*, names features in prose, does not list the 78 IDs, and contains at least one stale count ("147 tests") alongside the real 226 |
 | `docs/API.md` | **Missing** |
-| `docs/BACKUP_AND_RECOVERY.md` | **Missing** (backup/restore are described inside SETUP_AND_DEPLOYMENT) |
+| `docs/BACKUP_AND_RECOVERY.md` | **Missing** (backup and restore scripts exist: `scripts/backup.ts`, `scripts/restore.ts`, `npm run db:backup`) |
 | `docs/USER_ROLES_GUIDE.md` | **Missing** |
-| List of outstanding integrations and known limitations | **Partly** — ARCHITECTURE has a limits section; README points at SETUP §12 (not a §15 replacement) |
-| Seed scripts labelled demo data | **Absent by owner instruction** ("no demo data"); the database starts empty — an intentional, documented deviation |
-| `.env.example`, migrations, tests, CI | **Present** |
-| `STATE_MACHINES.md` covering all nine entities | **Partial** — PROGRESS itself says invoice, contract and incident machines are Not Started |
+| Seed scripts, clearly labelled demo data | Absent by design (owner's instruction: no demo data) — acceptable, but the "clearly labelled demo data" deliverable is therefore not met |
+| Outstanding integrations / known limitations list | **Missing** as a document; scattered remarks only |
 
 ---
 
-## 14. Phase-gate verdicts (`richie-tms-phase-prompts.md`)
+## 13. Defects found in this run
 
-**Phase 0** — deliverables produced, migrations/health/CI/lint present; **hosting verification still "Blocked"** in PROGRESS (Q-01), so section 2 of the Phase 0 prompt was never satisfied. Gate: **partly**.
-
-**Phase 1A** — exit criteria, as written:
-| Criterion | Verdict |
-|---|---|
-| Workflow C end to end **via Playwright** | **Not met** — runs manually end to end minus invoice/payment/enquiry; no Playwright |
-| Parallel requests cannot double-book a vehicle or driver | **Not demonstrated** — DB constraint exists and is tested sequentially; no parallel test |
-| Cross-role and permission-denial tests | **Met** |
-| Quotation and invoice arithmetic tests | **Partly** — quotation yes, **no invoice exists** |
-| Safety-blocked vehicle cannot be assigned; release needs approval | **Met** in substance |
-| Records persist after logout, login and restart | **Met** |
-
-→ **Phase 1A gate is not met** (Playwright, invoices/payments, WEB-01, MIG-01, RPT-01, parallel test).
-Phase 1B and 1C were started anyway, which the brief's §14 explicitly forbids.
-
-**Phase 1B** — **Not met**: no contracts, no CSV import, no bookings, no capacity check, no override-with-reason, no corporate invoicing, no cross-company isolation suite, no trip/booking/contract from-to matrices, no driver-event idempotency. What does exist (routes, trips, manifests, dispatch validation, driver portal) is genuinely good.
-
-**Phase 1C** — **Not met**: no PAX-01, no RPT-01/02/03/04 reports, no FIN-07, no exports, no eight end-to-end scenarios. `SETUP_AND_DEPLOYMENT.md` *was* followed from a clean checkout in an earlier session, which is one of its criteria.
-
-**Phase 2 / 3** — **Not started**, and honestly so.
+| # | Defect | Severity | Where | Status |
+| --- | --- | --- | --- | --- |
+| D-01 | **Seat capacity can be exceeded on a run already on the road.** Assignment, dispatch and start all re-check the roster against the vehicle, but adding an active passenger to a route mid-run had no check. Verified: a 22-seat vehicle carried 25 active passengers. | Safety / §5.1, §12 | `src/tms/busing.ts` `create_passenger`, `update_passenger` | **Fixed in this session** + regression test (`src/tms/busing.test.ts`, "refuses a roster addition that would overflow…") |
+| D-02 | **`PROGRESS.md` still tracks work by phase, not by feature ID**, and its Phase 14 section describes the superseded "editorial" interface as if it were shipped. §13.6 requires per-ID status. | Documentation / §13.6 | `docs/PROGRESS.md` | Partly addressed in this pass (Phase 16 added, stale "not started" wording corrected); the per-ID rewrite is remediation item 4 |
+| D-03 | **Reference numbers are derived from array length**, so they are not unique under concurrency and can be reissued after a restore. | Data integrity / §5.6 | `service.ts:799`, `logistics.ts:320,512` | Open |
+| D-04 | **Money is handled as floating point** in the domain layer. | Financial correctness | `src/tms/service.ts`, all totals | Open — the invoice work moves new amounts to `numeric(14,2)` in the database, but the domain layer still computes in `number` |
 
 ---
 
-## 15. Contradictions and defects found in this run
+## 14. Remediation plan — in the order the brief sets
 
-### 15.1 Contradictions of the brief (not previously recorded as decisions)
+The brief's Phase 1A order is: auth/permissions/audit/settings → fleet and drivers (incl. MIG-01) → customers and requests → availability and conflicts → quotations → confirmation/assignment/completion → **invoices and manual payments** → maintenance → **reports and public enquiry**. Steps 1–6 and 8 exist in some form; the work that remains, in that order:
 
-1. **Ten roles → five.** No dispatcher, fleet manager, corporate HR administrator, passenger, rental customer, maintenance technician (§6).
-2. **`pg-boss` / scheduled jobs absent and no scheduled endpoints either** (§4). Daily trip generation, reminders and retention have nowhere to run.
-3. **No Playwright** (§4, §12) — the eight required flows have no automated proof.
-4. **`src/modules/<domain>/…` not followed** and no decision record explains the `src/tms` + `src/server` layout (§4).
-5. **References are counters, not sequences with a year** (`RR-0001` from `rentals.length + 1`) (§5.6).
-6. **Money is arithmetic in JS floats** despite `numeric(14,2)` columns (§5.4).
-7. **No `status_history` rows with from→to**; history is per-entity JSON plus an audit row without a status pair (§5.3).
-8. **No `Africa/Accra` display pinning** (§5.5, §9).
-9. **Audit log has no IP address** (§5.7).
-10. **No idempotency keys for driver events** (§5.8) — this also blocks Phase 2's offline work.
-11. **Finance can read the whole employee roster with phone numbers** (§6 "no unrestricted access to operational or personal data"). Verified live: 25 passengers returned to the finance session.
-12. **Seat capacity is never enforced** (§5.1, §12 "capacity never exceeded"). Verified live: 25 staff on a 22-seat Coaster, assigned without complaint.
-13. **`docs/PROGRESS.md` is not tracked per feature ID** (§13.6, §14).
-14. **Three §15 documents are missing**, and `STATE_MACHINES.md` omits three of the nine entities.
-
-### 15.2 Defects found by driving the running app
-
-| # | Defect | Reproduction | Impact |
-|---|---|---|---|
-| 1 | **No service-date guard on starting work** | `start_rental` on `RR-0001` (start date **2026-11-02**) succeeded on **2026-10-24**; `start_trip` on `TR-0001` (service date **2026-10-26**) succeeded on 2026-10-24 | A rental or run can be "in progress" weeks early; the only precondition is status + assignment |
-| 2 | **Never checks seats against passengers** | 25 active passengers on `GT-1001` (22 seats) → `assign_trip` → *"TR-0002 assigned."* | Overloading is invisible; contradicts §5.1 and §12 |
-| 3 | **Client portal discloses staff contact details** | client session `/api/session` returns each passenger's `phone` and `employeeRef`, while `ClientPortal.tsx` says "Names and pickup stops only. Contact details are held by your account manager." | The interface's own privacy claim is false |
-| 4 | **Finance read scope** | finance session returns 25 passengers incl. `+233203334444` | §6 least-privilege breach |
-| 5 | **No invoice or payment record** | `record_payment` → `Unknown command.`; the only money trail is `deposit` and `finalInvoice` JSON on the rental | No invoice number, no paid/outstanding, no immutability, no reconciliation, and reports have nothing to reconcile against |
-| 6 | **No pagination on any table** | `grep -rn "pagination\|pageSize"` → 0 hits | §11 unmet; the app will not hold a real fleet's data |
-| 7 | **Stale documentation of the shipped interface** | `docs/PROGRESS.md` Phase 14 still describes "bright editorial", "front page", "numbered contents strip", "masthead", "rubric"; `src/index.css` keeps a "ledger tables" comment and per-route `--rubric` colours; `package.json` description and the README title say **"Transport Management Ledger"** | The owner banned that vocabulary and the editorial direction; docs and metadata still carry it |
-| 8 | **Dead dependency** | `@fontsource-variable/fraunces` is installed but nothing imports it | Unused install weight |
-
-### 15.3 Fixed since this report (same day, re-verified live)
-
-| # | Fix | Evidence |
-|---|---|---|
-| 1 | `start_rental` refuses before the booked date and after the return date; `start_trip` refuses before the service date and more than a day after it | `RR-0004 is booked from 2026-11-02. It cannot be started before that date.` · `TR-0013 is scheduled for 2026-10-27. It cannot be started before that day.` · tests in `service.test.ts` and `busing.test.ts` (D-61) |
-| 2 | Seat capacity refused at rental assignment and at busing assign, dispatch and start | `This vehicle seats 22; RT-001 has 25 active passengers. Use a larger vehicle or take staff off the roster first.` — refused at assign and again at dispatch · three new tests |
-| 3 | Finance no longer receives the employee roster, documents, accounts or audit trail | finance session after the rebuild: `users:0 passengers:0 documents:0 audit:0`, rentals/trips/clients intact; `visibility.test.ts` (D-60) |
-| 4 | A client contact's payload no longer carries staff phone numbers, matching the portal's own copy | `visibility.test.ts` "withholds staff phone numbers from a client contact but keeps the manifest" |
-| 5 | **MIG-01** closed: CSV import with a documented template, preview, row-level errors, duplicate detection and no silent discards | live import of 4 rows (2 created, 2 rejected by line and reason); `src/tms/import.test.ts` (12 tests) and `src/Import.test.tsx` (2 tests); template in `SETUP_AND_DEPLOYMENT.md` §8 |
-
-Gates after the fixes: `typecheck` clean · `lint` clean · **226 passed / 5 skipped** · build ✓ ·
-`/api/health` 200 on the rebuilt server, with the data seeded in this run still present.
-
-Observation, not a defect: `GET /` is served with `Cache-Control: s-maxage=31536000`. The HTML is a
-shell and all data is fetched after authentication, so this is not a data leak — but any future
-server-rendered, session-dependent content must not inherit that header.
+1. ~~**MIG-01** — CSV import~~ **Done** (`2a27fac`).
+2. ~~**FIN-02 / FIN-03** — invoice and payment entities~~ **Done, less adjustments** (Phase 16). The remaining gap is credit notes/adjustment records.
+3. **RPT-01** — rental report: enquiries, quotations issued, acceptance rate, confirmed/completed, revenue, outstanding, utilisation, cancellation reasons, with coverage and CSV export. *(Brief step 9.)*
+4. **Docs of record** — rewrite `docs/PROGRESS.md` as a 78-ID table with real status; add `docs/API.md`, `docs/BACKUP_AND_RECOVERY.md`, `docs/USER_ROLES_GUIDE.md` and a known-limitations section. *(§13.6, §15; fixes D-02.)*
+5. **WEB-01** — public enquiry endpoint with rate limiting and spam protection, creating a Submitted request and exposing no data. *(Brief step 9.)*
+6. **Concurrency proof** — a test that fires parallel double-booking requests at the real database and asserts exactly one wins; and **Playwright for workflow C**. *(Phase 1A exit criteria.)*
+7. **Structural fixes** — database sequences for all references (D-03); decimal money (D-04).
+8. **Deferred by design, to be stated as such in the docs** — multi-tenancy, the ten-role model, contracts, bookings, notifications, offline driver mode, GPS. These are Phase 1B/2/3 or owner-approved simplifications, not Phase 1A defects, but they must be labelled in `PROGRESS.md` rather than left implicit.
 
 ---
 
-## 16. What would make it conform (in the brief's own order)
+## 15. How this audit was performed
 
-1. **Close Phase 1A before anything else** — `docs/API.md`, `BACKUP_AND_RECOVERY.md`, `USER_ROLES_GUIDE.md`; invoice + payment entities with numbers, statuses, immutability and a unique billable-event constraint; the rental report; the public enquiry endpoint; CSV import; a Playwright suite for workflow C; a parallel-request double-booking test.
-2. **Fix the four live defects**: service-date guards, seat-capacity enforcement, finance read scope, client-portal field redaction.
-3. **Then Phase 1B**: contracts, employees with eligibility, bookings with capacity under a transaction, dispatch override-with-reason, corporate invoicing; add the remaining five roles as the permissions they need.
-4. **Then the invariants**: sequence-backed references (`QTE-2026-0001`), `status_history`, integers/`NUMERIC` in the domain layer instead of floats, `Africa/Accra` display, IP in the audit log, idempotency keys.
-5. **Then the job runner** (`pg-boss` or documented scheduled endpoints) so reminders, retention and daily generation stop being fiction.
-6. **Re-cut `docs/PROGRESS.md` per feature ID** with the six statuses from §14, and re-state Phase 14 as the shipped Daylight interface.
-
-*No application code was changed in producing this report.*
+- Read `richie-tms-standing-brief.md` §2–§15 and `richie-tms-phase-prompts.md` in full, and turned each line into a check.
+- Traced every check to code in `src/tms`, `src/server`, `src/screens`, `src/app/api` and `db/migrations`.
+- Ran the full quality gates: `npm run typecheck`, `npm run lint`, `npx vitest run` (**226 passed / 5 skipped**), `npm run build` (successful).
+- Exercised a running build against a real PostgreSQL instance with the same commands the UI issues, capturing exact user-facing messages, and inspected the response payloads per role to check read scoping.
+- Counted the backlog IDs against the brief to make the totals in §2 reconcilable: 78 IDs, 9 met, 37 partial, 18 not built, 14 deferred.

@@ -21,7 +21,9 @@ import {
   type Database,
   type Driver,
   type Incident,
+  type Invoice,
   type OdometerReading,
+  type Payment,
   type Passenger,
   type Rental,
   type Trip,
@@ -225,6 +227,41 @@ const odometerRow = (o: OdometerReading): Row => ({
   data: json(o),
 });
 
+const invoiceRow = (i: Invoice): Row => ({
+  id: i.id,
+  reference: i.reference,
+  kind: i.kind,
+  rental_id: i.rentalId,
+  client_id: i.clientId,
+  customer_name: i.customerName,
+  currency_code: i.currencyCode,
+  subtotal: i.subtotal.toFixed(2),
+  total: i.total.toFixed(2),
+  amount_paid: i.amountPaid.toFixed(2),
+  status: i.status,
+  billable_event: i.billableEvent,
+  issued_on: i.issuedOn,
+  due_on: i.dueOn,
+  created_at: i.createdAt,
+  updated_at: i.updatedAt,
+  data: json(i),
+});
+
+const paymentRow = (p: Payment): Row => ({
+  id: p.id,
+  reference: p.reference,
+  invoice_id: p.invoiceId,
+  amount: p.amount.toFixed(2),
+  currency_code: p.currencyCode,
+  method: p.method,
+  paid_on: p.paidOn,
+  external_reference: p.externalReference,
+  status: p.status,
+  recorded_by: p.recordedBy,
+  recorded_at: p.recordedAt,
+  data: json(p),
+});
+
 // --------------------------------------------------------------------------- helpers
 
 /** Insert-or-update, keyed on id. Values are chunked to stay under PostgreSQL's 65,535 parameter cap. */
@@ -276,7 +313,7 @@ async function auditRows(trx: Kysely<KyselyDatabase>, limit: number): Promise<Se
 
 /** Reads the whole working set. Audit is capped for the in-memory snapshot; the table keeps all. */
 export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Promise<Database> {
-  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, incidents, workOrders, documents, odometer, audit, settings] =
+  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, incidents, workOrders, documents, odometer, invoices, payments, audit, settings] =
     await Promise.all([
       rows(executor, "app_user"),
       rows(executor, "vehicle"),
@@ -290,6 +327,8 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
       rows(executor, "work_order"),
       rows(executor, "compliance_document"),
       rows(executor, "odometer_reading"),
+      rows(executor, "invoice"),
+      rows(executor, "payment"),
       auditRows(executor, AUDIT_LIMIT),
       executor.selectFrom("app_settings").select(["data"]).where("id", "=", "singleton").executeTakeFirst(),
     ]);
@@ -308,6 +347,8 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
     workOrders: workOrders.map((r) => r.data),
     documents: documents.map((r) => r.data),
     odometerReadings: odometer.map((r) => r.data),
+    invoices: invoices.map((r) => r.data),
+    payments: payments.map((r) => r.data),
     settings: (settings?.data as Database["settings"]) ?? emptyDatabase().settings,
     // Audit has no `data` column: it is a typed, append-only ledger precisely so that the rows
     // cannot be rewritten as opaque JSON (migration 001, trigger audit_append_only_trg).
@@ -450,6 +491,8 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   // 2. Deletions, children first. The application archives rather than deletes (§5.9), so this is
   //    only reached when a backup import removes records.
   const order: (keyof Database)[] = [
+    "payments",
+    "invoices",
     "workOrders",
     "incidents",
     "trips",
@@ -464,6 +507,8 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
     "users",
   ];
   const tableOf: Record<string, keyof KyselyDatabase> = {
+    payments: "payment",
+    invoices: "invoice",
     workOrders: "work_order",
     incidents: "incident",
     trips: "trip",
@@ -504,6 +549,19 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   await write("work_order", after.workOrders.map(workOrderRow), before.workOrders.map(workOrderRow));
   await write("compliance_document", after.documents.map(documentRow), before.documents.map(documentRow));
   await write("odometer_reading", after.odometerReadings.map(odometerRow), before.odometerReadings.map(odometerRow));
+  await write("invoice", after.invoices.map(invoiceRow), before.invoices.map(invoiceRow));
+  await write("payment", after.payments.map(paymentRow), before.payments.map(paymentRow));
+
+  // 3b. Number series. Keyed by (scope, period) rather than an id, so the generic upsert helper
+  //     above does not apply. Only ever moves forwards: a lowered counter could reissue a printed
+  //     document number, so the database check constraint refuses a lower value.
+  for (const counter of after.referenceCounters ?? []) {
+    await trx
+      .insertInto("reference_counter")
+      .values({ scope: counter.scope, period: counter.period, last: counter.last })
+      .onConflict((oc) => oc.columns(["scope", "period"]).doUpdateSet({ last: counter.last }))
+      .execute();
+  }
 
   // 4. Settings (single row).
   if (json(after.settings) !== json(before.settings)) {
@@ -544,6 +602,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
 export async function truncateAll(trx: Db | Trx): Promise<void> {
   await sql`
     truncate table resource_reservation, audit_entry, app_settings, odometer_reading,
+      payment, invoice, reference_counter,
       compliance_document, work_order, incident, trip, passenger, bus_route, rental,
       vehicle, driver, client, app_user restart identity cascade
   `.execute(trx);

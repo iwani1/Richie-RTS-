@@ -140,6 +140,11 @@ export interface Settings {
   shifts: Shift[];
   rental: RentalSettings;
   documentTypes: DocumentType[];
+  // No default: until the tax position is set, invoices cannot be issued (brief 2.3, 9).
+  taxPosition: TaxPosition | null;
+  taxLines: TaxLineSetting[];
+  // Payment terms in days from issue; no default, because "30 days" would be an invented term.
+  invoiceDueDays: number | null;
   // Days before expiry a document counts as "expiring soon". No default (Q-16): until
   // set, compliance reporting shows only already-expired documents, exactly like the
   // existing driver-licence check on the dashboard.
@@ -485,7 +490,114 @@ export interface OdometerReading {
   createdBy: string;
 }
 
-export const SCHEMA_VERSION = 10;
+// ---------------------------------------------------------------- invoicing (FIN-02, FIN-03)
+//
+// An invoice is the record the business is paid against. It is not the same thing as the
+// quotation: a quotation can be revised, an issued invoice cannot (brief 5.4). Payments point at an
+// invoice and are never edited; a correction is a new record with its own approver.
+export const INVOICE_STATUSES = ["issued", "part_paid", "paid", "void"] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  issued: "Issued",
+  part_paid: "Part paid",
+  paid: "Paid",
+  void: "Void",
+};
+
+export interface InvoiceLine {
+  id: string;
+  description: string;
+  quantity: number;
+  unitAmount: number; // major currency units, before tax
+}
+
+/** A tax line captured at issue time, so a later rate change never rewrites an issued invoice. */
+export interface InvoiceTaxLine {
+  name: string;
+  ratePercent: number;
+  amount: number;
+}
+
+export interface Invoice {
+  id: string;
+  reference: string; // INV-2026-0001, from the database reference counter
+  /** Rental invoices in Phase 1A. Corporate invoices arrive with contracts (FIN-02, Phase 1B). */
+  kind: "rental";
+  rentalId: string | null;
+  clientId: string | null;
+  customerName: string;
+  currencyCode: string;
+  lines: InvoiceLine[];
+  taxLines: InvoiceTaxLine[];
+  subtotal: number;
+  total: number;
+  amountPaid: number;
+  status: InvoiceStatus;
+  /** What is being billed. A unique index makes a second invoice for it impossible (brief 5.4). */
+  billableEvent: string;
+  issuedOn: string; // YYYY-MM-DD
+  dueOn: string; // YYYY-MM-DD
+  notes: string;
+  voidReason: string | null;
+  voidedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const PAYMENT_STATUSES = ["recorded", "verified", "reconciled"] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  recorded: "Recorded",
+  verified: "Verified",
+  reconciled: "Reconciled",
+};
+
+/**
+ * A manual payment (FIN-03). The financial fields are written once; only the verification and
+ * reconciliation status advances, and the database refuses any other change (migration 003).
+ */
+export interface Payment {
+  id: string;
+  reference: string; // PAY-2026-0001
+  invoiceId: string;
+  amount: number;
+  currencyCode: string;
+  method: string;
+  paidOn: string; // YYYY-MM-DD
+  externalReference: string; // bank slip / MoMo transaction id, if the operator has one
+  status: PaymentStatus;
+  note: string;
+  log: LogEntry[];
+  recordedBy: string;
+  recordedAt: string;
+}
+
+export const TAX_POSITIONS = ["not_registered", "registered"] as const;
+export type TaxPosition = (typeof TAX_POSITIONS)[number];
+
+export const TAX_POSITION_LABELS: Record<TaxPosition, string> = {
+  not_registered: "Not VAT registered — no tax lines on invoices",
+  registered: "VAT registered — apply the configured tax lines",
+};
+
+/** A configurable tax line. Rates are never hard-coded; the accountant supplies them (brief 9). */
+export interface TaxLineSetting {
+  id: string;
+  name: string;
+  ratePercent: number;
+}
+
+/** A per-scope, per-year number series (brief 5.6). Stored with the data so a restored backup
+ *  never reissues a reference that was already printed on a document. */
+export interface ReferenceCounter {
+  scope: "invoice" | "payment";
+  period: string; // YYYY
+  last: number;
+}
+
+export const SCHEMA_VERSION = 11;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -501,6 +613,9 @@ export interface Database {
   workOrders: WorkOrder[];
   documents: ComplianceDocument[];
   odometerReadings: OdometerReading[];
+  invoices: Invoice[];
+  payments: Payment[];
+  referenceCounters: ReferenceCounter[];
   settings: Settings;
   audit: AuditEntry[];
 }
@@ -524,6 +639,9 @@ export function emptyDatabase(): Database {
     workOrders: [],
     documents: [],
     odometerReadings: [],
+    invoices: [],
+    payments: [],
+    referenceCounters: [],
     settings: {
       companyName: null,
       currencyCode: null,
@@ -533,6 +651,9 @@ export function emptyDatabase(): Database {
       rental: emptyRentalSettings(),
       documentTypes: [],
       documentReminderLeadDays: null,
+      taxPosition: null,
+      taxLines: [],
+      invoiceDueDays: null,
       maintenance: emptyMaintenanceSettings(),
     },
     audit: [],
@@ -544,7 +665,7 @@ export function emptyDatabase(): Database {
 export function migrate(value: unknown): Database | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(v.schemaVersion as number)) return null;
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(v.schemaVersion as number)) return null;
   if (!Array.isArray(v.users) || !Array.isArray(v.vehicles) || !Array.isArray(v.drivers) || !Array.isArray(v.clients) || !Array.isArray(v.audit)) return null;
   if (typeof v.settings !== "object" || v.settings === null) return null;
   const settings = v.settings as Record<string, unknown>;
@@ -575,6 +696,12 @@ export function migrate(value: unknown): Database | null {
       : [],
     documents: Array.isArray(v.documents) ? (v.documents as ComplianceDocument[]) : [],
     odometerReadings: Array.isArray(v.odometerReadings) ? (v.odometerReadings as OdometerReading[]) : [],
+    invoices: Array.isArray(v.invoices)
+      ? (v.invoices as Invoice[]).map((invoice) => ({ ...invoice, taxLines: invoice.taxLines ?? [] }))
+      : [],
+    payments: Array.isArray(v.payments) ? (v.payments as Payment[]) : [],
+    // Counters arrive in schema 11. Older data had no invoices, so there is nothing to continue.
+    referenceCounters: Array.isArray(v.referenceCounters) ? (v.referenceCounters as ReferenceCounter[]) : [],
     settings: {
       companyName: (settings.companyName as string | null) ?? null,
       currencyCode: (settings.currencyCode as string | null) ?? null,
@@ -584,6 +711,9 @@ export function migrate(value: unknown): Database | null {
       rental,
       documentTypes: (settings.documentTypes as DocumentType[]) ?? [],
       documentReminderLeadDays: (settings.documentReminderLeadDays as number | null) ?? null,
+      taxPosition: (settings.taxPosition as TaxPosition | null) ?? null,
+      taxLines: (settings.taxLines as TaxLineSetting[]) ?? [],
+      invoiceDueDays: (settings.invoiceDueDays as number | null) ?? null,
       maintenance: { ...emptyMaintenanceSettings(), ...((settings.maintenance as Partial<MaintenanceSettings>) ?? {}) },
     },
     audit: v.audit as Database["audit"],

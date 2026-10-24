@@ -31,6 +31,7 @@ const KNOWN_TYPES = [
   "create_document", "update_document",
   "record_odometer", "void_odometer",
   "create_user", "update_user", "reset_user_password",
+  "issue_rental_invoice", "void_invoice", "record_payment", "advance_payment",
   "record_backup_export",
   "import_records",
 ] as const;
@@ -62,6 +63,10 @@ const envelope = z.object({
 // before a transaction opens, and so the mapping is visible in one place (docs/PERMISSIONS.md).
 const PERMISSION_FOR: Record<string, Parameters<typeof can>[1]> = {
   update_settings: "settings:update",
+  issue_rental_invoice: "invoices:issue",
+  void_invoice: "invoices:void",
+  record_payment: "payments:record",
+  advance_payment: "payments:advance",
   create_user: "users:create",
   update_user: "users:update",
   reset_user_password: "users:update",

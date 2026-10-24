@@ -195,8 +195,9 @@ npm run db:migrate
 
 Applies every file in `db/migrations/` in filename order, each in its own transaction, and records
 it in `schema_migrations`. It creates the extensions, the tables, the exclusion constraint that
-prevents double booking, and the append-only and odometer triggers. Re-running is safe: applied
-migrations are skipped.
+prevents double booking, the append-only and odometer triggers, and (from `003`) the invoice and
+payment tables with their immutability triggers and the reference counter. Re-running is safe:
+applied migrations are skipped.
 
 Expected:
 
@@ -204,7 +205,8 @@ Expected:
 Applying migrations to postgresql://***@127.0.0.1:5432/richie_tms
   > 001_init.sql
   > 002_resource_reservations.sql
-Done. Applied 2 migration(s).
+  > 003_invoices_and_payments.sql
+Done. Applied 3 migration(s).
 ```
 
 ## 7. Run
@@ -353,8 +355,9 @@ Deliberate cuts for this stage, recorded so nobody discovers them in production:
 
 Verified by running:
 
-- The full test suite (147 passed, 5 skipped) and the integration suite against PostgreSQL 18.
-- `npm run build` and `npm start`, with `/api/health` reporting the database and both migrations.
+- The full test suite (see `docs/PROGRESS.md` for the count in the current phase) and the
+  integration suite against PostgreSQL 18.
+- `npm run build` and `npm start`, with `/api/health` reporting the database and every migration.
 - Sign-in, a write, the audit entry it produces, and the redaction of every `passwordHash`.
 - Migration from an empty database, in order, twice.
 

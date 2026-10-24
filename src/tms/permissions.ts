@@ -50,6 +50,11 @@ export const PERMISSIONS = [
   "maintenance:advance",
   "maintenance:cost",
   "costs:read",
+  "invoices:read",
+  "invoices:issue",
+  "invoices:void",
+  "payments:record",
+  "payments:advance",
   "documents:read",
   "documents:create",
   "documents:update",
@@ -143,6 +148,11 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "costs:read",
     "kpis:read",
     "settings:read",
+    "invoices:read",
+    "invoices:issue",
+    "invoices:void",
+    "payments:record",
+    "payments:advance",
   ],
   // Own-record scope: a driver sees only the runs and incidents for the vehicle and
   // trips assigned to their linked driver record. See PERMISSIONS.md "Own-record scope".

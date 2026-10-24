@@ -287,6 +287,27 @@ function activeRoster(db: Database, routeId: string): number {
   return db.passengers.filter((passenger) => passenger.routeId === routeId && passenger.status === "active").length;
 }
 
+/**
+ * A run that is already on the road cannot be re-planned, so the roster check that happens at
+ * assign, dispatch and start has nothing to say about a rider added mid-run. Without this, a
+ * vehicle could leave the yard with a seat for every passenger and finish the trip over capacity.
+ * Capacity is a safety limit (brief 5.1, 12), so the addition is refused rather than warned about.
+ */
+function midRunCapacityErrors(db: Database, routeId: string | null, extraActive: number): Errors {
+  if (!routeId || extraActive <= 0) return {};
+  const running = db.trips.filter((trip) => trip.routeId === routeId && trip.status === "in_progress" && trip.vehicleId);
+  const count = activeRoster(db, routeId) + extraActive;
+  for (const trip of running) {
+    const vehicle = db.vehicles.find((candidate) => candidate.id === trip.vehicleId);
+    if (vehicle && vehicle.seatCapacity < count) {
+      return {
+        routeId: `${trip.reference} is already running and ${vehicle.registration} seats ${vehicle.seatCapacity}. ${count} active passengers would not fit; move someone to another run or take the request after it returns.`,
+      };
+    }
+  }
+  return {};
+}
+
 function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: string, driverId: string): Errors {
   const errors: Errors = {};
 
@@ -385,6 +406,9 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
             { stopId: "This stop is already recorded on a run in progress." },
           );
       }
+      const capacity = value.status === "active" ? midRunCapacityErrors(db, value.routeId, 1) : {};
+      if (Object.keys(capacity).length)
+        return fail(capacity.routeId ?? "This would exceed the vehicle's seats on a run in progress.", capacity);
       const created: Passenger = { id: makeId(), ...value, createdAt: now, updatedAt: now };
       const running = inProgressTripsForRoute(db, value.routeId);
       const midTrip = running.length > 0 ? ` Mid-trip addition during ${running.map((trip) => trip.reference).join(", ")}.` : "";
@@ -408,6 +432,10 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       const midTripErrors = midTripPassengerErrors(db, existing, value);
       if (Object.keys(midTripErrors).length)
         return fail("This change would disturb a run in progress. Only future stops can be changed mid-trip.", midTripErrors);
+      const stillOnSameRoute = existing.status === "active" && existing.routeId === value.routeId;
+      const capacity = value.status === "active" && value.routeId && !stillOnSameRoute ? midRunCapacityErrors(db, value.routeId, 1) : {};
+      if (Object.keys(capacity).length)
+        return fail(capacity.routeId ?? "This would exceed the vehicle's seats on a run in progress.", capacity);
       const updated: Passenger = { ...existing, ...value, updatedAt: now };
       const affectedRefs = [...new Set([...inProgressTripsForRoute(db, existing.routeId), ...inProgressTripsForRoute(db, value.routeId)].map((trip) => trip.reference))];
       const midTrip = affectedRefs.length > 0 ? ` Mid-trip change during ${affectedRefs.join(", ")}.` : "";
