@@ -42,6 +42,14 @@ podman run -d --name richie-db \
   docker.io/library/postgres:18-alpine
 ```
 
+Already cloned? Move the checkout to this build and restart:
+
+```bash
+cd richie-tms
+git fetch origin && git checkout arena/368c3fd2-richie-rts && git pull --ff-only
+npm ci && npm run build && npm start     # migrations are idempotent: npm run db:migrate again if the branch added one
+```
+
 Exact commands for every step, including backups and deployment notes:
 **`docs/SETUP_AND_DEPLOYMENT.md`**.
 
