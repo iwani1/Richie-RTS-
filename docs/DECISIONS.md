@@ -767,10 +767,35 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 
 - **Context.** Brief 12 asks for Playwright workflows. Browser binaries cannot be installed in this
   build environment and a headless browser would not exercise anything the HTTP path does not.
-- **Decision.** The end-to-end proof runs commands through the same server module the API route uses
-  (`runCommand`) against real PostgreSQL in CI: workflow C from rental request to a paid invoice,
-  with a reload in the middle, plus six parallel `assign_rental` calls proving one winner and five
-  readable refusals.
+- **Decision.** Two proofs, both in CI:
+  - `src/server/commandFlow.integration.test.ts` runs commands through the same server module the
+    API route uses (`runCommand`) against real PostgreSQL: workflow C from rental request to a paid
+    invoice with a reload in the middle, plus six parallel `assign_rental` calls proving one winner
+    and five readable refusals.
+  - `scripts/e2e-workflow-c.ts` (`npm run e2e`, CI job `e2e`) starts the built application, signs in
+    over HTTP with a real cookie, and repeats the workflow through the public endpoints, including
+    the 401, 403 and validation paths and the AUTH-05 profile endpoints (29 checks).
 - **Consequence.** This is a **substitute**, not the brief's requirement: it proves the command,
   persistence and concurrency path, not the browser rendering or the click path. Screens are covered
   separately by jsdom tests.
+
+## D-69 A person manages their own account; nobody else's
+
+- **Context.** AUTH-05 asks for profile management and a login history. The obvious shortcut — one
+  "Profile" panel inside Users — would have meant every role needed `users:update` to change their own
+  name, which is the permission that can also change roles and deactivate people.
+- **Decision.**
+  - Two commands, `update_profile` and `change_own_password`, act only on the actor's own row. There
+    is no id in the command or in `POST /api/profile`, so there is nothing to point at another user.
+  - Login history is read from `audit_entry` (`auth:sign_in`, the account's own rows, last ten). A
+    second event log would have been a second source of truth for the same fact.
+  - Changing a password re-seals the current session. The cookie carries a digest of the password
+    hash, so every other session for that account is invalidated by the change itself; re-signing the
+    device that made the change is a convenience, not a way around it.
+- **Rejected.** Letting administrators edit their own profile through `update_user` (they can, but
+  that is the administrative path and is audited as such); showing sign-in history from the audit
+  snapshot, which would have required the account to hold `audit:read` and so to see other people's
+  entries.
+- **Known gap.** No address, browser or device is recorded, and no "sign out everywhere" button exists
+  yet. The screen says the first plainly; the second is unnecessary while the credential digest ends
+  the other sessions.

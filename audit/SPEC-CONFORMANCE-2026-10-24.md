@@ -2,6 +2,7 @@
 
 **Date:** 2026-10-24
 **Commit audited:** `2a27fac` (branch `arena/368c3fd2-richie-rts`) plus the uncommitted invoice/payment work in this session, noted where it differs
+**Revised:** 2026-10-24 after the Phase 19 hardening pass (`2f970f8` and the AUTH-05 work). Rows that changed carry ↻, and the counts in §1–§2 were recomputed from the register in `docs/PROGRESS.md` rather than adjusted by hand.
 **Specs:** `richie-tms-standing-brief.md` (the brief) and `richie-tms-phase-prompts.md` (the phase prompts)
 **Method:** every requirement in the brief was traced to code, a command, or a live request. Nothing here is inferred from a screen rendering. Where a claim could be checked at runtime it was checked against a running build (`next start`) with a real PostgreSQL harness, and the exact message is quoted.
 
@@ -11,13 +12,13 @@
 
 **The build is not spec-conformant.** It is a well-engineered, coherent application that implements a substantial part of the brief, and in places (audit immutability, conflict prevention, permission enforcement on writes) it exceeds it. But measured against the brief as written:
 
-- **11 of 78 feature IDs are met** (14%). **36 are partial**, **16 are not built**, **14 are deferred** to phases 2–3 and are correctly not attempted.
-- In **Phase 1A specifically**, **7 of 30** IDs are met (AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RPT-01). **Two Phase 1A IDs are not built at all**: AUTH-05, WEB-01. FIN-02/FIN-03 shipped during this pass and are partial.
-- **None of the eight end-to-end workflows in §8 can be completed as specified, and none has ever been run in a browser.** Workflow C (bus rental) now runs from enquiry to a recorded payment in the application, but the Playwright requirement is unmet and RPT-01 is missing; workflows A, B, F and G depend on entities that do not exist (clients-as-companies, employees, contracts, bookings).
-- Several structural decisions **contradict the brief rather than adapt it**: five roles instead of ten, single-tenant instead of multi-company, one rental status instead of two entity lifecycles (12 states), and reference numbers derived from array length instead of a database sequence (fixed only for invoices and payments, which use a counter).
-- The **§13 definition of done is not being followed per feature**: `docs/PROGRESS.md` records work by *phase name*, not by feature ID, does not list the 78 IDs, and repeats "147/203 tests passing" claims that are internally inconsistent with the current suite.
+- **12 of 78 feature IDs are met** (15%). **38 are partial**, **14 are not built**, **14 are deferred** to phases 2–3 and are correctly not attempted. ↻
+- In **Phase 1A specifically**, **8 of 29** IDs are met (AUTH-01, AUTH-05, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RPT-01). ↻ **One Phase 1A ID is not built at all: WEB-01.** FIN-02/FIN-03 shipped during this pass and are partial.
+- **None of the eight end-to-end workflows in §8 can be completed as specified, and none has ever been run in a browser.** Workflow C (bus rental) now runs from enquiry to a recorded payment, is proved end to end through the server command path against PostgreSQL with a reload in the middle (`src/server/commandFlow.integration.test.ts`), and has RPT-01 behind it — but the **Playwright requirement is still unmet**, and workflows A, B, F and G depend on entities that do not exist (clients-as-companies, employees, contracts, bookings). ↻
+- Several structural decisions **contradict the brief rather than adapt it**: five roles instead of ten, single-tenant instead of multi-company, and one rental status instead of two entity lifecycles (12 states). The reference-number problem is fixed for invoices and payments (a `reference_counter` table, D-62); rentals, trips, incidents and work orders still number from array length.
+- The **§13 definition of done is not being followed per feature**: `docs/PROGRESS.md` records work by *phase name*, not by feature ID. ↻ A 78-ID register now sits at the top of that file, so the tracking gap is closed; the historical phase sections still describe work by phase.
 
-The **Phase 1A gate is not met**, for concrete reasons listed in §3 below.
+The **Phase 1A gate is still not met** — WEB-01 is unbuilt and the Playwright requirement is unmet — but the two exit criteria that were unproven (parallel double-booking and restart persistence) are now tested, and AUTH-05 is delivered. ↻
 
 What is genuinely strong and should not be rebuilt: append-only audit with a trigger, session handling, permission enforcement at the command boundary *and* on read, conflict exclusion constraints, the "no invented defaults — block the action instead" pattern, and the migration discipline.
 
@@ -27,13 +28,13 @@ What is genuinely strong and should not be rebuilt: append-only audit with a tri
 
 | Bucket | Count | Note |
 | --- | --- | --- |
-| Met | **11** | AUTH-01, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RTE-03, TRP-02, DRV-01, DRV-04, RPT-01 |
-| Partial | **36** | exists and works, but a named part of the requirement is missing |
-| Not built | **16** | no entity, command or screen |
+| Met | **12** | AUTH-01, AUTH-05, AUD-01, MIG-01, RNT-03, RNT-06, RNT-08, RTE-03, TRP-02, DRV-01, DRV-04, RPT-01 ↻ |
+| Partial | **38** | exists and works, but a named part of the requirement is missing |
+| Not built | **14** | no entity, command or screen (BKG-01…06 counted individually) ↻ |
 | Deferred (Phase 2/3) | **14** | correctly out of Phase 1 scope; listed so the count reconciles to 78 |
-| **Total** | **78** | matches the brief's backlog |
+| **Total** | **78** | matches the brief's backlog; the register in `docs/PROGRESS.md` is the source of these counts |
 
-Phase 1A only (`[1A]` tags): **30 IDs — 7 met, 21 partial, 2 not built** (AUTH-05, WEB-01).
+Phase 1A only (`[1A]` tags): **29 IDs — 8 met, 20 partial, 1 not built** (WEB-01). ↻
 
 ---
 
@@ -41,12 +42,12 @@ Phase 1A only (`[1A]` tags): **30 IDs — 7 met, 21 partial, 2 not built** (AUTH
 
 | Criterion | Result | Evidence |
 | --- | --- | --- |
-| Workflow C works end to end on real records, **via Playwright** | **Fail** | No Playwright dependency, no `e2e/` directory, no browser test anywhere. The flow itself now completes in the app (request → quotation → confirmation → assignment → start → completion → invoice → payment, Phase 16), but "via Playwright" is unmet. |
-| Parallel requests cannot double-book a vehicle or driver | **Fail (unproven)** | Conflict prevention exists and is correct (`db/migrations/002_resource_reservations.sql`, exclusion constraint; verified live that overlapping dates are refused), but there is **no parallel/concurrent test**. A sequential test does not demonstrate what the criterion asks. |
+| Workflow C works end to end on real records, **via Playwright** | **Fail** (substitute passes) ↻ | No Playwright dependency, no browser test anywhere. The substitute proves the flow through the same server module the HTTP route calls, against PostgreSQL, with a reload in the middle: `src/server/commandFlow.integration.test.ts`. It does **not** prove the browser or the click path; the screens are covered separately by jsdom tests. |
+| Parallel requests cannot double-book a vehicle or driver | **Met** ↻ | `commandFlow.integration.test.ts` fires six `assign_rental` calls at once for the same vehicle: exactly one succeeds, five get `409` with "already assigned to RR-…", and one `resource_reservation` row exists. |
 | Cross-role and permission-denial tests pass | **Partial** | `src/tms/service.test.ts` and `src/server/*.test.ts` cover denial for several commands; there is no generated per-command matrix and no denial test for the newer modules (busing dispatch, compliance documents, maintenance). |
 | Quotation and invoice arithmetic tests pass | **Partial** | Quotation totals, deposit percentage and rounding are covered in `service.test.ts`. Invoice totals, tax lines, discount, overpayment and idempotent replay are covered in `src/tms/finance.test.ts` (14 tests) — but the quotation itself still carries no tax lines, so "quotation arithmetic" is only partly the arithmetic the brief describes. |
-| A safety-blocked vehicle cannot be assigned; release needs approval | **Partial** | Blocking is enforced (`vehicle.status !== "available"` on trip assignment; `maintenance`/`out_of_service` refused on rental assignment). "Release needs approval" is not modelled: there is no technician role and no approver recorded, so self-release cannot be prevented by role. |
-| Records persist after logout, login and application restart | **Met by mechanism, unproven by test** | Repository writes to PostgreSQL per command inside a transaction; `trpc`-style snapshot endpoints read from the database. No automated restart test exists; the earlier manual probe confirmed persistence. |
+| A safety-blocked vehicle cannot be assigned; release needs approval | **Partial** ↻ | Blocking is enforced (`vehicle.status !== "available"` on trip assignment; `maintenance`/`out_of_service` refused on rental assignment). Release is now its own permission (`maintenance:release`, D-64) and the releaser is recorded on the work order — but the control is permission-based, not a second-person approval, and an administrator can both complete and release. |
+| Records persist after logout, login and application restart | **Met** ↻ | Repository writes to PostgreSQL per command inside a transaction. The workflow C test reloads the database after issuing and paying the invoice and asserts the rental, invoice, both payments and the number series are there. |
 
 ---
 
@@ -77,7 +78,7 @@ Phase 1A only (`[1A]` tags): **30 IDs — 7 met, 21 partial, 2 not built** (AUTH
 | Migrations | Versioned SQL files | `db/migrations/001…003` | Met |
 | Auth | Auth.js (NextAuth) v5, institutional credentials | **Auth.js not installed**; iron-session cookie + Argon2id + server-side credential rows (`src/server/session.ts`, `src/server/password.ts`) | Deviated — **documented** (D-51) and defensible: the brief says never hand-roll auth, and this is hand-rolled session auth. Flagged, not silently changed. |
 | Jobs | pg-boss | **Not installed**; no background job runner at all | **Missing** — nothing schedules reminders, retries or notifications. |
-| Testing | Vitest + Playwright + React Testing Library, real PostgreSQL for bookings/money | Vitest + jsdom/RTL; **no Playwright**; booking/money tests run against an **in-memory domain model**, not a real database | Partial — the brief explicitly says tests that touch bookings or money run against real PostgreSQL, not mocks |
+| Testing | Vitest + Playwright + React Testing Library, real PostgreSQL for bookings/money | Vitest + jsdom/RTL; **no Playwright**; unit tests run against an in-memory domain model, but the booking, money and concurrency proofs now run against real PostgreSQL in CI (`src/server/*.integration.test.ts`) ↻ | Partial — the brief explicitly says tests that touch bookings or money run against real PostgreSQL. The end-to-end and concurrency cases now do; the rest still do not |
 | Observability | structured logs with request IDs; errors with codes; `/health` | `/api/health` present; errors are typed results; no request-id correlation | Partial |
 | Module layout | vertical feature modules | Flat `src/tms/*` (domain) + `src/screens/*` (UI) + `src/server/*` (transport/persistence) | Deviated — undocumented |
 | Local dev | Docker Compose for PostgreSQL | **No compose file** (owner's instruction); README gives a `podman` one-liner and `npm run db:*` scripts | Deviated — documented and explicitly requested |
@@ -141,7 +142,7 @@ Legend — **M** met · **P** partial · **N** not built · **D** deferred to it
 | AUTH-02 | Invitation-based creation/activation; suspend and reactivate | **P** | Admin creates an account with a password and `active` flag; suspend/reactivate works. **No invitation or activation flow** (no email provider installed). |
 | AUTH-03 | Password reset | **P** | Administrator-initiated reset only (`reset_user_password`, Argon2id rehash). No self-service "forgot password" — needs mail. |
 | AUTH-04 | Role assignment, company association, escalation protection | **P** | Role assignment and escalation protection present; **no company association** (single-tenant). |
-| AUTH-05 | Profile management; login history | **N** | No profile screen (name/email are read-only in the shell). Login events exist only in the administrator-visible audit log. |
+| AUTH-05 | Profile management; login history | **M** ↻ | `src/screens/Profile.tsx` (nav "My account", available to every role), `GET/POST /api/profile`, commands `update_profile` / `change_own_password` scoped to the actor's own row. Sign-in history is the account's own `auth:sign_in` rows, and the screen states that no address or device is recorded (D-69). Tests: `service.test.ts` "profile (AUTH-05)", `Profile.test.tsx` (3). |
 | AUTH-06 | Two-factor authentication for privileged roles | **D** | Phase 2. |
 | AUD-01 | Audit log and viewer for Super Administrators | **M** | Insert-only table + trigger, viewer screen with filters. Caveats: no IP address; `audit:read` is also held by operations (dispatch needs to see who changed what), which is wider than "Super Administrators". Finance does not hold it. |
 | SET-01 | Settings registry for all configurable policy | **P** | Present: pricing basis, deposit %, quote validity, payment methods, shifts, vehicle categories, document types, reminder lead days, maintenance intervals, on-time threshold. **Missing: tax lines, cancellation windows/refund rules, boarding-code policy, the expired/suspended-contract booking rule, contract billing.** |
@@ -254,7 +255,7 @@ Legend — **M** met · **P** partial · **N** not built · **D** deferred to it
 | --- | --- | --- |
 | **A** Recurring corporate staff transport | **Fail** | No corporate client entity, no employees with department/eligibility, no contracts, no bookings. Routes, rosters, trips, dispatch and manifests work. |
 | **B** Employee return journey | **Fail** | Depends on BKG; directions exist on routes but there is no return-journey booking. |
-| **C** Bus rental | **Partial** | Enquiry → quotation → confirmation → assignment → start → completion → invoice → payment → **rental report** now all work on real records and are covered by tests (`service.test.ts`, `finance.test.ts`, `Invoices.test.tsx`, `rentalReport.test.ts`, `Reports.test.tsx`). **Missing: WEB-01 (no public enquiry form) and the Playwright proof.** |
+| **C** Bus rental | **Partial** | Enquiry → quotation → confirmation → assignment → start → completion → invoice → payment → **rental report** all work on real records and are covered by tests (`service.test.ts`, `finance.test.ts`, `Invoices.test.tsx`, `rentalReport.test.ts`, `Reports.test.tsx`). Proved end to end through the server path against PostgreSQL with a reload (`commandFlow.integration.test.ts`). **Missing: WEB-01 (no public enquiry form) and the Playwright proof.** |
 | **D** Vehicle breakdown | **Fail** | Incident creation and vehicle blocking work. **No replacement workflow, no notifications** (INC-02, NTF-01). |
 | **E** Maintenance and release | **Partial** | Work order lifecycle works with blocking; **release approval and the technician role do not exist**. |
 | **F** Corporate invoicing | **Fail** | Depends on contracts and bookings; no corporate invoice generation, no duplicate-billing protection yet. |
@@ -316,7 +317,7 @@ Suite at audit time: **255 passed, 5 skipped** (260) across 34 files; typecheck 
 | # | Defect | Severity | Where | Status |
 | --- | --- | --- | --- | --- |
 | D-01 | **Seat capacity can be exceeded on a run already on the road.** Assignment, dispatch and start all re-check the roster against the vehicle, but adding an active passenger to a route mid-run had no check. Verified: a 22-seat vehicle carried 25 active passengers. | Safety / §5.1, §12 | `src/tms/busing.ts` `create_passenger`, `update_passenger` | **Fixed in this session** + regression test (`src/tms/busing.test.ts`, "refuses a roster addition that would overflow…") |
-| D-02 | **`PROGRESS.md` still tracks work by phase, not by feature ID**, and its Phase 14 section describes the superseded "editorial" interface as if it were shipped. §13.6 requires per-ID status. | Documentation / §13.6 | `docs/PROGRESS.md` | Partly addressed in this pass (Phase 16 added, stale "not started" wording corrected); the per-ID rewrite is remediation item 4 |
+| D-02 | **`PROGRESS.md` tracked work by phase, not by feature ID**, and its Phase 14 section describes the superseded "editorial" interface as if it were shipped. §13.6 requires per-ID status. | Documentation / §13.6 | `docs/PROGRESS.md` | **Closed** ↻ — a 78-ID register now sits at the top of `PROGRESS.md`, one row per ID, with status and evidence |
 | D-03 | **Reference numbers are derived from array length**, so they are not unique under concurrency and can be reissued after a restore. | Data integrity / §5.6 | `service.ts:799`, `logistics.ts:320,512` | Open |
 | D-04 | **Money is handled as floating point** in the domain layer. | Financial correctness | `src/tms/service.ts`, all totals | Open — the invoice work moves new amounts to `numeric(14,2)` in the database, but the domain layer still computes in `number` |
 
@@ -329,9 +330,9 @@ The brief's Phase 1A order is: auth/permissions/audit/settings → fleet and dri
 1. ~~**MIG-01** — CSV import~~ **Done** (`2a27fac`).
 2. ~~**FIN-02 / FIN-03** — invoice and payment entities~~ **Done, less adjustments** (Phase 16). The remaining gap is credit notes/adjustment records.
 3. ~~**RPT-01** — rental report~~ **Done** (Phase 17).
-4. **Docs of record** — the three missing §15 documents are written (`API.md`, `BACKUP_AND_RECOVERY.md`, `USER_ROLES_GUIDE.md`). **Still open:** rewrite `docs/PROGRESS.md` as a 78-ID table with real status (fixes D-02).
-5. **WEB-01** — public enquiry endpoint with rate limiting and spam protection, creating a Submitted request and exposing no data. *(Brief step 9; last unbuilt Phase 1A feature with AUTH-05.)*
-6. **Concurrency proof** — a test that fires parallel double-booking requests at the real database and asserts exactly one wins; and **Playwright for workflow C**. *(Phase 1A exit criteria.)*
+4. ~~**Docs of record** — `API.md`, `BACKUP_AND_RECOVERY.md`, `USER_ROLES_GUIDE.md`~~ **Done** (`31c75b6`), and ~~the 78-ID register in `PROGRESS.md`~~ **Done** (Phase 19, closes D-02).
+5. **WEB-01** — public enquiry endpoint with rate limiting and spam protection, creating a Submitted request and exposing no data. *(Brief step 9; the only unbuilt Phase 1A feature left.)*
+6. ~~**Concurrency proof**~~ **Done** — six parallel assignments, one winner, five 409s (`commandFlow.integration.test.ts`). **Still open: Playwright for workflow C** — the HTTP/command substitute is not the brief's requirement. *(Phase 1A exit criteria.)*
 7. **Structural fixes** — database sequences for all references (D-03); decimal money (D-04).
 8. **Deferred by design, to be stated as such in the docs** — multi-tenancy, the ten-role model, contracts, bookings, notifications, offline driver mode, GPS. These are Phase 1B/2/3 or owner-approved simplifications, not Phase 1A defects, but they must be labelled in `PROGRESS.md` rather than left implicit.
 

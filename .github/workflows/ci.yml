@@ -1,13 +1,17 @@
 # Quality gates on every push and pull request.
 #
-# Two jobs, because the application now has two kinds of proof:
+# Three jobs, because the application now has three kinds of proof:
 #   1. quality-gates  — typecheck, lint, unit/UI tests with coverage thresholds, production build,
 #                       dependency audit. No database needed.
 #   2. integration    — the same suite the brief cares most about: real PostgreSQL, real
-#                       constraints (double booking, append-only audit, monotonic odometer).
+#                       constraints (double booking, append-only audit, monotonic odometer), and the
+#                       workflow C proof with a reload in the middle.
+#   3. e2e            — the built application, started for real, driven over HTTP from setup to a
+#                       paid invoice: cookies, CSRF, status codes and all (D-68: this is the
+#                       substitute for the brief's Playwright scenario, not the scenario itself).
 #
-# The integration job has never been observed on a GitHub runner from this development
-# environment; the suite itself runs green locally against PostgreSQL 18.4.
+# The integration and e2e jobs have never been observed on a GitHub runner from this development
+# environment; both suites run green locally against PostgreSQL 18.4.
 
 name: ci
 
@@ -116,3 +120,69 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://richie:ci-not-a-secret@127.0.0.1:5432/richie_tms_test
         run: npm run test:integration
+
+  # Workflow C through the real HTTP surface. The brief asks for Playwright here; this is the
+  # substitute recorded in D-68 and is labelled as such in the conformance report. It exercises the
+  # session cookie, the same-origin check, the command envelope and the status codes, which a
+  # command-level test cannot.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://richie:ci-not-a-secret@127.0.0.1:5432/richie_tms_e2e
+      SESSION_SECRET: ci-only-session-secret-at-least-32-characters
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: richie_tms_e2e
+          POSTGRES_USER: richie
+          POSTGRES_PASSWORD: ci-not-a-secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U richie -d richie_tms_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Migrate the e2e database
+        run: npm run db:migrate
+
+      - name: Build
+        run: npm run build
+
+      # The server is started and stopped inside one step: a background process left by one step is
+      # not reliably alive in the next one on a GitHub runner.
+      - name: Workflow C over HTTP, from first-run setup to a paid invoice
+        env:
+          BASE_URL: http://127.0.0.1:3000
+        run: |
+          npm start > server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for _ in $(seq 1 60); do
+            if curl -fsS "$BASE_URL/api/health" > /dev/null; then break; fi
+            sleep 2
+          done
+          if ! curl -fsS "$BASE_URL/api/health" > /dev/null; then
+            echo "The server did not become healthy within 120 seconds."
+            cat server.log
+            exit 1
+          fi
+          npm run e2e
+
+      - name: Server log (only when the run failed)
+        if: failure()
+        run: cat server.log

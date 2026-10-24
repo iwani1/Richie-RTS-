@@ -125,6 +125,10 @@ export type Command =
   | { type: "create_user"; input: UserInput; credential: Credential }
   | { type: "update_user"; id: string; input: UserInput }
   | { type: "reset_user_password"; id: string; credential: Credential }
+  // AUTH-05. Everyone may edit their own name and email, and change their own password; neither
+  // needs users:update, because it is their own account rather than someone else's.
+  | { type: "update_profile"; input: { fullName: string; email: string } }
+  | { type: "change_own_password"; credential: Credential }
   | { type: "update_settings"; input: Settings }
   | { type: "create_vehicle"; input: VehicleInput }
   | { type: "update_vehicle"; id: string; input: VehicleInput }
@@ -641,6 +645,45 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         summary: `Updated user ${updated.email}: role ${updated.role}, ${updated.active ? "active" : "inactive"}.`,
       }, now);
       return { ok: true, db: next, message: `User ${updated.fullName} updated.` };
+    }
+
+    case "update_profile": {
+      if (!actor) return fail("Sign in is required.");
+      const existing = db.users.find((u) => u.id === actor.id);
+      if (!existing) return fail("Your account no longer exists.");
+      const errors: Errors = {};
+      const fullName = command.input.fullName.trim();
+      const email = norm(command.input.email);
+      if (!fullName) errors.fullName = "Full name is required.";
+      if (!EMAIL_RE.test(email)) errors.email = "Enter a valid email address.";
+      else if (db.users.some((u) => u.id !== existing.id && u.email === email)) errors.email = "Another account already uses that email address.";
+      if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
+      const updated: User = { ...existing, fullName, email, updatedAt: now };
+      const next = audit({ ...db, users: db.users.map((u) => (u.id === updated.id ? updated : u)) }, actor, {
+        action: "users:update_profile",
+        entity: "user",
+        entityId: updated.id,
+        summary: `${existing.fullName} updated their own profile${email !== existing.email ? ` (email changed to ${email})` : ""}.`,
+      }, now);
+      return { ok: true, db: next, message: "Your profile was updated." };
+    }
+
+    case "change_own_password": {
+      if (!actor) return fail("Sign in is required.");
+      const existing = db.users.find((u) => u.id === actor.id);
+      if (!existing) return fail("Your account no longer exists.");
+      const credentialErrors = validateCredential(command.credential);
+      if (Object.keys(credentialErrors).length) return fail("Please correct the highlighted fields.", credentialErrors);
+      const updated: User = { ...existing, ...command.credential, updatedAt: now };
+      const next = audit({ ...db, users: db.users.map((u) => (u.id === updated.id ? updated : u)) }, actor, {
+        action: "users:change_password",
+        entity: "user",
+        entityId: updated.id,
+        summary: `${updated.fullName} changed their own password.`,
+      }, now);
+      // The password hash is part of the session's credential tag, so every other session for this
+      // account stops working the moment this returns; the caller re-signs the current one.
+      return { ok: true, db: next, message: "Your password was changed." };
     }
 
     case "reset_user_password": {

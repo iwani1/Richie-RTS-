@@ -553,3 +553,47 @@ describe("rentals - full lifecycle", () => {
     }
   });
 });
+
+describe("profile (AUTH-05)", () => {
+  it("lets an account change its own name and email without any administrative permission", () => {
+    const { db, finance } = seeded();
+    const result = execute(db, finance, { type: "update_profile", input: { fullName: "Efua Owusu", email: "efua@example.test" } }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const updated = result.db.users.find((user) => user.id === finance.id);
+    expect(updated).toMatchObject({ fullName: "Efua Owusu", email: "efua@example.test", role: "finance" });
+    // Nobody else moved, and the change is attributed.
+    expect(result.db.users.find((user) => user.id !== finance.id)?.fullName).toBe("Admin One");
+    expect(result.db.audit[0]).toMatchObject({ action: "users:update_profile", actorId: finance.id });
+    expect(result.db.audit[0].summary).toMatch(/email changed to efua@example\.test/);
+  });
+
+  it("refuses an email another account already uses, and refuses when nobody is signed in", () => {
+    const { db, finance } = seeded();
+    const taken = execute(db, finance, { type: "update_profile", input: { fullName: "Fin", email: "admin@example.test" } }, NOW);
+    expect(taken.ok).toBe(false);
+    if (!taken.ok) expect(taken.errors.email).toMatch(/already uses that email/);
+
+    const malformed = execute(db, finance, { type: "update_profile", input: { fullName: "Fin", email: "not-an-email" } }, NOW);
+    expect(malformed.ok).toBe(false);
+    if (!malformed.ok) expect(malformed.errors.email).toMatch(/valid email/);
+
+    const anonymous = execute(db, null, { type: "update_profile", input: { fullName: "Nobody", email: "nobody@example.test" } }, NOW);
+    expect(anonymous.ok).toBe(false);
+    if (!anonymous.ok) expect(anonymous.message).toMatch(/Sign in is required/);
+  });
+
+  it("changes only the caller's own password and audits it", () => {
+    const { db, finance } = seeded();
+    const next: Credential = { passwordHash: "b".repeat(64), passwordSalt: "c".repeat(32) };
+    const result = execute(db, finance, { type: "change_own_password", credential: next }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.db.users.find((user) => user.id === finance.id)).toMatchObject(next);
+    expect(result.db.users.find((user) => user.id !== finance.id)?.passwordHash).toBe("a".repeat(64));
+    expect(result.db.audit[0]).toMatchObject({ action: "users:change_password", actorId: finance.id });
+
+    const anonymous = execute(db, null, { type: "change_own_password", credential: next }, NOW);
+    expect(anonymous.ok).toBe(false);
+  });
+});

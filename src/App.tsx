@@ -5,6 +5,7 @@ import { DashboardPage } from "./screens/Dashboard";
 import { ClientsPage, DriversPage } from "./screens/Registers";
 import { RentalsPage } from "./screens/Rentals";
 import { InvoicesPage } from "./screens/Invoices";
+import { ProfilePage } from "./screens/Profile";
 import { ReportsPage } from "./screens/Reports";
 import { StaffBusingPage } from "./screens/StaffBusing";
 import { StaffLogisticsPage } from "./screens/StaffLogistics";
@@ -33,7 +34,7 @@ const NAV_GROUPS: { label: string; routes: Route[] }[] = [
   { label: "Service desk", routes: ["dashboard", "rentals", "invoices", "busing", "logistics", "fleetReadiness"] },
   { label: "Fleet & clients", routes: ["compliance", "vehicles", "drivers", "clients"] },
   { label: "Analysis", routes: ["reports"] },
-  { label: "Administration", routes: ["users", "settings", "audit"] },
+  { label: "Administration", routes: ["users", "settings", "audit", "profile"] },
 ];
 
 const ROUTE_ICONS: Record<Route, IconName> = {
@@ -51,6 +52,7 @@ const ROUTE_ICONS: Record<Route, IconName> = {
   users: "user",
   settings: "settings",
   audit: "audit",
+  profile: "user",
   driver_portal: "busing",
   client_portal: "client",
 };
@@ -196,6 +198,7 @@ function Shell() {
       case "users": return <UsersPage />;
       case "settings": return <SettingsPage />;
       case "audit": return <AuditPage />;
+      case "profile": return <ProfilePage />;
       default: return <DashboardPage navigate={navigate} />;
     }
   })();

@@ -127,6 +127,33 @@ again inside the service with the real actor. The full matrix is in `docs/PERMIS
 | A state change the record cannot make | `409` with a sentence naming the current state, e.g. `A rental cannot be completed from status "draft".` |
 | A guard that needs a setting nobody supplied | `409` naming the setting, e.g. `Blocked: quotation settings are incomplete. An administrator must set: deposit percentage.` |
 
+## `GET /api/profile` (AUTH-05)
+
+The signed-in account's own record and its last ten sign-ins. There is no id in the request, so this
+endpoint cannot be pointed at somebody else; managing another person's account is `POST /api/commands`
+(`users:update`).
+
+```json
+{ "ok": true,
+  "user": { "id": "…", "fullName": "Ama Mensah", "email": "ama@…", "role": "operations", "active": true },
+  "signIns": [ { "at": "2026-06-02T08:15:00.000Z" } ] }
+```
+
+Sign-ins come from the append-only audit table (`action = 'auth:sign_in'`). No address or device is
+recorded, and the response does not pretend otherwise.
+
+## `POST /api/profile` (AUTH-05)
+
+Two actions, both about the caller's own account, both `sameOrigin`-checked.
+
+| Body | Effect | Notes |
+|---|---|---|
+| `{"action":"details","fullName":"…","email":"…"}` | `update_profile` | Email must be unique; audited as `users:update_profile`. |
+| `{"action":"password","currentPassword":"…","newPassword":"…"}` | Verifies the current password, hashes the new one (Argon2id), runs `change_own_password`, then re-seals the session | Throttled on the account; audited as `users:change_password`. Every other session for the account stops working, because the session cookie carries a digest of the password hash. |
+
+Errors use the same shape as `/api/commands`: `400` with `{ errors: { field: message } }`, `401` when
+signed out, `403` for a cross-origin POST, `429` after repeated wrong current passwords.
+
 ## `GET /api/health`
 
 ```json
