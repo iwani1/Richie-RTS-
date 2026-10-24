@@ -420,3 +420,15 @@ Formulas are in `docs/KPIS.md` under "Rental report (RPT-01, implemented)".
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **255 passed, 5 skipped**,
 `build` succeeds.
+
+## Phase 18 - The three missing documents (§15)
+
+| Document | Status | Contents |
+|---|---|---|
+| `docs/API.md` | Done (verified against the routes) | The six endpoints with request/response shapes, the command catalogue, permission pre-checks, and the error table |
+| `docs/BACKUP_AND_RECOVERY.md` | Done (verified against `scripts/backup.ts` and `scripts/restore.ts`) | Full backup vs redacted export, `pg_dump`, restore procedure and verification, what a restore refuses, a quarterly drill |
+| `docs/USER_ROLES_GUIDE.md` | Done (verified against `permissions.ts` and the screens) | The five roles in operator language, separation of duties, driver and client-contact scope, and what each blocked message means |
+
+Still open from the conformance report: `PROGRESS.md` as a per-feature-ID table (§13.6), WEB-01,
+AUTH-05, the Playwright proof for workflow C and a real parallel double-booking test. Phase 1B
+(contracts, employees, bookings) and Phases 2–3 are unchanged and still not met.

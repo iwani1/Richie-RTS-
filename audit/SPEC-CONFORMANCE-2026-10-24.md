@@ -303,9 +303,9 @@ Suite at audit time: **255 passed, 5 skipped** (260) across 34 files; typecheck 
 | 4. Cross-company/permission-denial tests | Partial — cross-company impossible (single-tenant) |
 | 5. No dead controls | Partial |
 | 6. `PROGRESS.md` updated **per feature ID** with real status | **Fail** — PROGRESS is written by *phase*, names features in prose, does not list the 78 IDs, and contains at least one stale count ("147 tests") alongside the real 226 |
-| `docs/API.md` | **Missing** |
-| `docs/BACKUP_AND_RECOVERY.md` | **Missing** (backup and restore scripts exist: `scripts/backup.ts`, `scripts/restore.ts`, `npm run db:backup`) |
-| `docs/USER_ROLES_GUIDE.md` | **Missing** |
+| `docs/API.md` | **Met** — added in this pass: the six endpoints, the command catalogue, error shapes and status codes, and what is deliberately absent |
+| `docs/BACKUP_AND_RECOVERY.md` | **Met** — added in this pass: full backup vs redacted export, `pg_dump`, restore steps and what a restore refuses |
+| `docs/USER_ROLES_GUIDE.md` | **Met** — added in this pass: what each of the five roles can and cannot do, the separation of duties, and what a blocked message means |
 | Seed scripts, clearly labelled demo data | Absent by design (owner's instruction: no demo data) — acceptable, but the "clearly labelled demo data" deliverable is therefore not met |
 | Outstanding integrations / known limitations list | **Missing** as a document; scattered remarks only |
 
@@ -329,7 +329,7 @@ The brief's Phase 1A order is: auth/permissions/audit/settings → fleet and dri
 1. ~~**MIG-01** — CSV import~~ **Done** (`2a27fac`).
 2. ~~**FIN-02 / FIN-03** — invoice and payment entities~~ **Done, less adjustments** (Phase 16). The remaining gap is credit notes/adjustment records.
 3. ~~**RPT-01** — rental report~~ **Done** (Phase 17).
-4. **Docs of record** — rewrite `docs/PROGRESS.md` as a 78-ID table with real status; add `docs/API.md`, `docs/BACKUP_AND_RECOVERY.md`, `docs/USER_ROLES_GUIDE.md` and a known-limitations section. *(§13.6, §15; fixes D-02.)*
+4. **Docs of record** — the three missing §15 documents are written (`API.md`, `BACKUP_AND_RECOVERY.md`, `USER_ROLES_GUIDE.md`). **Still open:** rewrite `docs/PROGRESS.md` as a 78-ID table with real status (fixes D-02).
 5. **WEB-01** — public enquiry endpoint with rate limiting and spam protection, creating a Submitted request and exposing no data. *(Brief step 9; last unbuilt Phase 1A feature with AUTH-05.)*
 6. **Concurrency proof** — a test that fires parallel double-booking requests at the real database and asserts exactly one wins; and **Playwright for workflow C**. *(Phase 1A exit criteria.)*
 7. **Structural fixes** — database sequences for all references (D-03); decimal money (D-04).

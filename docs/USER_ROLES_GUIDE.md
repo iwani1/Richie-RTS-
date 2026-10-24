@@ -1,0 +1,172 @@
+# User roles guide
+
+This guide is for the people who run Richie Transport Services day to day. It says what each role
+can do, what it deliberately cannot do, and what to do when a screen says it is blocked.
+
+The permission matrix in `docs/PERMISSIONS.md` is the technical record. This document is the same
+information in the language of the business.
+
+---
+
+## The five roles
+
+| Role | Who it is for | What they do |
+|---|---|---|
+| **Administrator** | the owner, or one trusted deputy | everything: accounts, settings, all records, the audit log, backups |
+| **Operations / dispatch** | the person who runs the day | vehicles, drivers, rentals, routes, trips, dispatch, passengers, incidents, maintenance, documents |
+| **Finance** | the person who bills and reconciles | quotations' confirmation step, invoices, payments, costs, the rental report |
+| **Driver** | a driver, on their own phone | their own runs only: open a trip, board passengers, record a no-show, complete, report a defect |
+| **Client contact** | a corporate client's office | their own client's routes, roster and rental requests; can raise a request, not confirm one |
+
+There is one installation per company. Nobody signs in and sees another company's data, because there
+is no other company in the database.
+
+### Who approves what
+
+- **Quotations** are prepared by finance or an administrator and confirmed by finance. Operations can
+  prepare a quotation but not confirm it — the person who dispatches the vehicle is not the person who
+  takes the money.
+- **Invoices** are issued, voided and paid through the finance role only. Operations completes a
+  rental, which produces the line items to bill, and then stops.
+- **Settings** are administrator-only. This matters, because most blocks in the application exist
+  because a setting has no confirmed value (see below).
+
+---
+
+## Administrator
+
+**Can:** create, suspend and reactivate accounts; reset passwords; everything operations and finance
+can do; read the audit log; export a redacted backup for review.
+
+**Cannot:** see a password (only reset it). Cannot delete an account, a rental, an invoice or an audit
+entry — records are archived by status, never removed.
+
+**Typical first hour with a new installation:**
+
+1. Open the application. While no account exists it asks for the first administrator: give the owner's name, email and a password of at least the configured minimum.
+2. **Settings** — set the company name, currency, vehicle categories, payment methods, deposit
+   percentage, quotation validity and on-time threshold. Everything left blank stays blank, and the
+   feature that needs it stays blocked.
+3. **Users** — add the operations and finance accounts, then the drivers and client contacts.
+4. **Fleet** — add vehicles and drivers (or import them from CSV in **Vehicles → Import**).
+5. **Settings → Invoicing** — set the tax position and payment terms. Invoices cannot be issued until
+   these are set, on purpose.
+
+**What the audit log shows:** who did what, when, and to which record, as a sentence. It does not show
+IP addresses. Entries cannot be edited or deleted by anyone, including an administrator.
+
+---
+
+## Operations / dispatch
+
+**Can:** add and edit vehicles and drivers; record odometer readings; create rental requests, quote
+them, dispatch and complete them; create routes and stops; generate trips; assign vehicles and
+drivers; create and manage passengers; report incidents, advance them, record costs; create work
+orders, advance them, record costs; record compliance documents; read the audit log.
+
+**Cannot:** confirm a rental or take a deposit; issue an invoice or record a payment; change settings;
+create accounts.
+
+**The dispatch day:**
+
+1. **Staff busing → Trips** — the day's runs. Assign a vehicle and a driver; the screen refuses a
+   vehicle that is too small for the roster, already on another run at that time, assigned to a
+   rental that day, under maintenance or out of service.
+2. **Dispatch** — once the vehicle and driver are settled. Dispatch re-checks everything, so a roster
+   that grew after assignment is caught before the vehicle leaves.
+3. The driver starts and records each stop from their phone. You can watch boarding as it arrives.
+
+**Blocked vehicle?** A safety defect blocks it. It stays blocked until the work order is closed and
+the vehicle's status is moved back — record who released it in the work order note, and do not let
+the person who reported the defect be the only sign-off.
+
+---
+
+## Finance
+
+**Can:** see rentals, clients, vehicles, trips, incidents and maintenance costs; prepare quotations;
+confirm rentals and record the deposit; issue and void invoices; record payments and advance them to
+verified and reconciled; read the rental report.
+
+**Cannot:** see the employee roster, staff phone numbers, vehicle or driver documents, accounts, or
+the audit log. This is not a display choice: those collections are removed from the data the finance
+session receives (D-60).
+
+**Billing a rental:**
+
+1. Operations completes the rental, recording what was actually supplied.
+2. **Invoices → Issue an invoice** — choose the completed rental. The amounts come from the completion
+   record; you add a discount only if there is a reason for it.
+3. The tax lines and due date come from Settings and are fixed on the document.
+4. **Record a payment** against the invoice. Enter the bank slip or mobile money reference: if that
+   reference was already recorded against this invoice, the system tells you and adds nothing.
+5. **Verify**, then **Reconcile**, as the money clears.
+
+**Corrections.** An issued invoice cannot be edited. If it is wrong and **nothing has been paid**,
+void it (with a reason) and issue a corrected one — the corrected invoice takes the next number, and
+both stay on record. If money **has** been paid, the void is refused; record the corrected service as
+a new invoice. Credit notes are not built yet.
+
+---
+
+## Driver
+
+**Can:** see their own record, the runs assigned to them, the route and stops, the passenger count and
+the vehicle; start their own run; record boarding and no-shows at each stop; complete the run; report
+a defect or breakdown.
+
+**Cannot:** see any other driver's work, any client's billing, staff contact details or the fleet
+register; cannot start a run that is not theirs, before its service day, or after it.
+
+**On the road:**
+
+1. Open **My runs** → today's run → **Start**.
+2. At each stop, tap the passengers who boarded; mark anyone who did not appear as a no-show. A stop
+   that has been recorded cannot be changed afterwards, so record only what you saw.
+3. **Complete** once every stop is recorded.
+4. If the vehicle is unsafe, report a defect **before** setting off. It blocks the vehicle until
+   maintenance releases it.
+
+If the phone has no signal, record the stop when it returns. Offline queuing is not built yet
+(Phase 2), so write the times down and enter them as soon as you are back in coverage.
+
+---
+
+## Client contact
+
+**Can:** see their own client's record, its routes and stops, the staff roster assigned to those
+routes (names and stops, not phone numbers) and that client's rental requests; raise a rental request.
+
+**Cannot:** see any other client, any billing, staff phone numbers, invoices or payments; cannot
+confirm a rental or accept a quotation (that step belongs to finance).
+
+---
+
+## When a screen says it is blocked
+
+The application refuses rather than guesses. The message names what is missing, and it is almost
+always a setting:
+
+| Message | What it means | Who fixes it |
+|---|---|---|
+| `Blocked: quotation settings are incomplete. An administrator must set: …` | pricing basis, deposit %, validity, currency or payment methods are unset | administrator, in Settings |
+| `Invoicing is not configured` | tax position or payment terms are unset | administrator, in Settings → Invoicing |
+| `Not permitted: your role lacks …` | the role does not hold that permission | an administrator, if the role should have it |
+| `A rental cannot be … from status "…"` | the record is past or before that step | operations, by following the workflow in order |
+| `This invoice has payments recorded…` | a paid invoice cannot be voided | finance, by issuing a corrected invoice |
+| `Vehicle is … and cannot be assigned` | maintenance, out of service or retired | operations / maintenance, by releasing it |
+
+## Passwords and accounts
+
+- Passwords are set by an administrator; nobody can read them, including the administrator.
+- A reset signs the account out everywhere it is signed in.
+- A suspended account cannot sign in, and its existing sessions stop working on the next request.
+- There is no self-service "forgot password" link yet, because no mail provider is configured. Ask an
+  administrator to reset it.
+
+## What is not built yet
+
+Contracts, employee bookings, notifications (SMS or email), offline driver mode, boarding codes,
+GPS tracking, credit notes and PDF documents. The screens do not offer them, and `docs/PROGRESS.md`
+records each one with its status. If a supervisor asks for one of these, the answer is that it is on
+the roadmap, not that it is hidden somewhere.
