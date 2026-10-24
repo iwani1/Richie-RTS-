@@ -49,8 +49,15 @@ export function findActor(database: Database, userId: string | null): { user: Us
  */
 function passwordRejectedMessage(): string {
   let target = "";
+  let placeholder = false;
+  let placeholderValue = "";
   try {
     const url = new URL(process.env.DATABASE_URL ?? "");
+    // The example value from .env.example. It is not a password the database could have, so say
+    // that outright instead of offering the general advice.
+    const found = decodeURIComponent(url.password);
+    placeholder = /^(change[-_ ]?me|your[-_ ]?password)$/i.test(found);
+    if (placeholder) placeholderValue = found;
     const user = decodeURIComponent(url.username);
     if (user) {
       target = ` for user "${user}" at ${url.hostname || "the configured host"}${
@@ -59,6 +66,20 @@ function passwordRejectedMessage(): string {
     }
   } catch {
     // A malformed URL is reported by the configuration check, not here.
+  }
+  if (placeholder) {
+    return [
+      `DATABASE_URL still contains the example password "${placeholderValue}"${target}.`,
+      "",
+      "The database was created with a different password. Put that one in .env:",
+      "  grep '^DATABASE_URL' .env                              # what the app is sending",
+      "  podman inspect richie-db --format '{{json .Config.Env}}' # what it was created with",
+      "",
+      "Or change the database to match .env:",
+      `  podman exec -it richie-db psql -U richie -d postgres -c "ALTER USER richie WITH PASSWORD 'new-password';"`,
+      "",
+      "Then restart the server (Ctrl+C, then npm start); a running process keeps the .env it started with.",
+    ].join("\n");
   }
   return [
     `The database rejected the password in DATABASE_URL${target}.`,

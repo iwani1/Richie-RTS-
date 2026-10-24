@@ -33,6 +33,34 @@ describe("database error messages", () => {
     }
   });
 
+  it("recognises the example password and stops there", () => {
+    const previous = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = "postgresql://richie:change-me@127.0.0.1:5432/richie_tms";
+    try {
+      const result = describeDatabaseError(pgError("28P01"));
+      expect(result.message).toContain('still contains the example password "change-me"');
+      expect(result.message).toContain("127.0.0.1:5432");
+      expect(result.message).toContain("ALTER USER richie");
+      // The encoding table is for a password that exists; this one was never set.
+      expect(result.message).not.toContain("%40");
+    } finally {
+      if (previous === undefined) delete (process.env as Record<string, string | undefined>).DATABASE_URL;
+      else process.env.DATABASE_URL = previous;
+    }
+  });
+
+  it("treats either documented example password as unfilled, and quotes it back", () => {
+    const previous = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = "postgresql://richie:your-password@127.0.0.1:5432/richie_tms";
+    try {
+      const result = describeDatabaseError(pgError("28P01"));
+      expect(result.message).toContain('still contains the example password "your-password"');
+    } finally {
+      if (previous === undefined) delete (process.env as Record<string, string | undefined>).DATABASE_URL;
+      else process.env.DATABASE_URL = previous;
+    }
+  });
+
   it("still explains itself when DATABASE_URL cannot be parsed", () => {
     const previous = process.env.DATABASE_URL;
     process.env.DATABASE_URL = "not a url";

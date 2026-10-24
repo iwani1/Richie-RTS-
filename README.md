@@ -26,6 +26,12 @@ npm run db:migrate       # creates the schema
 npm run build && npm start
 ```
 
+`DATABASE_URL` holds a password, and it is the **one the database was created with**. If you start
+the container below with `POSTGRES_PASSWORD='your-password'`, leave `.env` as it is; if you chose
+your own, change the password in `DATABASE_URL` to match it. The two are independent — writing a
+password in `.env` does not set it on the database, and the server says so on screen when they
+disagree.
+
 There is no seed step. The database starts empty on purpose: the first screen asks for the
 administrator account, and Settings asks for the company's own rules.
 
