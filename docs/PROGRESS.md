@@ -430,7 +430,8 @@ Gates run at the end of this phase:
 
 > **Superseded.** The "bright editorial" direction described below was replaced by the Direction E
 > "Daylight" interface that ships today (`docs/DESIGN.md`). The rows are kept as history; do not read
-> them as a description of the current screens.
+> them as a description of the current screens. The Daylight screens were built and verified in the
+> same working period; their own record is `docs/DESIGN.md` §3-§8 rather than a row below.
 
 | Item | Status | Notes |
 |---|---|---|
@@ -469,6 +470,10 @@ Gates after these changes: `typecheck` clean, `lint` clean, `test` **226 passed,
 Still outstanding from the conformance report (Phase 1A, in the brief's order): RPT-01 rental
 reports, WEB-01 public enquiry, EMP-02 passenger import, a Playwright flow for workflow C, and a
 parallel-request double-booking test. Phase 1B onwards is unchanged and still not met.
+
+*Written at the time.* Since then: RPT-01 shipped in Phase 17, WEB-01 and the parallel-request
+double-booking test in Phase 19. **EMP-02 passenger import and the Playwright flow (D-68) remain
+open**, and Phase 1B onward is where it was.
 
 ## Phase 16 - Invoices and manual payments (FIN-02, FIN-03)
 
