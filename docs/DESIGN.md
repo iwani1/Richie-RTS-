@@ -209,15 +209,26 @@ from its own button, the scrim and Escape.
 | Settings | Supply the company's real rules | Nothing prefilled; what is still missing | "Rules to supply" read from the saved record, then one card per rule |
 | Audit | Prove who changed what | Chronology and the actor | Dense table: mono timestamps, action as a chip, record named, "showing 17 of 412" |
 | Command palette | Jump without the mouse | Destinations and their captions | Overlay, keyboard-first, permission-filtered, focus-trapped |
+| Printed invoice / credit note | Hand the customer a document | The figures and what is owed | A4 sheet in a preview overlay: letterhead and reference at the top, the line table, the totals in the lower right with the sentence that explains them beneath, footer with reference and print date. Print removes the app entirely |
+
+**Paper is a different surface, and it has its own rules (D-87).** A sheet that becomes a physical
+object a customer keeps cannot borrow the interface's tricks. It is white with dark ink whatever the
+screen theme; it has no tints, no pills and no cards, because a tint that means "part paid" means
+nothing once the customer is holding it. Status is a word. Columns of money sit in the monospaced face
+and line up on the right so an amount can be followed down. The one accent appears once, as an
+eyebrow over the document type and a hairline at the top of the sheet; in print the hairline goes and
+toner is saved. Small print is darkened to stay above 4.5:1 on white. The preview is the same sheet at
+screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **169 passed, 5 skipped** across 24 files
-  (the five skips are the database integration suite, which needs a live server); `next build`
-  compiles with the shell at 172 kB first load.
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **524 passed, 17 skipped** across 56 files
+  (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are
-  `rts-badge--`, `rts-btn--` and similar, whose concrete variants all exist.
+  `rts-badge--`, `rts-btn--` and similar, whose concrete variants all exist. Re-run while adding the
+  printed sheet (D-87), it found one that did not: `.rts-summary`, used by the invoice and credit-note
+  previews since Phase 16, had no rule at all. It now has one.
 - Contrast: every text token measured against the card and the canvas (§5). No word sits below 4.5:1;
   the vivid semantic values are confined to graphics and pass 3:1.
 - Fonts are self-hosted and imported once, in `src/app/layout.tsx`: Inter Variable for the interface,

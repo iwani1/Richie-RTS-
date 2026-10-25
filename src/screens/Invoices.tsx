@@ -17,6 +17,7 @@ import type { CommandResult } from "../tms/service";
 import type { CreditNote, Invoice, InvoiceStatus, Payment, PaymentStatus } from "../tms/types";
 import { CREDIT_NOTE_STATUS_LABELS, INVOICE_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "../tms/types";
 import { useTms } from "../tms/useTms";
+import { CreditNoteSheet, InvoiceSheet, PrintPreview } from "./Documents";
 import {
   Badge,
   Button,
@@ -364,6 +365,8 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
   const [voiding, setVoiding] = useState(false);
   const [crediting, setCrediting] = useState(false);
   const [voidingCredit, setVoidingCredit] = useState<CreditNote | null>(null);
+  // Which document is open in the print preview: this invoice, or one of its credit notes (D-87).
+  const [printing, setPrinting] = useState<{ kind: "invoice" } | { kind: "creditNote"; note: CreditNote } | null>(null);
   const payments = db.payments.filter((payment) => payment.invoiceId === invoice.id);
   const credits = db.creditNotes.filter((note) => note.invoiceId === invoice.id);
   const balance = invoiceBalance(db, invoice);
@@ -393,6 +396,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
         actions={
           <>
             <Button onClick={onBack}>Back to invoices</Button>
+            <Button onClick={() => setPrinting({ kind: "invoice" })}>Print invoice</Button>
             {allowed("payments:record") && invoice.status !== "void" && outstanding > 0 && (
               <Button variant="primary" onClick={() => setPaying(true)}>
                 Record a payment
@@ -540,12 +544,18 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
                 key: "actions",
                 header: "",
                 className: "text-right",
-                render: (note) =>
-                  allowed("credits:void") && note.status === "issued" ? (
-                    <Button variant="ghost" onClick={() => setVoidingCredit(note)} aria-label={`Void ${note.reference}`}>
-                      Void
+                render: (note) => (
+                  <span className="inline-flex gap-1">
+                    <Button variant="ghost" onClick={() => setPrinting({ kind: "creditNote", note })} aria-label={`Print ${note.reference}`}>
+                      Print
                     </Button>
-                  ) : null,
+                    {allowed("credits:void") && note.status === "issued" && (
+                      <Button variant="ghost" onClick={() => setVoidingCredit(note)} aria-label={`Void ${note.reference}`}>
+                        Void
+                      </Button>
+                    )}
+                  </span>
+                ),
               },
             ]}
           />
@@ -594,6 +604,14 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
           onSubmit={(reason) => voidCredit(voidingCredit, reason)}
           notify={setFlash}
         />
+      )}
+      {printing && (
+        <PrintPreview
+          label={printing.kind === "invoice" ? `Invoice ${invoice.reference}` : `Credit note ${printing.note.reference}`}
+          onClose={() => setPrinting(null)}
+        >
+          {printing.kind === "invoice" ? <InvoiceSheet invoice={invoice} /> : <CreditNoteSheet note={printing.note} />}
+        </PrintPreview>
       )}
       {voiding && (
         <VoidInvoiceForm

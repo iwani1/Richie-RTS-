@@ -263,3 +263,33 @@ describe("credit notes on the invoice screen (D-86)", () => {
     expect(tms.dispatch).toHaveBeenCalledWith({ type: "void_credit_note", id: creditNote.id, reason: "Wrong invoice" });
   });
 });
+
+describe("printing from the invoice screen (D-87)", () => {
+  it("opens the invoice as a printable document, with what is owed on it", () => {
+    renderInvoices(credited());
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Print invoice/i }));
+
+    expect(screen.getByRole("dialog", { name: "Print preview: Invoice INV-2026-0001" })).toBeTruthy();
+    const sheet = screen.getByRole("article", { name: /Invoice INV-2026-0001/i });
+    expect(within(sheet).getByText("Acme Ltd")).toBeTruthy();
+    expect(within(sheet).getByText("Credited by credit note")).toBeTruthy();
+    // 3,450 total less 1,000 received less 2,300 credited.
+    expect(within(sheet).getByText("GHS 150.00")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Close$/ }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("opens a credit note as its own document, against the invoice it corrects", () => {
+    renderInvoices(credited());
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Print CN-2026-0001/i }));
+
+    expect(screen.getByRole("dialog", { name: "Print preview: Credit note CN-2026-0001" })).toBeTruthy();
+    const sheet = screen.getByRole("article", { name: /Credit note CN-2026-0001/i });
+    expect(within(sheet).getByText("INV-2026-0001")).toBeTruthy();
+    expect(within(sheet).getByText("Airport transfer not operated")).toBeTruthy();
+    expect(within(sheet).getByText("GHS 2300.00")).toBeTruthy();
+  });
+});

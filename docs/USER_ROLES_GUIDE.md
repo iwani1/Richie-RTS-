@@ -117,6 +117,13 @@ that was charged. The credit note gets its own number (CN-2026-0001), leaves the
 they were recorded, and reduces what the invoice asks for. It cannot exceed the invoice total, it can
 be voided with a reason if you make a mistake, and it can never be edited or deleted.
 
+**Sending a copy.** Open the invoice and choose **Print invoice**, or **Print** beside a credit note.
+The preview shows exactly what will be printed; the **Print or save as PDF** button opens your
+browser's print dialog, where "Save as PDF" gives you a file to email. The sheet carries the company
+name from Settings, the customer, the dates, every line, the tax at the rate that was charged, what was
+received, what was credited, and what is still owed (or what is owed back). A void document prints as
+void and asks for nothing. Nothing is sent or stored by the system: what you do with the file is yours.
+
 If the credit takes the bill below what the customer has already paid, the invoice says **a refund is
 due** and shows the amount. That refund is money you pay out, so record it the way you record any other
 outgoing; the system does not pretend the customer paid less than they did.
