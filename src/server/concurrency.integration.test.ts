@@ -226,7 +226,12 @@ suite("concurrent dispatch, against PostgreSQL", () => {
     const rejected = outcomes.filter((outcome) => outcome.status === "rejected");
     expect(rejected).toHaveLength(1);
     const reason = (rejected[0] as PromiseRejectedResult).reason as { code?: string };
-    expect(reason.code).toBe("23P01");
+    // Both refusals are the database doing its job, and which one arrives depends on how the two
+    // transactions interleave: 23P01 is the exclusion constraint rejecting the second booking,
+    // 40P01 is PostgreSQL detecting the deadlock between two writers that each hold part of the
+    // work. Asserting only 23P01 made this test fail on timing rather than on behaviour (CI run
+    // 40161502901 caught it). The invariants below are what actually have to hold.
+    expect(["23P01", "40P01"]).toContain(reason.code);
 
     const reservations = await db()
       .selectFrom("resource_reservation")

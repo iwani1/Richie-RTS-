@@ -126,6 +126,10 @@ export function describeDatabaseError(error: unknown): ServerFailure {
       return { ok: false, status: 500, message: "The database schema is incomplete. Run: npm run db:migrate", errors: {} };
     case "23P01":
       return conflict("That vehicle or driver already has a booking overlapping those dates.");
+    // Two people saved at the same instant and PostgreSQL broke the tie by aborting one of them.
+    // Nothing is wrong with the record; the operator should look again and repeat the change.
+    case "40P01":
+      return conflict("Someone else was saving the same record at that moment, so this change was not applied. Check the record and try again.");
     case "23505":
       switch (pg.constraint) {
         case "vehicle_registration_uq":

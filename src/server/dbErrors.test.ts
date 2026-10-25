@@ -20,6 +20,17 @@ describe("database error messages", () => {
     expect(other.status).toBe(400);
   });
 
+  it("treats a deadlock between two operators as a retry, not a server fault", () => {
+    // Seen in CI (run 40161502901): two overlapping writes can be refused by the exclusion
+    // constraint (23P01) or by PostgreSQL breaking a deadlock (40P01). Both are the database doing
+    // its job, and both have to read as "look again and repeat", never as a 500.
+    const result = describeDatabaseError(pgError("40P01"));
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(409);
+    expect(result.message).toMatch(/try again/);
+    expect(result.message).toMatch(/not applied/);
+  });
+
   it("names the password as the problem, and says to restart", () => {
     const result = describeDatabaseError(pgError("28P01"));
     expect(result.ok).toBe(false);

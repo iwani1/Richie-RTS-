@@ -688,7 +688,9 @@ with a run that could never be closed.
 | Audit | Done (verified) | `trips:cancel` entry carries the trip reference, the incident reference in brackets, the stop count, the rider counts and the reason |
 | Tests | Done (verified) | 7 domain (`busing.test.ts` "stopping a run that has already started") and 3 screen (`Busing.test.tsx`) |
 
-Gates after this phase: `typecheck` clean, `lint` clean, `test` **349 passed, 14 skipped**, `build`
+| **Defect found by CI:** one concurrency test asserted a single error code | Fixed | Run `40161502901`: the "no application lock" case expected `23P01` (exclusion constraint) and received `40P01` (deadlock), because which refusal arrives depends on how the two transactions interleave. The test now accepts either and keeps every invariant that matters (one winner, one loser, one reservation, one rental). `40P01` is also mapped to a readable 409 for operators — "someone else was saving the same record… try again" — instead of a 500, with a unit test in `dbErrors.test.ts` |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **350 passed, 14 skipped**, `build`
 succeeds.
 
 Next on the queued list: Q-16, insurance and roadworthiness required before a vehicle is assigned.
