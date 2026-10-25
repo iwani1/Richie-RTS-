@@ -419,6 +419,28 @@ function primaryNote(db: Database, account: User, wasPrimary: boolean): string {
   return `, primary contact${client ? ` for ${client.name}` : ""}${demoted.length ? ` (mark taken from ${demoted.join(", ")})` : ""}`;
 }
 
+/**
+ * A short list of names the company keeps itself (work types, cost categories). Trimmed, deduped
+ * case-insensitively, and empty is allowed: an empty list means "not named yet", which the screens
+ * say plainly instead of inventing values (Q-34, Q-29).
+ */
+function validateNameList(names: string[], prefix: string, errors: Errors, maxLength: number): string[] {
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+  names.forEach((raw, index) => {
+    const name = raw.trim();
+    if (!name) {
+      errors[`${prefix}.${index}`] = "Enter a name, or remove the row.";
+      return;
+    }
+    if (name.length > maxLength) errors[`${prefix}.${index}`] = `Keep the name to ${maxLength} characters.`;
+    else if (seen.has(norm(name))) errors[`${prefix}.${index}`] = "Duplicate name.";
+    seen.add(norm(name));
+    cleaned.push(name);
+  });
+  return cleaned;
+}
+
 export function validateSettings(db: Database, input: Settings) {
   const errors: Errors = {};
   const companyName = input.companyName?.trim() || null;
@@ -518,6 +540,9 @@ export function validateSettings(db: Database, input: Settings) {
   if (invoiceDueDays !== null && (!Number.isInteger(invoiceDueDays) || invoiceDueDays < 0))
     errors.invoiceDueDays = "Enter a whole number of days (0 or more).";
 
+  const workTypes = validateNameList(input.workTypes ?? [], "workTypes", errors, 40);
+  const costCategories = validateNameList(input.costCategories ?? [], "costCategories", errors, 40);
+
   const maintenance = {
     schedules: input.maintenance.schedules.map((schedule) => ({
       categoryId: schedule.categoryId,
@@ -559,6 +584,8 @@ export function validateSettings(db: Database, input: Settings) {
       taxPosition,
       taxLines,
       invoiceDueDays,
+      workTypes,
+      costCategories,
       maintenance,
     },
   };

@@ -143,11 +143,18 @@ function logEntry(actor: Actor | null, note: string, fromStatus: string | null, 
   };
 }
 
-function makeCost(actor: Actor | null, input: CostInput): CostEntry {
+/** The configured spelling of a category, so "parts" and "Parts" are one line in the report. */
+function canonicalCategory(db: Database, raw: string): string {
+  const name = raw.trim();
+  if (!name) return "";
+  return db.settings.costCategories.find((category) => category.toLowerCase() === name.toLowerCase()) ?? name;
+}
+
+function makeCost(db: Database, actor: Actor | null, input: CostInput): CostEntry {
   return {
     id: makeId(),
     description: input.description.trim(),
-    category: input.category.trim(),
+    category: canonicalCategory(db, input.category),
     // Validated by `validateCost` before this runs; read exactly, never coerced (audit D-04).
     amount: parsePositiveAmount(input.amount).amount,
     incurredDate: input.incurredDate,
@@ -160,7 +167,14 @@ function validateCost(db: Database, input: CostInput): Errors {
   const errors: Errors = {};
   if (!input.description.trim()) errors.description = "Describe what the cost was for.";
   else if (input.description.trim().length > 120) errors.description = "Keep the description to 120 characters.";
+  // The category is one of the names the company configured (Q-29, D-78). Blank means
+  // "Uncategorised", which the report shows as its own line rather than hiding it.
+  const category = input.category.trim();
   if (input.category.trim().length > 40) errors.category = "Keep the category to 40 characters.";
+  else if (category && !db.settings.costCategories.some((name) => name.toLowerCase() === category.toLowerCase()))
+    errors.category = db.settings.costCategories.length
+      ? `Choose one of the configured cost categories: ${db.settings.costCategories.join(", ")}. An administrator edits the list in Settings.`
+      : "No cost categories are configured. An administrator adds them in Settings, or leave this blank to record the cost as uncategorised.";
   // One parser for every amount in the application (money.ts), so a cost cannot accept a value that
   // an invoice would refuse — or round one the operator can see is wrong (audit D-04).
   const parsed = parsePositiveAmount(input.amount);
@@ -249,7 +263,7 @@ function validateIncident(db: Database, input: IncidentInput) {
   };
 }
 
-function validateWorkOrder(db: Database, input: WorkOrderInput) {
+function validateWorkOrder(db: Database, input: WorkOrderInput, previousWorkType?: string) {
   const errors: Errors = {};
   const vehicle = db.vehicles.find((v) => v.id === input.vehicleId);
   if (!input.vehicleId) errors.vehicleId = "Select the vehicle this work is for.";
@@ -258,8 +272,16 @@ function validateWorkOrder(db: Database, input: WorkOrderInput) {
 
   if (!input.title.trim()) errors.title = "Give the work order a short title.";
   else if (input.title.trim().length > 120) errors.title = "Keep the title to 120 characters.";
-  if (!input.workType.trim()) errors.workType = "Describe the type of work (no work catalogue is configured).";
-  else if (input.workType.trim().length > 60) errors.workType = "Keep the work type to 60 characters.";
+  // The type is one of the names the company configured (Q-34, D-78). An order written while the
+  // type was still free text keeps its own wording: history is not rewritten to fit a new list.
+  const workType = input.workType.trim();
+  const configured = db.settings.workTypes;
+  if (!workType) errors.workType = "Choose the type of work.";
+  else if (workType.length > 60) errors.workType = "Keep the work type to 60 characters.";
+  else if (!configured.some((name) => name.toLowerCase() === workType.toLowerCase()) && workType !== previousWorkType)
+    errors.workType = configured.length
+      ? `Choose a configured work type: ${configured.join(", ")}. An administrator edits the list in Settings.`
+      : "No work types are configured. An administrator adds them in Settings before a work order can be raised.";
   if (input.workshop.trim().length > 120) errors.workshop = "Keep the workshop name to 120 characters.";
   if (input.description.trim().length > 2000) errors.description = "Keep the description to 2000 characters.";
 
@@ -443,7 +465,7 @@ export function executeLogistics(
       if (denied) return denied;
       const errors = validateCost(db, command.input);
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
-      const cost = makeCost(actor, command.input);
+      const cost = makeCost(db, actor, command.input);
 
       if (isIncident) {
         const existing = db.incidents.find((i) => i.id === command.id);
@@ -548,7 +570,7 @@ export function executeLogistics(
       if (!existing) return fail("Work order not found.");
       if (existing.status === "completed" || existing.status === "closed")
         return fail(`A ${existing.status} work order cannot be edited. Raise a new one for further work.`);
-      const { errors, value } = validateWorkOrder(db, command.input);
+      const { errors, value } = validateWorkOrder(db, command.input, existing.workType);
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
       if (value.vehicleId !== existing.vehicleId && existing.status !== "open")
         return fail("The vehicle cannot be changed once work has started.");

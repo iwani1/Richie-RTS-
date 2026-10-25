@@ -36,7 +36,12 @@ function world(options: { currency?: boolean } = {}): World {
 
   run(admin, {
     type: "update_settings",
-    input: { ...db.settings, currencyCode: options.currency === false ? null : "GHS", vehicleCategories: [{ id: "", name: "Minibus" }] },
+    input: {
+      ...db.settings,
+      currencyCode: options.currency === false ? null : "GHS",
+      vehicleCategories: [{ id: "", name: "Minibus" }],
+      costCategories: ["Parts", "Labour", "Recovery"],
+    },
   });
   run(ops, {
     type: "create_vehicle",
@@ -61,7 +66,7 @@ const incidentInput = (over: Partial<IncidentInput> = {}): IncidentInput => ({
 const workOrderInput = (vehicleId: string, over: Partial<WorkOrderInput> = {}): WorkOrderInput => ({
   vehicleId,
   title: "Cooling system inspection",
-  workType: "Engine",
+  workType: "Repair",
   workshop: "",
   description: "",
   reportedOdometer: "",
@@ -445,5 +450,61 @@ describe("permissions", () => {
       const work = attempt(w, actor, { type: "create_work_order", input: workOrderInput(w.vehicleId) });
       expect(work.ok).toBe(false);
     }
+  });
+});
+
+describe("configured work types and cost categories (Q-34, Q-29, D-78)", () => {
+  it("accepts a name from the configured list and refuses one that is not on it", () => {
+    const w = world();
+    const vehicleId = w.vehicleId;
+    step(w, w.ops, { type: "create_work_order", input: workOrderInput(vehicleId, { workType: "Tyres" }) });
+    expect(lastOrder(w.db).workType).toBe("Tyres");
+
+    const invented = attempt(w, w.ops, { type: "create_work_order", input: workOrderInput(vehicleId, { workType: "Gearbox rebuild", title: "Other job" }) });
+    expect(invented.ok).toBe(false);
+    if (!invented.ok) expect(invented.errors.workType).toBe(
+      "Choose a configured work type: Service, Repair, Tyres, Bodywork, Inspection, Other. An administrator edits the list in Settings.",
+    );
+  });
+
+  it("keeps the wording of an order raised while the type was free text", () => {
+    const w = world();
+    step(w, w.ops, { type: "create_work_order", input: workOrderInput(w.vehicleId) });
+    const order = w.db.workOrders[w.db.workOrders.length - 1];
+    // A record written before the list existed, as an import or an upgrade leaves it.
+    w.db = { ...w.db, workOrders: w.db.workOrders.map((record) => (record.id === order.id ? { ...record, workType: "Cooling system" } : record)) };
+
+    step(w, w.ops, { type: "update_work_order", id: order.id, input: workOrderInput(w.vehicleId, { workType: "Cooling system", title: "Cooling system, chased" }) });
+    expect(lastOrder(w.db).workType).toBe("Cooling system");
+
+    // It cannot be retyped into a *different* free-text value, only to a configured one.
+    const retyped = attempt(w, w.ops, { type: "update_work_order", id: order.id, input: workOrderInput(w.vehicleId, { workType: "Coolant leak" }) });
+    expect(retyped.ok).toBe(false);
+    if (!retyped.ok) expect(retyped.errors.workType).toMatch(/Choose a configured work type/);
+  });
+
+  it("refuses work orders while no work types are configured, and says where to add them", () => {
+    const w = world();
+    step(w, w.admin, { type: "update_settings", input: { ...w.db.settings, workTypes: [] } });
+    const result = attempt(w, w.ops, { type: "create_work_order", input: workOrderInput(w.vehicleId) });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.workType).toMatch(/No work types are configured/);
+  });
+
+  it("takes a cost category from the configured list, or none at all", () => {
+    const w = world();
+    step(w, w.ops, { type: "create_work_order", input: workOrderInput(w.vehicleId) });
+    const id = w.db.workOrders[w.db.workOrders.length - 1].id;
+
+    step(w, w.finance, { type: "add_work_order_cost", id, input: { description: "Pads", category: "parts", amount: "200", incurredDate: "2026-01-02" } });
+    // Entered in lower case, stored under the configured spelling.
+    expect(lastOrder(w.db).costEntries[0].category).toBe("Parts");
+
+    const uncategorised = attempt(w, w.finance, { type: "add_work_order_cost", id, input: { description: "Tea", category: "", amount: "5", incurredDate: "2026-01-02" } });
+    expect(uncategorised.ok).toBe(true);
+
+    const invented = attempt(w, w.finance, { type: "add_work_order_cost", id, input: { description: "Ransom", category: "Misc", amount: "5", incurredDate: "2026-01-02" } });
+    expect(invented.ok).toBe(false);
+    if (!invented.ok) expect(invented.errors.category).toMatch(/Choose one of the configured cost categories: Parts, Labour, Recovery/);
   });
 });

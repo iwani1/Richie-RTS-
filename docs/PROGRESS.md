@@ -87,8 +87,8 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | NTF-02 | 2 | SMS adapter through a Ghana-capable provider (candidates: Hubtel, Arkesel, mNotify; verify availability and pricing). SMS is the channel most staff… | Deferred | Phase 2. |
 | NTF-03 | 2 | Email adapter. | Deferred | Phase 2. |
 | RPT-01 | 1A | Rental reports: enquiries, quotations issued, acceptance rate, confirmed and completed rentals, revenue, outstanding balances, vehicle utilisation,… | Met | `src/tms/rentalReport.ts` + `src/screens/Reports.tsx` (Phase 17). All eight figures are computed from records, with coverage stated, a currency guard and a CSV of the same numbers; 7 domain tests and 3 screen tests. Formulas in `docs/KPIS.md`. |
-| RPT-02 | 1C | Staff transport and fleet reports: bookings received/confirmed/completed/cancelled, no-shows, on-time pickup rate, average delay, passengers… | Partial | On-time pickup rate with data coverage (`src/tms/kpis.ts`). **No bookings, no-shows, passengers transported, route utilisation, contract performance, downtime, fuel, mileage.** |
-| RPT-03 | 1C | Financial reports: revenue by service and customer, payments received, outstanding invoices, expenses by category, cost per trip, cost per passenger… | Not built | No revenue, payments or outstanding-invoice reporting. |
+| RPT-02 | 1C | Staff transport and fleet reports: bookings received/confirmed/completed/cancelled, no-shows, on-time pickup rate, average delay, passengers… | Partial | On-time pickup rate with data coverage (`src/tms/kpis.ts`). Utilisation **definition** agreed in Q-29 and written down in `KPIS.md`; the fleet-wide screen is still to build. **No bookings, no-shows, passengers transported, route utilisation, contract performance, downtime, fuel, mileage.** |
+| RPT-03 | 1C | Financial reports: revenue by service and customer, payments received, outstanding invoices, expenses by category, cost per trip, cost per passenger… | Partial | `src/tms/financialReport.ts` + a section on the Reports screen (Phase 28): all six figures computed from records, with the period, coverage, cost-per-trip and cost-per-passenger definitions from Q-29, and a CSV. **Revenue by service has one line** because only vehicle hire is invoiced in this build; contract billing is FIN-02. No profit or margin (costs captured are maintenance only). |
 | RPT-04 | 1C | Filters (date range, service, client, customer, route, driver, vehicle, status) and CSV export, always permission-scoped. Every KPI formula is… | Partial | The rental report has a date range, a coverage panel and a CSV of the same figures (Phase 17); other screens have search and status filters. Formulas documented in `docs/KPIS.md`. **The other reports have no date range or CSV, and there is no cross-report filter bar** (service, client, route, driver, vehicle). |
 | RPT-05 | 3 | PDF reports. | Deferred | Phase 3. |
 | GPS-01 | 2 | Provider interface; last reported location with timestamp; clear distinction between live, stale and simulated locations; never fabricate… | Deferred | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
@@ -105,7 +105,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | ERD.md | Done | `docs/ERD.md`, with Mermaid diagram, constraints and exclusion constraints. |
 | PERMISSIONS.md | Done | `docs/PERMISSIONS.md`. |
 | STATE_MACHINES.md | Done | Vehicle, rental and trip machines in `docs/STATE_MACHINES.md`. Invoice, contract and incident machines Not Started. |
-| KPIS.md | Done | RPT-01 implemented as a proposal; RPT-02 and RPT-03 Blocked on definitions and inputs. |
+| KPIS.md | Done | RPT-01 and RPT-03 implemented; utilisation, cost per trip and the cost-category list defined and approved (Q-29, D-78); RPT-02 screen outstanding. |
 | DATA_PROTECTION.md | Done (draft) | Requires legal review. Retention periods unset (Q-18). |
 | DECISIONS.md | Done | D-01 to D-15. |
 | OPEN_QUESTIONS.md | Done | Q-01 to Q-32. |
@@ -155,7 +155,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | Completion: stop times, one outcome per active passenger, threshold snapshot | Done (verified) | `busing.test.ts`, `Busing.test.tsx` |
 | Cancel planned or dispatched trips with a reason | Done (verified) | `busing.test.ts` |
 | RPT-01 on-time rate with coverage and status | Done (verified); definition pending confirmation | `busing.test.ts`, `Busing.test.tsx` |
-| RPT-02 fleet utilisation, RPT-03 cost per trip | Blocked | Definitions and inputs (Q-29) |
+| RPT-02 fleet utilisation, RPT-03 cost per trip | Defined | Q-29 definitions approved (Phase 28, D-78); RPT-03 built, RPT-02 screen outstanding |
 | Boarding codes | Blocked | Policy unknown (Q-19). Not implemented |
 | Passenger personal-data controls | Partial | Minimal fields and role limits; retention, notice and rights workflow not done (see DATA_PROTECTION.md) |
 | Server-side persistence and multi-tab safety | Done (verified) | Phase 13: writes are serialised server-side |
@@ -639,7 +639,7 @@ in this phase: the answers are accepted-or-not first, and the code follows in th
 | Answered by confirming today's behaviour (no code) | Done | Q-19 no boarding codes, Q-33 drivers already report breakdowns, Q-45 hand-recorded odometer, Q-46 renewal uses current settings |
 | Answered by statement (no code) | Done | Q-01/Q-50 one office machine on the LAN, Caddy or nginx in front; Q-49 proprietary and private, `LICENSE` added and `README.md` updated |
 | Decisions recorded | Done | D-73 (the set), D-74 (a wrong trip entry is corrected, never edited), D-75 (safety defects block; an overdue routine service warns) |
-| **Code queued, in this order** | In progress | 1. Q-42 correction entries + `trips:correct` (Phase 24); 2. Q-47 cancel an in-progress run with a reason and optional incident (Phase 25); 3. Q-16 mandatory insurance and roadworthiness before assignment (Phase 26); 4. Q-38 several client contacts (Phase 27); 5. Q-34 work-type list and Q-29 report definitions (with RPT-03); 6. Q-48 roster-change marker; 7. Q-43 the stricter dispatch switch |
+| **Code queued, in this order** | In progress | 1. Q-42 correction entries + `trips:correct` (Phase 24); 2. Q-47 cancel an in-progress run with a reason and optional incident (Phase 25); 3. Q-16 mandatory insurance and roadworthiness before assignment (Phase 26); 4. Q-38 several client contacts (Phase 27); 5. Q-34 work-type list and Q-29 report definitions, with RPT-03 (Phase 28); 6. Q-48 roster-change marker; 7. Q-43 the stricter dispatch switch |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **328 passed, 14 skipped**, `build`
 succeeds. Documentation and one licence file only; no behaviour changed.
@@ -746,3 +746,28 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **377 passed, 16
 integration tests are among the skipped ones and run against PostgreSQL in CI), `build` succeeds.
 
 Next on the queued list: Q-34 work-type list with Q-29 report definitions (RPT-03).
+
+## Phase 28 - Work types, cost categories and the financial report (item 5, Q-34 and Q-29 / RPT-03)
+
+Two answers, one phase. Q-34 settles what a work order is for; Q-29 settles what a recorded cost is
+for and how the money figures are defined. Without both, "how much did tyres cost" and "cost per
+trip" cannot be answered, and the reports had to say "not configured".
+
+| Item | Status | Evidence |
+|---|---|---|
+| A work order carries a type from a company list | Done (verified) | `settings.workTypes`, seeded with the six the owner approved (Service, Repair, Tyres, Bodywork, Inspection, Other) and editable in Settings. `validateWorkOrder` refuses anything else and names the list; the form is a select, not a text box |
+| History is not rewritten | Done (verified) | An order raised while the type was free text keeps its own wording: updating it is allowed, retyping it into a *different* free-text value is not, and the form shows it as "recorded before the list" |
+| Costs carry a category from a company list | Done (verified) | `settings.costCategories`, empty by default because nothing is assumed. Blank means "Uncategorised", which the report shows as its own line. Entered in any case, stored under the configured spelling |
+| Nothing is blocked silently | Done (verified) | With no work types configured, raising one is refused with "No work types are configured…". With no cost categories, costs are still recordable and counted as uncategorised — the note says so |
+| RPT-03: revenue by customer and service | Done (verified) | `financialReport`; invoices issued in the period, voids excluded, a missing customer name kept as its own line. One service line only, because only vehicle hire is invoiced — printed on screen |
+| RPT-03: received and outstanding at the period end | Done (verified) | Payments by `paidOn`; outstanding values each unpaid invoice at the period end, so a later payment does not settle it retroactively |
+| RPT-03: expenses by category | Done (verified) | Reuses `costReport` lines, so the logistics screen and the report cannot disagree about the same entries |
+| RPT-03: cost per trip and cost per passenger | Done (verified) | Q-29 definitions: recorded expenses ÷ completed scheduled runs; recorded expenses ÷ riders boarded on them. Null, not zero, when the denominator is missing |
+| No profit and no margin | Done (verified) | Deliberate: only maintenance and incident costs are captured. The screen says what is missing rather than printing a flattering number |
+| CSV | Done (verified) | "Download financial CSV" writes the same figures, with the revenue and expense tables in full |
+| Tests | Done (verified) | 9 domain (`financialReport.test.ts`), 4 domain (`logistics.test.ts` "configured work types and cost categories"), 2 screen (`Reports.test.tsx`), 2 screen (`Settings.test.tsx`), plus the work-order select assertion in `Logistics.test.tsx` |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **394 passed, 16 skipped**, `build`
+succeeds.
+
+Next on the queued list: Q-48, the in-app roster-change marker.

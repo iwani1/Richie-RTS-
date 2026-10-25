@@ -1009,3 +1009,25 @@ decision the office makes, not one the system invents.
 - **Consequence.** The unique index on `app_user.client_id` had to go (migration 005); the driver
   rule stays in the database as well as in the service. Nothing about scope changes for the people
   involved: each account sees exactly the one client it is linked to.
+
+### D-78: what work is, what a cost is for, and how the money is counted (Q-34, Q-29)
+
+- **Question.** Q-34 asked what causes of breakdown and maintenance exist; Q-29 asked for the
+  definitions behind fleet utilisation and cost per trip, and for the cost categories to record.
+  Both had been left as free text, which made "how much did tyres cost" unanswerable.
+- **Decision.** The five incident types stay as the brief wrote them. A work order instead carries a
+  **type from a company list** (agreed as Service, Repair, Tyres, Bodywork, Inspection, Other) and a
+  recorded cost carries a **category from a company list** (no values assumed; empty until the
+  company names them). The definitions: utilisation = committed vehicle-days ÷ available
+  vehicle-days; cost per trip = recorded expenses ÷ scheduled runs completed in the period;
+  cost per passenger = the same expenses ÷ riders actually boarded on those runs.
+- **Rejected.** Keeping work type as free text and cleaning it up later in a spreadsheet (the report
+  would be guessing which "brake pads" is "Parts"). A fixed taxonomy in code (the company names its
+  own work, exactly as with document types). Seeding cost categories with invented names (fuel and
+  driver pay are not recorded here, so a list would imply coverage the system does not have).
+  Dividing recorded expenses by "all trips including rentals" (a rental is not a scheduled run; the
+  denominator would mix two kinds of work). Printing 0 for cost per trip when nothing ran.
+- **Consequence.** Renaming a work type in Settings does not rewrite historical orders; they keep the
+  wording they were given, and the form shows it as a record from before the list. A company that
+  never configures cost categories keeps recording costs, and the report shows one "Uncategorised"
+  line instead of hiding them.

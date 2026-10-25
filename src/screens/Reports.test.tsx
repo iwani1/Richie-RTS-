@@ -133,13 +133,15 @@ describe("rental report screen", () => {
     // Invoiced and outstanding are the same figure here: nothing has been paid.
     expect(screen.getAllByText("GHS 2000.00").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Price")).toBeTruthy();
-    // No quotation means no acceptance rate; no vehicle in this fleet means no utilisation.
-    expect(screen.getAllByText("Not available").length).toBe(2);
+    // No quotation means no acceptance rate; no vehicle in this fleet means no utilisation; no
+    // completed run means no cost per trip, and nobody boarded means no cost per passenger.
+    expect(screen.getAllByText("Not available").length).toBe(4);
   });
 
   it("refuses to print money when no currency is configured", () => {
     renderReport(world(null));
-    expect(screen.getByText(/Money figures are withheld/i)).toBeTruthy();
+    // Both sections withhold money: the rental figures and the financial report.
+    expect(screen.getAllByText(/Money figures are withheld/i)).toHaveLength(2);
     expect(screen.getByRole("button", { name: /Download CSV/i })).toHaveProperty("disabled", true);
   });
 
@@ -150,5 +152,84 @@ describe("rental report screen", () => {
     fireEvent.change(to, { target: { value: "2020-01-01" } });
     fireEvent.change(from, { target: { value: "2020-02-01" } });
     expect(screen.getByText(/wrong way round/i)).toBeTruthy();
+  });
+});
+
+describe("money and cost section (RPT-03)", () => {
+  it("shows revenue by customer, expenses by category and the cost of a completed run", () => {
+    const db = world("GHS");
+    renderReport({
+      ...db,
+      workOrders: [
+        {
+          id: "wo1",
+          reference: "WO-0001",
+          vehicleId: "v1",
+          title: "Brakes",
+          workType: "Repair",
+          workshop: "",
+          description: "",
+          reportedOdometer: null,
+          plannedDate: null,
+          incidentId: null,
+          status: "open",
+          holdReason: null,
+          completedAt: null,
+          resetsServiceInterval: false,
+          costEntries: [
+            { id: "c1", description: "Pads", category: "Parts", amount: 300, incurredDate: today, recordedAt: at, recordedBy: "Fin" },
+            { id: "c2", description: "Fitting", category: "Labour", amount: 200, incurredDate: today, recordedAt: at, recordedBy: "Fin" },
+          ],
+          costsConfirmedComplete: true,
+          completionNote: null,
+          releasedBy: null,
+          releasedAt: null,
+          log: [],
+          // The cost report counts a work order only if the order itself was raised in the period.
+          createdAt: `${today}T09:00:00.000Z`,
+          updatedAt: `${today}T09:00:00.000Z`,
+        },
+      ],
+      trips: [
+        {
+          id: "t1",
+          reference: "TR-0001",
+          routeId: "route1",
+          serviceDate: today,
+          status: "completed",
+          vehicleId: "v1",
+          driverId: "d1",
+          dispatchedAt: at,
+          startedAt: at,
+          completedAt: at,
+          cancelReason: null,
+          cancelledAt: null,
+          cancelledBy: null,
+          incidentId: null,
+          stopLogs: [],
+          boardings: [{ passengerId: "p1", stopId: "s1", outcome: "boarded" }],
+          onTimeThresholdMinutes: 5,
+          corrections: [],
+          createdAt: at,
+          updatedAt: at,
+        },
+      ],
+    });
+
+    expect(screen.getByText("Money and cost (RPT-03)")).toBeTruthy();
+    // Revenue by customer names the customer, not just a total.
+    expect(screen.getByText("Acme Ltd")).toBeTruthy();
+    // Expenses keep their category, and cost per trip divides by the one completed run.
+    expect(screen.getByText("Parts")).toBeTruthy();
+    expect(screen.getByText("Labour")).toBeTruthy();
+    expect(screen.getByText("Cost per trip")).toBeTruthy();
+    // 500 of costs over 1 run, and over 1 rider boarded.
+    expect(screen.getAllByText("GHS 500.00").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole("button", { name: "Download financial CSV" })).toBeTruthy();
+  });
+
+  it("says plainly when the financial period holds nothing", () => {
+    renderReport({ ...world("GHS"), invoices: [], rentals: [] });
+    expect(screen.getByText(/No invoices, payments, recorded costs or completed runs/)).toBeTruthy();
   });
 });

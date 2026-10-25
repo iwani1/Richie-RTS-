@@ -111,6 +111,8 @@ function CostSection({
   disabled?: boolean;
   disabledReason?: string;
 }) {
+  const { db } = useTms();
+  const categories = db.settings.costCategories;
   const [values, setValues] = useState<CostInput>({ description: "", category: "", amount: "", incurredDate: todayYmd() });
   const [errors, setErrors] = useState<Errors>({});
 
@@ -156,8 +158,17 @@ function CostSection({
             <Field label="What was the cost for?" error={errors.description}>
               <TextInput value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} invalid={!!errors.description} />
             </Field>
-            <Field label="Category (optional)" hint="Free text. No cost categories are configured." error={errors.category}>
-              <TextInput value={values.category} onChange={(e) => setValues({ ...values, category: e.target.value })} invalid={!!errors.category} />
+            <Field
+              label="Category (optional)"
+              hint={categories.length ? "From the list the company configured in Settings." : "No cost categories are configured yet; this will be counted as uncategorised."}
+              error={errors.category}
+            >
+              <Select value={values.category} onChange={(e) => setValues({ ...values, category: e.target.value })} invalid={!!errors.category}>
+                <option value="">Uncategorised</option>
+                {categories.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </Select>
             </Field>
             <Field label={`Amount${currency ? ` (${currency})` : ""}`} error={errors.amount}>
               <TextInput value={values.amount} onChange={(e) => setValues({ ...values, amount: e.target.value })} inputMode="decimal" placeholder="0.00" invalid={!!errors.amount} />
@@ -704,7 +715,7 @@ function WorkOrderForm({ defaults, order, onClose }: { defaults: { vehicleId: st
   return (
     <Panel
       title={order ? `Edit ${order.reference}` : "Raise a work order"}
-      description="Work type and workshop are free text because no catalogue or approved supplier list has been configured."
+      description="The type of work comes from the list the company keeps in Settings; the workshop is still free text, because no approved supplier list exists."
       onClose={onClose}
     >
       <form onSubmit={submit} className="space-y-4">
@@ -718,8 +729,22 @@ function WorkOrderForm({ defaults, order, onClose }: { defaults: { vehicleId: st
           <TextInput value={values.title} onChange={(e) => setValues({ ...values, title: e.target.value })} invalid={!!errors.title} autoFocus />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Type of work" error={errors.workType}>
-            <TextInput value={values.workType} onChange={(e) => setValues({ ...values, workType: e.target.value })} invalid={!!errors.workType} placeholder="e.g. brake inspection" />
+          <Field
+            label="Type of work"
+            hint="From the list the company configured in Settings."
+            error={errors.workType}
+          >
+            <Select value={values.workType} onChange={(e) => setValues({ ...values, workType: e.target.value })} invalid={!!errors.workType}>
+              <option value="">Select a type</option>
+              {db.settings.workTypes.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+              {/* An order written while this was free text keeps its own wording rather than being
+                  silently reclassified. */}
+              {values.workType && !db.settings.workTypes.includes(values.workType) && (
+                <option value={values.workType}>{values.workType} (recorded before the list)</option>
+              )}
+            </Select>
           </Field>
           <Field label="Workshop (optional)" error={errors.workshop}>
             <TextInput value={values.workshop} onChange={(e) => setValues({ ...values, workshop: e.target.value })} invalid={!!errors.workshop} />
@@ -965,7 +990,7 @@ function CostsTab() {
             </p>
           </Band>
 
-          <Band label="By category" note="Categories are whatever the operator typed. Uncategorised entries are shown as their own line, not folded into another.">
+          <Band label="By category" note="Categories come from the list in Settings. Uncategorised entries are shown as their own line, not folded into another.">
             {report.lines.length === 0 ? (
               <p className="rts-band-empty">Nothing recorded in this period.</p>
             ) : (

@@ -202,6 +202,11 @@ with `required: true` refuses assignment while it is missing or lapsed on the da
 
 Distinct from `drivers.licence_expiry`, which continues to gate trip and rental assignment.
 
+Two other catalogues live in settings rather than in their own tables: `settings.workTypes` (what a
+work order is for) and `settings.costCategories` (what a recorded cost was for). A work order and a
+cost entry store the name they were given, so renaming a catalogue entry never rewrites history
+(D-78).
+
 ## Exclusion constraints (no-double-booking)
 
 These need the `btree_gist` extension. They are the database form of the overlap rules that the service enforces in code today. Neither is enforced by the current browser build.

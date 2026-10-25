@@ -2,7 +2,12 @@
 
 ## Source note
 
-The uploaded brief names RPT-01 to RPT-03 but does not define them. An earlier version of this project described them as "on-time rate, utilisation, cost per trip". That was an assumption, not a definition from the business. The definitions below are proposals. Management must confirm them (OPEN_QUESTIONS Q-29), and the screens say so.
+The uploaded brief names RPT-01 to RPT-03 but does not define them. An earlier version of this project described them as "on-time rate, utilisation, cost per trip". That was an assumption, not a definition from the business.
+
+**Status now.** The owner approved definitions for utilisation, cost per trip and the cost-category
+list (Q-29, D-78), and RPT-03 is implemented against them. The on-time rate and the rental report were
+already implemented earlier. Where a definition below is still marked "proposal", it has not been
+confirmed and the screen says so.
 
 Every KPI on screen shows its reporting period, numerator, denominator and data coverage. A KPI with missing inputs shows "Not computed" or "Insufficient data", never a number.
 
@@ -42,32 +47,53 @@ Every KPI on screen shows its reporting period, numerator, denominator and data 
 - Whether early arrivals should count as on time (Q-25).
 - Whether scheduled times should come from shift definitions (Q-27).
 
-## RPT-02 Fleet utilisation (not configured)
+## RPT-02 Fleet utilisation (definition agreed, not yet surfaced on its own screen)
 
-No definition exists in the source material. The calculation needs available hours per vehicle per period, which are not captured. The screen shows "Not configured" and no estimate. Definition and inputs are needed (Q-29).
+The owner approved a definition in Q-29 (D-78), so the figure is no longer "unknown":
 
-## RPT-03 Cost per trip (not configured)
+    utilisation = committed vehicle-days ÷ available vehicle-days
 
-No definition exists in the source material. The calculation needs a cost ledger (fuel, maintenance, driver pay, tolls and other costs) **and** a rule for which costs belong to a trip. Neither exists. The screen shows "Not configured". Definition, cost categories and the attribution rule are needed (Q-29).
+- **Committed vehicle-days**: days in the period on which a vehicle was committed to work — a rental
+  that held it (confirmed, in progress or completed, with a vehicle assigned) or a scheduled staff run
+  that has not been cancelled (planned, dispatched, in progress or completed, with a vehicle assigned).
+- **Available vehicle-days**: the acting fleet (vehicles not `retired`) × days in the period.
+- **Consequence of the definition**: a day counts once per vehicle, so two rentals of the same vehicle
+  on the same day are one vehicle-day, not two.
 
-### What Phase 3 does report instead
+The rental report already prints the rental-only half of this number under the label "Utilisation",
+and it says on screen that staff runs are not included. The fleet-wide figure needs the RPT-02 screen,
+which is still to be built; the definition itself is settled, so the remaining work is presentation.
 
-`costs.ts` reports **recorded costs**, which is a narrower and clearly different thing:
+## RPT-03 Financial report (implemented)
 
-    coverage = records with at least one recorded cost / records in scope
+Computed by `src/tms/financialReport.ts` and covered by `src/tms/financialReport.test.ts`. The screen
+prints it under the rental report, sharing the same period.
 
-Records in scope are incidents (by reported date) and work orders (by raised date) in the
-reporting period. Entries are counted by date incurred.
+| Metric | Formula | Population and exclusions |
+|---|---|---|
+| Revenue by customer | sum of `invoice.total`, grouped by the name billed | Non-void invoices issued in the period. An invoice with no name is its own line, "No customer named" |
+| Revenue by service | the same invoices grouped by what was sold | Only vehicle hire is invoiced in this build; the report has one line and says so |
+| Invoiced | sum of `invoice.total` | Non-void invoices issued in the period |
+| Received | sum of `payment.amount` | Payments whose `paidOn` is in the period, whatever the invoice date |
+| Outstanding | sum over non-void invoices issued on or before the period end of (total − payments paid on or before the period end) | Valued **at the period end**: a payment made later does not settle an invoice that was unpaid then |
+| Expenses by category | sum of recorded cost entries, grouped by the configured category | Entries whose `incurredDate` is in the period, on incidents reported or work orders raised in the period. Blank categories are shown as "Uncategorised" |
+| Cost per trip | recorded expenses ÷ scheduled runs completed in the period | Null ("Not available") when no run was completed. This is the Q-29 definition |
+| Cost per passenger | recorded expenses ÷ riders recorded as boarded on those completed runs | A no-show is not a passenger carried. Null when nobody boarded |
 
-| Shown | Meaning |
-|---|---|
-| Total recorded | Sum of amounts entered, only when the company currency is set |
-| Data coverage | How many records have any cost recorded at all |
-| Records with no cost | Counted separately and labelled as such |
-| Message when empty | "Nothing was recorded. This is not the same as zero cost." |
+**What it deliberately does not do.** It does not compute profit, margin or cost per vehicle: the
+recorded costs are maintenance and incident costs only (no fuel, driver pay or tolls are captured),
+so a margin would flatter the business. That limitation is printed under the figures rather than
+buried here.
 
-This is **not** a cost per trip, not a cost per vehicle, not an operating cost and not a margin.
-It is the sum of what someone typed in, and it says so.
+**Coverage shown with the report.** Uncategorised cost lines; invoices with no customer name;
+completed runs with no vehicle recorded; and the revenue-by-service line, which makes the
+single-service limitation visible.
+
+## Cost categories (Q-29, D-78)
+
+Every recorded cost carries a category chosen from the list in Settings, or none at all. Nothing is
+assumed: a new installation starts with an empty list, records costs as "Uncategorised", and the
+report shows that line instead of hiding it. This is what makes "how much did tyres cost" answerable.
 
 ## Reporting rules applied to every KPI
 

@@ -158,8 +158,17 @@ export interface Settings {
   // set, compliance reporting shows only already-expired documents, exactly like the
   // existing driver-licence check on the dashboard.
   documentReminderLeadDays: number | null;
+  // The types of work a work order can carry (Q-34, D-78). The six below are the list the owner
+  // approved, not a taxonomy invented here; the company may rename, remove or extend them.
+  workTypes: string[];
+  // What a recorded cost was for (Q-29, D-78). No values are assumed: until the company names
+  // them, costs are recorded as "Uncategorised" and the report says so.
+  costCategories: string[];
   maintenance: MaintenanceSettings;
 }
+
+/** The work types the owner approved in Q-34. Editable in Settings; nothing else is inferred. */
+export const DEFAULT_WORK_TYPES = ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"] as const;
 
 // Service intervals per vehicle category (OPEN_QUESTIONS Q-17, Q-37). Every field is null
 // until management supplies it. A schedule must configure at least one basis.
@@ -436,10 +445,12 @@ export interface LogEntry {
 }
 
 // A recorded cost fact. Amounts are operator-entered facts, never rates or prices the
-// system invented. Categories are free text because no taxonomy has been supplied (Q-29).
+// system invented. The category is one of the names the company configured in Settings, or
+// blank for "Uncategorised" (Q-29, D-78).
 export interface CostEntry {
   id: string;
   description: string;
+  /** A name from `settings.costCategories`, or empty for "Uncategorised" (Q-29). */
   category: string;
   amount: number;
   incurredDate: string; // YYYY-MM-DD
@@ -482,7 +493,9 @@ export interface WorkOrder {
   reference: string; // WO-0001
   vehicleId: string;
   title: string;
-  workType: string; // free text: no work taxonomy has been supplied
+  /** A name from `settings.workTypes` (Q-34). An order written before the list existed keeps its
+   *  own text and is never silently rewritten. */
+  workType: string;
   workshop: string; // free text: no approved workshop list has been supplied
   description: string;
   reportedOdometer: number | null;
@@ -704,6 +717,8 @@ export function emptyDatabase(): Database {
       taxPosition: null,
       taxLines: [],
       invoiceDueDays: null,
+      workTypes: [...DEFAULT_WORK_TYPES],
+      costCategories: [],
       maintenance: emptyMaintenanceSettings(),
     },
     audit: [],
@@ -780,6 +795,9 @@ export function migrate(value: unknown): Database | null {
       taxPosition: (settings.taxPosition as TaxPosition | null) ?? null,
       taxLines: (settings.taxLines as TaxLineSetting[]) ?? [],
       invoiceDueDays: (settings.invoiceDueDays as number | null) ?? null,
+      // Records written before the list existed keep the approved six rather than an empty list.
+      workTypes: Array.isArray(settings.workTypes) ? (settings.workTypes as string[]) : [...DEFAULT_WORK_TYPES],
+      costCategories: Array.isArray(settings.costCategories) ? (settings.costCategories as string[]) : [],
       maintenance: { ...emptyMaintenanceSettings(), ...((settings.maintenance as Partial<MaintenanceSettings>) ?? {}) },
     },
     audit: v.audit as Database["audit"],

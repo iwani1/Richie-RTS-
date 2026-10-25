@@ -1,7 +1,8 @@
 // Cost reporting for staff logistics.
 //
-// Costs are operator-entered facts. This module never invents a rate, price or category
-// taxonomy: categories are free text because none has been supplied (OPEN_QUESTIONS Q-29).
+// Costs are operator-entered facts. This module never invents a rate or a price, and it does not
+// decide what a category means: the names come from the company's list in Settings, and an entry
+// without one is reported as "Uncategorised" (Q-29, D-78).
 // Every figure is returned together with its reporting period and data coverage, and a
 // total is only produced once the company currency has been set (no default).
 

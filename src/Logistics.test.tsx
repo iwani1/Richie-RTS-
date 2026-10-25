@@ -49,6 +49,8 @@ function seed(): { vehicleId: string } {
       taxPosition: null,
       taxLines: [],
       invoiceDueDays: null,
+      workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
+      costCategories: ["Parts", "Labour", "Tyres"],
       maintenance: { schedules: [] },
     },
   });
@@ -120,7 +122,11 @@ describe("Staff logistics end-to-end (jsdom)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /Raise work order/i }));
     const workDialog = screen.getByRole("dialog");
     fireEvent.change(within(workDialog).getByLabelText(/^Title/), { target: { value: "Replace coolant hose" } });
-    fireEvent.change(within(workDialog).getByLabelText(/^Type of work/), { target: { value: "Engine" } });
+    // The type of work is a list the company keeps in Settings, not a box anyone can type into.
+    const typeField = within(workDialog).getByLabelText(/^Type of work/) as HTMLSelectElement;
+    expect(typeField.tagName).toBe("SELECT");
+    expect([...typeField.options].map((option) => option.value)).toEqual(["", "Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"]);
+    fireEvent.change(typeField, { target: { value: "Repair" } });
     fireEvent.click(within(workDialog).getByRole("button", { name: /Raise work order/i }));
     await screen.findByText(/WO-0001 raised/i);
     expect(await screen.findByText("Replace coolant hose")).toBeTruthy();

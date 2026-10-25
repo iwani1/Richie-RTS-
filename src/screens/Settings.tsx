@@ -179,6 +179,66 @@ export function SettingsPage() {
         )}
       </Band>
 
+      <Band label="Types of work"
+        note="What a work order is for (OPEN_QUESTIONS Q-34). The six below are the list agreed with the owner; rename, remove or add to it. A work order raised under a name you later remove keeps its own wording."
+        actions={editable ? <Button onClick={() => update({ workTypes: [...draft.workTypes, ""] })}>Add work type</Button> : undefined}
+      >
+        {draft.workTypes.length === 0 ? (
+          <p className="text-xs text-stone-500">No work types configured. A work order cannot be raised until at least one exists.</p>
+        ) : (
+          <ul className="space-y-2">
+            {draft.workTypes.map((name, i) => (
+              <li key={`work-${i}`} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-start">
+                <Field label={`Work type ${i + 1}`} error={errors[`workTypes.${i}`]}>
+                  <TextInput
+                    value={name}
+                    disabled={!editable}
+                    invalid={!!errors[`workTypes.${i}`]}
+                    onChange={(e) => update({ workTypes: draft.workTypes.map((value, j) => (j === i ? e.target.value : value)) })}
+                  />
+                </Field>
+                {editable && (
+                  <Button variant="danger" className="sm:mt-5" onClick={() => update({ workTypes: draft.workTypes.filter((_, j) => j !== i) })}>
+                    Remove
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {errors.workTypes && <Notice tone="error" className="mt-3">{errors.workTypes}</Notice>}
+      </Band>
+
+      <Band label="Cost categories"
+        note="What a recorded cost was for (OPEN_QUESTIONS Q-29). Nothing is assumed: leave the list empty and costs are recorded as uncategorised. The financial report groups expenses by these names."
+        actions={editable ? <Button onClick={() => update({ costCategories: [...draft.costCategories, ""] })}>Add cost category</Button> : undefined}
+      >
+        {draft.costCategories.length === 0 ? (
+          <p className="text-xs text-stone-500">No cost categories configured. Costs can still be recorded, and are counted as uncategorised.</p>
+        ) : (
+          <ul className="space-y-2">
+            {draft.costCategories.map((name, i) => (
+              <li key={`cost-${i}`} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-start">
+                <Field label={`Cost category ${i + 1}`} error={errors[`costCategories.${i}`]}>
+                  <TextInput
+                    value={name}
+                    disabled={!editable}
+                    invalid={!!errors[`costCategories.${i}`]}
+                    onChange={(e) => update({ costCategories: draft.costCategories.map((value, j) => (j === i ? e.target.value : value)) })}
+                  />
+                </Field>
+                {editable && (
+                  <Button variant="danger" className="sm:mt-5" onClick={() => update({ costCategories: draft.costCategories.filter((_, j) => j !== i) })}>
+                    Remove
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {errors.costCategories && <Notice tone="error" className="mt-3">{errors.costCategories}</Notice>}
+      </Band>
+
       <Band label="Bus rentals" note="Required before a quotation can be issued. No values are assumed; quoting stays blocked until these are set (OPEN_QUESTIONS Q-07, Q-08, Q-09, Q-11, Q-15).">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Pricing basis" hint="How rental charges are calculated. Rates themselves are entered per quotation." error={errors["rental.pricingBasis"]}>

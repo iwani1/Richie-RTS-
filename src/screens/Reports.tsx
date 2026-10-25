@@ -7,6 +7,7 @@
 // export can never contain a record the signed-in role cannot read.
 import { useMemo, useState } from "react";
 import { formatAmount } from "../tms/money";
+import { financialReport, financialReportCsv } from "../tms/financialReport";
 import { rentalReport, rentalReportCsv } from "../tms/rentalReport";
 import { useTms } from "../tms/useTms";
 import {
@@ -35,7 +36,17 @@ export function ReportsPage() {
   const [to, setTo] = useState(today);
 
   const report = useMemo(() => rentalReport(db, from, to), [db, from, to]);
+  const moneyReport = useMemo(() => financialReport(db, from, to), [db, from, to]);
   const reversed = from > to;
+  const downloadMoney = () => {
+    const blob = new Blob([financialReportCsv(moneyReport)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `financial-report-${moneyReport.from}-to-${moneyReport.to}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   const download = () => {
     const csv = rentalReportCsv(report);
@@ -131,6 +142,97 @@ export function ReportsPage() {
               </p>
             </TableCard>
           </div>
+
+          <section className="mt-6 space-y-4" aria-labelledby="financial-report">
+            <div className="flex flex-wrap items-end justify-between gap-3 border-t border-stone-200 pt-5">
+              <div>
+                <h2 id="financial-report" className="text-sm font-semibold uppercase tracking-wider text-stone-500">
+                  Money and cost (RPT-03)
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm text-stone-600">
+                  Revenue by customer and service, what came in, what is still owed at the period end, and what the fleet cost to keep
+                  running — grouped by the cost categories configured in Settings. Cost per trip is recorded costs divided by scheduled
+                  runs completed in the period, the definition agreed with the owner (Q-29).
+                </p>
+              </div>
+              <Button onClick={downloadMoney} disabled={moneyReport.status === "currency_not_set"}>
+                Download financial CSV
+              </Button>
+            </div>
+
+            <Notice tone={moneyReport.status === "currency_not_set" ? "warning" : "info"}>{moneyReport.message}</Notice>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Stat label="Invoiced" value={money(moneyReport.currencyCode, moneyReport.invoicedTotal)} caption={`${moneyReport.invoiceCount} invoices issued`} />
+              <Stat label="Received" value={money(moneyReport.currencyCode, moneyReport.receivedTotal)} caption={`${moneyReport.paymentCount} payments in the period`} />
+              <Stat label="Outstanding" value={money(moneyReport.currencyCode, moneyReport.outstandingTotal)} caption={`${moneyReport.outstandingCount} invoices not fully paid`} />
+              <Stat label="Costs recorded" value={money(moneyReport.currencyCode, moneyReport.expensesTotal)} caption={`${moneyReport.expenseLineCount} cost lines`} />
+              <Stat
+                label="Cost per trip"
+                value={moneyReport.costPerTrip === null ? "Not available" : money(moneyReport.currencyCode, moneyReport.costPerTrip)}
+                caption={`over ${moneyReport.completedTrips} completed run${moneyReport.completedTrips === 1 ? "" : "s"}`}
+              />
+              <Stat
+                label="Cost per passenger"
+                value={moneyReport.costPerPassenger === null ? "Not available" : money(moneyReport.currencyCode, moneyReport.costPerPassenger)}
+                caption={`over ${moneyReport.passengersBoarded} riders boarded`}
+              />
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <TableCard title="Revenue by customer" summary={`${moneyReport.revenueByCustomer.length} customers billed in the period`}>
+                <DataTable
+                  rows={moneyReport.revenueByCustomer}
+                  rowKey={(row) => row.customerName}
+                  emptyState={<EmptyState title="Nothing invoiced" body="No invoice was issued in this period." />}
+                  columns={[
+                    { key: "customer", header: "Customer", render: (row) => row.customerName },
+                    { key: "invoiced", header: "Invoiced", className: "text-right rts-mono", render: (row) => money(moneyReport.currencyCode, row.invoiced) },
+                    { key: "paid", header: "Paid", className: "text-right rts-mono", render: (row) => money(moneyReport.currencyCode, row.paid) },
+                    { key: "outstanding", header: "Owed", className: "text-right rts-mono", render: (row) => money(moneyReport.currencyCode, row.outstanding) },
+                  ]}
+                />
+              </TableCard>
+
+              <TableCard title="Expenses by category" summary={`${moneyReport.expensesByCategory.length} categories with costs in the period`}>
+                <DataTable
+                  rows={moneyReport.expensesByCategory}
+                  rowKey={(row) => row.category}
+                  emptyState={<EmptyState title="No costs recorded" body="Nothing was entered for this period. That is not the same as zero cost." />}
+                  columns={[
+                    { key: "category", header: "Category", render: (row) => row.category },
+                    { key: "lines", header: "Lines", className: "text-right rts-mono", render: (row) => row.lineCount },
+                    { key: "amount", header: "Amount", className: "text-right rts-mono", render: (row) => money(moneyReport.currencyCode, row.amount) },
+                  ]}
+                />
+              </TableCard>
+            </div>
+
+            <TableCard title="Money coverage" summary="What the financial figures above do and do not include">
+              <ul className="space-y-2 text-sm text-stone-700">
+                <li className="flex justify-between gap-4">
+                  <span>Uncategorised cost lines</span>
+                  <span className="rts-mono">{moneyReport.coverage.uncategorisedExpenseLines}</span>
+                </li>
+                <li className="flex justify-between gap-4">
+                  <span>Invoices with no customer name</span>
+                  <span className="rts-mono">{moneyReport.coverage.invoicesWithoutCustomer}</span>
+                </li>
+                <li className="flex justify-between gap-4">
+                  <span>Completed runs with no vehicle recorded</span>
+                  <span className="rts-mono">{moneyReport.coverage.completedTripsWithoutVehicle}</span>
+                </li>
+                <li className="flex justify-between gap-4">
+                  <span>Revenue by service</span>
+                  <span className="rts-mono">{moneyReport.revenueByService.map((row) => `${row.service}: ${money(moneyReport.currencyCode, row.invoiced)}`).join(" · ") || "nothing invoiced"}</span>
+                </li>
+              </ul>
+              <p className="mt-3 text-xs text-stone-500">
+                Outstanding is valued at the period end: a payment made later does not settle an invoice that was unpaid then. Only vehicle
+                hire is invoiced in this build, so revenue by service has one line — staff-transport contracts are not billed by this system yet.
+              </p>
+            </TableCard>
+          </section>
         </>
       )}
     </div>

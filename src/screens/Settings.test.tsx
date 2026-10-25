@@ -127,3 +127,33 @@ describe("the before-assignment switch on a document type", () => {
     ]);
   });
 });
+
+describe("the lists the company keeps itself", () => {
+  it("shows the approved work types and adds another to the saved settings", async () => {
+    const db = settingsDb(false);
+    const tms = makeTms(db);
+    render(
+      <TmsContext.Provider value={tms}>
+        <SettingsPage />
+      </TmsContext.Provider>,
+    );
+
+    // The six approved types are offered, not invented per screen.
+    expect((screen.getByLabelText("Work type 1") as HTMLInputElement).value).toBe("Service");
+    fireEvent.click(screen.getByRole("button", { name: "Add work type" }));
+    fireEvent.change(screen.getByLabelText("Work type 7"), { target: { value: "Electrical" } });
+    save();
+
+    await vi.waitFor(() => expect(tms.dispatch).toHaveBeenCalled());
+    const command = (tms.dispatch as unknown as { mock: { calls: [{ type: string; input: { workTypes: string[] } }][] } }).mock.calls[0][0];
+    expect(command.type).toBe("update_settings");
+    expect(command.input.workTypes).toEqual(["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other", "Electrical"]);
+  });
+
+  it("starts with no cost categories and says what that means", () => {
+    renderSettings(settingsDb(false));
+    expect(screen.getByText(/No cost categories configured/i)).toBeTruthy();
+    // The work-type band, by contrast, already holds the agreed six.
+    expect(screen.getByLabelText("Work type 6")).toHaveProperty("value", "Other");
+  });
+});
