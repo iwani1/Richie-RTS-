@@ -5,7 +5,7 @@
 import { can, type Permission } from "./permissions";
 import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
-import { formatAmount, isPercentWithTwoDecimals, linesTotal, percentOf, parseAmount, parseQuantity, toMinor, fromMinor } from "./money";
+import { formatAmount, isPercentWithTwoDecimals, linesTotal, parseAmount, parseQuantity, percentOf, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { confinedClientId } from "./scope";
 import {
@@ -206,15 +206,6 @@ export const RENTAL_TRANSITIONS: Record<RentalStatus, readonly RentalStatus[]> =
 };
 
 const ACTIVE_RENTAL_STATUSES: readonly RentalStatus[] = ["confirmed", "in_progress"];
-
-/**
- * Rounds an already-computed amount to two decimals, half-up.
- *
- * Kept because callers outside this file use it, but it is no longer where money is calculated;
- * `money.ts` does the arithmetic in integer pesewas, so this only has to round a value that is
- * already assumed to be a 2-decimal amount (audit D-04).
- */
-export const round2 = (n: number) => fromMinor(toMinor(n));
 
 const datesOverlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart <= bEnd && bStart <= aEnd;
 
