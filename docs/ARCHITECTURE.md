@@ -7,8 +7,8 @@
   more — the page needs a server, because that is where authority lives.
 - Runtime: one Node.js process on the operator's workstation (Fedora), plus PostgreSQL. The
   database is the source of truth. See `docs/SETUP_AND_DEPLOYMENT.md` for the install and run commands.
-- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (17 tables: `refund` arrived in
-  `010_refunds.sql`, D-92; `btree_gist` +
+- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (18 tables: `refund` arrived in
+  `010_refunds.sql`, D-92, and `expense` in `011_expenses.sql`, D-93; `btree_gist` +
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
 - Session: `iron-session` sealed cookie; passwords Argon2id (`@node-rs/argon2`) — D-51.
@@ -49,7 +49,7 @@ The interface is a purpose-built "operations ledger", not a component-kit defaul
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 16`, `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–16) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 18`, `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–18) |
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `confinedClientId`. Confines `driver` and `client_contact` to their one linked record. Fails closed |
@@ -62,12 +62,14 @@ The interface is a purpose-built "operations ledger", not a component-kit defaul
 | `src/tms/creditNotes.ts` | The one invoice balance rule (D-86): `outstanding = total − paid − credited`, what is still owed back when credits pass what was paid (`paid + credited − total − refunded`, D-92), and the date-limited variant the closed-period reports use. Read by `finance.ts`, the statement, both money reports, `financeHome.ts` and the Invoices screen |
 | `src/tms/financeHome.ts` | The finance home's figures: the period totals from `financialReport`, overdue invoices and unbilled hires as at today, payments to verify, and a margin that is withheld unless both sides of the period are complete |
 | `src/tms/kpis.ts` | KPI calculations. Each result carries period, numerator, denominator, coverage and an explicit status |
-| `src/tms/costs.ts` | Recorded-cost report with period, total, entries and data coverage |
+| `src/tms/costs.ts` | Recorded-cost report with period, total, entries and data coverage. Counts incident and work-order costs and standalone expenses in one figure (D-93) |
+| `src/tms/expenses.ts` | Spending that is not a repair: `record_expense` / `void_expense`, numbered `EXP-YYYY-NNNN`, with the receipt number and whether the paper is held (D-93) |
 | `src/tms/commands.ts` | `executeCommand()`: the single router for every write (`AnyCommand`) |
 | `src/tms/crypto.ts` | PBKDF2-SHA256 password hashing via Web Crypto |
 | `src/tms/useTms.ts` | React state, session, persistence, `dispatch()` |
 | `src/tms/customerStatement.ts` | A customer's account for a period (D-90): the entries, the balance carried in and out, and the ageing bands. Also `debtAgeing()` (D-91), which totals those same bands across the company. Calls the shared balance rule rather than subtracting again |
 | `src/screens/Statements.tsx` | The statement screen: choose a customer and a period, read the account, print it |
+| `src/screens/Expenses.tsx` | The expense register: enter spending from a receipt, see the period total, the category split and how much has no receipt number, and void a wrong entry with a reason (D-93) |
 | `src/screens/Documents.tsx` | The paper a customer keeps (D-87): `InvoiceSheet` and `CreditNoteSheet`, plus `PrintPreview`, which portals a sheet to `document.body`, sets the page title (the suggested file name) and hands printing to the browser |
 | `src/ui/useDialogFocus.ts` | The keyboard contract every overlay shares: focus in, Tab trapped, Escape closes, focus restored. Used by `Panel` and the print preview |
 | `src/pages/*` | Screens. `StaffBusing.tsx` holds Routes, Passengers, Trips, Bookings and Performance tabs |

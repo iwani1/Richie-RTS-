@@ -77,13 +77,14 @@ prints it under the rental report, sharing the same period.
 | Received | sum of `payment.amount` | Payments whose `paidOn` is in the period, whatever the invoice date |
 | Credited | sum of `creditNote.total` | Credit notes **issued** in the period; a voided note counts for nothing. Money taken off a bill, never money received (D-86) |
 | Outstanding | sum over non-void invoices issued on or before the period end of (total − payments paid on or before the period end − credit notes issued on or before the period end), floored at zero | Valued **at the period end**: a payment or a credit note dated later does not settle an invoice that was unpaid then. The arithmetic is the one helper in `src/tms/creditNotes.ts`, so this figure, the hire report and the invoice screen cannot disagree |
-| Expenses by category | sum of recorded cost entries, grouped by the configured category | Entries whose `incurredDate` is in the period, on incidents reported or work orders raised in the period. Blank categories are shown as "Uncategorised" |
+| Expenses by category | sum of recorded cost entries **and standalone expenses**, grouped by the configured category | Cost entries whose `incurredDate` is in the period on incidents reported or work orders raised in the period, plus live expenses whose `incurredOn` is in the period (D-93). Blank categories are shown as "Uncategorised". A voided expense counts for nothing; the cost report also states how many expenses carry no receipt number |
 | Cost per trip | recorded expenses ÷ scheduled runs completed in the period | Null ("Not available") when no run was completed. This is the Q-29 definition |
 | Cost per passenger | recorded expenses ÷ riders recorded as boarded on those completed runs | A no-show is not a passenger carried. Null when nobody boarded |
 
-**What it deliberately does not do.** It does not compute profit or cost per vehicle: the recorded
-costs are maintenance and incident costs only (no fuel, driver pay or tolls are captured), so a margin
-would flatter the business. That limitation is printed under the figures rather than buried here.
+**What it deliberately does not do.** It does not compute profit or cost per vehicle. Fuel, tolls and
+permits can now be entered (D-93), but an expense carries no vehicle and no trip, and driver pay is not
+captured at all, so a cost per vehicle or a true margin would still flatter the business. That
+limitation is printed under the figures rather than buried here.
 
 **Margin, and the rule that keeps it honest (FIN-07, D-84).** One figure is called margin, and it is
 withheld unless all four of these are true: the company currency is set; at least one non-void invoice
@@ -92,7 +93,7 @@ period is left unbilled**. The last condition is the important one — an unbill
 exists and has not been written down, so a margin computed over it overstates the business. When the
 rule fails the screen prints the reason instead of the number. Margin is `(invoiced − credited) − expenses`, shown
 with its percentage of revenue; it is **not** profit (tax owed, deposits held and fuel are not in it).
-Cash movement (payments received minus recorded spend) is shown beside it, because the two answer
+Cash movement (payments received minus recorded spend minus refunds paid back) is shown beside it, because the two answer
 different questions.
 
 **Coverage shown with the report.** Uncategorised cost lines; invoices with no customer name;

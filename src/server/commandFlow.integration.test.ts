@@ -301,6 +301,115 @@ suite("workflow C and concurrency, against PostgreSQL", () => {
     await expect(sql`delete from payment where id = ${reloaded.payments[0].id}`.execute(db())).rejects.toThrow(/never deleted/);
   }, 60_000);
 
+  it("pays money back against what is owed, and the database refuses to pay it out twice (D-92)", async () => {
+    const { adminId, vehicleId } = await world();
+    const rentalId = await confirmedRental(adminId, "2026-06-01", "2026-06-03");
+    await step("assign_rental", { id: rentalId, input: { vehicleId, driverId: "" } } as never, adminId, TODAY);
+    await step("start_rental", { id: rentalId } as never, adminId, "2026-06-01T09:00:00.000Z");
+    await step("complete_rental", { id: rentalId, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } } as never, adminId, "2026-06-03T18:00:00.000Z");
+    const invoiced = await step("issue_rental_invoice", { input: { rentalId, issuedOn: "2026-06-03", discountAmount: "", discountReason: "", notes: "" } } as never, adminId, "2026-06-03T18:30:00.000Z");
+    const invoice = invoiced.invoices[0];
+    // Paid in full, then 1,000 + VAT credited: 1,150 is owed back.
+    await step("record_payment", { input: { invoiceId: invoice.id, amount: "3450", method: "Bank transfer", paidOn: "2026-06-04", externalReference: "SLIP-9", note: "" } } as never, adminId, "2026-06-04T10:00:00.000Z");
+    await step("issue_credit_note", { input: { invoiceId: invoice.id, issuedOn: "2026-06-05", amount: "1000", description: "One day not operated", reason: "Vehicle broke down" } } as never, adminId, "2026-06-05T10:00:00.000Z");
+
+    // More than is owed back is refused with the figure that is left, not a constraint name.
+    const tooMuch = await command("record_refund", { input: { invoiceId: invoice.id, amount: "1151", method: "Bank transfer", paidOn: "2026-06-06", externalReference: "", reason: "Goodwill" } } as never, adminId, "2026-06-06T10:00:00.000Z");
+    expect(tooMuch.ok).toBe(false);
+    expect(tooMuch.errors.amount).toMatch(/GHS 1150\.00 left to refund/);
+
+    const refunded = await step("record_refund", { input: { invoiceId: invoice.id, amount: "1150", method: "Bank transfer", paidOn: "2026-06-06", externalReference: "TRF-1", reason: "One day not operated" } } as never, adminId, "2026-06-06T10:00:00.000Z");
+    expect(refunded.refunds[0]).toMatchObject({ reference: "REF-2026-0001", amount: 1150, status: "paid" });
+    // The payment is not rewritten by money going back out.
+    expect(refunded.invoices[0].amountPaid).toBe(3450);
+
+    const reloaded = await loadDatabase();
+    expect(reloaded.refunds.map((refund) => refund.reference)).toEqual(["REF-2026-0001"]);
+    expect(reloaded.referenceCounters).toEqual(expect.arrayContaining([{ scope: "refund", period: "2026", last: 1 }]));
+
+    // A second refund past what is left is refused by the trigger even when the service is bypassed.
+    await expect(
+      sql`
+        insert into refund (id, reference, invoice_id, client_id, customer_name, currency_code, amount,
+          method, paid_on, external_reference, reason, status, recorded_by, recorded_at, data)
+        values ('over', 'REF-2026-0099', ${invoice.id}, null, 'Acme Ltd', 'GHS', 10, 'Cash', '2026-06-07'::date,
+          '', 'Again', 'paid', 'Admin', now(), '{}'::jsonb)
+      `.execute(db()),
+    ).rejects.toThrow(/refund_within_due|exceeds/);
+
+    // Cancelling is one-way, needs a reason, and the row cannot be deleted or edited.
+    const cancelled = await step("void_refund", { id: reloaded.refunds[0].id, reason: "The transfer bounced" } as never, adminId, "2026-06-07T10:00:00.000Z");
+    expect(cancelled.refunds[0]).toMatchObject({ status: "void", voidReason: "The transfer bounced" });
+    await expect(sql`update refund set voided_at = null where id = ${reloaded.refunds[0].id}`.execute(db())).rejects.toThrow(/stays cancelled/);
+    await expect(sql`update refund set amount = 1 where id = ${reloaded.refunds[0].id}`.execute(db())).rejects.toThrow(/immutable/);
+    await expect(sql`delete from refund where id = ${reloaded.refunds[0].id}`.execute(db())).rejects.toThrow(/never deleted/);
+  }, 60_000);
+
+  it("records spending that is not a repair, and the database refuses to edit it (D-93)", async () => {
+    const { adminId } = await world();
+    await step(
+      "record_expense",
+      {
+        input: {
+          incurredOn: "2026-06-05",
+          category: "",
+          description: "Diesel, Kumasi depot",
+          payee: "Total Filling Station",
+          amount: "320.50",
+          method: "Cash",
+          receiptReference: "RCPT-0091",
+          receiptHeld: true,
+          notes: "",
+        },
+      } as never,
+      adminId,
+      "2026-06-05T10:00:00.000Z",
+    );
+
+    const reloaded = await loadDatabase();
+    expect(reloaded.expenses).toHaveLength(1);
+    expect(reloaded.expenses[0]).toMatchObject({
+      reference: "EXP-2026-0001",
+      incurredOn: "2026-06-05",
+      category: "",
+      amount: 320.5,
+      receiptReference: "RCPT-0091",
+      receiptHeld: true,
+      status: "recorded",
+    });
+    expect(reloaded.referenceCounters).toEqual(expect.arrayContaining([{ scope: "expense", period: "2026", last: 1 }]));
+
+    // The receipt facts are enforced by the table, not only by the service: a hand-written row cannot
+    // say the paper is held without a number on it, and cannot carry a void without a reason.
+    await expect(
+      sql`
+        insert into expense (id, reference, incurred_on, category, description, payee, amount, currency_code,
+          method, receipt_reference, receipt_held, status, recorded_by, recorded_at, updated_at, data)
+        values ('held', 'EXP-2026-0098', '2026-06-06'::date, '', 'Fuel', 'Shell', 10, 'GHS', '', '',
+          true, 'recorded', 'Admin', now(), now(), '{}'::jsonb)
+      `.execute(db()),
+    ).rejects.toThrow(/expense_held_has_reference|violates check constraint/);
+    await expect(
+      sql`
+        insert into expense (id, reference, incurred_on, category, description, payee, amount, currency_code,
+          method, receipt_reference, receipt_held, status, recorded_by, recorded_at, updated_at, data)
+        values ('voidless', 'EXP-2026-0097', '2026-06-06'::date, '', 'Fuel', 'Shell', 10, 'GHS', '', '',
+          false, 'void', 'Admin', now(), now(), '{}'::jsonb)
+      `.execute(db()),
+    ).rejects.toThrow(/expense_void_has_reason|violates check constraint/);
+
+    // An expense is never edited and never deleted: the only way out of a wrong one is a void.
+    const id = reloaded.expenses[0].id;
+    await expect(sql`update expense set amount = 1 where id = ${id}`.execute(db())).rejects.toThrow(/immutable/);
+    await expect(sql`update expense set category = 'Fuel' where id = ${id}`.execute(db())).rejects.toThrow(/immutable/);
+    await expect(sql`delete from expense where id = ${id}`.execute(db())).rejects.toThrow(/never deleted/);
+
+    const voided = await step("void_expense", { id, reason: "Receipt already recorded" } as never, adminId, "2026-06-07T10:00:00.000Z");
+    expect(voided.expenses[0]).toMatchObject({ status: "void", voidReason: "Receipt already recorded" });
+    // A void cannot be cleared, and the number is not reused.
+    await expect(sql`update expense set voided_at = null where id = ${id}`.execute(db())).rejects.toThrow(/stays cancelled/);
+  }, 60_000);
+
   it("cannot double-book one vehicle from six parallel requests", async () => {
     const { adminId, vehicleId } = await world();
     const rentals: string[] = [];

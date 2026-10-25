@@ -1555,3 +1555,40 @@ decision the office makes, not one the system invents.
   CSV, a "Paid back" figure and a *Money paid back* card on the finance home, the refund panel on the
   invoice screen, and 26 new tests (7 domain command, 3 balance/statement, 3 report, 3 finance home,
   3 visibility, 3 statement sheet, 3 invoice screen, plus the reference-series and boundary cases).
+
+## D-93 An expense keeps the number on the receipt, and is voided rather than edited
+
+- **Context.** Every cost the system held had to hang off an incident or a work order, so "costs
+  recorded" quietly meant "maintenance recorded". Fuel, tolls, permits, rent, driver allowances and
+  office spending — usually most of a transport month — were on paper in a drawer. A report built on
+  the cost register answered "what did repairs cost?" while being read as "what did the month cost?".
+- **Decision.** An **expense** is a record of money spent that is not a repair:
+  - numbered from its own series (`EXP-YYYY-NNNN`, restarting each year), filed by the **day the money
+    left** (`incurredOn`), with a description, who was paid, an amount and a currency;
+  - a **category** comes from the list in Settings or is left blank, and blank is reported as
+    "Uncategorised" rather than folded into another line. A method comes from the same payment-method
+    list the rest of the money screens use, or is left blank — the register must not invent options;
+  - **never edited**: a wrong entry is **voided once, with a reason**. The number, the figure and the
+    reason stay on the record, so a report that used the old figure can still be explained. A voided
+    expense counts in nothing;
+  - the **receipt is two facts**: the number printed on the paper (`receiptReference`), and whether the
+    paper is actually held (`receiptHeld`). Saying the paper is held without a number is refused, in
+    the service and by a table check, and the report states how many expenses have no number at all.
+  - **no currency set means no expense**: the company currency is required, exactly as it is for an
+    invoice, because an amount with no currency cannot be added to anything.
+- **Stored files are out of scope.** Only the receipt number and whether the paper is held are kept.
+  Where a scanned copy would live — on disk, in an object store, whose backups, how long — is an owner
+  decision, and pretending otherwise would put a file-path column in the schema that nothing honours.
+- **Where it is counted.** `costReport` pushes live expenses into its `lines` with `source: "expense"`
+  and reports `expenseCount`, `expenseTotal`, `expensesWithoutReceipt` and `expensesWithReceiptHeld`.
+  One cost figure, used by the cost tab, the money report and the finance home, so no two screens can
+  disagree about what the month cost. Refunds stay out of it (D-92): money paid back to a customer is
+  not a cost of running the work.
+- **Who may do it.** `expenses:read` for administrator, finance and operations (fuel and tolls are part
+  of what operations' own runs cost); `expenses:record` and `expenses:void` for administrator and
+  finance only. A driver and a client contact receive no expense at all — an expense names who was paid.
+- **Consequence.** A new `expenses` collection (`src/tms/expenses.ts`, `expenses` in the permission
+  list, the reference series, the snapshot scope and the repository), migration `011_expenses.sql` with
+  `expense_frozen()` and `expense_no_delete()`, the Expenses screen, expense figures on the cost tab,
+  and 24 new tests (7 domain command, 2 snapshot scope, 10 screen, 1 reference series, plus the
+  cost-report cases inside the command tests).

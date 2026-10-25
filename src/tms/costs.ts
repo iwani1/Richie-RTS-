@@ -10,7 +10,7 @@ import { sumAmounts } from "./money";
 import type { CostEntry, Database } from "./types";
 
 export interface CostLine extends CostEntry {
-  source: "incident" | "work_order";
+  source: "incident" | "work_order" | "expense";
   sourceReference: string;
   sourceDate: string;
 }
@@ -27,6 +27,13 @@ export interface CostReport {
   workOrdersWithoutCosts: number;
   workOrdersCostsConfirmed: number;
   coverage: number | null;
+  /** Standalone expenses in the period (fuel, tolls, permits...), which belong to no work order. */
+  expenseCount: number;
+  expenseTotal: number;
+  /** Expenses recorded with no receipt number at all. Stated, not hidden: it is a weaker fact. */
+  expensesWithoutReceipt: number;
+  /** Expenses whose paper receipt is said to be held. */
+  expensesWithReceiptHeld: number;
   status: "ok" | "no_costs" | "currency_not_set";
   message: string;
 }
@@ -53,6 +60,25 @@ export function costReport(db: Database, from: string, to: string): CostReport {
       lines.push({ ...cost, source: "work_order", sourceReference: order.reference, sourceDate: dateOf(order.createdAt) });
     }
   }
+
+  // Spending that is not a repair (D-93). It belongs in the same total: a report that left fuel and
+  // tolls out would answer "what did maintenance cost?" while claiming to answer "what did the month
+  // cost?". A voided expense counts for nothing, which is what voiding means.
+  const expenses = db.expenses.filter((expense) => expense.status !== "void" && inRange(expense.incurredOn));
+  for (const expense of expenses) {
+    lines.push({
+      id: expense.id,
+      description: expense.description,
+      category: expense.category,
+      amount: expense.amount,
+      incurredDate: expense.incurredOn,
+      recordedAt: expense.recordedAt,
+      recordedBy: expense.recordedBy,
+      source: "expense",
+      sourceReference: expense.reference,
+      sourceDate: expense.incurredOn,
+    });
+  }
   lines.sort((a, b) => (a.incurredDate === b.incurredDate ? a.description.localeCompare(b.description) : a.incurredDate < b.incurredDate ? -1 : 1));
 
   const incidentsWithCosts = incidents.filter((i) => i.costEntries.length > 0).length;
@@ -76,6 +102,10 @@ export function costReport(db: Database, from: string, to: string): CostReport {
     workOrdersWithoutCosts: workOrders.length - workOrdersWithCosts,
     workOrdersCostsConfirmed,
     coverage,
+    expenseCount: expenses.length,
+    expenseTotal: sumAmounts(expenses.map((expense) => expense.amount)),
+    expensesWithoutReceipt: expenses.filter((expense) => !expense.receiptReference).length,
+    expensesWithReceiptHeld: expenses.filter((expense) => expense.receiptHeld).length,
   };
 
   if (from > to)
@@ -95,6 +125,6 @@ export function costReport(db: Database, from: string, to: string): CostReport {
   return {
     ...base,
     status: "ok",
-    message: `${recordsWithCosts} of ${recordsInScope} incident(s) and work order(s) in this period have at least one recorded cost.`,
+    message: `${recordsWithCosts} of ${recordsInScope} incident(s) and work order(s) in this period have at least one recorded cost${expenses.length > 0 ? `, and ${expenses.length} standalone expense${expenses.length === 1 ? "" : "s"} (${expenses.filter((expense) => expense.receiptHeld).length} with the paper receipt held)` : ""}.`,
   };
 }

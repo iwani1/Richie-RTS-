@@ -87,7 +87,9 @@ the person who reported the defect be the only sign-off.
 **Can:** see rentals, clients, vehicles, trips, incidents and maintenance costs; prepare quotations;
 confirm rentals and record the deposit; issue and void invoices; record payments and advance them to
 verified and reconciled; cancel a payment recorded in error; issue and void credit notes; pay money
-back to a customer and cancel a refund recorded in error; print invoices, credit notes and statements; read the rental report. **Lands on the Finance screen**, which is where the
+back to a customer and cancel a refund recorded in error; record spending that is not a repair — fuel,
+tolls, permits — and void a wrong entry with a reason; print invoices, credit notes and statements;
+read the rental report. **Lands on the Finance screen**, which is where the
 money work starts: money in and out for a period, who is late paying and by how many days, completed
 hires nobody has invoiced yet, and payments still to verify or reconcile. The "Margin" figure appears
 only when both sides of the period are complete (an invoice and a cost line in the period, and no

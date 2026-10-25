@@ -7,6 +7,7 @@ export type Route =
   | "rentals"
   | "invoices"
   | "statements"
+  | "expenses"
   | "reports"
   | "busing"
   | "logistics"
@@ -46,6 +47,9 @@ export const NAV_ITEMS: NavItem[] = [
   // One customer's whole account, aged: the paper the office chases money with (FIN-02, D-90). Gated by
   // the invoice read permission because it is invoice, payment and credit-note data, nothing else.
   { route: "statements", label: "Statements", caption: "Who owes what, by age", permission: "invoices:read" },
+  // Spending that is not a repair: fuel, tolls, permits (FIN-05, D-93). Its own read permission,
+  // because operations reads costs without entering them.
+  { route: "expenses", label: "Expenses", caption: "Fuel, tolls, receipts", permission: "expenses:read" },
   { route: "reports", label: "Reports", caption: "Rentals, revenue, utilisation", permission: "kpis:read" },
   { route: "busing", label: "Staff busing", caption: "Routes, rosters, trips", permission: "routes:read" },
   { route: "logistics", label: "Staff logistics", caption: "Breakdowns, maintenance, costs", permission: "incidents:read" },

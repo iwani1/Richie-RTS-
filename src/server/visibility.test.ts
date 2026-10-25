@@ -426,3 +426,48 @@ describe("credit notes inside the snapshot (D-86)", () => {
     expect(visible.refunds.map((refund) => refund.reference)).toEqual(["REF-2026-0001"]);
   });
 });
+
+// Spending that is not a repair (FIN-05, D-93). An expense names who was paid — a filling station, a
+// landlord, sometimes a person — so it is company money information, not something a driver or a
+// customer has any reason to receive. The whitelist is the only thing standing between the collection
+// and every account, so it is asserted directly.
+describe("expense scope", () => {
+  function withExpense(): Database {
+    const w = world();
+    w.expenses = [
+      {
+        id: "ex1",
+        reference: "EXP-2026-0001",
+        incurredOn: "2026-06-05",
+        category: "Fuel",
+        description: "Diesel, depot run",
+        payee: "Total Filling Station",
+        amount: 320.5,
+        currencyCode: "GHS",
+        method: "Cash",
+        receiptReference: "RCPT-0091",
+        receiptHeld: true,
+        notes: "",
+        status: "recorded",
+        voidReason: null,
+        voidedAt: null,
+        recordedBy: "Finance",
+        recordedAt: at,
+        updatedAt: at,
+      },
+    ];
+    return w;
+  }
+
+  it("never sends an expense to a driver or a client contact", () => {
+    for (const who of [actor("driver-user", "driver"), actor("client-user", "client_contact")]) {
+      expect(scopeDatabase(withExpense(), who)!.expenses).toEqual([]);
+    }
+  });
+
+  it("sends the spending register to the roles that may read costs", () => {
+    for (const who of [actor("fin", "finance"), actor("ops", "operations"), actor("admin", "administrator")]) {
+      expect(scopeDatabase(withExpense(), who)!.expenses.map((expense) => expense.reference)).toEqual(["EXP-2026-0001"]);
+    }
+  });
+});

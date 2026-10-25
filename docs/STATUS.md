@@ -29,9 +29,9 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 | **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting | **Mostly built.** 25 IDs: 10 met, 13 partial, 2 not built — contracts and the route planning aid |
 | **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Mostly built.** 6 IDs: 1 met (finance dashboard), 4 partial, 1 not built (passenger portal) |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
-| **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Not started.** 7 IDs, 6 deferred, 1 partial (cost entries without receipts) |
+| **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs, 6 deferred, 1 met (expenses with a receipt number and whether the paper is held — no scanned copy yet) |
 
-Totals across all 78 brief requirements: **20 met · 41 partial · 3 not built · 14 deferred.**
+Totals across all 78 brief requirements: **21 met · 40 partial · 3 not built · 14 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -69,6 +69,12 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   counting as received, and the invoice goes back to what it actually owed — in the reports and on the
   printed sheet as well as on the screen. It is a one-way door, and a payment already matched to the
   bank statement warns what the match will be short by before it is cancelled.
+- **Expenses**: money spent that is not a repair — fuel, tolls, permits, rent, allowances — entered
+  from the receipt with the number printed on it and whether the paper is actually in the file. Each
+  entry is numbered (EXP-2026-0001), never edited: a wrong one is voided with a reason and entered
+  again, so a report built on the old figure stays explainable. It counts in the same cost figure the
+  cost tab and the money report use, and the report states how much spending has no receipt number at
+  all. **A scanned copy is not stored** — where a file would live is still an owner decision.
 - **Printable documents**: an invoice and each credit note print as a formatted A4 sheet, or save as a
   PDF from the browser's own print dialog. The printed amount due is the same figure the screen shows,
   a void document says so in words before any figure, and a statement prints money paid back as its
@@ -144,7 +150,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**606 passed, 18 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**625 passed, 20 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - 18 integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, and the database refusing to

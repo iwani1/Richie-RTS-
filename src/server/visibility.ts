@@ -62,6 +62,9 @@ const SECTION_PERMISSIONS: { [K in keyof Database]?: Permission } = {
   creditNotes: "invoices:read",
   // A refund is part of its invoice's money, so the invoice read permission opens it (D-92).
   refunds: "invoices:read",
+  // Spending that is not a repair (D-93), with its own read permission: finance records it, and
+  // operations may read it because it is part of what its runs cost.
+  expenses: "expenses:read",
   referenceCounters: "invoices:read",
   routes: "routes:read",
   settings: "settings:read",
@@ -122,6 +125,9 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       // D-92: a refund names a customer and an amount paid back to them. Billing, so it stays with
       // the invoice rows and never travels to a driver or a client contact.
       refunds: [],
+      // D-93: an expense names a payee and what the business spent. It never travels to a driver or
+      // a client contact.
+      expenses: [],
       referenceCounters: [],
       // Record-bound roles have no audit: the summaries name records that are not theirs.
       audit: [],

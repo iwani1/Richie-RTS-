@@ -40,6 +40,9 @@ export const REFERENCE_SERIES: Record<ReferenceScope, { prefix: string; width: n
   // Money going back out gets its own series, so a refund receipt is never mistaken for a payment
   // received (D-92). It restarts each year with the other financial documents.
   refund: { prefix: "REF", width: 4, perYear: true },
+  // Spending that is not a repair (D-93). Quoted against a receipt in the file, and restarted each
+  // year with the other money documents.
+  expense: { prefix: "EXP", width: 4, perYear: true },
 };
 
 /** The period a counter is filed under: the year for financial documents, `all` otherwise. */
@@ -68,6 +71,8 @@ function existingReferences(db: Database, scope: ReferenceScope): string[] {
       return db.payments.map((record) => record.reference);
     case "refund":
       return db.refunds.map((record) => record.reference);
+    case "expense":
+      return db.expenses.map((record) => record.reference);
     case "booking":
       return db.bookings.map((record) => record.reference);
     default:

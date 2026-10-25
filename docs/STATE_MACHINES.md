@@ -172,11 +172,25 @@ real money went back out (below).
 | — | `paid` | `refunds:record` | Invoice not void; amount > 0 and ≤ `paid + credited − total − refunded`; a configured method; date not before the invoice; a reason (300 characters); external reference not already used on a live refund |
 | `paid` | `void` | `refunds:void` | Not already cancelled; a reason (300 characters) |
 
-A refund never moves backwards or returns: `refund_frozen()` refuses any edit to the financial fields
-and refuses to un-cancel one, and `refund_no_delete()` refuses a delete. Cancelling does not remove the
+A refund never moves backwards or returns: `refund_frozen()` refuses any edit to the financial fields,
+refuses to un-cancel one, and refuses to rewrite the cancellation's reason or the time it was cancelled, and `refund_no_delete()` refuses a delete. Cancelling does not remove the
 number: it says the money was not paid back after all, and the amount becomes owed back again.
 `refund_within_due()` re-checks the ceiling in the database under a row lock, so the same over-credit
 cannot be paid out twice even by two operators at once.
+
+## Expense (`Expense.status`, FIN-05, D-93)
+
+| From | To | Who | Preconditions |
+|---|---|---|---|
+| — | `recorded` | `expenses:record` | Company currency set; date is a real day not in the future; amount > 0; description (200 characters); category blank or from Settings; method blank or configured; payee (120 characters); receipt number (120 characters) — the paper cannot be *held* without one |
+| `recorded` | `void` | `expenses:void` | Not already void; a reason (300 characters) |
+
+There is no path to `recorded` from `void`, and no path from `recorded` back to an earlier state: an
+expense **is never edited**. A wrong figure is voided with a reason and entered again as the next
+number, so a report that used the old figure can still be explained. `expense_frozen()` refuses every
+edit to the money fields and to the receipt facts, allows the void once, and requires the reason and
+time together; `expense_no_delete()` refuses a delete. A voided expense counts in nothing — not the
+cost report, not the money report, not the finance home — and the number stays on the list.
 
 ## Booking (`Booking.status`, BKG-03…05, D-83)
 

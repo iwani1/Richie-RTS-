@@ -105,6 +105,13 @@ is a payment the office *makes*, not a correction to a bill (that is `credits:is
 correction to money received (that is `payments:void`). The ceiling is enforced where the money is:
 `refunds:record` can only pay back what an invoice still owes, and the database refuses more.
 
+`expenses:read`, `expenses:record` and `expenses:void` (D-93) cover spending that is not a repair:
+fuel, tolls, permits, rent, allowances. **Operations may read it** — fuel and tolls are part of what its
+own runs cost, and the cost report is where that lands — but entering or voiding spending is a money
+job. A driver and a client contact hold none of the three, because an expense names who was paid
+(`visibility.ts`, `SECTION_PERMISSIONS`). Recording requires the company currency, so a company that
+has not set one cannot enter spending at all.
+
 Read scope: `invoices:read` also opens the invoice's payments, credit notes and refunds, because all
 three are part of the invoice — and it is the permission the **Statements** destination needs (D-90), because a
 statement is those same three collections read for one customer over a period. Record-bound roles receive none of the three collections, so a driver or client
@@ -168,6 +175,8 @@ administrators change them (`settings:update`).
 | maintenance:release | x | x | | | |
 | maintenance:cost | x | | x | | |
 | costs:read | x | x | x | | |
+| expenses:read | x | x | x | | |
+| expenses:record / expenses:void | x | | x | | |
 
 Separation of duties: operations runs the response and the maintenance work; finance records and
 reviews costs. **Releasing a vehicle is a separate permission from advancing the work.**

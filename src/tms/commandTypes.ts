@@ -33,6 +33,7 @@ export const KNOWN_COMMAND_TYPES = [
   "record_payment", "advance_payment", "void_payment",
   "issue_credit_note", "void_credit_note",
   "record_refund", "void_refund",
+  "record_expense", "void_expense",
   "create_adhoc_trip",
   "record_backup_export",
   "import_records",

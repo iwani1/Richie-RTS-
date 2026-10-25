@@ -946,7 +946,7 @@ function CostsTab() {
 
   return (
     <div className="space-y-5">
-      <Band label="Reporting period" note="Costs are shown for the dates they were incurred. Records in scope are incidents and work orders raised in the period.">
+      <Band label="Reporting period" note="Costs are shown for the dates they were incurred. In scope are incidents and work orders raised in the period, and expenses filed by the day the money was spent.">
         <div className="flex flex-wrap gap-3">
           <Field label="From"><TextInput type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
           <Field label="To"><TextInput type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
@@ -956,7 +956,10 @@ function CostsTab() {
 
       {report && (
         <>
-          <Band label="Recorded maintenance and incident costs" note="These are amounts entered by your team. They are not prices the system calculated, and they are not a complete cost of operations.">
+          <Band
+            label="Recorded spending"
+            note="Maintenance, incident costs and expenses such as fuel and tolls, together: one figure, so this report and the money report cannot tell different stories. These are amounts entered by your team, not prices the system calculated."
+          >
             {report.status !== "ok" && <Notice tone="warning" title={report.status === "currency_not_set" ? "Currency not set" : "No costs recorded"}>{report.message}</Notice>}
             {report.status === "ok" && <Notice tone="info" className="mb-3">{report.message}</Notice>}
             {/* A ruled total, not four cards: the number that matters is the sum, and the three
@@ -984,9 +987,19 @@ function CostsTab() {
                 <b>{report.incidentsWithCosts}</b>
                 <span>incidents with an entry</span>
               </span>
+              <span className="rts-statusline-cell">
+                <b>{report.expenseCount}</b>
+                <span>expenses</span>
+              </span>
+              <span className="rts-statusline-cell">
+                <b>{report.expensesWithoutReceipt}</b>
+                <span>expenses with no receipt number</span>
+              </span>
             </div>
             <p className="rts-footnote" style={{ marginTop: 10 }}>
               {report.workOrdersCostsConfirmed} work order(s) confirmed complete, including zero.
+              {report.expenseCount > 0 &&
+                ` Of ${report.expenseCount} expense(s), ${report.expensesWithReceiptHeld} carry the paper receipt; the rest are counted but weaker evidence.`}
             </p>
           </Band>
 
@@ -1018,7 +1031,10 @@ function CostsTab() {
             )}
           </Band>
 
-          <Band label="Cost entries" note="Every entry is an audited, editable record until the incident or work order is closed.">
+          <Band
+            label="Cost entries"
+            note="Maintenance and incident costs are audited and editable until the record is closed. Expenses are entered in the Expenses screen and are never edited — a wrong one is voided there, with a reason. A source starting EXP- is an expense."
+          >
             {report.lines.length === 0 ? (
               <EmptyState title="No cost entries" body="Nothing was recorded in this period. This is not a statement that the cost was zero." />
             ) : (

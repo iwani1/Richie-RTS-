@@ -20,6 +20,7 @@ import {
   type ComplianceDocument,
   type CreditNote,
   type Refund,
+  type Expense,
   type Database,
   type Driver,
   type Incident,
@@ -309,6 +310,27 @@ const refundRow = (r: Refund): Row => ({
   data: json(r),
 });
 
+const expenseRow = (e: Expense): Row => ({
+  id: e.id,
+  reference: e.reference,
+  incurred_on: e.incurredOn,
+  category: e.category,
+  description: e.description,
+  payee: e.payee,
+  amount: formatAmount(e.amount),
+  currency_code: e.currencyCode,
+  method: e.method,
+  receipt_reference: e.receiptReference,
+  receipt_held: e.receiptHeld,
+  status: e.status,
+  void_reason: e.voidReason,
+  voided_at: e.voidedAt,
+  recorded_by: e.recordedBy,
+  recorded_at: e.recordedAt,
+  updated_at: e.updatedAt,
+  data: json(e),
+});
+
 const paymentRow = (p: Payment): Row => ({
   id: p.id,
   reference: p.reference,
@@ -377,7 +399,7 @@ async function auditRows(trx: Kysely<KyselyDatabase>, limit: number): Promise<Se
 
 /** Reads the whole working set. Audit is capped for the in-memory snapshot; the table keeps all. */
 export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Promise<Database> {
-  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, bookings, incidents, workOrders, documents, odometer, invoices, creditNotes, payments, refunds, counters, audit, settings] =
+  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, bookings, incidents, workOrders, documents, odometer, invoices, creditNotes, payments, refunds, expenses, counters, audit, settings] =
     await Promise.all([
       rows(executor, "app_user"),
       rows(executor, "vehicle"),
@@ -396,6 +418,7 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
       rows(executor, "credit_note"),
       rows(executor, "payment"),
       rows(executor, "refund"),
+      rows(executor, "expense"),
       // Number series are what stop a second invoice or payment reusing INV-2026-0001. They are
       // stored outside the JSON snapshot, so this read is the only thing that carries them into
       // the next command (found by the workflow C integration test: without it every payment took
@@ -424,6 +447,7 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
     creditNotes: creditNotes.map((r) => r.data),
     payments: payments.map((r) => r.data),
     refunds: refunds.map((r) => r.data),
+    expenses: expenses.map((r) => r.data),
     referenceCounters: counters.map((counter) => ({
       scope: counter.scope as Database["referenceCounters"][number]["scope"],
       period: counter.period,
@@ -571,6 +595,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   // 2. Deletions, children first. The application archives rather than deletes (§5.9), so this is
   //    only reached when a backup import removes records.
   const order: (keyof Database)[] = [
+    "expenses",
     "refunds",
     "payments",
     "bookings",
@@ -590,6 +615,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
     "users",
   ];
   const tableOf: Record<string, keyof KyselyDatabase> = {
+    expenses: "expense",
     refunds: "refund",
     payments: "payment",
     bookings: "booking",
@@ -639,6 +665,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   await write("credit_note", after.creditNotes.map(creditNoteRow), before.creditNotes.map(creditNoteRow));
   await write("payment", after.payments.map(paymentRow), before.payments.map(paymentRow));
   await write("refund", after.refunds.map(refundRow), before.refunds.map(refundRow));
+  await write("expense", after.expenses.map(expenseRow), before.expenses.map(expenseRow));
   await write("booking", after.bookings.map(bookingRow), before.bookings.map(bookingRow));
 
   // 3b. Number series. Keyed by (scope, period) rather than an id, so the generic upsert helper
@@ -691,7 +718,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
 export async function truncateAll(trx: Db | Trx): Promise<void> {
   await sql`
     truncate table resource_reservation, audit_entry, app_settings, odometer_reading,
-      payment, refund, credit_note, invoice, reference_counter,
+      payment, refund, credit_note, invoice, reference_counter, expense,
       compliance_document, work_order, incident, booking, trip, passenger, bus_route, rental,
       vehicle, driver, client, app_user restart identity cascade
   `.execute(trx);

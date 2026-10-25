@@ -799,6 +799,60 @@ export interface Refund {
   updatedAt: string;
 }
 
+export const EXPENSE_STATUSES = ["recorded", "void"] as const;
+export type ExpenseStatus = (typeof EXPENSE_STATUSES)[number];
+
+export const EXPENSE_STATUS_LABELS: Record<ExpenseStatus, string> = {
+  recorded: "Recorded",
+  void: "Void",
+};
+
+/**
+ * Money the business spent on something that is not a repair: fuel, tolls, a permit, rent, a driver's
+ * allowance (FIN-05, D-93).
+ *
+ * Until this existed, every recorded cost had to hang off an incident or a work order, so the only
+ * costs the system could hold were maintenance costs. Fuel and tolls — usually the largest running
+ * costs a transport business has — had nowhere to go, which made "what did this month cost?" quietly
+ * mean "what did maintenance cost?".
+ *
+ * An expense is a record of a real payment, not a price the system worked out:
+ *
+ *   * it is numbered (`EXP-YYYY-NNNN`) so a receipt in a shoebox can be traced to a line;
+ *   * it is filed by the day it was incurred, which is the day the money left;
+ *   * `category` must be one of the names in Settings, or empty for "Uncategorised" — never invented;
+ *   * it carries who was paid and the number on the paper receipt, plus whether the paper is actually
+ *     held, because a cost nobody can produce a receipt for is a weaker fact and the report says so;
+ *   * it can be voided once, with a reason — never edited, so the figure a report was built on stays
+ *     the figure on the record.
+ */
+export interface Expense {
+  id: string;
+  reference: string; // EXP-2026-0001
+  /** The day the money was spent. Reports file it here, not by when it was typed in. */
+  incurredOn: string; // YYYY-MM-DD
+  /** A name from `settings.costCategories`, or empty for "Uncategorised" (Q-29). */
+  category: string;
+  description: string;
+  /** Who was paid: the filling station, the toll booth, the landlord. Optional. */
+  payee: string;
+  amount: number;
+  currencyCode: string;
+  /** How it was paid, from the configured methods, or empty when none were configured (D-93). */
+  method: string;
+  /** The number printed on the paper receipt or invoice, if there is one. */
+  receiptReference: string;
+  /** Whether the paper receipt is actually in the file. A receipt number without the paper is a claim. */
+  receiptHeld: boolean;
+  notes: string;
+  status: ExpenseStatus;
+  voidReason: string | null;
+  voidedAt: string | null;
+  recordedBy: string;
+  recordedAt: string;
+  updatedAt: string;
+}
+
 export const TAX_POSITIONS = ["not_registered", "registered"] as const;
 export type TaxPosition = (typeof TAX_POSITIONS)[number];
 
@@ -820,7 +874,7 @@ export interface TaxLineSetting {
  * A numbering series. Rentals, routes, trips, incidents and work orders are numbered continuously
  * and filed under the period `all`; invoices and payments restart each year (audit D-03).
  */
-export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "creditNote", "payment", "refund", "booking"] as const;
+export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "creditNote", "payment", "refund", "expense", "booking"] as const;
 export type ReferenceScope = (typeof REFERENCE_SCOPES)[number];
 
 export interface ReferenceCounter {
@@ -886,7 +940,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 /**
  * Every schema version this build can still read.
@@ -896,7 +950,7 @@ export const SCHEMA_VERSION = 17;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -916,6 +970,7 @@ export interface Database {
   creditNotes: CreditNote[];
   payments: Payment[];
   refunds: Refund[];
+  expenses: Expense[];
   bookings: Booking[];
   referenceCounters: ReferenceCounter[];
   settings: Settings;
@@ -945,6 +1000,7 @@ export function emptyDatabase(): Database {
     creditNotes: [],
     payments: [],
     refunds: [],
+    expenses: [],
     bookings: [],
     referenceCounters: [],
     settings: {
@@ -1031,6 +1087,8 @@ export function migrate(value: unknown): Database | null {
     payments: Array.isArray(v.payments)
       ? (v.payments as Payment[]).map((payment) => ({ ...payment, voidReason: payment.voidReason ?? null, voidedAt: payment.voidedAt ?? null }))
       : [],
+    // Expenses that are not repairs arrived in schema 18; an older backup simply has none.
+    expenses: Array.isArray(v.expenses) ? (v.expenses as Expense[]) : [],
     // Refunds arrived in schema 17; an older backup simply has none.
     refunds: Array.isArray(v.refunds) ? (v.refunds as Refund[]) : [],
     // Bookings arrived in schema 14; an older backup simply has none.

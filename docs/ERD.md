@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 17). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
+The app stores these as arrays inside one JSON document (schema version 18). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
 erDiagram
@@ -339,7 +339,7 @@ Unique `(rental_id, revision_number)`; quote and line snapshots are immutable. T
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous
 snapshot, so the current quote count equals history length + 1.
 
-## Phase 16 invoices and payments (implemented in `db/migrations/003_invoices_and_payments.sql`, extended by `008_credit_notes.sql`, `009_payment_cancellations.sql` and `010_refunds.sql`)
+## Phase 16 invoices and payments (implemented in `db/migrations/003_invoices_and_payments.sql`, extended by `008_credit_notes.sql`, `009_payment_cancellations.sql` and `010_refunds.sql`; expenses in `011_expenses.sql`)
 
 ```mermaid
 erDiagram
@@ -352,6 +352,7 @@ erDiagram
   REFERENCE_COUNTER ||--o{ PAYMENT : "allocates PAY-nnnn-yyyy"
   REFERENCE_COUNTER ||--o{ CREDIT_NOTE : "allocates CN-nnnn-yyyy"
   REFERENCE_COUNTER ||--o{ REFUND : "allocates REF-nnnn-yyyy"
+  REFERENCE_COUNTER ||--o{ EXPENSE : "allocates EXP-nnnn-yyyy"
 
   INVOICE {
     text id PK
@@ -406,6 +407,26 @@ erDiagram
     jsonb data "lines, taxLines (the invoice's own snapshot)"
   }
 
+  EXPENSE {
+    text id PK
+    text reference UK "EXP-YYYY-NNNN"
+    text incurred_on "the day the money left"
+    text category "a Settings category, or blank"
+    text description
+    text payee "who was paid"
+    numeric amount "14,2, > 0"
+    text currency_code
+    text method "a configured method, or blank"
+    text receipt_reference "the number on the paper"
+    boolean receipt_held "the paper is in the file"
+    text status "recorded|void"
+    text void_reason "never edited; voided once (D-93)"
+    timestamptz voided_at
+    text recorded_by
+    timestamptz recorded_at
+    jsonb data "notes, receipt facts"
+  }
+
   REFERENCE_COUNTER {
     text scope PK "invoice|creditNote|payment|…"
     text period PK "YYYY|all"
@@ -440,5 +461,14 @@ Constraints and triggers:
   constraint; `refund_frozen_trg` keeps the financial fields immutable and allows the cancellation to be
   set once; `refund_no_delete_trg` refuses a delete. A refund does **not** change `payment`, and the
   invoice's `amount_paid` is untouched by it.
+- **`expense` (migration `011_expenses.sql`, D-93).** Money spent that is not a repair. Checks:
+  `reference ~ '^EXP-[0-9]{4}-[0-9]{4,}$'`, `amount > 0`, `status in ('recorded','void')`,
+  `expense_void_has_reason` (a void carries a reason and a time), `expense_held_has_reference` (the
+  paper cannot be held without a number printed on it). `expense_frozen_trg` refuses any change to the
+  reference, date, category, description, payee, amount, currency, method, receipt facts or who
+  recorded it, makes the void one-way, and requires `voided_at` with the reason; `expense_no_delete_trg`
+  refuses a delete. Indexes `expense_incurred_idx` and `expense_category_idx` keep the period and
+  category reports cheap. A scanned copy is **not** stored — only the number and whether the paper is
+  held (D-93).
 - `reference_counter` is written by the same transaction that writes the document, so two writers
   cannot allocate the same number.

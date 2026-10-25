@@ -58,6 +58,11 @@ export const PERMISSIONS = [
   "maintenance:release",
   "maintenance:cost",
   "costs:read",
+  // Spending that is not a repair (D-93). Recording it is a money job; operations reads it because
+  // fuel and tolls are how its own runs are priced, but does not enter it.
+  "expenses:read",
+  "expenses:record",
+  "expenses:void",
   "invoices:read",
   "invoices:issue",
   "invoices:void",
@@ -140,6 +145,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "maintenance:advance",
     "maintenance:release",
     "costs:read",
+    // Spending that is not a repair (D-93): operations may read it, because fuel and tolls are part of
+    // what its own runs cost, but entering it is a money job.
+    "expenses:read",
     "documents:read",
     "documents:create",
     "documents:update",
@@ -180,10 +188,14 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "payments:record",
     "payments:advance",
     "payments:void",
-  // Money going back out to a customer (D-92). Kept apart from payments:void and credits:void because
-  // this is a payment the office makes, not a correction to a bill or to money received.
-  "refunds:record",
-  "refunds:void",
+    // Money going back out to a customer (D-92). Kept apart from payments:void and credits:void
+    // because this is a payment the office makes, not a correction to a bill or money received.
+    "refunds:record",
+    "refunds:void",
+    // Spending that is not a repair (D-93). Recording it is finance's job; operations may read it.
+    "expenses:read",
+    "expenses:record",
+    "expenses:void",
   ],
   // Own-record scope: a driver sees only the runs and incidents for the vehicle and
   // trips assigned to their linked driver record. See PERMISSIONS.md "Own-record scope".
