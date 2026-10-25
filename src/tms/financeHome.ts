@@ -53,6 +53,18 @@ export interface UnbilledHire {
   finalTotal: number | null;
 }
 
+/** Money the office paid back to a customer in the period (D-92). */
+export interface RefundPaid {
+  id: string;
+  reference: string;
+  invoiceReference: string;
+  customerName: string;
+  amount: number;
+  paidOn: string;
+  method: string;
+  reason: string;
+}
+
 export interface AwaitingPayment {
   id: string;
   reference: string;
@@ -98,6 +110,8 @@ export interface FinanceHome {
     paymentCount: number;
     creditedTotal: number;
     creditNoteCount: number;
+    refundedTotal: number;
+    refundCount: number;
     outstandingTotal: number;
     outstandingCount: number;
     expensesTotal: number;
@@ -114,7 +128,13 @@ export interface FinanceHome {
    * spent before it was billed, and the screen shows both rather than one blended number.
    */
   margin: MarginView;
-  movement: { received: number; expenses: number; difference: number } | null;
+  /**
+   * Cash, as three figures rather than one blended number: money received, money spent on the work,
+   * and money paid back to customers (D-92). A refund is not a cost of running the business, so it is
+   * stated beside spending rather than inside it, and `difference` subtracts both because both left
+   * the bank.
+   */
+  movement: { received: number; expenses: number; refunds: number; difference: number } | null;
   byCustomer: RevenueByCustomer[];
   byCategory: ExpensesByCategory[];
   overdue: OverdueInvoice[];
@@ -124,6 +144,8 @@ export interface FinanceHome {
   unbilled: UnbilledHire[];
   awaitingPayments: AwaitingPayment[];
   awaitingTotal: number;
+  /** Refunds recorded in the period, newest date last, from live records only. */
+  refunds: RefundPaid[];
   coverage: FinancialReport["coverage"];
   status: "ok" | "currency_not_set";
   message: string;
@@ -240,6 +262,8 @@ export function financeHome(db: Database, from: string, to: string, asAt: string
       paymentCount: report.paymentCount,
       creditedTotal: report.creditedTotal,
       creditNoteCount: report.creditNoteCount,
+      refundedTotal: report.refundedTotal,
+      refundCount: report.refundCount,
       outstandingTotal: report.outstandingTotal,
       outstandingCount: report.outstandingCount,
       expensesTotal: report.expensesTotal,
@@ -255,7 +279,9 @@ export function financeHome(db: Database, from: string, to: string, asAt: string
         : {
             received: report.receivedTotal,
             expenses: report.expensesTotal,
-            difference: fromMinor(toMinor(report.receivedTotal) - toMinor(report.expensesTotal)),
+            refunds: report.refundedTotal,
+            // Both leave the bank, so both come off: a refund is cash out even though it is not a cost.
+            difference: fromMinor(toMinor(report.receivedTotal) - toMinor(report.expensesTotal) - toMinor(report.refundedTotal)),
           },
     margin,
     byCustomer: report.revenueByCustomer,
@@ -266,6 +292,19 @@ export function financeHome(db: Database, from: string, to: string, asAt: string
     unbilled,
     awaitingPayments,
     awaitingTotal: sum(awaitingPayments.map((payment) => payment.amount)),
+    refunds: db.refunds
+      .filter((refund) => refund.status !== "void" && refund.paidOn >= from && refund.paidOn <= to)
+      .map((refund) => ({
+        id: refund.id,
+        reference: refund.reference,
+        invoiceReference: refund.invoiceReference,
+        customerName: refund.customerName,
+        amount: refund.amount,
+        paidOn: refund.paidOn,
+        method: refund.method,
+        reason: refund.reason,
+      }))
+      .sort((a, b) => (a.paidOn === b.paidOn ? a.reference.localeCompare(b.reference) : a.paidOn < b.paidOn ? -1 : 1)),
     coverage: report.coverage,
     status: currencyCode === null ? "currency_not_set" : "ok",
     message:

@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FinanceHomePage } from "./FinanceHome";
 import { TmsContext, type Tms } from "../tms/useTms";
-import { emptyDatabase, emptyRentalSettings, type Database, type Invoice, type Payment, type Rental, type User } from "../tms/types";
+import { emptyDatabase, emptyRentalSettings, type Database, type Invoice, type Payment, type Refund, type Rental, type User } from "../tms/types";
 
 afterEach(cleanup);
 
@@ -100,6 +100,28 @@ const unbilled: Rental = {
   createdAt: at,
   updatedAt: `${daysAgo(2)}T17:00:00.000Z`,
 };
+
+const refund = (overrides: Partial<Refund> = {}): Refund => ({
+  id: "rf1",
+  reference: "REF-2026-0001",
+  invoiceId: "inv1",
+  invoiceReference: "INV-2026-0001",
+  clientId: null,
+  customerName: "Northstar Foods",
+  currencyCode: "GHS",
+  amount: 200,
+  method: "Bank transfer",
+  paidOn: today,
+  externalReference: "",
+  reason: "Day not operated",
+  status: "paid",
+  voidReason: null,
+  voidedAt: null,
+  recordedBy: "Efua Owusu",
+  recordedAt: at,
+  updatedAt: at,
+  ...overrides,
+});
 
 function world(currencyCode: string | null = "GHS"): Database {
   const base = emptyDatabase();
@@ -229,5 +251,26 @@ describe("finance home", () => {
     const navigate = open(world());
     fireEvent.click(screen.getByRole("button", { name: /Open invoices/i }));
     expect(navigate).toHaveBeenCalledWith("invoices");
+  });
+});
+
+describe("money paid back on the finance home (D-92)", () => {
+  it("states what was refunded, and takes it off cash movement without calling it a cost", () => {
+    const db = world();
+    open({ ...db, refunds: [refund({ amount: 200 })] });
+
+    expect(screen.getAllByText("Paid back").length).toBeGreaterThan(0);
+    // The card names the refund, the invoice and the reason, so the figure can be traced.
+    expect(screen.getByText("REF-2026-0001")).toBeTruthy();
+    expect(screen.getAllByText(/GHS 200\.00/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Day not operated/).length).toBeGreaterThan(0);
+    // 500 received less 200 paid back: the caption says so rather than leaving the reader to guess.
+    expect(screen.getByText(/Received less spend less GHS 200\.00 paid back to customers/)).toBeTruthy();
+  });
+
+  it("says nothing was paid back when that is the truth", () => {
+    open(world());
+    expect(screen.getByText("Nothing paid back")).toBeTruthy();
+    expect(screen.getByText(/No refund was recorded in this period/)).toBeTruthy();
   });
 });

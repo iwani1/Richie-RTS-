@@ -364,6 +364,29 @@ describe("credit notes inside the snapshot (D-86)", () => {
         updatedAt: at,
       },
     ];
+    // A refund names a customer and an amount paid back to them (D-92). It travels with the invoice.
+    w.refunds = [
+      {
+        id: "rf1",
+        reference: "REF-2026-0001",
+        invoiceId: invoice.id,
+        invoiceReference: invoice.reference,
+        clientId: "c1",
+        customerName: "Acme Ltd",
+        currencyCode: "GHS",
+        amount: 200,
+        method: "Bank transfer",
+        paidOn: "2026-06-06",
+        externalReference: "",
+        reason: "Service not delivered",
+        status: "paid",
+        voidReason: null,
+        voidedAt: null,
+        recordedBy: "Fin",
+        recordedAt: at,
+        updatedAt: at,
+      },
+    ];
     return w;
   }
 
@@ -383,9 +406,23 @@ describe("credit notes inside the snapshot (D-86)", () => {
     expect(visible.invoices.map((invoice) => invoice.reference)).toEqual(["INV-2026-0001"]);
   });
 
-  it("sends operations nothing about billing, credit notes included", () => {
+  it("sends operations nothing about billing, credit notes and refunds included", () => {
     const visible = scopeDatabase(withCreditNotes(), actor("ops", "operations"))!;
     expect(visible.creditNotes).toEqual([]);
+    expect(visible.refunds).toEqual([]);
     expect(visible.invoices).toEqual([]);
+  });
+
+  it("never sends a refund to a driver or a client contact", () => {
+    // The narrowed snapshot is a whitelist; an unlisted collection would be handed over in full.
+    for (const who of [actor("driver-user", "driver"), actor("client-user", "client_contact")]) {
+      const visible = scopeDatabase(withCreditNotes(), who)!;
+      expect(visible.refunds).toEqual([]);
+    }
+  });
+
+  it("sends finance the refunds that belong to the invoices it may read", () => {
+    const visible = scopeDatabase(withCreditNotes(), actor("fin", "finance"))!;
+    expect(visible.refunds.map((refund) => refund.reference)).toEqual(["REF-2026-0001"]);
   });
 });

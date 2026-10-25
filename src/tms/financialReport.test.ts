@@ -5,7 +5,7 @@
 // disagree, one of them is a defect — so these tests are the document's evidence.
 import { describe, expect, it } from "vitest";
 import { financialReport, financialReportCsv } from "./financialReport";
-import { emptyDatabase, emptyRentalSettings, type CostEntry, type Database, type Invoice, type Payment, type Trip } from "./types";
+import { emptyDatabase, emptyRentalSettings, type CostEntry, type Database, type Invoice, type Payment, type Refund, type Trip } from "./types";
 
 const JUNE = { from: "2026-06-01", to: "2026-06-30" };
 const at = "2026-06-01T08:00:00.000Z";
@@ -76,6 +76,28 @@ function payment(overrides: Partial<Payment> = {}): Payment {
     ...overrides,
   };
 }
+
+const refund = (overrides: Partial<Refund> = {}): Refund => ({
+  id: "rf1",
+  reference: "REF-2026-0001",
+  invoiceId: "inv1",
+  invoiceReference: "INV-2026-0001",
+  clientId: null,
+  customerName: "Northstar Foods",
+  currencyCode: "GHS",
+  amount: 200,
+  method: "Bank transfer",
+  paidOn: "2026-06-20",
+  externalReference: "",
+  reason: "Day not operated",
+  status: "paid",
+  voidReason: null,
+  voidedAt: null,
+  recordedBy: "Fin",
+  recordedAt: at,
+  updatedAt: at,
+  ...overrides,
+});
 
 const cost = (overrides: Partial<CostEntry> = {}): CostEntry => ({
   id: "c1",
@@ -256,7 +278,7 @@ describe("financial report (RPT-03)", () => {
     expect(reversed.status).toBe("invalid_range");
     const empty = financialReport(world({ workOrders: [] }), JUNE.from, JUNE.to);
     expect(empty.status).toBe("empty");
-    expect(empty.message).toMatch(/No invoices, payments, credit notes, recorded costs or completed runs/);
+    expect(empty.message).toMatch(/No invoices, payments, credit notes, refunds, recorded costs or completed runs/);
   });
 
   it("writes the same figures to CSV", () => {
@@ -270,5 +292,31 @@ describe("financial report (RPT-03)", () => {
     // A customer name with a comma has to survive the round trip through a spreadsheet.
     const quoted = financialReportCsv(financialReport(world({ invoices: [invoice({ customerName: "Acme, Ltd" })] }), JUNE.from, JUNE.to));
     expect(quoted).toContain('"Acme, Ltd"');
+  });
+});
+
+describe("money paid back in the report (D-92)", () => {
+  it("states refunds separately from costs, and files them by the day they were paid", () => {
+    const db = world({ invoices: [invoice()], refunds: [refund(), refund({ id: "rf2", reference: "REF-2026-0002", paidOn: "2026-07-02" })] });
+    const report = financialReport(db, JUNE.from, JUNE.to);
+    // Only June's refund is in June, and it is not counted as a cost: the business did not spend it.
+    expect(report.refundCount).toBe(1);
+    expect(report.refundedTotal).toBe(200);
+    // A refund is cash out, not a cost of the work: dropping it into expenses would make the month
+    // look as though it cost more to run than it did.
+    expect(report.expensesTotal).toBe(financialReport(world({ invoices: [invoice()] }), JUNE.from, JUNE.to).expensesTotal);
+    expect(report.message).toMatch(/GHS 200\.00 paid back on 1 refund/);
+    expect(financialReportCsv(report)).toContain("Refunded,GHS 200.00");
+  });
+
+  it("ignores a cancelled refund", () => {
+    const report = financialReport(world({ invoices: [invoice()], refunds: [refund({ status: "void", voidReason: "Never left", voidedAt: at })] }), JUNE.from, JUNE.to);
+    expect(report.refundCount).toBe(0);
+    expect(report.refundedTotal).toBe(0);
+  });
+
+  it("is not an empty period just because a refund is the only thing in it", () => {
+    const report = financialReport(world({ invoices: [], refunds: [refund()] }), JUNE.from, JUNE.to);
+    expect(report.status).toBe("ok");
   });
 });

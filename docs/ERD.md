@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 16). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
+The app stores these as arrays inside one JSON document (schema version 17). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
 erDiagram
@@ -339,7 +339,7 @@ Unique `(rental_id, revision_number)`; quote and line snapshots are immutable. T
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous
 snapshot, so the current quote count equals history length + 1.
 
-## Phase 16 invoices and payments (implemented in `db/migrations/003_invoices_and_payments.sql`, extended by `008_credit_notes.sql` and `009_payment_cancellations.sql`)
+## Phase 16 invoices and payments (implemented in `db/migrations/003_invoices_and_payments.sql`, extended by `008_credit_notes.sql`, `009_payment_cancellations.sql` and `010_refunds.sql`)
 
 ```mermaid
 erDiagram
@@ -347,9 +347,11 @@ erDiagram
   CLIENT ||--o{ INVOICE : "may be the account"
   INVOICE ||--o{ PAYMENT : "is paid by"
   INVOICE ||--o{ CREDIT_NOTE : "is corrected by (D-86)"
+  INVOICE ||--o{ REFUND : "is paid back by (D-92)"
   REFERENCE_COUNTER ||--o{ INVOICE : "allocates INV-nnnn-yyyy"
   REFERENCE_COUNTER ||--o{ PAYMENT : "allocates PAY-nnnn-yyyy"
   REFERENCE_COUNTER ||--o{ CREDIT_NOTE : "allocates CN-nnnn-yyyy"
+  REFERENCE_COUNTER ||--o{ REFUND : "allocates REF-nnnn-yyyy"
 
   INVOICE {
     text id PK
@@ -432,5 +434,11 @@ Constraints and triggers:
   is a check constraint, not a courtesy. Note that the ceiling is the invoice total and **not** what is
   still unpaid: crediting an invoice that is already paid is a refund, and `paid + credited − total`
   is reported as a refund due rather than netted away (`src/tms/creditNotes.ts`).
+- **`refund` (migration `010_refunds.sql`, D-92).** Money actually paid back. `refund_within_due_trg`
+  locks the invoice and refuses an amount greater than `live payments + live credits − invoice total −
+  live refunds`, so the same over-credit cannot be paid out twice; `refund_void_has_reason` is a check
+  constraint; `refund_frozen_trg` keeps the financial fields immutable and allows the cancellation to be
+  set once; `refund_no_delete_trg` refuses a delete. A refund does **not** change `payment`, and the
+  invoice's `amount_paid` is untouched by it.
 - `reference_counter` is written by the same transaction that writes the document, so two writers
   cannot allocate the same number.

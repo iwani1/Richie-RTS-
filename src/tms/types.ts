@@ -748,6 +748,57 @@ export interface Payment {
   voidedAt: string | null;
 }
 
+export const REFUND_STATUSES = ["paid", "void"] as const;
+export type RefundStatus = (typeof REFUND_STATUSES)[number];
+
+export const REFUND_STATUS_LABELS: Record<RefundStatus, string> = {
+  paid: "Paid back",
+  void: "Cancelled",
+};
+
+/**
+ * Money going back out to a customer (FIN-03, D-92).
+ *
+ * A credit note only ever *states* that money is owed back — it takes an amount off the bill, and
+ * when the bill drops below what was received the difference becomes a refund due. Nothing in the
+ * system used to record the day the office actually paid it: it was booked as a plain expense, which
+ * lost the customer, the invoice and the reason, and made the month's cash-out look like spending on
+ * the business.
+ *
+ * A refund is therefore its own numbered document, like a payment in reverse:
+ *
+ *   * it is raised against one invoice, and its ceiling is that invoice's `refundDue`
+ *     (paid + credited − total, less refunds already made), checked in whole pesewas;
+ *   * it does **not** change what the customer has paid. They paid what they paid; the office gave
+ *     some of it back, and that is a separate fact;
+ *   * it can be cancelled once, with a reason, if the transfer never left — the money is then owed
+ *     back again, and the file still shows that the office tried.
+ */
+export interface Refund {
+  id: string;
+  reference: string; // REF-2026-0001
+  invoiceId: string;
+  /** Copied onto the refund so it reads on its own in a list. */
+  invoiceReference: string;
+  clientId: string | null;
+  customerName: string;
+  currencyCode: string;
+  amount: number;
+  /** How the money left the business: the same list of methods Settings holds for money coming in. */
+  method: string;
+  paidOn: string; // YYYY-MM-DD
+  /** Bank reference, transfer id or receipt number, if the operator has one. */
+  externalReference: string;
+  /** Why the office paid money back. Required: a refund with no explanation is not auditable. */
+  reason: string;
+  status: RefundStatus;
+  voidReason: string | null;
+  voidedAt: string | null;
+  recordedBy: string;
+  recordedAt: string;
+  updatedAt: string;
+}
+
 export const TAX_POSITIONS = ["not_registered", "registered"] as const;
 export type TaxPosition = (typeof TAX_POSITIONS)[number];
 
@@ -769,7 +820,7 @@ export interface TaxLineSetting {
  * A numbering series. Rentals, routes, trips, incidents and work orders are numbered continuously
  * and filed under the period `all`; invoices and payments restart each year (audit D-03).
  */
-export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "creditNote", "payment", "booking"] as const;
+export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "creditNote", "payment", "refund", "booking"] as const;
 export type ReferenceScope = (typeof REFERENCE_SCOPES)[number];
 
 export interface ReferenceCounter {
@@ -835,7 +886,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 /**
  * Every schema version this build can still read.
@@ -845,7 +896,7 @@ export const SCHEMA_VERSION = 16;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -864,6 +915,7 @@ export interface Database {
   invoices: Invoice[];
   creditNotes: CreditNote[];
   payments: Payment[];
+  refunds: Refund[];
   bookings: Booking[];
   referenceCounters: ReferenceCounter[];
   settings: Settings;
@@ -892,6 +944,7 @@ export function emptyDatabase(): Database {
     invoices: [],
     creditNotes: [],
     payments: [],
+    refunds: [],
     bookings: [],
     referenceCounters: [],
     settings: {
@@ -978,6 +1031,8 @@ export function migrate(value: unknown): Database | null {
     payments: Array.isArray(v.payments)
       ? (v.payments as Payment[]).map((payment) => ({ ...payment, voidReason: payment.voidReason ?? null, voidedAt: payment.voidedAt ?? null }))
       : [],
+    // Refunds arrived in schema 17; an older backup simply has none.
+    refunds: Array.isArray(v.refunds) ? (v.refunds as Refund[]) : [],
     // Bookings arrived in schema 14; an older backup simply has none.
     bookings: Array.isArray(v.bookings)
       ? (v.bookings as Booking[]).map((booking) => ({

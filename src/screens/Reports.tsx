@@ -168,6 +168,11 @@ export function ReportsPage() {
               <Stat label="Outstanding" value={money(moneyReport.currencyCode, moneyReport.outstandingTotal)} caption={`${moneyReport.outstandingCount} invoices not fully paid`} />
               <Stat label="Costs recorded" value={money(moneyReport.currencyCode, moneyReport.expensesTotal)} caption={`${moneyReport.expenseLineCount} cost lines`} />
               <Stat
+                label="Refunded"
+                value={money(moneyReport.currencyCode, moneyReport.refundedTotal)}
+                caption={`${moneyReport.refundCount} refund${moneyReport.refundCount === 1 ? "" : "s"} paid back — cash out, not a cost of running the work`}
+              />
+              <Stat
                 label="Cost per trip"
                 value={moneyReport.costPerTrip === null ? "Not available" : money(moneyReport.currencyCode, moneyReport.costPerTrip)}
                 caption={`over ${moneyReport.completedTrips} completed run${moneyReport.completedTrips === 1 ? "" : "s"}`}

@@ -87,13 +87,14 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Cancelling a payment recorded in error, with a reason, one way, leaving the invoice owed again | Works; the money reports, the finance home and the printed sheet all ignore a cancelled payment |
 | Customer statements: one account for a period, balance carried in and out, debt aged in bands, printable | Works; the figures come from the same balance rule as the invoice, and a cancelled payment is not stated |
 | Debt ageing for the whole company, in the same bands | Works; one banding function behind the finance home and every printed statement |
+| Refunds: money paid back, numbered, dated, with a reason, capped at what is owed back | Works; a cancelled refund is kept and the money becomes owed again, and the database refuses to pay out more than is owed |
 | Printable invoice and credit note: A4 sheet, or save as PDF from the browser's print dialog | Works; the printed amount due is the figure the screen shows |
 | Finance home: money in and out, who is late, unbilled work, payments to check | Works; margin is withheld until both sides of the period are complete |
 | Public enquiry form, embeddable on the company website | Works; throttled, spam-trapped, creates a draft only |
 | CSV import for vehicles, drivers, clients and staff rosters | Works; rejects a row with its line number, never merges an existing person |
 | Contracts, notifications, driver app, GPS | **Not built** — see `docs/PROGRESS.md` |
 
-582 unit and UI tests plus 18 integration tests against a real PostgreSQL; coverage thresholds are
+606 unit and UI tests plus 18 integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { InvoicesPage } from "./Invoices";
 import { TmsContext, type Tms } from "../tms/useTms";
 import type { CommandResult } from "../tms/service";
-import { emptyDatabase, type CreditNote, type Database, type Invoice, type Payment, type User } from "../tms/types";
+import { emptyDatabase, type CreditNote, type Database, type Invoice, type Payment, type Refund, type User } from "../tms/types";
 
 afterEach(cleanup);
 
@@ -213,7 +213,10 @@ describe("credit notes on the invoice screen (D-86)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
     expect(screen.getByText("A refund is due")).toBeTruthy();
-    expect(screen.getByText(/is owed back\. Credit notes never move money/i)).toBeTruthy();
+    // The notice now says where the money is actually recorded, rather than telling the operator to
+    // book it as an ordinary outgoing (D-92).
+    expect(screen.getByText(/A credit note never moves money: record the\s+refund here/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Pay a refund/i })).toBeTruthy();
   });
 
   it("lists the credit note on the invoice, with its reason, and offers to void it", () => {
@@ -348,5 +351,85 @@ describe("cancelling a payment recorded in error (D-88)", () => {
     expect(screen.queryByRole("button", { name: /Cancel PAY-2026-0002/i })).toBeNull();
     // The received figure is one of two payments, and the caption says so rather than lying.
     expect(screen.getByText(/1 payment counting of 2 recorded/)).toBeTruthy();
+  });
+});
+
+describe("refunds paid back on the invoice screen (D-92)", () => {
+  // GHS 3,450 paid in full, then GHS 2,300 credited: GHS 2,300 is genuinely owed back.
+  const overpaid = (overrides: Partial<Database> = {}): Database => ({
+    ...base(),
+    payments: [{ ...payment, amount: 3450, status: "reconciled" }],
+    invoices: [{ ...invoice, amountPaid: 3450, status: "paid" }],
+    creditNotes: [creditNote],
+    ...overrides,
+  });
+
+  const refund: Refund = {
+    id: "rf1",
+    reference: "REF-2026-0001",
+    invoiceId: invoice.id,
+    invoiceReference: invoice.reference,
+    clientId: null,
+    customerName: "Acme Ltd",
+    currencyCode: "GHS",
+    amount: 2300,
+    method: "Bank transfer",
+    paidOn: "2026-06-20",
+    externalReference: "TRF-1",
+    reason: "Service not delivered",
+    status: "paid",
+    voidReason: null,
+    voidedAt: null,
+    recordedBy: "Ama Mensah",
+    recordedAt: at,
+    updatedAt: at,
+  };
+
+  it("records the refund with the amount still owed back filled in and the reason required", () => {
+    const tms = renderInvoices(overpaid());
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Pay a refund/i }));
+
+    const dialog = screen.getByRole("dialog");
+    const amount = within(dialog).getByLabelText(/Amount paid back/i) as HTMLInputElement;
+    expect(amount.value).toBe("2300.00");
+    // The reason is a field of its own, not an optional note: a refund with no explanation cannot be
+    // audited a year later.
+    fireEvent.change(within(dialog).getByLabelText(/Why the money was paid back/i), { target: { value: "Service not delivered" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Record the refund/i }));
+
+    expect(tms.dispatch).toHaveBeenCalledWith({
+      type: "record_refund",
+      input: expect.objectContaining({ invoiceId: "i1", amount: "2300.00", reason: "Service not delivered" }),
+    });
+  });
+
+  it("lists a refund with its number, reason and method, and says nothing further is owed back", () => {
+    renderInvoices(overpaid({ refunds: [refund] }));
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+
+    expect(screen.getByText("The refund has been paid")).toBeTruthy();
+    expect(screen.getAllByText("REF-2026-0001").length).toBeGreaterThan(0);
+    // The status badge and the column header say the same thing, deliberately: the word carries the
+    // state, not only the colour.
+    expect(screen.getAllByText("Paid back").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Service not delivered").length).toBeGreaterThan(0);
+    // Received is still GHS 3,450: a refund does not rewrite what the customer paid.
+    expect(screen.getAllByText(/GHS 3450\.00 received/).length).toBeGreaterThan(0);
+    // Nothing is owed back any more, so the action is gone.
+    expect(screen.queryByRole("button", { name: /Pay a refund/i })).toBeNull();
+  });
+
+  it("cancels a refund with a reason, so the money is owed back again", () => {
+    const tms = renderInvoices(overpaid({ refunds: [refund] }));
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Cancel REF-2026-0001/i }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/becomes owed back to the customer again on INV-2026-0001/i)).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText(/^Reason/), { target: { value: "Transfer never left the bank" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Cancel refund/i }));
+
+    expect(tms.dispatch).toHaveBeenCalledWith({ type: "void_refund", id: "rf1", reason: "Transfer never left the bank" });
   });
 });

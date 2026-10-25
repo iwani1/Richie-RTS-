@@ -210,6 +210,7 @@ from its own button, the scrim and Escape.
 | Audit | Prove who changed what | Chronology and the actor | Dense table: mono timestamps, action as a chip, record named, "showing 17 of 412" |
 | Command palette | Jump without the mouse | Destinations and their captions | Overlay, keyboard-first, permission-filtered, focus-trapped |
 | Finance home | Decide what to do about the money | How bad the debt is, then what to chase | Page head, period, eight figures, then **debt by age** (four bands with a sentence each, and the customers behind them) above the overdue list, unbilled work, payments to check, revenue and spend. The oldest band is named, never only coloured |
+| Invoices | Settle what is owed on one invoice | The balance and every action on it | Detail: notice, seven figures (total, received, credited, outstanding, refunded), line items, payments, credit notes, **refunds paid back** with their own numbers and reasons, then the document itself. A refund is recorded from here, in a panel that fills in what is still owed back |
 | Statements | Chase what one customer owes | The balance and its age | Customer list ordered by what is owed beside the statement itself: five figures, the ageing bands in words, the entries in the period, the invoices still owing. Prints as the same A4 sheet as an invoice |
 | Printed invoice / credit note | Hand the customer a document | The figures and what is owed | A4 sheet in a preview overlay: letterhead and reference at the top, the line table, the totals in the lower right with the sentence that explains them beneath, footer with reference and print date. Print removes the app entirely |
 
@@ -224,7 +225,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **582 passed, 18 skipped** across 59 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **606 passed, 18 skipped** across 60 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are

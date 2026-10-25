@@ -60,6 +60,8 @@ const SECTION_PERMISSIONS: { [K in keyof Database]?: Permission } = {
   // A payment and a credit note are part of their invoice, so the same read permission opens them.
   payments: "invoices:read",
   creditNotes: "invoices:read",
+  // A refund is part of its invoice's money, so the invoice read permission opens it (D-92).
+  refunds: "invoices:read",
   referenceCounters: "invoices:read",
   routes: "routes:read",
   settings: "settings:read",
@@ -117,6 +119,9 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       // It is billing, so it stays with the invoice and the payment rows — never with a driver or a
       // client contact. Adding the collection without this line would have sent the whole table.
       creditNotes: [],
+      // D-92: a refund names a customer and an amount paid back to them. Billing, so it stays with
+      // the invoice rows and never travels to a driver or a client contact.
+      refunds: [],
       referenceCounters: [],
       // Record-bound roles have no audit: the summaries name records that are not theirs.
       audit: [],

@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { ageBucketFor, customerStatement, debtAgeing, statementCustomers } from "./customerStatement";
 import { invoiceBalance } from "./creditNotes";
-import { emptyDatabase, type CreditNote, type Database, type Invoice, type Payment } from "./types";
+import { emptyDatabase, type CreditNote, type Database, type Invoice, type Payment, type Refund } from "./types";
 
 const AT = "2026-06-01T09:00:00.000Z";
 
@@ -79,6 +79,28 @@ const credit = (overrides: Partial<CreditNote> = {}): CreditNote => ({
   ...overrides,
 });
 
+const refund = (overrides: Partial<Refund> = {}): Refund => ({
+  id: "rf1",
+  reference: "REF-2026-0001",
+  invoiceId: "inv1",
+  invoiceReference: "INV-2026-0001",
+  clientId: null,
+  customerName: "Acme Ltd",
+  currencyCode: "GHS",
+  amount: 1150,
+  method: "Bank transfer",
+  paidOn: "2026-06-25",
+  externalReference: "TRF-9",
+  reason: "Service cancelled after payment",
+  status: "paid",
+  voidReason: null,
+  voidedAt: null,
+  recordedBy: "Fin",
+  recordedAt: AT,
+  updatedAt: AT,
+  ...overrides,
+});
+
 function world(overrides: Partial<Database> = {}): Database {
   const db = emptyDatabase();
   return {
@@ -129,7 +151,7 @@ describe("a customer statement for a period", () => {
       .filter((entry) => entry.customerName === "Acme Ltd")
       .reduce((sum, entry) => {
         const balance = invoiceBalance(db, entry, "2026-06-30");
-        return sum + balance.total - balance.paid - balance.credited;
+        return sum + balance.total - balance.paid - balance.credited + balance.refunded;
       }, 0);
     expect(statement.closingBalance).toBe(perInvoice);
   });
@@ -375,5 +397,63 @@ describe("how bad the debt is, across customers (RPT-04, D-91)", () => {
     expect(statement.ageing.days31to60).toBe(ageing.days31to60);
     expect(statement.ageing.days61plus).toBe(ageing.days61plus);
     expect(statement.ageing.total).toBe(ageing.total);
+  });
+});
+
+describe("money paid back on a statement (D-92)", () => {
+  // The balance on a statement is what the customer holds with the office. A refund gives some of
+  // that back, so it belongs in the debit column and closes an in-credit account to zero — it is not
+  // a second credit, which would take the same money off twice.
+  const overpaid = () =>
+    world({
+      payments: [payment({ amount: 4600 })],
+      creditNotes: [credit()],
+      refunds: [refund()],
+    });
+
+  it("closes an in-credit account to zero, in the debit column, and says so", () => {
+    const statement = customerStatement(overpaid(), "Acme Ltd", "2026-06-01", "2026-06-30");
+    expect(statement.rows.map((row) => [row.date, row.kind, row.debit, row.credit, row.balance])).toEqual([
+      ["2026-06-01", "invoice", 4600, 0, 4600],
+      ["2026-06-10", "payment", 0, 4600, 0],
+      ["2026-06-20", "creditNote", 0, 1150, -1150],
+      ["2026-06-25", "refund", 1150, 0, 0],
+    ]);
+    expect(statement.refunded).toBe(1150);
+    expect(statement.received).toBe(4600);
+    expect(statement.credited).toBe(1150);
+    expect(statement.closingBalance).toBe(0);
+    expect(statement.message).toBe("Acme Ltd's account is settled as at 2026-06-30.");
+  });
+
+  it("leaves a cancelled refund off the customer's page, because the money never left", () => {
+    const statement = customerStatement(
+      world({
+        payments: [payment({ amount: 4600 })],
+        creditNotes: [credit()],
+        refunds: [refund({ status: "void", voidReason: "Transfer never left the bank", voidedAt: AT })],
+      }),
+      "Acme Ltd",
+      "2026-06-01",
+      "2026-06-30",
+    );
+    expect(statement.rows.some((row) => row.kind === "refund")).toBe(false);
+    expect(statement.refunded).toBe(0);
+    // Still in credit: the money is owed back again, and the statement must not pretend otherwise.
+    expect(statement.closingBalance).toBe(-1150);
+    expect(statement.message).toMatch(/is in credit by GHS 1150\.00/);
+  });
+
+  it("files a refund in the month it was paid, not the month of the invoice it settles", () => {
+    const statement = customerStatement(
+      overpaid(),
+      "Acme Ltd",
+      "2026-07-01",
+      "2026-07-31",
+    );
+    expect(statement.rows).toEqual([]);
+    // Everything happened in June, so July opens and closes settled.
+    expect(statement.openingBalance).toBe(0);
+    expect(statement.closingBalance).toBe(0);
   });
 });

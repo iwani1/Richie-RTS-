@@ -94,12 +94,19 @@ company-wide report cannot be assembled from it.
 | payments:void | x | | x | | |
 | credits:issue | x | | x | | |
 | credits:void | x | | x | | |
+| refunds:record | x | | x | | |
+| refunds:void | x | | x | | |
 
 `payments:void` is separate from `payments:record` on purpose (D-88): the person who took the money in
 is not always the person who may take it back, and the cancellation carries that person's name.
 
-Read scope: `invoices:read` also opens the invoice's payments and credit notes, because both are part
-of the invoice — and it is the permission the **Statements** destination needs (D-90), because a
+`refunds:record` and `refunds:void` (D-92) are kept apart from all four of the above. Paying money back
+is a payment the office *makes*, not a correction to a bill (that is `credits:issue`) and not a
+correction to money received (that is `payments:void`). The ceiling is enforced where the money is:
+`refunds:record` can only pay back what an invoice still owes, and the database refuses more.
+
+Read scope: `invoices:read` also opens the invoice's payments, credit notes and refunds, because all
+three are part of the invoice — and it is the permission the **Statements** destination needs (D-90), because a
 statement is those same three collections read for one customer over a period. Record-bound roles receive none of the three collections, so a driver or client
 contact never sees a customer's billing (`visibility.ts`, `SECTION_PERMISSIONS`).
 

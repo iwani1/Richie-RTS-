@@ -14,8 +14,8 @@ import { useMemo, useState, type FormEvent } from "react";
 import { invoiceBalance, isLivePayment, type InvoiceBalance } from "../tms/creditNotes";
 import { formatAmount, fromMinor, lineAmount, linesTotal, parseAmount, percentOfMinor, toMinor } from "../tms/money";
 import type { CommandResult } from "../tms/service";
-import type { CreditNote, Invoice, InvoiceStatus, Payment, PaymentStatus } from "../tms/types";
-import { CREDIT_NOTE_STATUS_LABELS, INVOICE_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "../tms/types";
+import type { CreditNote, Invoice, InvoiceStatus, Payment, PaymentStatus, Refund } from "../tms/types";
+import { CREDIT_NOTE_STATUS_LABELS, INVOICE_STATUS_LABELS, PAYMENT_STATUS_LABELS, REFUND_STATUS_LABELS } from "../tms/types";
 import { useTms } from "../tms/useTms";
 import { CreditNoteSheet, InvoiceSheet, PrintPreview } from "./Documents";
 import {
@@ -380,6 +380,9 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
   const [voidingCredit, setVoidingCredit] = useState<CreditNote | null>(null);
   // The payment being cancelled, with the reason typed into the panel (D-88).
   const [cancellingPayment, setCancellingPayment] = useState<Payment | null>(null);
+  // Money going back out: the refund form, and the refund being cancelled (D-92).
+  const [refunding, setRefunding] = useState(false);
+  const [cancellingRefund, setCancellingRefund] = useState<Refund | null>(null);
   // Which document is open in the print preview: this invoice, or one of its credit notes (D-87).
   const [printing, setPrinting] = useState<{ kind: "invoice" } | { kind: "creditNote"; note: CreditNote } | null>(null);
   const payments = db.payments.filter((payment) => payment.invoiceId === invoice.id);
@@ -388,6 +391,9 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
   // balance (D-88).
   const livePaymentsForInvoice = payments.filter(isLivePayment);
   const credits = db.creditNotes.filter((note) => note.invoiceId === invoice.id);
+  // A cancelled refund is still listed: the number was issued and the office decided not to pay it,
+  // which is a fact the next reader needs (D-92).
+  const refunds = db.refunds.filter((refund) => refund.invoiceId === invoice.id);
   const balance = invoiceBalance(db, invoice);
   const outstanding = balance.outstanding;
   const rental = db.rentals.find((candidate) => candidate.id === invoice.rentalId) ?? null;
@@ -403,6 +409,13 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
     const result = await dispatch({ type: "void_payment", id: payment.id, reason });
     setFlash({ tone: result.ok ? "success" : "error", message: result.message });
     if (result.ok) setCancellingPayment(null);
+    return result;
+  };
+
+  const cancelRefund = async (refund: Refund, reason: string) => {
+    const result = await dispatch({ type: "void_refund", id: refund.id, reason });
+    setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) setCancellingRefund(null);
     return result;
   };
 
@@ -427,6 +440,9 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
               <Button variant="primary" onClick={() => setPaying(true)}>
                 Record a payment
               </Button>
+            )}
+            {allowed("refunds:record") && invoice.status !== "void" && toMinor(balance.refundDue) > 0 && (
+              <Button onClick={() => setRefunding(true)}>Pay a refund</Button>
             )}
             {allowed("credits:issue") && invoice.status !== "void" && toMinor(creditRoom) > 0 && (
               <Button onClick={() => setCrediting(true)}>Credit the invoice</Button>
@@ -456,8 +472,14 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
       )}
       {balance.refundDue > 0 && (
         <Notice tone="warning" title="A refund is due" className="mb-4">
-          Credit notes have taken this invoice below what the customer paid, so {money(invoice.currencyCode, balance.refundDue)} is owed back. Credit notes never move money: pay the
-          refund the way you pay any other outgoing, and keep the receipt with the invoice.
+          Credit notes have taken this invoice below what the customer paid, so {money(invoice.currencyCode, balance.refundDue)} is owed back. A credit note never moves money: record the
+          refund here when the money actually leaves, so the date, the method and the reason are on the account rather than only in the bank statement.
+        </Notice>
+      )}
+      {balance.refundDue === 0 && balance.refunded > 0 && (
+        <Notice tone="info" title="The refund has been paid" className="mb-4">
+          {money(invoice.currencyCode, balance.refunded)} has been paid back to the customer, so nothing further is owed back on this invoice. Refunds never change what was received: they are
+          listed below with their own numbers.
         </Notice>
       )}
 
@@ -476,6 +498,11 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
           caption={`${credits.filter((note) => note.status === "issued").length} credit note${credits.filter((note) => note.status === "issued").length === 1 ? "" : "s"} issued`}
         />
         <Stat label="Outstanding" value={money(invoice.currencyCode, outstanding)} caption="total less received and credited" />
+        <Stat
+          label="Refunded"
+          value={money(invoice.currencyCode, balance.refunded)}
+          caption={balance.refundDue > 0 ? `${money(invoice.currencyCode, balance.refundDue)} still to pay back` : "nothing owed back"}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -645,6 +672,54 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             </ul>
           )}
         </TableCard>
+
+        <TableCard
+          title="Refunds paid back"
+          summary={
+            refunds.length
+              ? `${money(invoice.currencyCode, balance.refunded)} paid back · ${money(invoice.currencyCode, balance.refundDue)} still owed back`
+              : "Money returned to the customer appears here, with its own number"
+          }
+        >
+          <DataTable
+            rows={refunds}
+            rowKey={(refund) => refund.id}
+            emptyState={
+              <EmptyState
+                title="No refunds"
+                body="A refund is recorded here when money actually leaves. A credit note only states that it is owed."
+              />
+            }
+            columns={[
+              { key: "ref", header: "Refund", render: (refund) => <span className="rts-mono text-xs">{refund.reference}</span> },
+              { key: "date", header: "Paid back", render: (refund) => formatDate(refund.paidOn) },
+              { key: "method", header: "How", render: (refund) => <span className="text-xs text-stone-700">{refund.method}</span> },
+              {
+                key: "reason",
+                header: "Why",
+                render: (refund) => (
+                  <span className="flex flex-col">
+                    <span className="text-xs text-stone-800">{refund.reason}</span>
+                    {refund.voidReason && <span className="text-xs text-stone-600">Cancelled: {refund.voidReason}</span>}
+                  </span>
+                ),
+              },
+              { key: "amount", header: "Amount", className: "text-right rts-mono", render: (refund) => money(refund.currencyCode, refund.amount) },
+              { key: "status", header: "Status", render: (refund) => <Badge tone={refund.status === "void" ? "neutral" : "info"}>{REFUND_STATUS_LABELS[refund.status]}</Badge> },
+              {
+                key: "actions",
+                header: "",
+                className: "text-right",
+                render: (refund) =>
+                  allowed("refunds:void") && refund.status === "paid" ? (
+                    <Button variant="ghost" onClick={() => setCancellingRefund(refund)} aria-label={`Cancel ${refund.reference}`}>
+                      Cancel
+                    </Button>
+                  ) : null,
+              },
+            ]}
+          />
+        </TableCard>
       </div>
 
       {invoice.notes && (
@@ -677,6 +752,24 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
           invoiceReference={invoice.reference}
           onClosed={() => setCancellingPayment(null)}
           onSubmit={(reason) => cancelPayment(cancellingPayment, reason)}
+          notify={setFlash}
+        />
+      )}
+      {refunding && (
+        <RefundForm
+          invoice={invoice}
+          refundDue={balance.refundDue}
+          onClosed={() => setRefunding(false)}
+          onSubmit={async (input) => dispatch({ type: "record_refund", input })}
+          notify={setFlash}
+        />
+      )}
+      {cancellingRefund && (
+        <CancelRefundForm
+          refund={cancellingRefund}
+          invoiceReference={invoice.reference}
+          onClosed={() => setCancellingRefund(null)}
+          onSubmit={(reason) => cancelRefund(cancellingRefund, reason)}
           notify={setFlash}
         />
       )}
@@ -1030,6 +1123,135 @@ function VoidCreditNoteForm({
           <Button onClick={onClosed}>Cancel</Button>
           <Button type="submit" variant="danger">
             Void credit note
+          </Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+/**
+ * Recording money going back to a customer (FIN-03, D-92).
+ *
+ * The mirror of the payment form, with one difference that matters: the reason is required. A payment
+ * explains itself with a bank slip; a refund does not, and "why did we send this customer money" is the
+ * question asked a year later.
+ */
+function RefundForm({
+  invoice,
+  refundDue,
+  onSubmit,
+  notify,
+  onClosed,
+}: {
+  invoice: Invoice;
+  refundDue: number;
+  onClosed: () => void;
+  onSubmit: (input: { invoiceId: string; amount: string; method: string; paidOn: string; externalReference: string; reason: string }) => Promise<CommandResult>;
+  notify: CommandNotify;
+}) {
+  const { db } = useTms();
+  const today = todayYmd();
+  const methods = db.settings.rental.paymentMethods;
+  const [values, setValues] = useState({
+    amount: refundDue.toFixed(2),
+    method: methods[0] ?? "",
+    paidOn: today,
+    externalReference: "",
+    reason: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const result = await onSubmit({ invoiceId: invoice.id, ...values });
+    notify({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) onClosed();
+    else setErrors(result.errors);
+  };
+
+  return (
+    <Panel
+      title={`Pay a refund against ${invoice.reference}`}
+      description="This records money leaving the business. It does not change what the customer has paid — the credit note already reduced the bill — and the amount cannot exceed what is still owed back."
+      onClose={onClosed}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {methods.length === 0 && <Notice tone="warning">No payment methods are configured. Add them in Settings before recording a refund.</Notice>}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Amount paid back" error={errors.amount} hint={`Owed back ${money(invoice.currencyCode, refundDue)}`}>
+            <TextInput inputMode="decimal" value={values.amount} onChange={(e) => setValues({ ...values, amount: e.target.value })} invalid={!!errors.amount} />
+          </Field>
+          <Field label="Date paid back" error={errors.paidOn}>
+            <TextInput type="date" value={values.paidOn} onChange={(e) => setValues({ ...values, paidOn: e.target.value })} invalid={!!errors.paidOn} />
+          </Field>
+        </div>
+        <Field label="How the money went back" error={errors.method}>
+          <Select value={values.method} onChange={(e) => setValues({ ...values, method: e.target.value })} invalid={!!errors.method}>
+            <option value="">Select a method</option>
+            {methods.map((method) => (
+              <option key={method} value={method}>
+                {method}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Reference (optional)" hint="Transfer id or receipt number, if the bank gave one" error={errors.externalReference}>
+          <TextInput value={values.externalReference} onChange={(e) => setValues({ ...values, externalReference: e.target.value })} invalid={!!errors.externalReference} />
+        </Field>
+        <Field label="Why the money was paid back" error={errors.reason} hint="Kept on the record: a refund with no explanation cannot be audited">
+          <TextInput value={values.reason} onChange={(e) => setValues({ ...values, reason: e.target.value })} invalid={!!errors.reason} />
+        </Field>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClosed}>Cancel</Button>
+          <Button type="submit" variant="primary">
+            Record the refund
+          </Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+/** Cancelling a refund that never left the bank (D-92). The amount goes back to being owed. */
+function CancelRefundForm({
+  refund,
+  invoiceReference,
+  onSubmit,
+  notify,
+  onClosed,
+}: {
+  refund: Refund;
+  invoiceReference: string;
+  onClosed: () => void;
+  onSubmit: (reason: string) => Promise<CommandResult>;
+  notify: CommandNotify;
+}) {
+  const [reason, setReason] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const result = await onSubmit(reason);
+    notify({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) onClosed();
+    else setErrors(result.errors);
+  };
+
+  return (
+    <Panel
+      title={`Cancel ${refund.reference}`}
+      description={`${money(refund.currencyCode, refund.amount)} becomes owed back to the customer again on ${invoiceReference}. The refund keeps its number and stays on record with this reason.`}
+      onClose={onClosed}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Reason" hint="Kept on the record and in the audit trail" error={errors.reason}>
+          <TextInput value={reason} onChange={(e) => setReason(e.target.value)} invalid={!!errors.reason} />
+        </Field>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClosed}>Keep the refund</Button>
+          <Button type="submit" variant="danger">
+            Cancel refund
           </Button>
         </div>
       </form>

@@ -7,7 +7,8 @@
   more — the page needs a server, because that is where authority lives.
 - Runtime: one Node.js process on the operator's workstation (Fedora), plus PostgreSQL. The
   database is the source of truth. See `docs/SETUP_AND_DEPLOYMENT.md` for the install and run commands.
-- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (16 tables, `btree_gist` +
+- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (17 tables: `refund` arrived in
+  `010_refunds.sql`, D-92; `btree_gist` +
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
 - Session: `iron-session` sealed cookie; passwords Argon2id (`@node-rs/argon2`) — D-51.
@@ -58,7 +59,7 @@ The interface is a purpose-built "operations ledger", not a component-kit defaul
 | `src/tms/bookings.ts` | Seat bookings: one named rider's seat on one run, capacity as roster + bookings, request/confirm/waitlist/reject/cancel, cut-offs, offers that are never auto-confirmed, and the run's manifest (`manifestFor`: roster plus every seat that still holds one) |
 | `src/tms/compliance.ts` | Vehicle/driver compliance documents, expiry status and reminder lead time |
 | `src/tms/maintenance.ts` | Odometer readings, last completed service anchor and fleet readiness evaluation per configured basis |
-| `src/tms/creditNotes.ts` | The one invoice balance rule (D-86): `outstanding = total − paid − credited`, the refund due when credits pass what was paid, and the date-limited variant the closed-period reports use. Read by `finance.ts`, both money reports, `financeHome.ts` and the Invoices screen |
+| `src/tms/creditNotes.ts` | The one invoice balance rule (D-86): `outstanding = total − paid − credited`, what is still owed back when credits pass what was paid (`paid + credited − total − refunded`, D-92), and the date-limited variant the closed-period reports use. Read by `finance.ts`, the statement, both money reports, `financeHome.ts` and the Invoices screen |
 | `src/tms/financeHome.ts` | The finance home's figures: the period totals from `financialReport`, overdue invoices and unbilled hires as at today, payments to verify, and a margin that is withheld unless both sides of the period are complete |
 | `src/tms/kpis.ts` | KPI calculations. Each result carries period, numerator, denominator, coverage and an explicit status |
 | `src/tms/costs.ts` | Recorded-cost report with period, total, entries and data coverage |

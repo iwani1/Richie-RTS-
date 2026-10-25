@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–40** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 41 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–41** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 42 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -53,6 +53,10 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   itself refuses, and six simultaneous attempts give one winner and five refusals.
 - Invoices numbered per year, with your tax lines, discounts, due dates, voiding, part payments and
   exact settlement. Money is computed in whole pesewas with one rounding rule.
+- **A refund record**: money actually paid back to a customer is its own numbered document with a
+  date, a method and a reason, capped at what is still owed back, cancellable once, stated on the
+  invoice, the customer statement, the money report and the finance home — instead of being booked as
+  a plain expense that lost the customer and inflated the month's costs.
 - **Debt by age** on the finance home: everything still owed, across every customer, in the bands a
   statement prints (not yet due, 1–30, 31–60, over 60 days), with the customers behind it — so "how bad
   is the debt?" is one glance rather than a column added up by hand.
@@ -67,7 +71,8 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   bank statement warns what the match will be short by before it is cancelled.
 - **Printable documents**: an invoice and each credit note print as a formatted A4 sheet, or save as a
   PDF from the browser's own print dialog. The printed amount due is the same figure the screen shows,
-  a void document says so in words before any figure, and a refund is asked for on the paper.
+  a void document says so in words before any figure, and a statement prints money paid back as its
+  own line with the refund's number, so the customer can trace the receipt.
 - **Credit notes** for an invoice that has already gone out: a numbered document (CN-2026-0001) that
   takes money off one invoice — an overcharge, a hire partly not delivered, a late goodwill discount.
   It carries the invoice's own tax, leaves the payments exactly as recorded, can be voided with a
@@ -139,7 +144,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**582 passed, 18 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**606 passed, 18 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - 18 integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, and the database refusing to

@@ -70,6 +70,10 @@ export const PERMISSIONS = [
   // Cancelling a payment recorded in error (D-88). Kept apart from payments:record: the person who
   // took the money in is not always the person who may undo it, and the undo has to be attributable.
   "payments:void",
+  // Money going back out to a customer (D-92). Kept apart from payments:void and credits:void because
+  // this is a payment the office makes, not a correction to a bill or to money received.
+  "refunds:record",
+  "refunds:void",
   "documents:read",
   "documents:create",
   "documents:update",
@@ -176,6 +180,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "payments:record",
     "payments:advance",
     "payments:void",
+  // Money going back out to a customer (D-92). Kept apart from payments:void and credits:void because
+  // this is a payment the office makes, not a correction to a bill or to money received.
+  "refunds:record",
+  "refunds:void",
   ],
   // Own-record scope: a driver sees only the runs and incidents for the vehicle and
   // trips assigned to their linked driver record. See PERMISSIONS.md "Own-record scope".

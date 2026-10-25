@@ -54,6 +54,8 @@ const PERMISSION_FOR: Record<string, Parameters<typeof can>[1]> = {
   record_payment: "payments:record",
   advance_payment: "payments:advance",
   void_payment: "payments:void",
+  record_refund: "refunds:record",
+  void_refund: "refunds:void",
   create_user: "users:create",
   update_user: "users:update",
   reset_user_password: "users:update",

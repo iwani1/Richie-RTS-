@@ -43,12 +43,14 @@ const KIND_LABEL: Record<StatementRowKind, string> = {
   invoice: "Invoice",
   creditNote: "Credit note",
   payment: "Payment",
+  refund: "Refund paid back",
 };
 
-const KIND_TONE: Record<StatementRowKind, "info" | "success" | "neutral"> = {
+const KIND_TONE: Record<StatementRowKind, "info" | "success" | "neutral" | "warning"> = {
   invoice: "info",
   creditNote: "neutral",
   payment: "success",
+  refund: "warning",
 };
 
 /** The first day of the month `date` falls in: a statement is most often read month by month. */
@@ -193,11 +195,12 @@ export function StatementsPage() {
 
           {statement && ready && (
             <>
-              <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
                 <Stat label="Brought forward" value={money(currency, statement.openingBalance)} caption={`as at ${formatDate(from)}`} />
                 <Stat label="Invoiced" value={money(currency, statement.invoiced)} caption="in the period" />
                 <Stat label="Received" value={money(currency, statement.received)} caption="payments that count" />
                 <Stat label="Credited" value={money(currency, statement.credited)} caption="credit notes issued" />
+                <Stat label="Refunded" value={money(currency, statement.refunded)} caption="paid back in the period" />
                 <Stat
                   label={statement.closingBalance < 0 ? "In credit" : "Balance due"}
                   value={money(currency, statement.closingBalance)}

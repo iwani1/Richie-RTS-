@@ -24,12 +24,19 @@
 //
 // Every amount is added in whole pesewas and converted once (audit D-04): floats show a pesewa of
 // balance that nobody can find.
-import { invoiceBalance, liveCreditNotes, livePayments } from "./creditNotes";
+import { invoiceBalance, liveCreditNotes, livePayments, liveRefunds } from "./creditNotes";
 import { formatAmount, fromMinor, toMinor } from "./money";
 import type { Database, Invoice } from "./types";
 
-/** What a row on the statement is. Debits add to what the customer owes; credits take away. */
-export type StatementRowKind = "invoice" | "creditNote" | "payment";
+/**
+ * What a row on the statement is. Debits add to what the customer owes; credits take away.
+ *
+ * A refund is a debit, which reads oddly until you remember what the balance is: it is what the
+ * customer holds with the office. Money paid back to them therefore increases what they are owed, in
+ * exactly the way a payment decreases it. Recording a refund as a credit would double-count it, since
+ * the credit note that caused the refund already took the money off the bill (D-92).
+ */
+export type StatementRowKind = "invoice" | "creditNote" | "payment" | "refund";
 
 export interface StatementRow {
   id: string;
@@ -88,6 +95,8 @@ export interface CustomerStatement {
   invoiced: number;
   received: number;
   credited: number;
+  /** Money the office paid back in the period. Carried in the debit column, not netted off received. */
+  refunded: number;
   rows: StatementRow[];
   openInvoices: AgedInvoice[];
   ageing: StatementAgeing;
@@ -146,14 +155,19 @@ export function statementNameOf(invoice: Invoice): string {
  * Signed, and never floored: an invoice that has been credited below what was paid contributes a
  * negative amount, which is what turns into "in credit" on the statement. The flooring in
  * `invoiceBalance` belongs to a single invoice's "amount due" line, not to a running account.
+ *
+ * A refund is **added**: the balance is what the customer holds with the office, and paying money back
+ * reduces that holding. Without this the opening balance of the month after a refund would still show
+ * the customer in credit by money they had already been given, and the refund row would then be
+ * counted a second time in the running total (D-92).
  */
 function signedBalance(db: Database, invoice: Invoice, upTo: string): number {
   const balance = invoiceBalance(db, invoice, upTo);
-  return toMinor(balance.total) - toMinor(balance.paid) - toMinor(balance.credited);
+  return toMinor(balance.total) - toMinor(balance.paid) - toMinor(balance.credited) + toMinor(balance.refunded);
 }
 
-/** Same-day order: the bill, then what came off it, then what was paid. */
-const KIND_ORDER: Record<StatementRowKind, number> = { invoice: 0, creditNote: 1, payment: 2 };
+/** Same-day order: the bill, what came off it, what was paid, then what was paid back. */
+const KIND_ORDER: Record<StatementRowKind, number> = { invoice: 0, creditNote: 1, payment: 2, refund: 3 };
 
 /**
  * Everybody the office can print a statement for: the customers on live invoices, which is the only
@@ -231,7 +245,7 @@ export function emptyAgeing(): StatementAgeing {
 export function customerStatement(db: Database, customerName: string, from: string, to: string): CustomerStatement {
   const name = customerName.trim();
   const empty: StatementAgeing = { notYetDue: 0, days1to30: 0, days31to60: 0, days61plus: 0, total: 0 };
-  const base = { customerName: name, currencyCode: null, from, to, openingBalance: 0, closingBalance: 0, invoiced: 0, received: 0, credited: 0, rows: [], openInvoices: [], ageing: empty };
+  const base = { customerName: name, currencyCode: null, from, to, openingBalance: 0, closingBalance: 0, invoiced: 0, received: 0, credited: 0, refunded: 0, rows: [], openInvoices: [], ageing: empty };
 
   if (!name) return { ...base, status: "no_customer", message: "Choose a customer to see their statement." };
   if (!isDate(from) || !isDate(to) || from > to) {
@@ -313,6 +327,22 @@ export function customerStatement(db: Database, customerName: string, from: stri
     });
   }
 
+  // Money paid back to the customer. A cancelled refund gave nothing back, so it is not stated: the
+  // statement is the customer's page, and money that never left the office was never on it (D-92).
+  for (const refund of liveRefunds(db, undefined, to)) {
+    if (!invoiceIds.has(refund.invoiceId)) continue;
+    if (ymd(refund.paidOn) < from) continue;
+    drafts.push({
+      id: refund.id,
+      date: ymd(refund.paidOn),
+      kind: "refund",
+      reference: refund.reference,
+      description: refund.method ? `Refund paid back — ${refund.method}` : "Refund paid back",
+      debit: refund.amount,
+      credit: 0,
+    });
+  }
+
   drafts.sort((a, b) =>
     a.date === b.date
       ? KIND_ORDER[a.kind] === KIND_ORDER[b.kind]
@@ -365,6 +395,7 @@ export function customerStatement(db: Database, customerName: string, from: stri
   const invoicedMinor = drafts.filter((draft) => draft.kind === "invoice").reduce((sum, draft) => sum + toMinor(draft.debit), 0);
   const receivedMinor = drafts.filter((draft) => draft.kind === "payment").reduce((sum, draft) => sum + toMinor(draft.credit), 0);
   const creditedMinor = drafts.filter((draft) => draft.kind === "creditNote").reduce((sum, draft) => sum + toMinor(draft.credit), 0);
+  const refundedMinor = drafts.filter((draft) => draft.kind === "refund").reduce((sum, draft) => sum + toMinor(draft.debit), 0);
 
   const money = (minor: number) => `${currencyCode} ${formatAmount(fromMinor(minor))}`;
   const oldest = openInvoices.reduce((worst, row) => Math.max(worst, row.daysOverdue), 0);
@@ -385,6 +416,7 @@ export function customerStatement(db: Database, customerName: string, from: stri
     invoiced: fromMinor(invoicedMinor),
     received: fromMinor(receivedMinor),
     credited: fromMinor(creditedMinor),
+    refunded: fromMinor(refundedMinor),
     rows,
     openInvoices,
     ageing: aged,

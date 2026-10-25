@@ -99,6 +99,12 @@ different questions.
 completed runs with no vehicle recorded; and the revenue-by-service line, which makes the
 single-service limitation visible.
 
+**Money paid back (D-92).** `Refunded` is cash, not cost: the sum of live refunds whose `paidOn` falls
+in the period. It is stated on its own line and **never** added to `Costs recorded`, because a refund
+does not make the work more expensive — it returns money that was never earned. It is subtracted in the
+finance home's cash movement, which is a bank question rather than a margin question. A cancelled refund
+counts as nothing.
+
 **Debt ageing (RPT-04, D-90, D-91).** A fourth way of cutting the same money: everything still owed on
 live invoices, **as at a stated date**, placed in the band its due date earns — not yet due, 1–30 days
 late, 31–60, over 60. An invoice is measured at `outstanding` (total less payments that still count less

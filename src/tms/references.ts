@@ -37,6 +37,9 @@ export const REFERENCE_SERIES: Record<ReferenceScope, { prefix: string; width: n
   // year alongside it, with a prefix that no one can mistake for an invoice.
   creditNote: { prefix: "CN", width: 4, perYear: true },
   payment: { prefix: "PAY", width: 4, perYear: true },
+  // Money going back out gets its own series, so a refund receipt is never mistaken for a payment
+  // received (D-92). It restarts each year with the other financial documents.
+  refund: { prefix: "REF", width: 4, perYear: true },
 };
 
 /** The period a counter is filed under: the year for financial documents, `all` otherwise. */
@@ -63,6 +66,8 @@ function existingReferences(db: Database, scope: ReferenceScope): string[] {
       return db.creditNotes.map((record) => record.reference);
     case "payment":
       return db.payments.map((record) => record.reference);
+    case "refund":
+      return db.refunds.map((record) => record.reference);
     case "booking":
       return db.bookings.map((record) => record.reference);
     default:

@@ -1507,3 +1507,51 @@ decision the office makes, not one the system invents.
   `src/screens/FinanceHome.tsx`; the total row style in `src/index.css`. 5 domain tests, 1 finance-home
   test, 1 navigation test, and a boundary test on the bands themselves. The stale line "PDF statements
   are not built yet" under the coverage note is replaced: statements print from the Statements screen.
+
+## D-92 A refund is its own numbered record, not an expense and not a negative payment
+
+- **Context.** D-86 made the system state what it owes back: when credit notes take an invoice below
+  what the customer paid, `refundDue` says so plainly on the invoice. What the system could not record
+  was the day the office actually sent the money. The workaround was to book it as a recorded cost,
+  which:
+  - lost the customer, the invoice and the reason — a refund looked like any other expense line;
+  - inflated the month's cost of running the work, which is the figure the margin is computed from;
+  - left `refundDue` standing for ever, so the invoice kept saying money was owed back that had
+    already been paid, and nothing stopped the same over-credit being paid out twice.
+- **Decision.** A **refund** is a record of its own, the mirror of a payment:
+  - numbered from its own series (`REF-YYYY-NNNN`, restarting each year like the other financial
+    documents), against one invoice, with its own date, method, optional bank reference, and a
+    **required reason** — the credit note says why the bill was reduced, the refund says why cash left
+    the bank, and the two can legitimately differ;
+  - its ceiling is what is **still** owed back: `paid + credited − total − refunded` on that invoice,
+    compared in whole pesewas, with the same arithmetic the button's default amount comes from;
+  - it does **not** change what the customer paid. `invoiceBalance` gains a `refunded` figure and
+    `refundDue` subtracts it; `paid`, `outstanding` and the invoice's own `amountPaid` are untouched;
+  - it can be cancelled once, with a reason. The number stays, the reason stays, and the amount
+    becomes owed back again — a transfer that never left is a fact worth keeping.
+  - it is stated where money is stated: the invoice (with a **Pay a refund** action), the customer
+    statement (as a debit, because the balance is what the customer holds with the office), the
+    money report (its own "Refunded" line, kept out of costs), and the finance home (its own figure
+    and card, subtracted from cash movement because both leave the bank).
+  - the database holds the ceiling itself: `refund_within_due()` locks the invoice, adds the live
+    payments and credit notes, subtracts the live refunds, and refuses a row that exceeds what is
+    left; `refund_frozen()` and `refund_no_delete()` make a recorded refund a one-way door.
+- **Rejected.**
+  - *A negative payment.* Every sum over `payments` — received, cash movement, the invoice's paid
+    figure, the bank reconciliation — would have had to filter by sign, and one forgotten filter
+    reports refunds as money received. Two facts, two tables.
+  - *A recorded cost with a "refund" category.* It works today only because expenses are a dumb list;
+    it puts the refund into cost per trip and into the margin's cost base, which is untrue, and it
+    still leaves the customer off the record.
+  - *Cancelling the credit note instead.* That reverses the decision to give the money back, and
+    loses the reason the refund was paid.
+  - *A fourth status on `refundDue` ("refunded").* That is a field on an invoice, not a document: it
+    carries no date, no method, no reason and no number, which is precisely what the office needs a
+    year later.
+- **Consequence.** `Refund` (schema 17, `READABLE_SCHEMA_VERSIONS` extended), `refunds` collection,
+  migration `010_refunds.sql`, `record_refund` / `void_refund` commands and `refunds:record` /
+  `refunds:void` permissions, `liveRefunds` / `isLiveRefund` / `refundedTotal` in `creditNotes.ts`,
+  refund rows on the statement and in the printed sheet, a "Refunded" line in the financial report and
+  CSV, a "Paid back" figure and a *Money paid back* card on the finance home, the refund panel on the
+  invoice screen, and 26 new tests (7 domain command, 3 balance/statement, 3 report, 3 finance home,
+  3 visibility, 3 statement sheet, 3 invoice screen, plus the reference-series and boundary cases).

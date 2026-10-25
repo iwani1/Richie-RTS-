@@ -19,7 +19,7 @@
 // the company currency is not set, because a total without a currency is a guess.
 
 import { costReport } from "./costs";
-import { creditedTotal, invoiceBalance, isLivePayment } from "./creditNotes";
+import { creditedTotal, invoiceBalance, isLivePayment, liveRefunds } from "./creditNotes";
 import { fromMinor, sumAmounts, toMinor } from "./money";
 import type { Database, Invoice, Payment } from "./types";
 
@@ -60,6 +60,13 @@ export interface FinancialReport {
   /** Credit notes issued in the period: money taken off the bills, not money received. */
   creditedTotal: number;
   creditNoteCount: number;
+  /**
+   * Money paid back to customers in the period (D-92). Cash out, and deliberately kept apart from
+   * recorded costs: a refund is not spending on the business, and folding it into expenses would make
+   * the month look as though it cost more to run than it did.
+   */
+  refundedTotal: number;
+  refundCount: number;
   /** Not paid and not credited in full as at the period end. */
   outstandingTotal: number;
   outstandingCount: number;
@@ -109,6 +116,7 @@ export function financialReport(db: Database, from: string, to: string): Financi
 
   const invoices = db.invoices.filter((invoice) => invoice.status !== "void" && inRange(invoice.issuedOn));
   const payments = db.payments.filter((payment) => isLivePayment(payment) && inRange(ymd(payment.paidOn)));
+  const refunds = liveRefunds(db).filter((refund) => inRange(ymd(refund.paidOn)));
 
   // Revenue by customer. A missing name is its own line: folding it into "other" would hide that
   // the invoice cannot be traced to anybody.
@@ -191,6 +199,8 @@ export function financialReport(db: Database, from: string, to: string): Financi
     paymentCount: payments.length,
     creditedTotal: sumAmounts(creditNotes.map((note) => note.total)),
     creditNoteCount: creditNotes.length,
+    refundedTotal: sumAmounts(refunds.map((refund) => refund.amount)),
+    refundCount: refunds.length,
     outstandingTotal: fromMinor(outstandingMinor),
     outstandingCount,
     expensesByCategory,
@@ -225,7 +235,12 @@ function statusOf(report: FinancialReport, from: string, to: string, costLines: 
   if (from > to) return "invalid_range";
   if (!report.currencyCode) return "currency_not_set";
   const nothing =
-    report.invoiceCount === 0 && report.paymentCount === 0 && report.creditNoteCount === 0 && costLines === 0 && report.completedTrips === 0;
+    report.invoiceCount === 0 &&
+    report.paymentCount === 0 &&
+    report.creditNoteCount === 0 &&
+    report.refundCount === 0 &&
+    costLines === 0 &&
+    report.completedTrips === 0;
   return nothing ? "empty" : "ok";
 }
 
@@ -234,7 +249,7 @@ function describe(report: FinancialReport): string {
   if (report.status === "currency_not_set")
     return "Money figures are withheld: the company currency is not set in Settings, and a total without a currency would be a guess.";
   if (report.status === "empty")
-    return `No invoices, payments, credit notes, recorded costs or completed runs between ${report.from} and ${report.to}.`;
+    return `No invoices, payments, credit notes, refunds, recorded costs or completed runs between ${report.from} and ${report.to}.`;
   const cost =
     report.costPerTrip === null
       ? "no run was completed in the period, so cost per trip is not available"
@@ -242,7 +257,10 @@ function describe(report: FinancialReport): string {
   const credited = report.creditNoteCount
     ? `, ${report.currencyCode} ${report.creditedTotal.toFixed(2)} credited back on ${report.creditNoteCount} credit note${report.creditNoteCount === 1 ? "" : "s"}`
     : "";
-  return `${report.invoiceCount} invoice${report.invoiceCount === 1 ? "" : "s"} issued for ${report.currencyCode} ${report.invoicedTotal.toFixed(2)}${credited}; ${report.expenseLineCount} recorded cost line${report.expenseLineCount === 1 ? "" : "s"}; ${cost}.`;
+  const refunded = report.refundCount
+    ? `, ${report.currencyCode} ${report.refundedTotal.toFixed(2)} paid back on ${report.refundCount} refund${report.refundCount === 1 ? "" : "s"}`
+    : "";
+  return `${report.invoiceCount} invoice${report.invoiceCount === 1 ? "" : "s"} issued for ${report.currencyCode} ${report.invoicedTotal.toFixed(2)}${credited}${refunded}; ${report.expenseLineCount} recorded cost line${report.expenseLineCount === 1 ? "" : "s"}; ${cost}.`;
 }
 
 /** The report as CSV, so the owner can check the arithmetic in a spreadsheet. */
@@ -255,6 +273,7 @@ export function financialReportCsv(report: FinancialReport): string {
     ["Invoiced", money(report.invoicedTotal), `${report.invoiceCount} live invoices issued in the period`],
     ["Received", money(report.receivedTotal), `${report.paymentCount} payments received in the period`],
     ["Credited", money(report.creditedTotal), `${report.creditNoteCount} credit notes issued in the period`],
+    ["Refunded", money(report.refundedTotal), `${report.refundCount} refunds paid back in the period`],
     ["Outstanding at period end", money(report.outstandingTotal), `${report.outstandingCount} invoices not fully paid or credited`],
     ["Costs recorded", money(report.expensesTotal), `${report.expenseLineCount} cost lines incurred in the period`],
     ["Completed runs", String(report.completedTrips), "scheduled runs completed in the period"],

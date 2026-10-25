@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { financeHome } from "./financeHome";
 import { financialReport } from "./financialReport";
-import { emptyDatabase, emptyRentalSettings, type Client, type CostEntry, type CreditNote, type Database, type Invoice, type Payment, type Rental } from "./types";
+import { emptyDatabase, emptyRentalSettings, type Client, type CostEntry, type CreditNote, type Database, type Invoice, type Payment, type Refund, type Rental } from "./types";
 
 const at = "2026-06-01T08:00:00.000Z";
 const JUNE = { from: "2026-06-01", to: "2026-06-30" };
@@ -127,6 +127,28 @@ const cost = (overrides: Partial<CostEntry> = {}): CostEntry => ({
   ...overrides,
 });
 
+const refund = (overrides: Partial<Refund> = {}): Refund => ({
+  id: "rf1",
+  reference: "REF-2026-0001",
+  invoiceId: "inv1",
+  invoiceReference: "INV-2026-0001",
+  clientId: "c1",
+  customerName: "Northstar Foods",
+  currencyCode: "GHS",
+  amount: 200,
+  method: "Bank transfer",
+  paidOn: "2026-06-20",
+  externalReference: "",
+  reason: "Day not operated",
+  status: "paid",
+  voidReason: null,
+  voidedAt: null,
+  recordedBy: "Fin",
+  recordedAt: at,
+  updatedAt: at,
+  ...overrides,
+});
+
 function build(overrides: Partial<Database> = {}): Database {
   return {
     ...emptyDatabase(),
@@ -159,7 +181,7 @@ describe("finance home - the period figures", () => {
     const db = build();
     const home = financeHome(db, JUNE.from, JUNE.to, "2026-06-25");
     // GHS 500 came in and nothing was recorded as spent.
-    expect(home.movement).toEqual({ received: 500, expenses: 0, difference: 500 });
+    expect(home.movement).toEqual({ received: 500, expenses: 0, refunds: 0, difference: 500 });
   });
 
   it("withholds every amount when no currency is configured", () => {
@@ -219,7 +241,7 @@ describe("finance home - margin, only when the data can carry it (FIN-07)", () =
   it("keeps cash movement and margin apart, because they are different questions", () => {
     const home = financeHome(billedAndSpent(), JUNE.from, JUNE.to, "2026-06-25");
     // GHS 500 was received and GHS 800 was spent, so cash went down 300 — while the work earned 1,200.
-    expect(home.movement).toEqual({ received: 500, expenses: 800, difference: -300 });
+    expect(home.movement).toEqual({ received: 500, expenses: 800, refunds: 0, difference: -300 });
     expect(home.margin.amount).toBe(1200);
   });
 
@@ -430,5 +452,46 @@ describe("finance home - work waiting on finance", () => {
     expect(home.awaitingPayments.map((row) => row.reference)).toEqual(["PAY-2026-0001"]);
     expect(home.awaitingTotal).toBe(500);
     expect(home.figures.receivedTotal).toBe(500);
+  });
+});
+
+describe("money paid back on the finance home (D-92)", () => {
+  it("comes off cash movement but not off the costs of the work", () => {
+    const db = build({
+      payments: [payment({ amount: 500 })],
+      refunds: [refund({ amount: 200 })],
+    });
+    const home = financeHome(db, JUNE.from, JUNE.to, "2026-06-25");
+    // 500 in, 200 back out, nothing spent: the two are stated side by side because a refund is not a
+    // cost of running the work, even though both leave the bank.
+    expect(home.movement).toEqual({ received: 500, expenses: 0, refunds: 200, difference: 300 });
+    expect(home.figures.refundedTotal).toBe(200);
+    expect(home.figures.refundCount).toBe(1);
+    expect(home.figures.expensesTotal).toBe(0);
+    expect(home.refunds.map((row) => [row.reference, row.customerName, row.amount, row.reason])).toEqual([
+      ["REF-2026-0001", "Northstar Foods", 200, "Day not operated"],
+    ]);
+  });
+
+  it("leaves a cancelled refund out entirely: the money never left", () => {
+    const home = financeHome(
+      build({ refunds: [refund({ status: "void", voidReason: "Transfer never left", voidedAt: at })] }),
+      JUNE.from,
+      JUNE.to,
+      "2026-06-25",
+    );
+    expect(home.refunds).toEqual([]);
+    expect(home.figures.refundCount).toBe(0);
+    expect(home.movement?.refunds).toBe(0);
+  });
+
+  it("counts a refund by the day it was paid, not by the invoice's date", () => {
+    // The invoice is June's; the refund was paid in July. June's cash movement must not change.
+    const db = build({ refunds: [refund({ paidOn: "2026-07-04" })] });
+    const june = financeHome(db, JUNE.from, JUNE.to, "2026-06-25");
+    expect(june.figures.refundCount).toBe(0);
+    const july = financeHome(db, "2026-07-01", "2026-07-31", "2026-07-31");
+    expect(july.figures.refundedTotal).toBe(200);
+    expect(july.movement?.difference).toBe(-200);
   });
 });

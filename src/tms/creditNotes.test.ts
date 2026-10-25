@@ -104,7 +104,7 @@ function world(overrides: Partial<Database> = {}): Database {
 describe("credit-note arithmetic (D-86)", () => {
   it("subtracts both the money received and the money credited, and never goes below zero", () => {
     const balance = invoiceBalance(world(), invoice);
-    expect(balance).toEqual({ total: 4600, paid: 1000, credited: 1150, outstanding: 2450, refundDue: 0, settled: false });
+    expect(balance).toEqual({ total: 4600, paid: 1000, credited: 1150, refunded: 0, outstanding: 2450, refundDue: 0, settled: false });
     expect(outstanding(world(), invoice)).toBe(2450);
     // The same invoice with nothing credited is the balance the old helper produced.
     expect(invoiceBalance(world({ creditNotes: [] }), invoice).outstanding).toBe(3600);

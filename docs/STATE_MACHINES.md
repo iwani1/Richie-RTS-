@@ -162,7 +162,21 @@ after insert; only the status may move.
 | — | `voidedAt` + `voidReason` set | `payments:void` | Payment not already cancelled; a reason (300 characters); any verification status, with the reconciliation warning stated when it is `reconciled` |
 
 A cancelled payment never returns: the trigger refuses to clear either column, and the status stays
-exactly as it was. Cancelling is not a refund — that is a credit note whose refund is stated on it.
+exactly as it was. Cancelling is not a refund: cancelling says the money never arrived, a refund says
+real money went back out (below).
+
+## Refund (`Refund.status`, FIN-03, D-92)
+
+| From | To | Who | Preconditions |
+|---|---|---|---|
+| — | `paid` | `refunds:record` | Invoice not void; amount > 0 and ≤ `paid + credited − total − refunded`; a configured method; date not before the invoice; a reason (300 characters); external reference not already used on a live refund |
+| `paid` | `void` | `refunds:void` | Not already cancelled; a reason (300 characters) |
+
+A refund never moves backwards or returns: `refund_frozen()` refuses any edit to the financial fields
+and refuses to un-cancel one, and `refund_no_delete()` refuses a delete. Cancelling does not remove the
+number: it says the money was not paid back after all, and the amount becomes owed back again.
+`refund_within_due()` re-checks the ceiling in the database under a row lock, so the same over-credit
+cannot be paid out twice even by two operators at once.
 
 ## Booking (`Booking.status`, BKG-03…05, D-83)
 

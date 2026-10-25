@@ -379,6 +379,9 @@ export function StatementSheet({ statement }: { statement: CustomerStatement }) 
     invoice: "Invoice",
     creditNote: "Credit note",
     payment: "Payment",
+    // "Paid back", not "Refund": the customer's bookkeeper is reading a column headed Debit, and the
+    // word has to say which way the money went (D-92).
+    refund: "Refund paid back",
   };
 
   return (
@@ -437,6 +440,7 @@ export function StatementSheet({ statement }: { statement: CustomerStatement }) 
                 {kindLabel[row.kind]}
                 {row.kind === "creditNote" && row.description ? ` — ${row.description}` : ""}
                 {row.kind === "payment" && row.description ? ` — ${row.description.replace("Payment received — ", "")}` : ""}
+                {row.kind === "refund" && row.description ? ` — ${row.description.replace("Refund paid back — ", "")}` : ""}
               </td>
               <td className="rts-mono">{row.reference}</td>
               <td className="rts-sheet-num">{row.debit > 0 ? money(currency, row.debit) : ""}</td>
@@ -468,6 +472,13 @@ export function StatementSheet({ statement }: { statement: CustomerStatement }) 
             <dt>Credit notes issued</dt>
             <dd>{money(currency, statement.credited)}</dd>
           </div>
+          {statement.refunded > 0 && (
+            <div className="rts-sheet-row">
+              {/* Stated as money that left the office, never netted off what the customer paid (D-92). */}
+              <dt>Refunds paid back</dt>
+              <dd>{money(currency, statement.refunded)}</dd>
+            </div>
+          )}
           <div className="rts-sheet-row rts-sheet-row--due">
             <dt>{statement.closingBalance < 0 ? "In credit — owed to the customer" : "Balance due"}</dt>
             <dd>{money(currency, Math.abs(statement.closingBalance))}</dd>

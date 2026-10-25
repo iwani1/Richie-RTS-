@@ -11,7 +11,7 @@
 // and totals are frozen here and by trigger in migration 003. Only its status, amount paid and void
 // note move, and the void path refuses once money has been recorded against it.
 
-import { creditedTotal, invoiceBalance, livePayments } from "./creditNotes";
+import { creditedTotal, invoiceBalance, isLiveRefund, livePayments } from "./creditNotes";
 import { formatAmount, fromMinor, linesTotal, parseAmount, parsePositiveAmount, percentOfMinor, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
@@ -24,6 +24,7 @@ import type {
   InvoiceTaxLine,
   Payment,
   PaymentStatus,
+  Refund,
 } from "./types";
 import { PAYMENT_STATUSES } from "./types";
 
@@ -35,6 +36,8 @@ export const FINANCE_COMMAND_TYPES = [
   "void_payment",
   "issue_credit_note",
   "void_credit_note",
+  "record_refund",
+  "void_refund",
 ] as const;
 
 export interface IssueInvoiceInput {
@@ -70,6 +73,22 @@ export interface CreditNoteInput {
   reason: string;
 }
 
+/**
+ * What the operator types when money goes back to a customer (D-92).
+ *
+ * `reason` is required and is not the same as the credit note's reason: a credit note says why the
+ * bill was reduced, a refund says why cash left the bank. They can differ — a bill corrected in March
+ * may only be paid back in April — and a year later the second one is what an auditor asks for.
+ */
+export interface RefundInput {
+  invoiceId: string;
+  amount: string;
+  method: string;
+  paidOn: string;
+  externalReference: string;
+  reason: string;
+}
+
 export type FinanceCommand =
   | { type: "issue_rental_invoice"; input: IssueInvoiceInput }
   | { type: "void_invoice"; id: string; reason: string }
@@ -77,7 +96,9 @@ export type FinanceCommand =
   | { type: "advance_payment"; id: string; to: PaymentStatus }
   | { type: "void_payment"; id: string; reason: string }
   | { type: "issue_credit_note"; input: CreditNoteInput }
-  | { type: "void_credit_note"; id: string; reason: string };
+  | { type: "void_credit_note"; id: string; reason: string }
+  | { type: "record_refund"; input: RefundInput }
+  | { type: "void_refund"; id: string; reason: string };
 
 export function isFinanceCommand(command: { type: string }): command is FinanceCommand {
   return (FINANCE_COMMAND_TYPES as readonly string[]).includes(command.type);
@@ -626,6 +647,135 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
         db: next,
         message: `${updated.reference} voided.${balance ? ` ${note.invoiceReference} outstanding: ${note.currencyCode} ${formatAmount(balance.outstanding)}.` : ""}`,
       };
+    }
+
+    case "record_refund": {
+      // Money going back out (D-92). Until this existed the office booked a refund as a plain
+      // expense, which put the customer, the invoice and the reason nowhere and made the month's
+      // cash-out look like spending on the business. A refund is the mirror of a payment: numbered,
+      // dated, attributable, and cancellable once if the transfer never left.
+      const denied = authorise(actor, "refunds:record");
+      if (denied) return denied;
+      const errors: Errors = {};
+      const input = command.input;
+      const invoice = db.invoices.find((record) => record.id === input.invoiceId);
+      if (!input.invoiceId) errors.invoiceId = "Select the invoice this refund belongs to.";
+      else if (!invoice) errors.invoiceId = "Invoice not found.";
+      else if (invoice.status === "void") errors.invoiceId = `${invoice.reference} is void, so no refund can be recorded against it.`;
+
+      // The ceiling is what is *still* owed back, which already nets off refunds paid earlier: the
+      // same over-credit must not be paid out twice (D-92).
+      const dueNow = invoice ? invoiceBalance(db, invoice).refundDue : 0;
+      const parsed = parsePositiveAmount(input.amount ?? "");
+      const amount = parsed.amount;
+      if (parsed.problem === "too-many-decimals") errors.amount = "Use at most two decimal places: amounts are in pesewas.";
+      else if (parsed.problem === "too-large") errors.amount = "That amount looks wrong. Check the figure.";
+      else if (parsed.problem) errors.amount = "Enter the amount paid back.";
+      else if (invoice && toMinor(amount) > toMinor(dueNow)) {
+        errors.amount =
+          toMinor(dueNow) <= 0
+            ? `${invoice.reference} has no refund due: nothing has been received or credited past its total.`
+            : `${invoice.reference} has ${invoice.currencyCode} ${formatAmount(dueNow)} left to refund, so this amount is too large.`;
+      }
+
+      const method = input.method.trim();
+      if (!method) errors.method = "Select how the money went back.";
+      else if (!db.settings.rental.paymentMethods.includes(method)) errors.method = "Unknown method. Add it in Settings first.";
+
+      if (!isValidDate(input.paidOn)) errors.paidOn = "Enter the date the money went back.";
+      else if (invoice && input.paidOn < invoice.issuedOn) errors.paidOn = `A refund cannot pre-date the invoice (${invoice.issuedOn}).`;
+
+      const externalReference = input.externalReference.trim();
+      if (externalReference.length > 120) errors.externalReference = "Keep the reference to 120 characters.";
+      const reason = input.reason.trim();
+      if (!reason) errors.reason = "Say why the money was paid back. It is kept on the record.";
+      else if (reason.length > 300) errors.reason = "Keep the reason to 300 characters.";
+      if (Object.keys(errors).length) return fail("Please correct the refund details.", errors);
+
+      // Idempotency, the same rule payments follow: the transfer or receipt id is the key, so the same
+      // refund entered twice returns the existing record instead of paying it out twice.
+      const duplicate = externalReference ? db.refunds.find((refund) => refund.externalReference === externalReference && isLiveRefund(refund)) : undefined;
+      if (duplicate) {
+        return { ok: true, db, message: `That reference is already recorded as ${duplicate.reference}; nothing was added.` };
+      }
+
+      const period = input.paidOn.slice(0, 4);
+      const { reference, counters } = allocateReference(db, "refund", period);
+      const refund: Refund = {
+        id: makeId(),
+        reference,
+        invoiceId: invoice!.id,
+        invoiceReference: invoice!.reference,
+        clientId: invoice!.clientId,
+        customerName: invoice!.customerName,
+        currencyCode: invoice!.currencyCode,
+        amount,
+        method,
+        paidOn: input.paidOn,
+        externalReference,
+        reason,
+        status: "paid",
+        voidReason: null,
+        voidedAt: null,
+        recordedBy: actor?.fullName ?? "System",
+        recordedAt: now,
+        updatedAt: now,
+      };
+      const nextDb = { ...db, referenceCounters: counters, refunds: [...db.refunds, refund] };
+      // What is left to refund, from the shared rule that has already been told about this refund.
+      const balance = invoiceBalance(nextDb, invoice!);
+      const leftNote =
+        balance.refundDue > 0
+          ? ` ${invoice!.currencyCode} ${formatAmount(balance.refundDue)} is still owed back.`
+          : ` Nothing further is owed back on ${invoice!.reference}.`;
+      const next = audit(
+        nextDb,
+        actor,
+        {
+          action: "finance:refund_record",
+          entity: "refund",
+          entityId: refund.id,
+          summary: `${refund.reference} ${refund.currencyCode} ${formatAmount(refund.amount)} paid back against ${invoice!.reference} (${method}). Reason: ${reason}.${leftNote}`,
+        },
+        now,
+      );
+      return { ok: true, db: next, message: `${refund.reference} recorded: ${refund.currencyCode} ${formatAmount(refund.amount)} paid back against ${invoice!.reference}.${leftNote}` };
+    }
+
+    case "void_refund": {
+      // A transfer that was never sent, or sent to the wrong account. Cancelling does not delete the
+      // record: the number stays, the reason stays, and the amount becomes owed back again, so the
+      // next person can see that a refund was attempted and reversed (D-92).
+      const denied = authorise(actor, "refunds:void");
+      if (denied) return denied;
+      const refund = db.refunds.find((record) => record.id === command.id);
+      if (!refund) return fail("Refund not found.");
+      if (refund.status === "void") return fail(`${refund.reference} is already cancelled.`);
+      const reason = command.reason.trim();
+      if (!reason) return fail("A reason is required.", { reason: "Say why this refund is being cancelled." });
+      if (reason.length > 300) return fail("Keep the reason to 300 characters.", { reason: "Keep the reason to 300 characters." });
+
+      const cancelled: Refund = { ...refund, status: "void", voidReason: reason, voidedAt: now, updatedAt: now };
+      const nextDb = { ...db, refunds: db.refunds.map((record) => (record.id === cancelled.id ? cancelled : record)) };
+      const invoice = db.invoices.find((record) => record.id === refund.invoiceId);
+      const balance = invoice ? invoiceBalance(nextDb, invoice) : null;
+      const dueNote = balance
+        ? balance.refundDue > 0
+          ? ` ${invoice!.currencyCode} ${formatAmount(balance.refundDue)} is owed back again.`
+          : ""
+        : "";
+      const next = audit(
+        nextDb,
+        actor,
+        {
+          action: "finance:refund_void",
+          entity: "refund",
+          entityId: cancelled.id,
+          summary: `${cancelled.reference} ${cancelled.currencyCode} ${formatAmount(cancelled.amount)} cancelled against ${refund.invoiceReference}. Reason: ${reason}.${dueNote}`,
+        },
+        now,
+      );
+      return { ok: true, db: next, message: `${cancelled.reference} cancelled.${dueNote}` };
     }
   }
 }

@@ -82,6 +82,7 @@ the service layer (`setup_administrator`), not in the route.
 
 ```json
 { "type": "record_payment", "input": { "invoiceId": "…", "amount": "500.00", "method": "Cash", "paidOn": "2026-06-01", "externalReference": "", "note": "" } }
+{ "type": "record_refund",  "input": { "invoiceId": "…", "amount": "200.00", "method": "Bank transfer", "paidOn": "2026-06-01", "externalReference": "TRF-1", "reason": "Service not delivered" } }
 
 // Taking money off an invoice: the amount is stated before tax, and the tax comes from the invoice.
 { "type": "issue_credit_note", "input": { "invoiceId": "…", "issuedOn": "2026-06-04", "amount": "1000.00", "description": "One day not operated", "reason": "Vehicle broke down" } }
@@ -110,7 +111,7 @@ A successful command returns the **new scoped snapshot**, so the caller never ne
 | Roster | `create_passenger`, `update_passenger` |
 | Incidents and maintenance | `create_incident`, `update_incident`, `advance_incident`, `add_incident_cost`, `remove_incident_cost`, `create_work_order`, `update_work_order`, `advance_work_order`, `add_work_order_cost`, `remove_work_order_cost` |
 | Documents | `create_document`, `update_document` |
-| Money | `issue_rental_invoice`, `void_invoice`, `record_payment`, `advance_payment`, `void_payment`, `issue_credit_note`, `void_credit_note` |
+| Money | `issue_rental_invoice`, `void_invoice`, `record_payment`, `advance_payment`, `void_payment`, `issue_credit_note`, `void_credit_note`, `record_refund`, `void_refund` |
 | Data | `import_records` (CSV, vehicles / drivers / clients), `record_backup_export` |
 
 The catalogue is `KNOWN_COMMAND_TYPES` in `src/tms/commandTypes.ts`; a test compares it against every
@@ -127,7 +128,7 @@ Two commands exist in the domain but are **not** reachable over HTTP:
 The route pre-checks the permission for the commands whose permission differs from the obvious one
 (`update_settings`, `create_user`, `update_user`, `reset_user_password`, `record_backup_export`,
 `issue_rental_invoice`, `void_invoice`, `record_payment`, `advance_payment`, `void_payment`,
-`issue_credit_note`, `void_credit_note`), and every command checks
+`issue_credit_note`, `void_credit_note`, `record_refund`, `void_refund`), and every command checks
 again inside the service with the real actor. The full matrix is in `docs/PERMISSIONS.md`.
 
 ### Errors worth knowing

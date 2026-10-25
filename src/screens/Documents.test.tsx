@@ -19,6 +19,7 @@ import {
   type Database,
   type Invoice,
   type Payment,
+  type Refund,
   type Rental,
   type User,
 } from "../tms/types";
@@ -360,6 +361,47 @@ describe("the statement a customer's bookkeeper reads (FIN-02, D-90)", () => {
     expect(within(owing).getByText("INV-2026-0002")).toBeTruthy();
     // The unpaid invoice is 27 days late as at 30 June, and the table says so in days.
     expect(within(owing).getByText("27")).toBeTruthy();
+  });
+
+  it("prints money paid back as its own row, so the customer can trace the refund receipt", () => {
+    const db = world();
+    const refunded: Refund = {
+      id: "rf1",
+      reference: "REF-2026-0001",
+      invoiceId: invoice.id,
+      invoiceReference: invoice.reference,
+      clientId: null,
+      customerName: "Acme Ltd",
+      currencyCode: "GHS",
+      amount: 400,
+      method: "Bank transfer",
+      paidOn: "2026-06-20",
+      externalReference: "",
+      reason: "Service not delivered",
+      status: "paid",
+      voidReason: null,
+      voidedAt: null,
+      recordedBy: "Ama Mensah",
+      recordedAt: at,
+      updatedAt: at,
+    };
+    const over: Database = {
+      ...db,
+      invoices: [{ ...invoice, total: 1000, subtotal: 1000, taxLines: [] }],
+      payments: [{ ...payment, amount: 1000 }],
+      creditNotes: [{ ...creditNote, total: 400, subtotal: 400, taxLines: [] }],
+      refunds: [refunded],
+    };
+    renderSheet(<StatementSheet statement={customerStatement(over, "Acme Ltd", "2026-06-01", "2026-06-30")} />, over);
+
+    const sheet = screen.getByRole("article", { name: /Statement for Acme Ltd/i });
+    // Named as money going back, with the receipt number the customer can quote.
+    expect(within(sheet).getByText(/Refund paid back/)).toBeTruthy();
+    expect(within(sheet).getByText("REF-2026-0001")).toBeTruthy();
+    // In credit by 400 before the refund, settled after it: the account now says so, not "in credit".
+    expect(within(sheet).queryByText(/In credit — owed to the customer/)).toBeNull();
+    expect(within(sheet).getByText("Refunds paid back")).toBeTruthy();
+    expect(within(sheet).getByText(/Nothing is owed on this account as at/i)).toBeTruthy();
   });
 
   it("says an account is in credit rather than printing a demand", () => {

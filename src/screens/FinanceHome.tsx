@@ -90,7 +90,11 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
             <Stat
               label="Cash movement"
               value={home.movement ? money(currency, home.movement.difference) : "Not available"}
-              caption="Recorded payments in minus recorded spend — cash, not profit: what is owed and what is held are not in it"
+              caption={
+                home.movement && home.figures.refundCount > 0
+                  ? `Received less spend less ${money(currency, home.movement.refunds)} paid back to customers — cash, not profit`
+                  : "Recorded payments in minus recorded spend — cash, not profit: what is owed and what is held are not in it"
+              }
             />
             <Stat
               label="Overdue now"
@@ -101,6 +105,11 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
               label="Unbilled work"
               value={home.unbilled.length}
               caption="completed hires with no invoice issued"
+            />
+            <Stat
+              label="Paid back"
+              value={money(currency, home.figures.refundedTotal)}
+              caption={`${home.figures.refundCount} refund${home.figures.refundCount === 1 ? "" : "s"} to customers in the period`}
             />
             <Stat
               label="To check"
@@ -244,6 +253,29 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                       className: "text-right rts-mono",
                       render: (row) => (row.finalTotal === null ? <em className="rts-unset">none recorded</em> : money(currency, row.finalTotal)),
                     },
+                  ]}
+                />
+              </TableCard>
+
+              <TableCard
+                title="Money paid back"
+                summary={
+                  home.refunds.length
+                    ? `${money(currency, home.figures.refundedTotal)} refunded in the period. A refund settles a credit, it is not a cost of the work.`
+                    : "Refunds recorded in the period appear here, with the invoice and the reason."
+                }
+              >
+                <DataTable
+                  rows={home.refunds}
+                  rowKey={(row) => row.id}
+                  emptyState={<EmptyState title="Nothing paid back" body="No refund was recorded in this period." />}
+                  columns={[
+                    { key: "ref", header: "Refund", render: (row) => <span className="font-mono text-xs font-semibold text-stone-900">{row.reference}</span> },
+                    { key: "invoice", header: "Against", render: (row) => <span className="font-mono text-xs">{row.invoiceReference}</span> },
+                    { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="rts-unset">no name recorded</em> },
+                    { key: "paid", header: "Paid back", render: (row) => formatDate(row.paidOn) },
+                    { key: "reason", header: "Why", render: (row) => <span className="text-xs text-stone-600">{row.reason}</span> },
+                    { key: "amount", header: "Amount", className: "text-right rts-mono", render: (row) => money(currency, row.amount) },
                   ]}
                 />
               </TableCard>

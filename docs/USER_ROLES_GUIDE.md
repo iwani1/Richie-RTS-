@@ -86,8 +86,8 @@ the person who reported the defect be the only sign-off.
 
 **Can:** see rentals, clients, vehicles, trips, incidents and maintenance costs; prepare quotations;
 confirm rentals and record the deposit; issue and void invoices; record payments and advance them to
-verified and reconciled; cancel a payment recorded in error; issue and void credit notes; print
-invoices, credit notes and statements; read the rental report. **Lands on the Finance screen**, which is where the
+verified and reconciled; cancel a payment recorded in error; issue and void credit notes; pay money
+back to a customer and cancel a refund recorded in error; print invoices, credit notes and statements; read the rental report. **Lands on the Finance screen**, which is where the
 money work starts: money in and out for a period, who is late paying and by how many days, completed
 hires nobody has invoiced yet, and payments still to verify or reconcile. The "Margin" figure appears
 only when both sides of the period are complete (an invoice and a cost line in the period, and no
@@ -126,9 +126,17 @@ one-way door — a cancelled payment is never un-cancelled, so if the money real
 again as a new payment. If it had already been matched to the bank statement, the panel tells you what
 that statement will now be short by before you agree.
 
-Cancelling is not a refund. Cancelling says the money was never received; giving real money back is a
-**credit note** with a refund stated on it (below), and the refund itself is paid the way you pay any
-other outgoing.
+Cancelling is not a refund. Cancelling says the money was never received. Giving real money back is a
+**credit note** with a refund stated on it, and then a **refund** record when the money actually leaves
+(below) — one says what is owed back, the other says what was paid.
+
+**Paying money back to a customer.** When a credit note takes a bill below what the customer has
+already paid, the invoice says a refund is due. Open that invoice and choose **Pay a refund** when the
+money actually leaves: the form fills in what is still owed back, and asks for the date, the method and
+a reason. The refund gets its own number (REF-…), and the invoice, the customer's statement and the
+money report all show it. Recorded a refund that never left the bank? Cancel it with a reason — the
+number stays on the file and the money becomes owed back again. A refund is not a cost: it comes off
+the cash movement figure, not off what the work cost.
 
 **How bad is the debt?** The Finance screen opens with **Debt by age**: everything still owed, in the
 same four bands a statement prints, with the customers behind them and how late each one's oldest

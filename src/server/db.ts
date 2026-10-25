@@ -276,6 +276,27 @@ export interface CreditNoteRow {
   data: Json;
 }
 
+export interface RefundRow {
+  id: string;
+  reference: string;
+  invoice_id: string;
+  client_id: string | null;
+  customer_name: string;
+  currency_code: string;
+  amount: string;
+  method: string;
+  paid_on: DateOnly;
+  external_reference: string;
+  reason: string;
+  status: string;
+  void_reason: string | null;
+  voided_at: Timestamp | null;
+  recorded_by: string;
+  recorded_at: Timestamp;
+  updated_at: Timestamp;
+  data: Json;
+}
+
 export interface AuditEntryRow {
   id: string;
   at: Timestamp;
@@ -326,6 +347,7 @@ export interface KyselyDatabase {
   invoice: InvoiceRow;
   credit_note: CreditNoteRow;
   payment: PaymentRow;
+  refund: RefundRow;
   audit_entry: AuditEntryRow;
   reference_counter: { scope: string; period: string; last: number };
   app_settings: AppSettingsRow;
