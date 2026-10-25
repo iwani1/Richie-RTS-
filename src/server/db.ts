@@ -253,6 +253,26 @@ export interface PaymentRow {
   data: Json;
 }
 
+export interface CreditNoteRow {
+  id: string;
+  reference: string;
+  invoice_id: string;
+  client_id: string | null;
+  customer_name: string;
+  currency_code: string;
+  subtotal: string;
+  total: string;
+  reason: string;
+  issued_on: DateOnly;
+  status: string;
+  void_reason: string | null;
+  voided_at: Timestamp | null;
+  created_by: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  data: Json;
+}
+
 export interface AuditEntryRow {
   id: string;
   at: Timestamp;
@@ -301,6 +321,7 @@ export interface KyselyDatabase {
   compliance_document: ComplianceDocumentRow;
   odometer_reading: OdometerReadingRow;
   invoice: InvoiceRow;
+  credit_note: CreditNoteRow;
   payment: PaymentRow;
   audit_entry: AuditEntryRow;
   reference_counter: { scope: string; period: string; last: number };

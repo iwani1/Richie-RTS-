@@ -66,7 +66,15 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
           </Notice>
 
           <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Invoiced" value={money(currency, home.figures.invoicedTotal)} caption={`${home.figures.invoiceCount} invoices issued in the period`} />
+            <Stat
+              label="Invoiced"
+              value={money(currency, home.figures.invoicedTotal)}
+              caption={
+                home.figures.creditNoteCount > 0
+                  ? `${home.figures.invoiceCount} invoices issued · ${money(currency, home.figures.creditedTotal)} credited back on ${home.figures.creditNoteCount} note${home.figures.creditNoteCount === 1 ? "" : "s"}`
+                  : `${home.figures.invoiceCount} invoices issued in the period`
+              }
+            />
             <Stat label="Received" value={money(currency, home.figures.receivedTotal)} caption={`${home.figures.paymentCount} payments recorded in the period`} />
             <Stat label="Costs recorded" value={money(currency, home.figures.expensesTotal)} caption={`${home.figures.expenseLineCount} cost lines in the period`} />
             <Stat
@@ -74,7 +82,7 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
               value={home.margin.available ? money(currency, home.margin.amount ?? 0) : "Not available"}
               caption={
                 home.margin.available
-                  ? `Hires billed less costs recorded${home.margin.percent === null ? "" : ` — ${(home.margin.percent * 100).toFixed(1)}% of revenue`}`
+                  ? `Hires billed${home.figures.creditNoteCount > 0 ? " less credits" : ""} less costs recorded${home.margin.percent === null ? "" : ` — ${(home.margin.percent * 100).toFixed(1)}% of revenue`}`
                   : home.margin.reason
               }
             />

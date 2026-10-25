@@ -11,10 +11,12 @@
 // and totals are frozen here and by trigger in migration 003. Only its status, amount paid and void
 // note move, and the void path refuses once money has been recorded against it.
 
+import { creditedTotal, invoiceBalance } from "./creditNotes";
 import { formatAmount, fromMinor, linesTotal, parseAmount, parsePositiveAmount, percentOfMinor, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
 import type {
+  CreditNote,
   Database,
   Invoice,
   InvoiceLine,
@@ -25,7 +27,14 @@ import type {
 } from "./types";
 import { PAYMENT_STATUSES } from "./types";
 
-export const FINANCE_COMMAND_TYPES = ["issue_rental_invoice", "void_invoice", "record_payment", "advance_payment"] as const;
+export const FINANCE_COMMAND_TYPES = [
+  "issue_rental_invoice",
+  "void_invoice",
+  "record_payment",
+  "advance_payment",
+  "issue_credit_note",
+  "void_credit_note",
+] as const;
 
 export interface IssueInvoiceInput {
   rentalId: string;
@@ -44,11 +53,29 @@ export interface PaymentInput {
   note: string;
 }
 
+/**
+ * What the operator types to take money off an invoice.
+ *
+ * `amount` is deliberately stated **before tax**: the credit note carries the invoice's own tax
+ * lines, and the tax is worked out here rather than typed in. An operator who had to work out the
+ * tax on a refund by hand would be the most likely place in the whole system for the two figures to
+ * drift apart, and a credit note's tax must reverse the tax that was actually charged.
+ */
+export interface CreditNoteInput {
+  invoiceId: string;
+  issuedOn: string;
+  amount: string;
+  description: string;
+  reason: string;
+}
+
 export type FinanceCommand =
   | { type: "issue_rental_invoice"; input: IssueInvoiceInput }
   | { type: "void_invoice"; id: string; reason: string }
   | { type: "record_payment"; input: PaymentInput }
-  | { type: "advance_payment"; id: string; to: PaymentStatus };
+  | { type: "advance_payment"; id: string; to: PaymentStatus }
+  | { type: "issue_credit_note"; input: CreditNoteInput }
+  | { type: "void_credit_note"; id: string; reason: string };
 
 export function isFinanceCommand(command: { type: string }): command is FinanceCommand {
   return (FINANCE_COMMAND_TYPES as readonly string[]).includes(command.type);
@@ -62,20 +89,15 @@ export function billableEventFor(rentalId: string): string {
   return `rental:${rentalId}:final`;
 }
 
-/** Everything recorded against an invoice, in whole pesewas, so the comparison is exact. */
-function paidMinor(db: Database, invoice: Invoice): number {
-  return db.payments.reduce((sum, payment) => (payment.invoiceId === invoice.id ? sum + toMinor(payment.amount) : sum), 0);
-}
-
 /**
- * What is still owed on an invoice.
+ * What is still owed on an invoice: total, less money received, less what was credited back.
  *
  * Compared and subtracted in integer pesewas: `paid >= total` on floats is where an invoice that is
- * paid to the cedi shows a pesewa of balance forever (audit D-04).
+ * paid to the cedi shows a pesewa of balance forever (audit D-04). The arithmetic itself lives in
+ * `creditNotes.ts` so the screen, the reports and this module cannot disagree (D-86).
  */
 export function outstanding(db: Database, invoice: Invoice): number {
-  const remaining = toMinor(invoice.total) - paidMinor(db, invoice);
-  return fromMinor(remaining > 0 ? remaining : 0);
+  return invoiceBalance(db, invoice).outstanding;
 }
 
 function statusFor(totalMinor: number, paidMinorTotal: number): InvoiceStatus {
@@ -93,6 +115,23 @@ function taxLinesFor(db: Database, subtotal: number): InvoiceTaxLine[] {
   if (db.settings.taxPosition !== "registered") return [];
   const subtotalMinor = toMinor(subtotal);
   return db.settings.taxLines.map((line) => ({
+    name: line.name,
+    ratePercent: line.ratePercent,
+    amount: fromMinor(percentOfMinor(subtotalMinor, line.ratePercent)),
+  }));
+}
+
+/**
+ * The tax a credit note reverses, taken from the invoice's own snapshot rather than from today's
+ * settings.
+ *
+ * If the rate changed after the invoice went out, the credit still has to reverse the tax that was
+ * actually charged on that document, or the two figures would not cancel. An invoice raised before
+ * the company registered for tax has no lines, so its credit has no tax either.
+ */
+function creditTaxLinesFor(invoice: Invoice, subtotal: number): InvoiceTaxLine[] {
+  const subtotalMinor = toMinor(subtotal);
+  return invoice.taxLines.map((line) => ({
     name: line.name,
     ratePercent: line.ratePercent,
     amount: fromMinor(percentOfMinor(subtotalMinor, line.ratePercent)),
@@ -225,7 +264,13 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
       const payments = db.payments.filter((payment) => payment.invoiceId === invoice.id);
       if (payments.length) {
         return fail(
-          `${invoice.reference} has ${payments.length} payment${payments.length === 1 ? "" : "s"} recorded against it, so it cannot be voided. Payments are immutable; correct the balance with an adjusting entry.`,
+          `${invoice.reference} has ${payments.length} payment${payments.length === 1 ? "" : "s"} recorded against it, so it cannot be voided. Payments are immutable; take the money off with a credit note instead.`,
+        );
+      }
+      const credits = db.creditNotes.filter((note) => note.invoiceId === invoice.id && note.status === "issued");
+      if (credits.length) {
+        return fail(
+          `${invoice.reference} has ${credits.length === 1 ? `credit note ${credits[0].reference}` : `${credits.length} credit notes`} against it, so it cannot be voided. Void the credit note first if it was wrong.`,
         );
       }
       const updated: Invoice = { ...invoice, status: "void", voidReason: command.reason.trim(), voidedAt: now, updatedAt: now };
@@ -343,12 +388,11 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
         },
         now,
       );
-      const balanceMinor = toMinor(updated.total) - paidMinorTotal;
-      const balance = fromMinor(balanceMinor > 0 ? balanceMinor : 0);
+      const balance = invoiceBalance({ ...db, payments: [...db.payments, payment] }, updated);
       return {
         ok: true,
         db: next,
-        message: `${payment.reference} recorded. ${updated.reference} outstanding: ${updated.currencyCode} ${formatAmount(balance)}.`,
+        message: `${payment.reference} recorded. ${updated.reference} outstanding: ${updated.currencyCode} ${formatAmount(balance.outstanding)}.`,
       };
     }
 
@@ -389,6 +433,125 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
         now,
       );
       return { ok: true, db: next, message: `${updated.reference} marked ${command.to}.` };
+    }
+
+    case "issue_credit_note": {
+      const denied = authorise(actor, "credits:issue");
+      if (denied) return denied;
+      const errors: Errors = {};
+      const input = command.input;
+      const invoice = db.invoices.find((record) => record.id === input.invoiceId);
+      if (!input.invoiceId) errors.invoiceId = "Select the invoice this credit is for.";
+      else if (!invoice) errors.invoiceId = "Invoice not found.";
+      else if (invoice.status === "void") errors.invoiceId = `${invoice.reference} is void, so there is nothing left to credit.`;
+
+      const parsed = parsePositiveAmount(input.amount ?? "");
+      const subtotal = parsed.problem ? 0 : parsed.amount;
+      const taxLines = invoice ? creditTaxLinesFor(invoice, subtotal) : [];
+      const total = fromMinor(toMinor(subtotal) + taxLines.reduce((sum, line) => sum + toMinor(line.amount), 0));
+      const roomMinor = invoice ? toMinor(invoice.total) - toMinor(creditedTotal(db, invoice)) : 0;
+
+      if (parsed.problem === "too-many-decimals") errors.amount = "Use at most two decimal places: amounts are in pesewas.";
+      else if (parsed.problem === "too-large") errors.amount = "That amount looks wrong. Check the figure.";
+      else if (parsed.problem) errors.amount = "Enter the amount to credit, before tax.";
+      else if (invoice && toMinor(total) > roomMinor) {
+        // The ceiling is the invoice's own total, less what has already been credited. Stated in the
+        // same terms as the figures on screen: this is money off the bill, not money in the bank.
+        errors.amount =
+          roomMinor <= 0
+            ? `${invoice.reference} has already been credited in full; nothing is left to take off it.`
+            : `That is more than ${invoice.reference} has left: ${invoice.currencyCode} ${formatAmount(fromMinor(roomMinor))} including tax.`;
+      }
+
+      const description = input.description.trim();
+      if (!description) errors.description = "Say what this credit is for, as it should read on the document.";
+      else if (description.length > 200) errors.description = "Keep the description to 200 characters.";
+      const reason = input.reason.trim();
+      if (!reason) errors.reason = "Give a short reason. It is kept on the record.";
+      else if (reason.length > 300) errors.reason = "Keep the reason to 300 characters.";
+      if (!isValidDate(input.issuedOn)) errors.issuedOn = "Enter the date of the credit note.";
+      else if (invoice && input.issuedOn < invoice.issuedOn) errors.issuedOn = `A credit note cannot pre-date the invoice (${invoice.issuedOn}).`;
+      if (Object.keys(errors).length) return fail("Please correct the credit note details.", errors);
+
+      const period = input.issuedOn.slice(0, 4);
+      const { reference, counters } = allocateReference(db, "creditNote", period);
+      const note: CreditNote = {
+        id: makeId(),
+        reference,
+        invoiceId: invoice!.id,
+        invoiceReference: invoice!.reference,
+        clientId: invoice!.clientId,
+        customerName: invoice!.customerName,
+        currencyCode: invoice!.currencyCode,
+        // One line in this release: the amount the office decided to take off, described in the
+        // operator's own words. The document shape allows more lines if a later form offers them.
+        lines: [{ id: makeId(), description, quantity: 1, unitAmount: subtotal }],
+        taxLines,
+        subtotal,
+        total,
+        reason,
+        issuedOn: input.issuedOn,
+        status: "issued",
+        voidReason: null,
+        voidedAt: null,
+        createdBy: actor?.fullName ?? "System",
+        createdAt: now,
+        updatedAt: now,
+      };
+      const nextDb = { ...db, referenceCounters: counters, creditNotes: [...db.creditNotes, note] };
+      const balance = invoiceBalance(nextDb, invoice!);
+      const taxMinor = toMinor(total) - toMinor(subtotal);
+      const taxNote = taxLines.length ? ` (including ${invoice!.currencyCode} ${formatAmount(fromMinor(taxMinor))} tax)` : "";
+      const refundNote = balance.refundDue > 0
+        ? ` ${invoice!.reference} is now paid past its total: ${invoice!.currencyCode} ${formatAmount(balance.refundDue)} is owed back to the customer as a refund.`
+        : ` ${invoice!.reference} outstanding: ${invoice!.currencyCode} ${formatAmount(balance.outstanding)}.`;
+      const next = audit(
+        nextDb,
+        actor,
+        {
+          action: "finance:credit_note_issue",
+          entity: "creditNote",
+          entityId: note.id,
+          summary: `${note.reference} credited ${note.currencyCode} ${formatAmount(note.total)} against ${invoice!.reference}. Reason: ${reason}.${refundNote}`,
+        },
+        now,
+      );
+      return { ok: true, db: next, message: `${note.reference} issued for ${note.currencyCode} ${formatAmount(note.total)}${taxNote}.${refundNote}` };
+    }
+
+    case "void_credit_note": {
+      const denied = authorise(actor, "credits:void");
+      if (denied) return denied;
+      const note = db.creditNotes.find((record) => record.id === command.id);
+      if (!note) return fail("Credit note not found.");
+      if (note.status === "void") return fail(`${note.reference} is already void.`);
+      if (!command.reason.trim()) return fail("A reason is required.", { reason: "Give a short reason." });
+      const updated: CreditNote = {
+        ...note,
+        status: "void",
+        voidReason: command.reason.trim(),
+        voidedAt: now,
+        updatedAt: now,
+      };
+      const nextDb = { ...db, creditNotes: db.creditNotes.map((record) => (record.id === updated.id ? updated : record)) };
+      const invoice = db.invoices.find((record) => record.id === note.invoiceId);
+      const balance = invoice ? invoiceBalance(nextDb, invoice) : null;
+      const next = audit(
+        nextDb,
+        actor,
+        {
+          action: "finance:credit_note_void",
+          entity: "creditNote",
+          entityId: updated.id,
+          summary: `${updated.reference} voided: ${updated.currencyCode} ${formatAmount(updated.total)} restored to ${note.invoiceReference}. Reason: ${updated.voidReason}`,
+        },
+        now,
+      );
+      return {
+        ok: true,
+        db: next,
+        message: `${updated.reference} voided.${balance ? ` ${note.invoiceReference} outstanding: ${note.currencyCode} ${formatAmount(balance.outstanding)}.` : ""}`,
+      };
     }
   }
 }

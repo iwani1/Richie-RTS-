@@ -91,10 +91,12 @@ company-wide report cannot be assembled from it.
 | invoices:void | x | | x | | |
 | payments:record | x | | x | | |
 | payments:advance | x | | x | | |
+| credits:issue | x | | x | | |
+| credits:void | x | | x | | |
 
-Read scope: `invoices:read` also opens the invoice's payments, because a payment is part of its
-invoice. Record-bound roles receive neither collection, so a driver or client contact never sees a
-customer's billing (`visibility.ts`, `SECTION_PERMISSIONS`).
+Read scope: `invoices:read` also opens the invoice's payments and credit notes, because both are part
+of the invoice. Record-bound roles receive none of the three collections, so a driver or client
+contact never sees a customer's billing (`visibility.ts`, `SECTION_PERMISSIONS`).
 
 Separation of duties: operations completes a rental and therefore produces the line items that will
 be billed, but cannot issue the invoice or record money against it. Finance issues, records payments
@@ -108,6 +110,12 @@ Two rules are enforced in the service and again in the database (migration `003`
 
 Voiding needs `invoices:void` and is refused once any payment stands against the invoice. The voided
 invoice keeps its number, so a corrected invoice receives the next one and the audit trail keeps both.
+
+Taking money *off* an invoice after it has gone out needs `credits:issue` (and `credits:void` to undo a
+credit note). It is deliberately separate from `invoices:void`: a credit note is a numbered document
+of its own, not a correction of the invoice's details, and the two are different facts — "this document
+never counted" and "everything except this counted" (D-86). Finance and the administrator hold both;
+operations holds neither, exactly as with issuing and recording money.
 
 ## Compliance documents (Phase 6)
 

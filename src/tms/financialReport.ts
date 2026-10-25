@@ -19,6 +19,7 @@
 // the company currency is not set, because a total without a currency is a guess.
 
 import { costReport } from "./costs";
+import { creditedTotal, invoiceBalance } from "./creditNotes";
 import { fromMinor, sumAmounts, toMinor } from "./money";
 import type { Database, Invoice, Payment } from "./types";
 
@@ -26,6 +27,8 @@ export interface RevenueByCustomer {
   customerName: string;
   invoiceCount: number;
   invoiced: number;
+  /** Taken off those invoices by credit notes issued on or before the period end (D-86). */
+  credited: number;
   paid: number;
   outstanding: number;
 }
@@ -54,7 +57,10 @@ export interface FinancialReport {
   /** Payments recorded in the period. */
   receivedTotal: number;
   paymentCount: number;
-  /** Not paid in full as at the period end. */
+  /** Credit notes issued in the period: money taken off the bills, not money received. */
+  creditedTotal: number;
+  creditNoteCount: number;
+  /** Not paid and not credited in full as at the period end. */
   outstandingTotal: number;
   outstandingCount: number;
   expensesByCategory: ExpensesByCategory[];
@@ -99,12 +105,13 @@ export function financialReport(db: Database, from: string, to: string): Financi
 
   // Revenue by customer. A missing name is its own line: folding it into "other" would hide that
   // the invoice cannot be traced to anybody.
-  const customers = new Map<string, { invoiceCount: number; invoiced: number; paid: number }>();
+  const customers = new Map<string, { invoiceCount: number; invoiced: number; credited: number; paid: number }>();
   for (const invoice of invoices) {
     const key = invoice.customerName.trim() || "No customer named";
-    const bucket = customers.get(key) ?? { invoiceCount: 0, invoiced: 0, paid: 0 };
+    const bucket = customers.get(key) ?? { invoiceCount: 0, invoiced: 0, credited: 0, paid: 0 };
     bucket.invoiceCount += 1;
     bucket.invoiced += toMinor(invoice.total);
+    bucket.credited += toMinor(creditedTotal(db, invoice, to));
     bucket.paid += paidToward(db.payments, invoice, to);
     customers.set(key, bucket);
   }
@@ -113,8 +120,11 @@ export function financialReport(db: Database, from: string, to: string): Financi
       customerName,
       invoiceCount: bucket.invoiceCount,
       invoiced: fromMinor(bucket.invoiced),
-      paid: fromMinor(Math.min(bucket.paid, bucket.invoiced)),
-      outstanding: fromMinor(Math.max(bucket.invoiced - bucket.paid, 0)),
+      credited: fromMinor(bucket.credited),
+      // Paid is capped at what is still asked for after credits: a customer whose overpayment became
+      // a refund has not paid more than the invoice, and the row has to add up on screen.
+      paid: fromMinor(Math.min(bucket.paid, Math.max(bucket.invoiced - bucket.credited, 0))),
+      outstanding: fromMinor(Math.max(bucket.invoiced - bucket.credited - bucket.paid, 0)),
     }))
     .sort((a, b) => (b.invoiced === a.invoiced ? a.customerName.localeCompare(b.customerName) : b.invoiced - a.invoiced));
 
@@ -133,11 +143,13 @@ export function financialReport(db: Database, from: string, to: string): Financi
   // Outstanding as at the period end: an invoice issued later does not belong in a statement about
   // what was owed at that date, and a payment made later does not settle it retroactively.
   const openInvoices = db.invoices.filter((invoice) => invoice.status !== "void" && invoice.issuedOn <= to);
-  const outstandingMinor = openInvoices.reduce((sum, invoice) => {
-    const remaining = toMinor(invoice.total) - paidToward(db.payments, invoice, to);
-    return sum + (remaining > 0 ? remaining : 0);
-  }, 0);
-  const outstandingCount = openInvoices.filter((invoice) => paidToward(db.payments, invoice, to) < toMinor(invoice.total)).length;
+  // Both payments and credits are measured as at the period end, and the balance itself is the one
+  // shared helper (creditNotes.ts) so this statement cannot disagree with the invoice screen.
+  const balances = openInvoices.map((invoice) => invoiceBalance(db, invoice, to));
+  const outstandingMinor = balances.reduce((sum, balance) => sum + toMinor(balance.outstanding), 0);
+  const outstandingCount = balances.filter((balance) => toMinor(balance.outstanding) > 0).length;
+
+  const creditNotes = db.creditNotes.filter((note) => note.status === "issued" && inRange(note.issuedOn));
 
   // Expenses: the cost report already decides what a recorded cost is and refuses to total across
   // currencies, so the two screens cannot disagree about the same entries.
@@ -170,6 +182,8 @@ export function financialReport(db: Database, from: string, to: string): Financi
     invoiceCount: invoices.length,
     receivedTotal: sumAmounts(payments.map((payment) => payment.amount)),
     paymentCount: payments.length,
+    creditedTotal: sumAmounts(creditNotes.map((note) => note.total)),
+    creditNoteCount: creditNotes.length,
     outstandingTotal: fromMinor(outstandingMinor),
     outstandingCount,
     expensesByCategory,
@@ -203,7 +217,8 @@ function divide(total: number, count: number): number {
 function statusOf(report: FinancialReport, from: string, to: string, costLines: number): FinancialReport["status"] {
   if (from > to) return "invalid_range";
   if (!report.currencyCode) return "currency_not_set";
-  const nothing = report.invoiceCount === 0 && report.paymentCount === 0 && costLines === 0 && report.completedTrips === 0;
+  const nothing =
+    report.invoiceCount === 0 && report.paymentCount === 0 && report.creditNoteCount === 0 && costLines === 0 && report.completedTrips === 0;
   return nothing ? "empty" : "ok";
 }
 
@@ -212,12 +227,15 @@ function describe(report: FinancialReport): string {
   if (report.status === "currency_not_set")
     return "Money figures are withheld: the company currency is not set in Settings, and a total without a currency would be a guess.";
   if (report.status === "empty")
-    return `No invoices, payments, recorded costs or completed runs between ${report.from} and ${report.to}.`;
+    return `No invoices, payments, credit notes, recorded costs or completed runs between ${report.from} and ${report.to}.`;
   const cost =
     report.costPerTrip === null
       ? "no run was completed in the period, so cost per trip is not available"
       : `cost per trip ${report.currencyCode} ${report.costPerTrip.toFixed(2)} over ${report.completedTrips} completed run${report.completedTrips === 1 ? "" : "s"}`;
-  return `${report.invoiceCount} invoice${report.invoiceCount === 1 ? "" : "s"} issued for ${report.currencyCode} ${report.invoicedTotal.toFixed(2)}; ${report.expenseLineCount} recorded cost line${report.expenseLineCount === 1 ? "" : "s"}; ${cost}.`;
+  const credited = report.creditNoteCount
+    ? `, ${report.currencyCode} ${report.creditedTotal.toFixed(2)} credited back on ${report.creditNoteCount} credit note${report.creditNoteCount === 1 ? "" : "s"}`
+    : "";
+  return `${report.invoiceCount} invoice${report.invoiceCount === 1 ? "" : "s"} issued for ${report.currencyCode} ${report.invoicedTotal.toFixed(2)}${credited}; ${report.expenseLineCount} recorded cost line${report.expenseLineCount === 1 ? "" : "s"}; ${cost}.`;
 }
 
 /** The report as CSV, so the owner can check the arithmetic in a spreadsheet. */
@@ -229,18 +247,19 @@ export function financialReportCsv(report: FinancialReport): string {
     ["Period to", report.to, ""],
     ["Invoiced", money(report.invoicedTotal), `${report.invoiceCount} live invoices issued in the period`],
     ["Received", money(report.receivedTotal), `${report.paymentCount} payments received in the period`],
-    ["Outstanding at period end", money(report.outstandingTotal), `${report.outstandingCount} invoices not fully paid`],
+    ["Credited", money(report.creditedTotal), `${report.creditNoteCount} credit notes issued in the period`],
+    ["Outstanding at period end", money(report.outstandingTotal), `${report.outstandingCount} invoices not fully paid or credited`],
     ["Costs recorded", money(report.expensesTotal), `${report.expenseLineCount} cost lines incurred in the period`],
     ["Completed runs", String(report.completedTrips), "scheduled runs completed in the period"],
     ["Passengers boarded", String(report.passengersBoarded), "riders recorded as boarded on those runs"],
     ["Cost per trip", report.costPerTrip === null ? "not available" : money(report.costPerTrip), "recorded costs / completed runs"],
     ["Cost per passenger", report.costPerPassenger === null ? "not available" : money(report.costPerPassenger), "recorded costs / riders boarded"],
     ["", "", ""],
-    ["Revenue by customer", "Invoiced", "Paid · Outstanding · Invoices"],
+    ["Revenue by customer", "Invoiced", "Credited · Paid · Outstanding · Invoices"],
     ...report.revenueByCustomer.map((row) => [
       row.customerName,
       money(row.invoiced),
-      `${money(row.paid)} · ${money(row.outstanding)} · ${row.invoiceCount}`,
+      `${money(row.credited)} · ${money(row.paid)} · ${money(row.outstanding)} · ${row.invoiceCount}`,
     ]),
     ["", "", ""],
     ["Revenue by service", "Invoiced", "Invoices"],

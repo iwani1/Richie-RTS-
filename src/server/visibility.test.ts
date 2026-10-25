@@ -309,3 +309,83 @@ describe("the seats a bound account may see (D-85)", () => {
     expect(visible.passengers.map((p) => p.fullName)).toContain("Other Client Rider");
   });
 });
+
+describe("credit notes inside the snapshot (D-86)", () => {
+  // A credit note names a customer and says why they were given money back. It belongs to the
+  // invoice's billing, so it follows the invoice's read permission and nothing else. This block
+  // exists because the narrowed snapshot is a whitelist: a collection added to the database and not
+  // to that list is handed to a bound account in full (the same shape of leak D-85 fixed).
+  function withCreditNotes(): Database {
+    const w = world();
+    const invoice = {
+      id: "inv1",
+      reference: "INV-2026-0001",
+      kind: "rental" as const,
+      rentalId: null,
+      clientId: "c1",
+      customerName: "Acme Ltd",
+      currencyCode: "GHS",
+      lines: [],
+      taxLines: [],
+      subtotal: 1000,
+      total: 1000,
+      amountPaid: 0,
+      status: "issued" as const,
+      billableEvent: "rental:r1:final",
+      issuedOn: "2026-06-01",
+      dueOn: "2026-06-15",
+      notes: "",
+      voidReason: null,
+      voidedAt: null,
+      createdAt: at,
+      updatedAt: at,
+    };
+    w.invoices = [invoice];
+    w.creditNotes = [
+      {
+        id: "cn1",
+        reference: "CN-2026-0001",
+        invoiceId: invoice.id,
+        invoiceReference: invoice.reference,
+        clientId: "c1",
+        customerName: "Acme Ltd",
+        currencyCode: "GHS",
+        lines: [],
+        taxLines: [],
+        subtotal: 200,
+        total: 200,
+        reason: "Service not delivered",
+        issuedOn: "2026-06-04",
+        status: "issued",
+        voidReason: null,
+        voidedAt: null,
+        createdBy: "Fin",
+        createdAt: at,
+        updatedAt: at,
+      },
+    ];
+    return w;
+  }
+
+  it("never sends a credit note to a driver or a client contact", () => {
+    for (const who of [
+      actor("driver-user", "driver"),
+      actor("client-user", "client_contact"),
+    ]) {
+      const visible = scopeDatabase(withCreditNotes(), who)!;
+      expect(visible.creditNotes).toEqual([]);
+    }
+  });
+
+  it("sends finance the credit notes that belong to the invoices it may read", () => {
+    const visible = scopeDatabase(withCreditNotes(), actor("fin", "finance"))!;
+    expect(visible.creditNotes.map((note) => note.reference)).toEqual(["CN-2026-0001"]);
+    expect(visible.invoices.map((invoice) => invoice.reference)).toEqual(["INV-2026-0001"]);
+  });
+
+  it("sends operations nothing about billing, credit notes included", () => {
+    const visible = scopeDatabase(withCreditNotes(), actor("ops", "operations"))!;
+    expect(visible.creditNotes).toEqual([]);
+    expect(visible.invoices).toEqual([]);
+  });
+});

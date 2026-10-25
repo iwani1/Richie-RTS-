@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 14). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
+The app stores these as arrays inside one JSON document (schema version 15). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
 erDiagram
@@ -346,8 +346,10 @@ erDiagram
   RENTAL ||--o{ INVOICE : "bills the completion"
   CLIENT ||--o{ INVOICE : "may be the account"
   INVOICE ||--o{ PAYMENT : "is paid by"
+  INVOICE ||--o{ CREDIT_NOTE : "is corrected by (D-86)"
   REFERENCE_COUNTER ||--o{ INVOICE : "allocates INV-nnnn-yyyy"
   REFERENCE_COUNTER ||--o{ PAYMENT : "allocates PAY-nnnn-yyyy"
+  REFERENCE_COUNTER ||--o{ CREDIT_NOTE : "allocates CN-nnnn-yyyy"
 
   INVOICE {
     text id PK
@@ -382,9 +384,27 @@ erDiagram
     jsonb data
   }
 
+  CREDIT_NOTE {
+    text id PK
+    text reference UK "CN-YYYY-NNNN"
+    text invoice_id FK "the invoice it corrects"
+    text client_id FK
+    text customer_name
+    text currency_code
+    numeric subtotal "14,2"
+    numeric total "14,2, > 0, <= the invoice total"
+    text reason
+    date issued_on
+    text status "issued|void"
+    text void_reason
+    timestamptz voided_at
+    text created_by
+    jsonb data "lines, taxLines (the invoice's own snapshot)"
+  }
+
   REFERENCE_COUNTER {
-    text scope PK "invoice|payment"
-    text period PK "YYYY"
+    text scope PK "invoice|creditNote|payment|…"
+    text period PK "YYYY|all"
     integer last
   }
 ```
@@ -401,5 +421,13 @@ Constraints and triggers:
 - `payment_frozen_trg` — refuses any change to the financial fields, and refuses a status move
   backwards.
 - `invoice_no_delete_trg`, `payment_no_delete_trg` — delete is never allowed (brief 5.9).
+- **`credit_note` (migration `008_credit_notes.sql`, D-86).** A credit note is the only way money comes
+  off an issued invoice. `credit_note_within_invoice_trg` locks the invoice row and refuses an insert
+  whose total would push the sum of live credits past the invoice's own total, so two simultaneous
+  credit notes cannot each see the same room; `credit_note_frozen_trg` makes the document immutable and
+  refuses to un-void one; `credit_note_no_delete_trg` refuses a delete. `credit_note_void_has_reason`
+  is a check constraint, not a courtesy. Note that the ceiling is the invoice total and **not** what is
+  still unpaid: crediting an invoice that is already paid is a refund, and `paid + credited − total`
+  is reported as a refund due rather than netted away (`src/tms/creditNotes.ts`).
 - `reference_counter` is written by the same transaction that writes the document, so two writers
   cannot allocate the same number.

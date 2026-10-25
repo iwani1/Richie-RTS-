@@ -159,8 +159,8 @@ describe("financial report (RPT-03)", () => {
     });
     const report = financialReport(db, JUNE.from, JUNE.to);
     expect(report.revenueByCustomer).toEqual([
-      { customerName: "Northstar Foods", invoiceCount: 1, invoiced: 2000, paid: 0, outstanding: 2000 },
-      { customerName: "Harbour Logistics", invoiceCount: 1, invoiced: 800, paid: 0, outstanding: 800 },
+      { customerName: "Northstar Foods", invoiceCount: 1, invoiced: 2000, credited: 0, paid: 0, outstanding: 2000 },
+      { customerName: "Harbour Logistics", invoiceCount: 1, invoiced: 800, credited: 0, paid: 0, outstanding: 800 },
     ]);
     // Only hire is invoiced in this build, and the row says so rather than inventing a service.
     expect(report.revenueByService).toEqual([{ service: "Vehicle hire", invoiceCount: 2, invoiced: 2800 }]);
@@ -237,7 +237,7 @@ describe("financial report (RPT-03)", () => {
     expect(reversed.status).toBe("invalid_range");
     const empty = financialReport(world({ workOrders: [] }), JUNE.from, JUNE.to);
     expect(empty.status).toBe("empty");
-    expect(empty.message).toMatch(/No invoices, payments, recorded costs or completed runs/);
+    expect(empty.message).toMatch(/No invoices, payments, credit notes, recorded costs or completed runs/);
   });
 
   it("writes the same figures to CSV", () => {

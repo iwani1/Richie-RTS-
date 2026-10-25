@@ -61,6 +61,10 @@ export const PERMISSIONS = [
   "invoices:read",
   "invoices:issue",
   "invoices:void",
+  // Taking money *off* an invoice (D-86). Separate from invoices:void because a credit note is a
+  // numbered document of its own, not a correction of the invoice's details.
+  "credits:issue",
+  "credits:void",
   "payments:record",
   "payments:advance",
   "documents:read",
@@ -164,6 +168,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "invoices:read",
     "invoices:issue",
     "invoices:void",
+    "credits:issue",
+    "credits:void",
     "payments:record",
     "payments:advance",
   ],

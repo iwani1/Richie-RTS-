@@ -33,6 +33,9 @@ export const REFERENCE_SERIES: Record<ReferenceScope, { prefix: string; width: n
   // Financial documents restart each year: INV-2026-0001 is what an accountant and a tax inspector
   // both expect to see.
   invoice: { prefix: "INV", width: 4, perYear: true },
+  // A credit note is quoted to the same accountant as the invoice it corrects, so it restarts each
+  // year alongside it, with a prefix that no one can mistake for an invoice.
+  creditNote: { prefix: "CN", width: 4, perYear: true },
   payment: { prefix: "PAY", width: 4, perYear: true },
 };
 
@@ -56,6 +59,8 @@ function existingReferences(db: Database, scope: ReferenceScope): string[] {
       return db.workOrders.map((record) => record.reference);
     case "invoice":
       return db.invoices.map((record) => record.reference);
+    case "creditNote":
+      return db.creditNotes.map((record) => record.reference);
     case "payment":
       return db.payments.map((record) => record.reference);
     case "booking":

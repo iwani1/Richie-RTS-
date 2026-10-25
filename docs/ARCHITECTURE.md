@@ -48,7 +48,7 @@ The interface is a purpose-built "operations ledger", not a component-kit defaul
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 14`, `emptyDatabase()`, `migrate()` (accepts schema 1–14) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 15`, `emptyDatabase()`, `migrate()` (accepts schema 1–15) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `confinedClientId`. Confines `driver` and `client_contact` to their one linked record. Fails closed |
 | `src/tms/service.ts` | Core commands: setup, users, settings, vehicles, drivers, clients, rentals, backup import |
@@ -57,6 +57,7 @@ The interface is a purpose-built "operations ledger", not a component-kit defaul
 | `src/tms/bookings.ts` | Seat bookings: one named rider's seat on one run, capacity as roster + bookings, request/confirm/waitlist/reject/cancel, cut-offs, offers that are never auto-confirmed, and the run's manifest (`manifestFor`: roster plus every seat that still holds one) |
 | `src/tms/compliance.ts` | Vehicle/driver compliance documents, expiry status and reminder lead time |
 | `src/tms/maintenance.ts` | Odometer readings, last completed service anchor and fleet readiness evaluation per configured basis |
+| `src/tms/creditNotes.ts` | The one invoice balance rule (D-86): `outstanding = total − paid − credited`, the refund due when credits pass what was paid, and the date-limited variant the closed-period reports use. Read by `finance.ts`, both money reports, `financeHome.ts` and the Invoices screen |
 | `src/tms/financeHome.ts` | The finance home's figures: the period totals from `financialReport`, overdue invoices and unbilled hires as at today, payments to verify, and a margin that is withheld unless both sides of the period are complete |
 | `src/tms/kpis.ts` | KPI calculations. Each result carries period, numerator, denominator, coverage and an explicit status |
 | `src/tms/costs.ts` | Recorded-cost report with period, total, entries and data coverage |

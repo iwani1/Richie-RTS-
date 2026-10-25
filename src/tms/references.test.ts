@@ -58,6 +58,7 @@ describe("reference series", () => {
       incident: "IN-0001",
       workOrder: "WO-0001",
       invoice: "INV-2026-0001",
+      creditNote: "CN-2026-0001",
       payment: "PAY-2026-0001",
       booking: "BK-0001",
     });

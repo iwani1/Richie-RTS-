@@ -66,6 +66,8 @@ const PERMISSION_FOR: Record<string, Parameters<typeof can>[1]> = {
   update_settings: "settings:update",
   issue_rental_invoice: "invoices:issue",
   void_invoice: "invoices:void",
+  issue_credit_note: "credits:issue",
+  void_credit_note: "credits:void",
   record_payment: "payments:record",
   advance_payment: "payments:advance",
   create_user: "users:create",

@@ -8,8 +8,9 @@
 //
 // Formulas are documented in docs/KPIS.md. Changing one here without changing it there is a defect.
 
-import { fromMinor, sumAmounts, toMinor } from "./money";
-import type { Database, Invoice, Payment, Rental } from "./types";
+import { invoiceBalance } from "./creditNotes";
+import { sumAmounts, toMinor } from "./money";
+import type { Database, Rental } from "./types";
 
 export interface CancellationReason {
   reason: string;
@@ -38,7 +39,10 @@ export interface RentalReport {
   /** Payments received in the range, whatever the invoice date. */
   receivedTotal: number;
   paymentCount: number;
-  /** Invoices issued on or before `to` that are still not paid in full. */
+  /** Credit notes issued in the range: money taken off the bills, not money received (D-86). */
+  creditedTotal: number;
+  creditNoteCount: number;
+  /** Invoices issued on or before `to` that are still not paid or credited in full. */
   outstandingTotal: number;
   outstandingCount: number;
   /** Rental vehicle-days committed inside the range. */
@@ -69,15 +73,6 @@ export function daysInRange(from: string, to: string): string[] {
   return Array.from({ length: end - start + 1 }, (_, offset) => new Date((start + offset) * dayMs).toISOString().slice(0, 10));
 }
 
-/**
- * Payments against one invoice, summed in whole pesewas (money.ts).
- *
- * These figures are compared with a printed total and subtracted from it, so a float sum that lands
- * a hair under the total would report a settled invoice as outstanding forever (audit D-04).
- */
-const paidOnMinor = (payments: Payment[], invoice: Invoice) =>
-  payments.reduce((sum, payment) => (payment.invoiceId === invoice.id ? sum + toMinor(payment.amount) : sum), 0);
-
 
 /** Vehicle-days a rental commits inside the range. Only a committed rental occupies a vehicle. */
 function rentalVehicleDays(rental: Rental, days: string[]): number {
@@ -104,14 +99,14 @@ export function rentalReport(db: Database, from: string, to: string): RentalRepo
   const invoicedTotal = sumAmounts(invoices.map((invoice) => invoice.total));
   const receivedTotal = sumAmounts(payments.map((payment) => payment.amount));
 
+  // The balance itself comes from the one shared helper (creditNotes.ts): total, less money received,
+  // less what credit notes took off, all as at the period end. The hire report and the finance report
+  // therefore cannot quote different balances for the same invoice.
   const openInvoices = db.invoices.filter((invoice) => invoice.status !== "void" && invoice.issuedOn <= to);
-  const outstandingTotal = sumAmounts(
-    openInvoices.map((invoice) => {
-      const remaining = toMinor(invoice.total) - paidOnMinor(db.payments, invoice);
-      return fromMinor(remaining > 0 ? remaining : 0);
-    }),
-  );
-  const outstandingCount = openInvoices.filter((invoice) => paidOnMinor(db.payments, invoice) < toMinor(invoice.total)).length;
+  const balances = openInvoices.map((invoice) => invoiceBalance(db, invoice, to));
+  const outstandingTotal = sumAmounts(balances.map((balance) => balance.outstanding));
+  const outstandingCount = balances.filter((balance) => toMinor(balance.outstanding) > 0).length;
+  const creditNotes = db.creditNotes.filter((note) => note.status === "issued" && inRange(note.issuedOn));
 
   const fleet = db.vehicles.filter((vehicle) => vehicle.status !== "retired");
   const vehicleDays = db.rentals.reduce((sum, rental) => sum + rentalVehicleDays(rental, days), 0);
@@ -143,6 +138,8 @@ export function rentalReport(db: Database, from: string, to: string): RentalRepo
     invoiceCount: invoices.length,
     receivedTotal,
     paymentCount: payments.length,
+    creditedTotal: sumAmounts(creditNotes.map((note) => note.total)),
+    creditNoteCount: creditNotes.length,
     outstandingTotal,
     outstandingCount,
     vehicleDays,
@@ -159,7 +156,11 @@ export function rentalReport(db: Database, from: string, to: string): RentalRepo
       ).filter((rental) => !rental.assignedVehicleId).length,
       invoicesWithoutCurrency: db.invoices.filter((invoice) => !invoice.currencyCode).length,
     },
-    status: currencyCode ? (requests.length === 0 && invoices.length === 0 && payments.length === 0 ? "empty" : "ok") : "currency_not_set",
+    status: currencyCode
+      ? requests.length === 0 && invoices.length === 0 && payments.length === 0 && creditNotes.length === 0
+        ? "empty"
+        : "ok"
+      : "currency_not_set",
     message: "",
   };
   report.message = describe(report);
@@ -169,7 +170,8 @@ export function rentalReport(db: Database, from: string, to: string): RentalRepo
 function describe(report: RentalReport): string {
   if (report.status === "currency_not_set")
     return "Money figures are withheld: the company currency is not set in Settings, and a total without a currency would be a guess.";
-  if (report.status === "empty") return `No rental requests, invoices or payments between ${report.from} and ${report.to}.`;
+  if (report.status === "empty")
+    return `No rental requests, invoices, payments or credit notes between ${report.from} and ${report.to}.`;
   const acceptance =
     report.acceptanceRate === null
       ? "no quotation was issued, so no acceptance rate is shown"
@@ -192,7 +194,8 @@ export function rentalReportCsv(report: RentalReport): string {
     ["Acceptance rate", report.acceptanceRate === null ? "not available" : `${(report.acceptanceRate * 100).toFixed(1)}%`, "accepted / quotations issued"],
     ["Invoiced", money(report.invoicedTotal), `${report.invoiceCount} live invoices issued in the period`],
     ["Received", money(report.receivedTotal), `${report.paymentCount} payments received in the period`],
-    ["Outstanding", money(report.outstandingTotal), `${report.outstandingCount} invoices not fully paid`],
+    ["Credited", money(report.creditedTotal), `${report.creditNoteCount} credit notes issued in the period`],
+    ["Outstanding", money(report.outstandingTotal), `${report.outstandingCount} invoices not fully paid or credited`],
     ["Rental vehicle-days", String(report.vehicleDays), "committed by confirmed, in-progress and completed rentals"],
     ["Available vehicle-days", String(report.availableVehicleDays), "fleet excluding retired × days in period"],
     ["Utilisation", report.utilisation === null ? "not available" : `${(report.utilisation * 100).toFixed(1)}%`, "vehicle-days / available vehicle-days"],

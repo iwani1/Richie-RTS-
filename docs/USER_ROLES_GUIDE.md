@@ -86,7 +86,7 @@ the person who reported the defect be the only sign-off.
 
 **Can:** see rentals, clients, vehicles, trips, incidents and maintenance costs; prepare quotations;
 confirm rentals and record the deposit; issue and void invoices; record payments and advance them to
-verified and reconciled; read the rental report. **Lands on the Finance screen**, which is where the
+verified and reconciled; issue and void credit notes; read the rental report. **Lands on the Finance screen**, which is where the
 money work starts: money in and out for a period, who is late paying and by how many days, completed
 hires nobody has invoiced yet, and payments still to verify or reconcile. The "Margin" figure appears
 only when both sides of the period are complete (an invoice and a cost line in the period, and no
@@ -106,10 +106,20 @@ session receives (D-60).
    reference was already recorded against this invoice, the system tells you and adds nothing.
 5. **Verify**, then **Reconcile**, as the money clears.
 
-**Corrections.** An issued invoice cannot be edited. If it is wrong and **nothing has been paid**,
-void it (with a reason) and issue a corrected one — the corrected invoice takes the next number, and
-both stay on record. If money **has** been paid, the void is refused; record the corrected service as
-a new invoice. Credit notes are not built yet.
+**Corrections.** An issued invoice cannot be edited. If it is wrong and **nothing has been paid**, you
+may void it (with a reason) and issue a corrected one — the corrected invoice takes the next number,
+and both stay on record.
+
+If money **has** been paid, the void is refused. Take the money off with a **credit note** instead:
+open the invoice, choose **Credit the invoice**, and say what it is for and why. The amount you type is
+before tax; the tax is worked out from the invoice's own rates, so the credit reverses exactly the tax
+that was charged. The credit note gets its own number (CN-2026-0001), leaves the payments exactly as
+they were recorded, and reduces what the invoice asks for. It cannot exceed the invoice total, it can
+be voided with a reason if you make a mistake, and it can never be edited or deleted.
+
+If the credit takes the bill below what the customer has already paid, the invoice says **a refund is
+due** and shows the amount. That refund is money you pay out, so record it the way you record any other
+outgoing; the system does not pretend the customer paid less than they did.
 
 ---
 

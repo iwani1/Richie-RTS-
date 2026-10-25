@@ -18,6 +18,7 @@ import {
   type BusRoute,
   type Client,
   type ComplianceDocument,
+  type CreditNote,
   type Database,
   type Driver,
   type Incident,
@@ -266,6 +267,26 @@ const invoiceRow = (i: Invoice): Row => ({
   data: json(i),
 });
 
+const creditNoteRow = (c: CreditNote): Row => ({
+  id: c.id,
+  reference: c.reference,
+  invoice_id: c.invoiceId,
+  client_id: c.clientId,
+  customer_name: c.customerName,
+  currency_code: c.currencyCode,
+  subtotal: formatAmount(c.subtotal),
+  total: formatAmount(c.total),
+  reason: c.reason,
+  issued_on: c.issuedOn,
+  status: c.status,
+  void_reason: c.voidReason,
+  voided_at: c.voidedAt,
+  created_by: c.createdBy,
+  created_at: c.createdAt,
+  updated_at: c.updatedAt,
+  data: json(c),
+});
+
 const paymentRow = (p: Payment): Row => ({
   id: p.id,
   reference: p.reference,
@@ -332,7 +353,7 @@ async function auditRows(trx: Kysely<KyselyDatabase>, limit: number): Promise<Se
 
 /** Reads the whole working set. Audit is capped for the in-memory snapshot; the table keeps all. */
 export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Promise<Database> {
-  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, bookings, incidents, workOrders, documents, odometer, invoices, payments, counters, audit, settings] =
+  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, bookings, incidents, workOrders, documents, odometer, invoices, creditNotes, payments, counters, audit, settings] =
     await Promise.all([
       rows(executor, "app_user"),
       rows(executor, "vehicle"),
@@ -348,6 +369,7 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
       rows(executor, "compliance_document"),
       rows(executor, "odometer_reading"),
       rows(executor, "invoice"),
+      rows(executor, "credit_note"),
       rows(executor, "payment"),
       // Number series are what stop a second invoice or payment reusing INV-2026-0001. They are
       // stored outside the JSON snapshot, so this read is the only thing that carries them into
@@ -374,6 +396,7 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
     documents: documents.map((r) => r.data),
     odometerReadings: odometer.map((r) => r.data),
     invoices: invoices.map((r) => r.data),
+    creditNotes: creditNotes.map((r) => r.data),
     payments: payments.map((r) => r.data),
     referenceCounters: counters.map((counter) => ({
       scope: counter.scope as Database["referenceCounters"][number]["scope"],
@@ -524,6 +547,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   const order: (keyof Database)[] = [
     "payments",
     "bookings",
+    "creditNotes",
     "invoices",
     "workOrders",
     "incidents",
@@ -541,6 +565,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   const tableOf: Record<string, keyof KyselyDatabase> = {
     payments: "payment",
     bookings: "booking",
+    creditNotes: "credit_note",
     invoices: "invoice",
     workOrders: "work_order",
     incidents: "incident",
@@ -583,6 +608,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   await write("compliance_document", after.documents.map(documentRow), before.documents.map(documentRow));
   await write("odometer_reading", after.odometerReadings.map(odometerRow), before.odometerReadings.map(odometerRow));
   await write("invoice", after.invoices.map(invoiceRow), before.invoices.map(invoiceRow));
+  await write("credit_note", after.creditNotes.map(creditNoteRow), before.creditNotes.map(creditNoteRow));
   await write("payment", after.payments.map(paymentRow), before.payments.map(paymentRow));
   await write("booking", after.bookings.map(bookingRow), before.bookings.map(bookingRow));
 
@@ -636,7 +662,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
 export async function truncateAll(trx: Db | Trx): Promise<void> {
   await sql`
     truncate table resource_reservation, audit_entry, app_settings, odometer_reading,
-      payment, invoice, reference_counter,
+      payment, credit_note, invoice, reference_counter,
       compliance_document, work_order, incident, booking, trip, passenger, bus_route, rental,
       vehicle, driver, client, app_user restart identity cascade
   `.execute(trx);

@@ -663,6 +663,51 @@ export interface Invoice {
   updatedAt: string;
 }
 
+// ---- Credit notes (FIN-02, D-86) ----
+//
+// A credit note is the only way to take money *off* an invoice. An issued invoice is immutable: it
+// cannot be edited down, and it cannot be voided once money has been recorded against it. When a
+// service was not delivered, an amount was overcharged or a goodwill discount was agreed after the
+// document went out, the office issues a credit note against that invoice. It keeps its own number,
+// its own lines and its own reason, and it reduces what the invoice asks for.
+//
+// A credit note never moves money. Payments already recorded stay exactly as they are, because they
+// are facts about money that arrived. If the credit takes the bill below what was paid, the difference
+// is a **refund due** — stated plainly, never netted away silently (see `refundDue` in finance.ts).
+export const CREDIT_NOTE_STATUSES = ["issued", "void"] as const;
+export type CreditNoteStatus = (typeof CREDIT_NOTE_STATUSES)[number];
+
+export const CREDIT_NOTE_STATUS_LABELS: Record<CreditNoteStatus, string> = {
+  issued: "Issued",
+  void: "Void",
+};
+
+export interface CreditNote {
+  id: string;
+  reference: string; // CN-2026-0001
+  invoiceId: string;
+  /** Copied onto the credit note so it reads as a document on its own. */
+  invoiceReference: string;
+  clientId: string | null;
+  customerName: string;
+  currencyCode: string;
+  lines: InvoiceLine[];
+  /** The invoice's own tax rates, snapshotted here: a later rate change never rewrites a credit. */
+  taxLines: InvoiceTaxLine[];
+  /** Net of tax, in the invoice's currency. */
+  subtotal: number;
+  /** What this note takes off the invoice: subtotal plus the tax credited with it. */
+  total: number;
+  reason: string;
+  issuedOn: string; // YYYY-MM-DD
+  status: CreditNoteStatus;
+  voidReason: string | null;
+  voidedAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const PAYMENT_STATUSES = ["recorded", "verified", "reconciled"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
@@ -713,7 +758,7 @@ export interface TaxLineSetting {
  * A numbering series. Rentals, routes, trips, incidents and work orders are numbered continuously
  * and filed under the period `all`; invoices and payments restart each year (audit D-03).
  */
-export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "payment", "booking"] as const;
+export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "creditNote", "payment", "booking"] as const;
 export type ReferenceScope = (typeof REFERENCE_SCOPES)[number];
 
 export interface ReferenceCounter {
@@ -779,7 +824,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -796,6 +841,7 @@ export interface Database {
   documents: ComplianceDocument[];
   odometerReadings: OdometerReading[];
   invoices: Invoice[];
+  creditNotes: CreditNote[];
   payments: Payment[];
   bookings: Booking[];
   referenceCounters: ReferenceCounter[];
@@ -823,6 +869,7 @@ export function emptyDatabase(): Database {
     documents: [],
     odometerReadings: [],
     invoices: [],
+    creditNotes: [],
     payments: [],
     bookings: [],
     referenceCounters: [],
@@ -852,7 +899,7 @@ export function emptyDatabase(): Database {
 export function migrate(value: unknown): Database | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(v.schemaVersion as number)) return null;
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(v.schemaVersion as number)) return null;
   if (!Array.isArray(v.users) || !Array.isArray(v.vehicles) || !Array.isArray(v.drivers) || !Array.isArray(v.clients) || !Array.isArray(v.audit)) return null;
   if (typeof v.settings !== "object" || v.settings === null) return null;
   const settings = v.settings as Record<string, unknown>;
@@ -904,6 +951,8 @@ export function migrate(value: unknown): Database | null {
     invoices: Array.isArray(v.invoices)
       ? (v.invoices as Invoice[]).map((invoice) => ({ ...invoice, taxLines: invoice.taxLines ?? [] }))
       : [],
+    // Credit notes arrived in schema 15; an older backup simply has none.
+    creditNotes: Array.isArray(v.creditNotes) ? (v.creditNotes as CreditNote[]).map((note) => ({ ...note, taxLines: note.taxLines ?? [] })) : [],
     payments: Array.isArray(v.payments) ? (v.payments as Payment[]) : [],
     // Bookings arrived in schema 14; an older backup simply has none.
     bookings: Array.isArray(v.bookings)

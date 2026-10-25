@@ -1258,3 +1258,61 @@ decision the office makes, not one the system invents.
   collection it *was* allowed to see, and `bookings` — added after that whitelist was written — fell
   through to the whole table. A client contact or driver was being sent every booking in the company.
   The snapshot now narrows bookings with the rest, and three tests pin it.
+
+## D-86 A credit note is how money comes off an invoice, and a refund is said out loud
+
+- **Context.** An issued invoice is immutable and a payment is immutable; together those two rules left
+  the office with no lawful way to handle the most ordinary financial correction there is. An invoice
+  could be voided only while nothing had been paid for it. Once any money was on it — which is the
+  normal case by the time anyone notices a wrong amount — the only answers the system had were "do
+  nothing" and "record a payment that never happened". The gap was worst for the case that actually
+  happens: a hire was partly not delivered, the customer was overcharged, or a goodwill discount was
+  agreed after the document went out.
+- **Decision.** A **credit note** is a numbered document of its own (`CN-2026-0001`), raised against
+  exactly one invoice, taking money off what that invoice asks for.
+  - It carries its own date, its own line (what the credit is for, printed on the document), its own
+    reason (why the office decided to give the money back, kept for the record) and its own tax lines,
+    **taken from the invoice's snapshot** rather than today's settings: a credit must reverse the tax
+    that was actually charged, or the two documents do not cancel.
+  - It is **immutable once issued** and never deleted: a wrong credit note is voided with a reason and
+    the next number is issued. The database enforces both, by trigger, exactly as it does for invoices.
+  - An invoice that has been credited **can no longer be voided** (service and trigger): voiding it
+    would leave a live credit note against a document the reports treat as never having counted. Void
+    the credit note first if the credit itself was the mistake.
+  - It **never moves money**. Payments already recorded stay exactly as they were, because they are
+    facts about money that arrived. What changes is what the invoice asks for.
+  - The balance rule is written once, in `src/tms/creditNotes.ts`:
+    `outstanding = total − paid − credited`, floored at zero. Every reader — the invoice screen, the
+    finance report, the rentals report, the finance home — calls that one function, so a screen, a
+    statement and a tile cannot disagree about the same invoice.
+  - A credit may be issued up to the **invoice's own total** (less what has already been credited). It
+    is *not* capped at what is still unpaid, because a service cancelled after payment is a normal
+    thing and the honest answer there is a refund: when `paid + credited > total` the difference is
+    stated as **a refund due** on the invoice, in the list and in the invoice's own notice. It is never
+    netted quietly into a zero balance.
+  - An invoice's **status** continues to describe money received (`issued`, `part_paid`, `paid`,
+    `void`). Whether the bill is closed is the balance's answer: a fully credited invoice shows
+    **Settled by credit** beside a status that honestly still says how much cash arrived.
+- **Rejected.** Editing an invoice in place (destroys the document a customer holds and defeats every
+  immutability trigger built so far). Deleting a payment and re-entering a smaller one (the money
+  arrived; deleting the receipt is the one thing an audit trail must never allow). Allowing a void once
+  money is on the invoice (a void says "this document never counted"; a part credit says "everything
+  except this counted", and the two are different facts). Netting a refund into a zero balance
+  (the office would owe money it has no record of owing). Capping credits at the unpaid balance
+  (it would forbid correcting an invoice that was already paid, which is the case that needs it most).
+  Recording a refund as a negative payment (payments are money in, with a method and a bank slip; a
+  refund is money out and would corrupt every "received" total in sight). A free-text adjustment field
+  on the invoice (an adjustment with no number, no date and no document is exactly what an accountant
+  cannot reconcile).
+- **Consequence.** Migration `008_credit_notes.sql` (`credit_note` table, the ceiling trigger
+  `credit_note_within_invoice` under a row lock on the invoice, the frozen/no-delete triggers, and the
+  widened `reference_counter` scope); `CreditNote`/`CreditNoteLine` in `src/tms/types.ts` (schema 15);
+  the `creditNote` reference series (`CN`, per year, `src/tms/references.ts`);
+  `src/tms/creditNotes.ts` for the arithmetic; `issue_credit_note` / `void_credit_note` in
+  `src/tms/finance.ts` behind `credits:issue` / `credits:void` (finance and administrator); the
+  Invoices screen gains a **Credit the invoice** action, a credit-note table on the invoice, a
+  "Credited" figure beside Received, the refund notice, and a **Credited** column and tile;
+  `financialReport` and `rentalReport` report `creditedTotal` / `creditNoteCount` and net every
+  balance of them; the finance home's margin is measured on revenue after credits. Full refunds are
+  not a separate record: the refund is stated, and paying it out is an ordinary expense until a cash
+  book exists.

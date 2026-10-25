@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { InvoicesPage } from "./Invoices";
 import { TmsContext, type Tms } from "../tms/useTms";
 import type { CommandResult } from "../tms/service";
-import { emptyDatabase, type Database, type Invoice, type Payment, type User } from "../tms/types";
+import { emptyDatabase, type CreditNote, type Database, type Invoice, type Payment, type User } from "../tms/types";
 
 afterEach(cleanup);
 
@@ -68,10 +68,35 @@ const payment: Payment = {
   recordedAt: at,
 };
 
+const creditNote: CreditNote = {
+  id: "cn1",
+  reference: "CN-2026-0001",
+  invoiceId: invoice.id,
+  invoiceReference: invoice.reference,
+  clientId: null,
+  customerName: "Acme Ltd",
+  currencyCode: "GHS",
+  lines: [{ id: "cl1", description: "Airport transfer not operated", quantity: 1, unitAmount: 2000 }],
+  taxLines: [{ name: "VAT", ratePercent: 15, amount: 300 }],
+  subtotal: 2000,
+  total: 2300,
+  reason: "Service not delivered",
+  issuedOn: "2026-06-02",
+  status: "issued",
+  voidReason: null,
+  voidedAt: null,
+  createdBy: "Ama Mensah",
+  createdAt: at,
+  updatedAt: at,
+};
+
 const base = (): Database => {
   const db = emptyDatabase();
   return { ...db, users: [admin], invoices: [invoice], payments: [payment] };
 };
+
+/** The same invoice after a credit note took GHS 2,300.00 off it. */
+const credited = (): Database => ({ ...base(), creditNotes: [creditNote] });
 
 function makeTms(db: Database, overrides: Partial<Tms> = {}): Tms {
   return {
@@ -157,5 +182,84 @@ describe("invoices and payments screen", () => {
     expect(screen.getByText(/Invoicing is not configured/i)).toBeTruthy();
     expect(screen.getByText(/Set the company tax position in Settings/i)).toBeTruthy();
     expect(screen.getByText(/Set the payment terms in days in Settings/i)).toBeTruthy();
+  });
+});
+
+describe("credit notes on the invoice screen (D-86)", () => {
+  it("shows what was credited and reports the invoice as settled by credit rather than paid", () => {
+    renderInvoices(credited());
+    const row = screen.getByText("INV-2026-0001").closest("tr") as HTMLElement;
+    // Total 3,450 less GHS 1,000 received less GHS 2,300 credited leaves 150 outstanding.
+    expect(within(row).getByText("GHS 2300.00")).toBeTruthy();
+    expect(within(row).getByText("GHS 150.00")).toBeTruthy();
+    // Money received is still stated as received: the payment was not rewritten.
+    expect(within(row).getByText("GHS 1000.00")).toBeTruthy();
+    expect(within(row).getByText("Part paid")).toBeTruthy();
+  });
+
+  it("warns that a refund is due when credits pass what the customer paid", () => {
+    const refundable: Database = {
+      ...base(),
+      payments: [{ ...payment, amount: 3450 }],
+      invoices: [{ ...invoice, amountPaid: 3450, status: "paid" }],
+      creditNotes: [creditNote],
+    };
+    renderInvoices(refundable);
+    const row = screen.getByText("INV-2026-0001").closest("tr") as HTMLElement;
+    // 1,000 paid is not the case here: GHS 3,450 was paid and GHS 2,300 credited, so 2,300 is owed back.
+    expect(within(row).getByText(/GHS 2300.00 back/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    expect(screen.getByText("A refund is due")).toBeTruthy();
+    expect(screen.getByText(/is owed back\. Credit notes never move money/i)).toBeTruthy();
+  });
+
+  it("lists the credit note on the invoice, with its reason, and offers to void it", () => {
+    renderInvoices(credited());
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+
+    expect(screen.getAllByText("CN-2026-0001").length).toBeGreaterThan(0);
+    expect(screen.getByText("Service not delivered")).toBeTruthy();
+    expect(screen.getByText("Airport transfer not operated")).toBeTruthy();
+    // The notice and the card summary both state the credited total; both are wanted.
+    expect(screen.getAllByText(/2300\.00/).length).toBeGreaterThanOrEqual(2);
+    // The credit note's own status badge, distinct from the "Issued" column header and the invoice status.
+    expect(screen.getAllByText("Issued").length).toBeGreaterThan(1);
+    // A credit note can be voided even though the payment standing on the invoice cannot be touched.
+    expect(screen.getByRole("button", { name: /Void CN-2026-0001/i })).toBeTruthy();
+  });
+
+  it("issues a credit note from the invoice, previewing the tax the invoice itself carried", async () => {
+    const tms = renderInvoices(credited());
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Credit the invoice/i }));
+
+    const dialog = screen.getByRole("dialog");
+    // 3,450 less 2,300 already credited leaves 1,150 that can still come off, including tax.
+    expect(within(dialog).getByText(/GHS 1150\.00 is left to credit/)).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText(/Amount to credit/i), { target: { value: "100" } });
+    // The invoice's own rate (15%), not today's settings: 100 + 15 = 115.
+    expect(within(dialog).getByText("Credit note total: GHS 115.00")).toBeTruthy();
+
+    fireEvent.change(within(dialog).getByLabelText(/What it is for/i), { target: { value: "One day not operated" } });
+    fireEvent.change(within(dialog).getByLabelText(/Reason for the credit/i), { target: { value: "Vehicle broke down" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Issue credit note$/i }));
+
+    expect(tms.dispatch).toHaveBeenCalledWith({
+      type: "issue_credit_note",
+      input: expect.objectContaining({ invoiceId: invoice.id, amount: "100", description: "One day not operated", reason: "Vehicle broke down" }),
+    });
+  });
+
+  it("voids a credit note through the panel with a reason", async () => {
+    const tms = renderInvoices(credited());
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Void CN-2026-0001/i }));
+
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/Reason/i), { target: { value: "Wrong invoice" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Void credit note$/i }));
+
+    expect(tms.dispatch).toHaveBeenCalledWith({ type: "void_credit_note", id: creditNote.id, reason: "Wrong invoice" });
   });
 });

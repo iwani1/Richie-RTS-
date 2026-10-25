@@ -57,8 +57,9 @@ const SECTION_PERMISSIONS: { [K in keyof Database]?: Permission } = {
   passengers: "passengers:read",
   rentals: "rentals:read",
   invoices: "invoices:read",
-  // A payment is part of its invoice, so the same read permission opens it.
+  // A payment and a credit note are part of their invoice, so the same read permission opens them.
   payments: "invoices:read",
+  creditNotes: "invoices:read",
   referenceCounters: "invoices:read",
   routes: "routes:read",
   settings: "settings:read",
@@ -112,6 +113,10 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       odometerReadings: database.odometerReadings.filter((reading) => vehicleIds.has(reading.vehicleId)),
       invoices: [],
       payments: [],
+      // D-86: a credit note states what a customer was billed and why they were given money back.
+      // It is billing, so it stays with the invoice and the payment rows — never with a driver or a
+      // client contact. Adding the collection without this line would have sent the whole table.
+      creditNotes: [],
       referenceCounters: [],
       // Record-bound roles have no audit: the summaries name records that are not theirs.
       audit: [],

@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–35** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 36 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–36** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 37 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -53,6 +53,12 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   itself refuses, and six simultaneous attempts give one winner and five refusals.
 - Invoices numbered per year, with your tax lines, discounts, due dates, voiding, part payments and
   exact settlement. Money is computed in whole pesewas with one rounding rule.
+- **Credit notes** for an invoice that has already gone out: a numbered document (CN-2026-0001) that
+  takes money off one invoice — an overcharge, a hire partly not delivered, a late goodwill discount.
+  It carries the invoice's own tax, leaves the payments exactly as recorded, can be voided with a
+  reason, and can never exceed the bill. If it takes the bill below what the customer already paid,
+  the screen says a refund is due rather than hiding it. The invoice screen, both money reports and
+  the finance home all use the one balance rule, so they cannot disagree.
 - Staff busing: routes, rosters, trip generation, dispatch, progressive boarding capture, on-time
   reporting, mid-run passenger changes with a seat-capacity check, and a run created outside the
   schedule when a bus fails or a one-off movement appears — with a written reason, and checked
@@ -109,12 +115,16 @@ These work, and the difference is worth knowing before relying on them:
   details, credit terms or a customer type.
 - **Work orders** — five statuses, no parts list or inspection record; the release step is complete.
 - **Rental report** — eight figures with CSV; other reports do not yet share its filters and export.
+- **Credit notes** — one line each, typed before tax (the tax follows from the invoice). A note cannot
+  carry several lines from the screen yet, and a refund that is actually paid out is recorded as an
+  ordinary expense, because there is no cash book.
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**328 passed, 14 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**512 passed, 17 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
-- 14 integration tests against real PostgreSQL in CI, including six operators racing for one vehicle.
+- 17 integration tests against real PostgreSQL in CI, including six operators racing for one vehicle and
+  the database refusing to credit an invoice past its own total.
 - `npm run e2e` — 39 checks against the built, started application over HTTP.
 - The trial on real data: §1–§10 passed on a copy of the database on 2026-10-25 (recorded in
   `docs/REAL_DATA_TRIAL.md` §10), including the invoice arithmetic checked to the pesewa.
@@ -126,12 +136,13 @@ These work, and the difference is worth knowing before relying on them:
 
 1. **Repeat the trial's §5–§8 on the live database** (port 3000). The copy passed; this is the step
    that says the system is ready for a working day.
-2. **Credit notes** — a wrong invoice can be voided, but a part refund or adjustment cannot yet be
-   corrected in-app. This is the largest gap in the money story.
-3. **Contracts (CLI-02)** — the contract record and the terms wording it needs from the owner; the
-   seat bookings that depend on it are built (`BKG-01…06`, Phase 33).
-4. **Passenger portal (PAX-01)** — passengers cannot sign in to see their own journeys; the public
+2. **Contracts (CLI-02)** — the contract record and the terms wording it needs from the owner; the
+   seat bookings that depend on it are built (`BKG-01…06`, Phase 33) and credit notes now cover the
+   billing corrections (Phase 36).
+3. **Passenger portal (PAX-01)** — passengers cannot sign in to see their own journeys; the public
    booking path does not exist yet.
+4. **PDF invoices and credit notes** — the documents exist in the system, but printing one as a file
+   to send to a customer is Phase 3 work.
 
 Everything else on the missing list needs a provider (SMS, mail, GPS, card payments), hardware, or a
 business decision that has not been made.

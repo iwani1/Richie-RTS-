@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { financeHome } from "./financeHome";
 import { financialReport } from "./financialReport";
-import { emptyDatabase, emptyRentalSettings, type Client, type CostEntry, type Database, type Invoice, type Payment, type Rental } from "./types";
+import { emptyDatabase, emptyRentalSettings, type Client, type CostEntry, type CreditNote, type Database, type Invoice, type Payment, type Rental } from "./types";
 
 const at = "2026-06-01T08:00:00.000Z";
 const JUNE = { from: "2026-06-01", to: "2026-06-30" };
@@ -226,6 +226,64 @@ describe("finance home - margin, only when the data can carry it (FIN-07)", () =
     expect(home.margin.available).toBe(false);
     expect(home.margin.amount).toBeNull();
     expect(home.margin.reason).toMatch(/no invoice was issued/i);
+  });
+
+  it("measures the margin on revenue after credit notes, not on the gross bill (D-86)", () => {
+    const credited: CreditNote = {
+      id: "cn1",
+      reference: "CN-2026-0001",
+      invoiceId: "inv1",
+      invoiceReference: "INV-2026-0001",
+      clientId: "c1",
+      customerName: "Northstar Foods",
+      currencyCode: "GHS",
+      lines: [{ id: "cl1", description: "Day not operated", quantity: 1, unitAmount: 500 }],
+      taxLines: [],
+      subtotal: 500,
+      total: 500,
+      reason: "Service not delivered",
+      issuedOn: "2026-06-10",
+      status: "issued",
+      voidReason: null,
+      voidedAt: null,
+      createdBy: "Fin",
+      createdAt: at,
+      updatedAt: at,
+    };
+    const home = financeHome(build({ invoices: [invoice({ total: 2000, issuedOn: "2026-06-05" })], workOrders: spent(800), creditNotes: [credited] }), JUNE.from, JUNE.to, "2026-06-25");
+    // 2,000 billed less 500 credited is 1,500 of revenue; 800 was spent, so the work earned 700.
+    expect(home.margin).toMatchObject({ revenue: 1500, costs: 800, amount: 700 });
+    expect(home.margin.percent).toBe(0.467);
+    // The gross figure is still reported, because it is what was invoiced.
+    expect(home.figures.invoicedTotal).toBe(2000);
+    expect(home.figures.creditedTotal).toBe(500);
+  });
+
+  it("withholds the margin when everything billed was credited back", () => {
+    const full: CreditNote = {
+      id: "cn1",
+      reference: "CN-2026-0001",
+      invoiceId: "inv1",
+      invoiceReference: "INV-2026-0001",
+      clientId: "c1",
+      customerName: "Northstar Foods",
+      currencyCode: "GHS",
+      lines: [],
+      taxLines: [],
+      subtotal: 2000,
+      total: 2000,
+      reason: "Hire cancelled",
+      issuedOn: "2026-06-10",
+      status: "issued",
+      voidReason: null,
+      voidedAt: null,
+      createdBy: "Fin",
+      createdAt: at,
+      updatedAt: at,
+    };
+    const home = financeHome(build({ invoices: [invoice({ total: 2000, issuedOn: "2026-06-05" })], workOrders: spent(800), payments: [], creditNotes: [full] }), JUNE.from, JUNE.to, "2026-06-25");
+    expect(home.margin.available).toBe(false);
+    expect(home.margin.reason).toMatch(/credited back/i);
   });
 
   it("withholds the margin when no cost was recorded, rather than repeating revenue as profit", () => {

@@ -94,6 +94,8 @@ export interface FinanceHome {
     invoiceCount: number;
     receivedTotal: number;
     paymentCount: number;
+    creditedTotal: number;
+    creditNoteCount: number;
     outstandingTotal: number;
     outstandingCount: number;
     expensesTotal: number;
@@ -104,7 +106,8 @@ export interface FinanceHome {
     passengersBoarded: number;
   };
   /**
-   * Hires billed less costs recorded for the period, with the money that came in kept separate.
+   * Hires billed (less what credit notes took back) less costs recorded, with the money that came in
+   * kept separate.
    * `movement` is cash; `margin` is what the work earned. They differ by what is owed and what was
    * spent before it was billed, and the screen shows both rather than one blended number.
    */
@@ -204,11 +207,15 @@ export function financeHome(db: Database, from: string, to: string, asAt: string
       return withheld(
         `${unbilledInPeriod.length} completed hire${unbilledInPeriod.length === 1 ? "" : "s"} in the period ${unbilledInPeriod.length === 1 ? "has" : "have"} no invoice yet, so revenue is incomplete.`,
       );
-    const amount = fromMinor(toMinor(report.invoicedTotal) - toMinor(report.expensesTotal));
-    const revenueMinor = toMinor(report.invoicedTotal);
+    // A credit note is money the customer will never pay, so it cannot count as revenue in a margin:
+    // gross invoiced would report a margin on a bill that was largely cancelled (D-86).
+    const revenueMinor = toMinor(report.invoicedTotal) - toMinor(report.creditedTotal);
+    if (revenueMinor <= 0)
+      return withheld("Everything invoiced in the period was credited back, so there is no revenue to measure a margin against.");
+    const amount = fromMinor(revenueMinor - toMinor(report.expensesTotal));
     return {
       available: true,
-      revenue: report.invoicedTotal,
+      revenue: fromMinor(revenueMinor),
       costs: report.expensesTotal,
       amount,
       percent: revenueMinor > 0 ? Math.round(((toMinor(amount) / revenueMinor) * 1000)) / 1000 : null,
@@ -226,6 +233,8 @@ export function financeHome(db: Database, from: string, to: string, asAt: string
       invoiceCount: report.invoiceCount,
       receivedTotal: report.receivedTotal,
       paymentCount: report.paymentCount,
+      creditedTotal: report.creditedTotal,
+      creditNoteCount: report.creditNoteCount,
       outstandingTotal: report.outstandingTotal,
       outstandingCount: report.outstandingCount,
       expensesTotal: report.expensesTotal,

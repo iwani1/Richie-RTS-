@@ -120,11 +120,29 @@ transition. There is no transition that retroactively marks or unmarks a service
 | — | `issued` | `invoices:issue` | Rental completed (a final invoice exists); currency, tax position and payment terms configured; no other live invoice for the same billable event |
 | `issued` | `part_paid` | automatic | A payment is recorded that is less than the total |
 | `issued` / `part_paid` | `paid` | automatic | Recorded payments reach the total |
-| `issued` | `void` | `invoices:void` | A reason is given and **no payment** exists |
+| `issued` | `void` | `invoices:void` | A reason is given and **no payment and no live credit note** exists (void the credit note first) |
 
 No transition leaves `void`, and no transition edits the document: identity, dates, lines and totals
 are frozen by trigger (`003_invoices_and_payments.sql`). `amount_paid` is derived from the payment
 rows.
+
+The status describes **money received**, and nothing else. Whether the bill is closed is the balance's
+answer: `outstanding = total − paid − credited` (`src/tms/creditNotes.ts`, D-86). An invoice can
+therefore be `issued` or `part_paid` with nothing left to collect because a credit note took the rest
+off it — the screen adds **Settled by credit** and the screen, the reports and the finance home all
+read the same figure.
+
+## Credit note (`CreditNote.status`, FIN-02, D-86)
+
+| From | To | Who | Preconditions |
+|---|---|---|---|
+| — | `issued` | `credits:issue` | Invoice exists and is not void; a date on or after the invoice; a line description and a reason; an amount > 0 before tax; `credited + this ≤ invoice total` |
+| `issued` | `void` | `credits:void` | A reason is given |
+
+No transition leaves `void`; a void credit note is not resurrected, because un-voiding would silently
+restore a discount the office had withdrawn. No transition edits the document: reference, invoice,
+customer, currency, amounts, date, reason, lines and tax lines are frozen by trigger
+(`008_credit_notes.sql`). Deleting one is refused outright.
 
 ## Payment (`Payment.status`, FIN-03)
 

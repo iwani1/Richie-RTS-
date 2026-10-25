@@ -2,6 +2,8 @@
 // the same service being billed twice or a payment being recorded twice.
 import { describe, expect, it } from "vitest";
 import { executeCommand, type AnyCommand } from "./commands";
+import { invoiceBalance } from "./creditNotes";
+import { outstanding } from "./finance";
 import { execute, type Actor, type Credential, type CommandResult } from "./service";
 import { emptyDatabase, emptyRentalSettings, type Database } from "./types";
 
@@ -431,5 +433,172 @@ describe("money arithmetic on real documents (audit D-04)", () => {
     expect(issued.subtotal).toBe(15.35);
     expect(issued.taxLines[0].amount).toBe(2.3);
     expect(issued.total).toBe(17.65);
+  });
+});
+
+// Credit notes (FIN-02, D-86): the only way to take money off an invoice that has already gone out.
+//
+// The invoice in these tests is worth GHS 4,000.00 before tax, VAT 15% and NHIL 2.5% on top, so its
+// total is GHS 4,700.00. A credit note is typed before tax and carries the invoice's own rates.
+describe("FIN-02 credit notes", () => {
+  function invoiced(overrides: Record<string, unknown> = {}) {
+    const w = completedRental(overrides);
+    step(w, "finance", { type: "issue_rental_invoice", input: invoice({ rentalId: w.rentalId }) });
+    return w;
+  }
+
+  const credit = (invoiceId: string, overrides: Record<string, unknown> = {}) => ({
+    invoiceId,
+    issuedOn: "2026-06-02",
+    amount: "1000",
+    description: "Airport transfer not operated",
+    reason: "Service not delivered",
+    ...overrides,
+  });
+
+  it("issues a numbered credit note with the invoice's own tax, and reduces what is owed", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    const issued = step(w, "finance", { type: "issue_credit_note", input: credit(invoiceId) });
+
+    const note = w.db.creditNotes[0];
+    expect(note.reference).toBe("CN-2026-0001");
+    expect(note.invoiceReference).toBe("INV-2026-0001");
+    expect(note.subtotal).toBe(1000);
+    // The same two rates the invoice was charged at, on the amount being credited.
+    expect(note.taxLines).toEqual([
+      { name: "VAT", ratePercent: 15, amount: 150 },
+      { name: "NHIL", ratePercent: 2.5, amount: 25 },
+    ]);
+    expect(note.total).toBe(1175);
+    expect(note.status).toBe("issued");
+    expect(note.createdBy).toBe("Fin");
+    expect(issued.ok && issued.message).toMatch(/CN-2026-0001 issued for GHS 1175\.00/);
+    expect(issued.ok && issued.message).toMatch(/outstanding: GHS 3525\.00/);
+    // The invoice itself does not change: an issued invoice is immutable, and its payments are facts.
+    expect(w.db.invoices[0].total).toBe(4700);
+    expect(w.db.invoices[0].amountPaid).toBe(0);
+    expect(w.db.audit[0].action).toBe("finance:credit_note_issue");
+  });
+
+  it("refuses more than the invoice has left, and accepts the exact ceiling", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    const tooMuch = attempt(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { amount: "5000" }) });
+    expect(tooMuch.ok).toBe(false);
+    expect(errorsOf(tooMuch).amount).toMatch(/GHS 4700\.00 including tax/);
+    expect(w.db.creditNotes).toHaveLength(0);
+
+    // 4,000 before tax is the whole invoice: 4,000 + 600 + 100 = 4,700.
+    step(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { amount: "4000" }) });
+    expect(w.db.creditNotes[0].total).toBe(4700);
+
+    const full = attempt(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { amount: "1" }) });
+    expect(full.ok).toBe(false);
+    expect(errorsOf(full).amount).toMatch(/credited in full|more than INV-2026-0001 has left/);
+  });
+
+  it("closes the balance when payments and credits together cover the invoice", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    step(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "2000" }) });
+    step(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { amount: "2000" }) });
+    expect(outstanding(w.db, w.db.invoices[0])).toBe(350);
+
+    // The last 350.00 including tax: 297.87 + 44.68 VAT + 7.45 NHIL = 350.00 exactly.
+    const last = step(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { amount: "297.87", description: "Balance written off" }) });
+    const balance = invoiceBalance(w.db, w.db.invoices[0]);
+    expect(balance.credited).toBe(2700);
+    expect(balance.paid).toBe(2000);
+    expect(balance.outstanding).toBe(0);
+    expect(balance.refundDue).toBe(0);
+    expect(balance.settled).toBe(true);
+    // Nothing was paid beyond what was received, and the money received was not rewritten.
+    expect(w.db.invoices[0].amountPaid).toBe(2000);
+    expect(last.ok && last.message).toMatch(/outstanding: GHS 0\.00/);
+  });
+
+  it("says plainly when a credit takes the bill below the cash received", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    step(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "4700" }) });
+    expect(w.db.invoices[0].status).toBe("paid");
+
+    const issued = step(w, "finance", { type: "issue_credit_note", input: credit(invoiceId) });
+    const balance = invoiceBalance(w.db, w.db.invoices[0]);
+    expect(balance.outstanding).toBe(0);
+    expect(balance.refundDue).toBe(1175);
+    expect(issued.ok && issued.message).toMatch(/GHS 1175\.00 is owed back to the customer as a refund/);
+    // The payment is untouched: a refund is money out, not a smaller receipt.
+    expect(w.db.payments[0].amount).toBe(4700);
+  });
+
+  it("voids a credit note, puts the money back on the bill, and never reuses the number", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    step(w, "finance", { type: "issue_credit_note", input: credit(invoiceId) });
+    const noteId = w.db.creditNotes[0].id;
+    expect(outstanding(w.db, w.db.invoices[0])).toBe(3525);
+
+    const voided = step(w, "finance", { type: "void_credit_note", id: noteId, reason: "Issued against the wrong invoice" });
+    expect(voided.ok && voided.message).toMatch(/CN-2026-0001 voided\. INV-2026-0001 outstanding: GHS 4700\.00/);
+    expect(w.db.creditNotes[0].status).toBe("void");
+    expect(w.db.creditNotes[0].voidReason).toBe("Issued against the wrong invoice");
+    expect(outstanding(w.db, w.db.invoices[0])).toBe(4700);
+
+    const twice = attempt(w, "finance", { type: "void_credit_note", id: noteId, reason: "Again" });
+    expect(twice.ok).toBe(false);
+    expect(twice.ok === false && twice.message).toMatch(/already void/);
+
+    step(w, "finance", { type: "issue_credit_note", input: credit(invoiceId) });
+    expect(w.db.creditNotes[1].reference).toBe("CN-2026-0002");
+  });
+
+  it("refuses to void an invoice while a credit note stands, and allows it once the note is void", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    step(w, "finance", { type: "issue_credit_note", input: credit(invoiceId) });
+
+    const refused = attempt(w, "finance", { type: "void_invoice", id: invoiceId, reason: "Wrong customer" });
+    expect(refused.ok).toBe(false);
+    expect(refused.ok === false && refused.message).toMatch(/credit note CN-2026-0001 against it/);
+    expect(w.db.invoices[0].status).toBe("issued");
+
+    // Void the credit note and the invoice is voidable again: the document has nothing against it.
+    step(w, "finance", { type: "void_credit_note", id: w.db.creditNotes[0].id, reason: "Issued in error" });
+    step(w, "finance", { type: "void_invoice", id: invoiceId, reason: "Wrong customer" });
+    expect(w.db.invoices[0].status).toBe("void");
+  });
+
+  it("needs a description, a reason and a date on or after the invoice", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    expect(errorsOf(attempt(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { description: "  " }) })).description).toMatch(/Say what this credit is for/);
+    expect(errorsOf(attempt(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { reason: "" }) })).reason).toMatch(/short reason/);
+    expect(errorsOf(attempt(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { issuedOn: "2026-05-30" }) })).issuedOn).toMatch(/pre-date/);
+    expect(errorsOf(attempt(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { amount: "0" }) })).amount).toBeDefined();
+    expect(errorsOf(attempt(w, "finance", { type: "issue_credit_note", input: credit(invoiceId, { amount: "1.005" }) })).amount).toMatch(/two decimal places/);
+    expect(w.db.creditNotes).toHaveLength(0);
+  });
+
+  it("is closed to operations, like the rest of the money", () => {
+    const w = invoiced();
+    const refusal = attempt(w, "ops", { type: "issue_credit_note", input: credit(w.db.invoices[0].id) });
+    expect(refusal.ok).toBe(false);
+    expect(refusal.ok === false && refusal.message).toMatch(/lacks credits:issue/);
+    expect(attempt(w, "ops", { type: "void_credit_note", id: "missing", reason: "x" }).ok).toBe(false);
+  });
+
+  it("makes a later payment respect what the credit already took off", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    step(w, "finance", { type: "issue_credit_note", input: credit(invoiceId) });
+    const over = attempt(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "4700" }) });
+    expect(over.ok).toBe(false);
+    expect(errorsOf(over).amount).toMatch(/GHS 3525\.00 outstanding/);
+
+    step(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "3525" }) });
+    expect(invoiceBalance(w.db, w.db.invoices[0]).settled).toBe(true);
+    expect(w.db.invoices[0].amountPaid).toBe(3525);
   });
 });

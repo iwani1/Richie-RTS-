@@ -204,6 +204,55 @@ suite("workflow C and concurrency, against PostgreSQL", () => {
     ).rejects.toThrow(/invoice_billable_event_uq|duplicate key/);
   }, 60_000);
 
+  it("takes money off an invoice with a credit note, and the database refuses to over-credit (D-86)", async () => {
+    const { adminId, vehicleId } = await world();
+    const rentalId = await confirmedRental(adminId, "2026-06-01", "2026-06-03");
+    await step("assign_rental", { id: rentalId, input: { vehicleId, driverId: "" } } as never, adminId, TODAY);
+    await step("start_rental", { id: rentalId } as never, adminId, "2026-06-01T09:00:00.000Z");
+    await step("complete_rental", { id: rentalId, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } } as never, adminId, "2026-06-03T18:00:00.000Z");
+    const invoiced = await step("issue_rental_invoice", { input: { rentalId, issuedOn: "2026-06-03", discountAmount: "", discountReason: "", notes: "" } } as never, adminId, "2026-06-03T18:30:00.000Z");
+    const invoice = invoiced.invoices[0];
+
+    const credited = await step(
+      "issue_credit_note",
+      { input: { invoiceId: invoice.id, issuedOn: "2026-06-04", amount: "1000", description: "One day not operated", reason: "Vehicle broke down" } } as never,
+      adminId,
+      "2026-06-04T10:00:00.000Z",
+    );
+    const note = credited.creditNotes[0];
+    expect(note.reference).toBe("CN-2026-0001");
+    // 1,000 before tax plus 15% VAT on the invoice's own rate.
+    expect(note.total).toBe(1150);
+    // The invoice itself is untouched; the credit is a document of its own.
+    expect(credited.invoices[0]).toMatchObject({ reference: "INV-2026-0001", total: 3450, amountPaid: 0 });
+
+    const reloaded = await loadDatabase();
+    expect(reloaded.creditNotes.map((entry) => entry.reference)).toEqual(["CN-2026-0001"]);
+    expect(reloaded.creditNotes[0]).toMatchObject({ total: 1150, status: "issued", reason: "Vehicle broke down" });
+    expect(reloaded.referenceCounters).toEqual(expect.arrayContaining([{ scope: "creditNote", period: "2026", last: 1 }]));
+
+    // The ceiling is in the database, not only in the service: a direct insert past the invoice total
+    // is refused by the trigger, so an import or a hand-written row cannot credit more than was billed.
+    await expect(
+      sql`
+        insert into credit_note (id, reference, invoice_id, client_id, customer_name, currency_code,
+          subtotal, total, reason, issued_on, status, created_by, created_at, updated_at, data)
+        values ('over', 'CN-2026-0099', ${invoice.id}, null, 'Acme Ltd', 'GHS',
+          3000, 3450, 'Too much', '2026-06-05'::date, 'issued', 'Admin', now(), now(), '{}'::jsonb)
+      `.execute(db()),
+    ).rejects.toThrow(/credit_note_within_invoice|exceeds/);
+
+    // Voiding puts the money back on the bill, and the number is not reused.
+    const voided = await step("void_credit_note", { id: note.id, reason: "Wrong invoice" } as never, adminId, "2026-06-05T10:00:00.000Z");
+    expect(voided.creditNotes[0].status).toBe("void");
+    const after = await loadDatabase();
+    expect(after.creditNotes[0]).toMatchObject({ reference: "CN-2026-0001", status: "void", voidReason: "Wrong invoice" });
+
+    // A deleted or edited credit note is refused outright, like an invoice.
+    await expect(sql`delete from credit_note where id = ${note.id}`.execute(db())).rejects.toThrow(/never deleted/);
+    await expect(sql`update credit_note set total = 1 where id = ${note.id}`.execute(db())).rejects.toThrow(/immutable/);
+  }, 60_000);
+
   it("cannot double-book one vehicle from six parallel requests", async () => {
     const { adminId, vehicleId } = await world();
     const rentals: string[] = [];

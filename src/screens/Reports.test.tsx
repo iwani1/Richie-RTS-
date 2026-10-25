@@ -233,6 +233,6 @@ describe("money and cost section (RPT-03)", () => {
 
   it("says plainly when the financial period holds nothing", () => {
     renderReport({ ...world("GHS"), invoices: [], rentals: [] });
-    expect(screen.getByText(/No invoices, payments, recorded costs or completed runs/)).toBeTruthy();
+    expect(screen.getByText(/No invoices, payments, credit notes, recorded costs or completed runs/)).toBeTruthy();
   });
 });

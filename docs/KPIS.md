@@ -71,11 +71,12 @@ prints it under the rental report, sharing the same period.
 
 | Metric | Formula | Population and exclusions |
 |---|---|---|
-| Revenue by customer | sum of `invoice.total`, grouped by the name billed | Non-void invoices issued in the period. An invoice with no name is its own line, "No customer named" |
+| Revenue by customer | sum of `invoice.total`, grouped by the name billed | Non-void invoices issued in the period. An invoice with no name is its own line, "No customer named". The row also carries **Credited** (credit notes issued on or before the period end), so invoiced − credited − paid = outstanding on screen |
 | Revenue by service | the same invoices grouped by what was sold | Only vehicle hire is invoiced in this build; the report has one line and says so |
 | Invoiced | sum of `invoice.total` | Non-void invoices issued in the period |
 | Received | sum of `payment.amount` | Payments whose `paidOn` is in the period, whatever the invoice date |
-| Outstanding | sum over non-void invoices issued on or before the period end of (total − payments paid on or before the period end) | Valued **at the period end**: a payment made later does not settle an invoice that was unpaid then |
+| Credited | sum of `creditNote.total` | Credit notes **issued** in the period; a voided note counts for nothing. Money taken off a bill, never money received (D-86) |
+| Outstanding | sum over non-void invoices issued on or before the period end of (total − payments paid on or before the period end − credit notes issued on or before the period end), floored at zero | Valued **at the period end**: a payment or a credit note dated later does not settle an invoice that was unpaid then. The arithmetic is the one helper in `src/tms/creditNotes.ts`, so this figure, the hire report and the invoice screen cannot disagree |
 | Expenses by category | sum of recorded cost entries, grouped by the configured category | Entries whose `incurredDate` is in the period, on incidents reported or work orders raised in the period. Blank categories are shown as "Uncategorised" |
 | Cost per trip | recorded expenses ÷ scheduled runs completed in the period | Null ("Not available") when no run was completed. This is the Q-29 definition |
 | Cost per passenger | recorded expenses ÷ riders recorded as boarded on those completed runs | A no-show is not a passenger carried. Null when nobody boarded |
@@ -89,7 +90,7 @@ withheld unless all four of these are true: the company currency is set; at leas
 was issued in the period; at least one cost line was recorded in it; and **no hire completed in the
 period is left unbilled**. The last condition is the important one — an unbilled hire is revenue that
 exists and has not been written down, so a margin computed over it overstates the business. When the
-rule fails the screen prints the reason instead of the number. Margin is `invoiced − expenses`, shown
+rule fails the screen prints the reason instead of the number. Margin is `(invoiced − credited) − expenses`, shown
 with its percentage of revenue; it is **not** profit (tax owed, deposits held and fuel are not in it).
 Cash movement (payments received minus recorded spend) is shown beside it, because the two answer
 different questions.
@@ -128,7 +129,8 @@ The period is inclusive of both dates, by calendar day (Africa/Accra, no dayligh
 | Acceptance rate | accepted ÷ quotations issued | Null when nothing was quoted. Shown as "Not available", never 0% |
 | Invoiced | sum of `invoice.total` | Invoices issued in the period, excluding `void` |
 | Received | sum of `payment.amount` | Payments whose `paidOn` is in the period, whatever the invoice date |
-| Outstanding | sum of (invoice total − recorded payments) | Non-void invoices issued on or before the period end, including earlier periods, because money owed is a running balance |
+| Credited | sum of `creditNote.total` | Credit notes issued in the period, excluding `void` (D-86) |
+| Outstanding | sum of (invoice total − recorded payments − issued credit notes), floored at zero | Non-void invoices issued on or before the period end, including earlier periods, because money owed is a running balance. Same helper as the finance report |
 | Rental vehicle-days | count of days in the period on which a rental holds a vehicle | Rentals with status `confirmed`, `in_progress` or `completed` **and** an assigned vehicle, overlapping the day |
 | Available vehicle-days | vehicles in the fleet excluding `retired` × days in the period | The acting fleet, not the fleet as it was on each day — a limitation stated on screen |
 | Utilisation | rental vehicle-days ÷ available vehicle-days | Null when the period has no days or no vehicles. Can be 0%. Does not include staff-busing trips, which are RPT-02 |
