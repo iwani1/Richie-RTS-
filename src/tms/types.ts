@@ -640,7 +640,7 @@ export interface InvoiceTaxLine {
 export interface Invoice {
   id: string;
   reference: string; // INV-2026-0001, from the database reference counter
-  /** Rental invoices in Phase 1A. Corporate invoices arrive with contracts (FIN-02, Phase 1B). */
+  /** Rental invoices today. An invoice raised against a corporate agreement is not built yet (FIN-02). */
   kind: "rental";
   rentalId: string | null;
   clientId: string | null;
@@ -799,6 +799,91 @@ export interface Refund {
   updatedAt: string;
 }
 
+// ---- Contracts (brief 1B: CLI-02, D-95) ----
+//
+// A contract is the paper behind a corporate account: what was agreed, for which days and routes, at
+// what price basis, and until when. Until now a client record said only that the company existed, so
+// nothing in the system could answer "does this account still have an agreement?" — which is the
+// question that decides whether a booking is the office's problem or a favour.
+//
+// The record is a transcription, not a calculation. Pricing model, billing frequency, payment terms and
+// service-level targets are typed from the signed contract, because the system must not invent a rate
+// and the company's real terms are not published anywhere it can read.
+//
+// Two decisions worth stating:
+//   * **Expiry is computed, not stored.** A date passing is not an event a person records; storing
+//     "expired" would need a nightly job and would be wrong between runs. `contractStateOf()` reports
+//     "expired" from the end date, and every screen shows it as a status.
+//   * **A contract is never rewritten once it is approved.** The terms of an agreed contract are what
+//     was signed; a change is a new contract, and the history says which one it replaced. Until
+//     approval, drafting and correction are ordinary edits.
+export const CONTRACT_STATUSES = ["draft", "pending_approval", "active", "suspended", "terminated"] as const;
+export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
+
+/** What is shown to a person: the stored status, or "expired" when an active term has run out. */
+export type ContractState = ContractStatus | "expired";
+
+export const CONTRACT_STATUS_LABELS: Record<ContractState, string> = {
+  draft: "Draft",
+  pending_approval: "Pending approval",
+  active: "Active",
+  suspended: "Suspended",
+  terminated: "Terminated",
+  expired: "Expired",
+};
+
+/** The services this system can actually deliver, so a contract cannot promise a third one. */
+export const CONTRACT_SERVICE_TYPES = ["staff_transport", "bus_rental", "both"] as const;
+export type ContractServiceType = (typeof CONTRACT_SERVICE_TYPES)[number];
+
+export const CONTRACT_SERVICE_LABELS: Record<ContractServiceType, string> = {
+  staff_transport: "Staff transport",
+  bus_rental: "Bus rental",
+  both: "Staff transport and bus rental",
+};
+
+/** One line of the record's own history: who moved it, when, from what, to what, and why. */
+export interface ContractEvent {
+  at: string;
+  actor: string;
+  from: ContractState;
+  to: ContractState;
+  note: string;
+}
+
+export interface Contract {
+  id: string;
+  reference: string; // CT-0001
+  clientId: string;
+  /** The client's name at the time, so a renamed account does not rewrite a signed document. */
+  clientName: string;
+  serviceType: ContractServiceType;
+  startDate: string; // YYYY-MM-DD
+  /** Null means open-ended: no renewal date has been agreed. */
+  endDate: string | null;
+  status: ContractStatus;
+  /** The routes the contract covers. Empty means the contract names no routes. */
+  routeIds: string[];
+  /** Weekdays the service runs (0 = Sunday), as agreed. Empty means the contract says nothing. */
+  weekdays: number[];
+  /** Shifts covered, from `settings.shifts`, by id. Empty means every shift. */
+  shiftIds: string[];
+  /** The vehicle category the contract requires, or empty. */
+  vehicleCategoryId: string;
+  // Typed from the signed contract. Blank means the paper does not say, and is never filled in here.
+  pricingModel: string;
+  billingFrequency: string;
+  paymentTerms: string;
+  serviceLevelTargets: string;
+  notes: string;
+  /** The contract this one replaces, when a renegotiated agreement is entered as a new record. */
+  replacesId: string | null;
+  history: ContractEvent[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const EXPENSE_STATUSES = ["recorded", "void"] as const;
 export type ExpenseStatus = (typeof EXPENSE_STATUSES)[number];
 
@@ -874,7 +959,7 @@ export interface TaxLineSetting {
  * A numbering series. Rentals, routes, trips, incidents and work orders are numbered continuously
  * and filed under the period `all`; invoices and payments restart each year (audit D-03).
  */
-export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "creditNote", "payment", "refund", "expense", "booking"] as const;
+export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "contract", "invoice", "creditNote", "payment", "refund", "expense", "booking"] as const;
 export type ReferenceScope = (typeof REFERENCE_SCOPES)[number];
 
 export interface ReferenceCounter {
@@ -940,7 +1025,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 /**
  * Every schema version this build can still read.
@@ -950,7 +1035,7 @@ export const SCHEMA_VERSION = 18;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -972,6 +1057,7 @@ export interface Database {
   refunds: Refund[];
   expenses: Expense[];
   bookings: Booking[];
+  contracts: Contract[];
   referenceCounters: ReferenceCounter[];
   settings: Settings;
   audit: AuditEntry[];
@@ -1002,6 +1088,7 @@ export function emptyDatabase(): Database {
     refunds: [],
     expenses: [],
     bookings: [],
+    contracts: [],
     referenceCounters: [],
     settings: {
       companyName: null,
@@ -1101,6 +1188,19 @@ export function migrate(value: unknown): Database | null {
           cancelledAt: booking.cancelledAt ?? null,
           cancelledBy: booking.cancelledBy ?? null,
           history: Array.isArray(booking.history) ? booking.history : [],
+        }))
+      : [],
+    // Contracts arrived in schema 19; an older backup simply has none.
+    contracts: Array.isArray(v.contracts)
+      ? (v.contracts as Contract[]).map((contract) => ({
+          ...contract,
+          endDate: contract.endDate ?? null,
+          routeIds: Array.isArray(contract.routeIds) ? contract.routeIds : [],
+          weekdays: Array.isArray(contract.weekdays) ? contract.weekdays : [],
+          shiftIds: Array.isArray(contract.shiftIds) ? contract.shiftIds : [],
+          vehicleCategoryId: contract.vehicleCategoryId ?? "",
+          replacesId: contract.replacesId ?? null,
+          history: Array.isArray(contract.history) ? contract.history : [],
         }))
       : [],
     // Counters arrive in schema 11. Older data had no invoices, so there is nothing to continue.

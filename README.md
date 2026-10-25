@@ -93,9 +93,10 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Finance home: money in and out, who is late, unbilled work, payments to check | Works; margin is withheld until both sides of the period are complete |
 | Public enquiry form, embeddable on the company website | Works; throttled, spam-trapped, creates a draft only |
 | CSV import for vehicles, drivers, clients and staff rosters | Works; rejects a row with its line number, never merges an existing person |
-| Contracts, notifications, driver app, GPS | **Not built** — see `docs/PROGRESS.md` |
+| Corporate agreements: term, service, routes, pricing and payment terms transcribed from the signed paper, with approval, suspension, termination and a renewal watch | Works; an approved agreement's terms are frozen by the database, a booking is refused under an agreement that is not active, and expiry is read from the end date rather than recorded |
+| Notifications, driver app, GPS, passenger portal | **Not built** — see `docs/PROGRESS.md` |
 
-625 unit and UI tests plus 21 integration tests against a real PostgreSQL; coverage thresholds are
+661 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

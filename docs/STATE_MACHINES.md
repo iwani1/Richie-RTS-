@@ -200,8 +200,8 @@ an audit entry.
 
 | From | To | Who | Preconditions |
 |---|---|---|---|
-| — | `requested` | `bookings:create` | Rider active, same client as the route, **not** already on the route's roster; a run exists on that date, is not cancelled, completed, departed or **already under way**; a vehicle is assigned so seats can be counted; a seat is free; outside the request cut-off (if one is set) |
-| `requested` | `confirmed` | `bookings:manage` | A seat is still free, and the run has not left |
+| — | `requested` | `bookings:create` | The client's covering contract is `active` on that date (a client with no contract on file is not blocked, and a terminated one does not gate); rider active, same client as the route, **not** already on the route's roster; a run exists on that date, is not cancelled, completed, departed or **already under way**; a vehicle is assigned so seats can be counted; a seat is free; outside the request cut-off (if one is set) |
+| `requested` | `confirmed` | `bookings:manage` | A seat is still free, the run has not left, and the covering contract is still `active` (it may have been suspended since the request) |
 | `requested` / `offered` | `waitlisted` | `bookings:manage` | Attempting to confirm when the run is full: the request moves to the waiting list instead of failing |
 | `waitlisted` | `offered` | automatic, on a cancellation | The oldest waiter on that run, and only when the freed seat actually makes room. **Never `confirmed`**: the offer waits for a person |
 | `offered` / `requested` / `waitlisted` | `confirmed` | `bookings:manage` | A seat is free (`offered` already holds one) |
@@ -217,7 +217,30 @@ stop record expects an outcome for them at their pickup stop, and the completion
 run. The manifest is fixed once the run is `in_progress`, so no seat can be added to a bus that has
 left.
 
+## Contract (`Contract.status`, CLI-02, D-95)
+
+The status records where the paper is; it does **not** record expiry. A contract whose end date has
+passed reads **Expired** on every screen because `contractStateOf()` derives it from `end_date` — the
+stored status stays `active` until somebody suspends or terminates it. That is the point: a date
+passing is not an event a person records, and a stored "expired" would be wrong between nightly runs.
+
+| From | To | Who | Preconditions |
+|---|---|---|---|
+| — | `draft` | `contracts:create` | Client chosen, start date given, end date after it or blank (open-ended); the routes named must belong to that client |
+| `draft` | `pending_approval` | `contracts:advance` | The terms are in a state somebody would sign; nothing else is checked, because approval is the gate |
+| `pending_approval` | `active` | `contracts:advance` | The end date has not already passed (a lapsed term cannot be put in force; the message names the date); no other live contract covers any of its days |
+| `pending_approval` | `draft` | `contracts:advance` | A reason is required |
+| `active` | `suspended` | `contracts:advance` | A reason is required — typically an unpaid invoice |
+| `active` | `terminated` | `contracts:advance` | A reason is required; terminal |
+| `suspended` | `active` | `contracts:advance` | The end date has not already passed |
+| `suspended` | `terminated` | `contracts:advance` | A reason is required; terminal |
+| `terminated` | (none) | - | terminal — service resumes under a new numbered contract |
+
+Terms are editable in `draft` and `pending_approval` only. After approval the record is a record: a
+renegotiation is a new contract with `replacesId` naming this one, and the old one is suspended or
+terminated. Two **drafts** may overlap (that is how a renewal is prepared); two **live** contracts may
+not, and `replacesId` does not waive that — the renewal starts after the old term ends.
+
 ## Planned (not yet implemented)
 
-Quotation (as a standalone revisable document), the rental-vs-trip split and contract state machines
-are still Not Started.
+Quotation (as a standalone revisable document) and the rental-vs-trip split are still Not Started.

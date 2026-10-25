@@ -590,4 +590,75 @@ describe("bookings - a booked seat is on the run's list of people (D-85)", () =>
     expect(reassign.ok).toBe(false);
     if (!reassign.ok) expect(reassign.errors.vehicleId).toMatch(/booked seat\(s\)/);
   });
+
+  it("refuses a seat on a date no active contract covers, and names the contract in the way (D-95)", () => {
+    const w = build();
+    // A contract for the client, still a draft: it covers 1 June but is not in force.
+    const withContract = run(w.db, w.ops, {
+      type: "create_contract",
+      input: {
+        clientId: w.clientId,
+        serviceType: "staff_transport",
+        startDate: "2026-06-01",
+        endDate: "2026-12-31",
+        routeIds: [w.routeId],
+        weekdays: [1, 2, 3, 4, 5],
+        shiftIds: [],
+        vehicleCategoryId: "",
+        pricingModel: "Per trip",
+        billingFrequency: "",
+        paymentTerms: "",
+        serviceLevelTargets: "",
+        notes: "",
+      },
+    });
+
+    const refused = attempt(withContract, w.ops, request(w));
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.message).toMatch(/CT-0001/);
+      expect(refused.errors.serviceDate).toMatch(/cannot be taken under it/);
+    }
+
+    // Approving the contract is what makes the same request acceptable — nothing else changed.
+    const id = withContract.contracts[0].id;
+    let approved = run(withContract, w.ops, { type: "advance_contract", id, to: "pending_approval", reason: "" });
+    approved = run(approved, w.admin, { type: "advance_contract", id, to: "active", reason: "" });
+    const allowed = attempt(approved, w.ops, request(w));
+    expect(allowed.ok).toBe(true);
+  });
+
+  it("re-checks the contract when a requested seat is confirmed, not only when it was asked for (D-95)", () => {
+    const w = build();
+    let db = run(w.db, w.ops, request(w));
+    const id = db.bookings[0].id;
+
+    // A contract that is suspended by the time the office looks at the seat.
+    db = run(db, w.ops, {
+      type: "create_contract",
+      input: {
+        clientId: w.clientId,
+        serviceType: "staff_transport",
+        startDate: "2026-06-01",
+        endDate: "2026-12-31",
+        routeIds: [w.routeId],
+        weekdays: [],
+        shiftIds: [],
+        vehicleCategoryId: "",
+        pricingModel: "",
+        billingFrequency: "",
+        paymentTerms: "",
+        serviceLevelTargets: "",
+        notes: "",
+      },
+    });
+    const contractId = db.contracts[0].id;
+    db = run(db, w.ops, { type: "advance_contract", id: contractId, to: "pending_approval", reason: "" });
+    db = run(db, w.admin, { type: "advance_contract", id: contractId, to: "active", reason: "" });
+    db = run(db, w.ops, { type: "advance_contract", id: contractId, to: "suspended", reason: "Invoice unpaid" });
+
+    const confirm = attempt(db, w.ops, { type: "confirm_booking", id });
+    expect(confirm.ok).toBe(false);
+    if (!confirm.ok) expect(confirm.message).toMatch(/CT-0001 is suspended/);
+  });
 });

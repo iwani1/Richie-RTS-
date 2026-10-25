@@ -370,6 +370,11 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 
 ## D-41 Interface: the operations-ledger visual system
 
+> **Superseded.** The owner rejected this editorial build and chose the Daylight direction
+> (`docs/DESIGN.md` §2a and §4). Kept because the reason the first attempt failed is still the reason
+> the shipped one works: the people using this know what a timetable and an invoice look like, and
+> they want the day's exceptions first.
+
 - **Decision.** Replace the generic light-dashboard skin with a purpose-built visual language:
   newsprint paper, ink green, signal amber and brass; Fraunces display headings, Archivo body
   text and IBM Plex Mono for labels, table headers, nav indices and badges; square corners,
@@ -1619,3 +1624,60 @@ decision the office makes, not one the system invents.
 - **Consequence.** Cancelling a refund and voiding a credit note both work against a real database, and
   give the headroom back. `commandFlow.integration.test.ts` voids a credit note for the invoice's whole
   total, which is the case the old trigger refused, so the bug cannot return quietly.
+
+## D-95 An agreement is copied from the signed paper, and nothing rewrites it afterwards
+
+- **Context.** Brief item CLI-02 asks for corporate contracts: reference, client, dates, a status that
+  includes Draft, Pending Approval, Active, Suspended, Expired and Terminated, plus the commercial
+  terms — service, routes, pricing, billing frequency, payment terms, service levels. Two temptations
+  come with it. The first is to *calculate* things the office has not decided: a monthly rate times a
+  number of buses, an invoice schedule derived from the billing frequency, an assumed 30-day term. The
+  second is to keep one record and edit it as the agreement changes, so the office can answer "what
+  did we agree?" only with what the agreement says today.
+- **Decision.** A contract is a **transcription** of what was signed, and it is **not rewritten once
+  approved**.
+  - **Transcription, not calculation.** Pricing model, billing frequency, payment terms and service
+    level targets are typed from the paper as free text in the office's own words — "monthly rate per
+    bus", "monthly in arrears", "30 days from invoice". Each may be left blank, and blank stays blank:
+    the screen shows "Not recorded" rather than a default nobody agreed to. The client's **name is
+    copied in at creation** (`clientName`) so the contract still reads correctly if the client is later
+    renamed, while `clientId` continues to resolve live — the routes on the contract must still belong
+    to that client.
+  - **Expiry is derived, not recorded.** `contractStateOf({status, endDate}, today)` reports
+    `"expired"` when an active contract's end date has passed. No nightly job marks anything; a
+    suspended contract past its end date still reads suspended, because pausing for an unpaid invoice
+    is a fact about now that an end date does not undo.
+  - **An approved contract is frozen; a change is a new one.** `isContractEditable` is true only for
+    draft and pending approval. After that the terms cannot be corrected — a new `CT-` record is
+    created with `replacesId` pointing at the old one, and the old one is suspended or terminated. The
+    day-to-day moves that are *not* about money stay available: `draft → pending_approval`,
+    `pending_approval → active | draft`, `active → suspended | terminated`, `suspended → active |
+    terminated`, and `terminated` is final. Suspending, terminating or sending back to draft requires a
+    reason; approving is refused once the end date has passed, naming the date, because an agreement
+    that has already ended cannot be put in force.
+  - **Two live contracts cannot cover the same day for one client.** A second live contract whose dates
+    overlap an existing live one is refused, naming the first (`CT-0001 already covers 2026-06-01 for
+    Acme Ltd`). Two drafts may coexist — that is how a renewal is prepared before the old one lapses —
+    and the overlap rule is not waived by `replacesId`: a renewal must start after the old contract
+    ends.
+  - **The agreement gates bookings.** A booking request for a service date is refused when the covering
+    contract is not active (`CT-0001 is draft, so bookings for 2026-06-01 cannot be taken under it`) or
+    when no contract covers the date but one ended before it (`CT-0001 ended on … and has not been
+    renewed`). It is allowed when the client has no contract on file at all — most of the work is not
+    under contract, and a gate that blocked it would stop the office operating — or when the covering
+    contract was terminated. The check runs again at `confirm_booking`: a contract can be suspended
+    between the request and the confirmation.
+  - **Who sees it.** `contracts:read` for the office by permission; a **client contact sees its own
+    client's contracts** — it is their agreement — and a driver sees none, because a driver has no
+    reason to know what a client pays. `ClientPortal` carries a "Your agreement" card: service, term
+    (or "open-ended"), and state.
+  - **Renewal watch.** `contractsDueForRenewal(db, today)` lists live contracts ending inside
+    `settings.documentReminderLeadDays`. When that setting is blank the list is **empty** and the
+    screen says the window is not set, rather than warning about nothing.
+- **Consequence.** New `contracts` collection (`src/tms/contracts.ts`), the `CT-` reference series
+  (width 4, not per year), `contracts:read`/`create`/`update`/`advance` permissions, the snapshot scope,
+  the repository rows and the `Contracts` screen with its own route and nav entry; migration
+  `015_contracts.sql` with `contract_frozen()` (terms only — status still moves) and
+  `contract_no_delete()`; bookings gain a contract check on request and on confirmation; commands 55
+  to 58. 31 new tests (22 domain, 9 screen) plus 3 snapshot-scope cases, 2 booking cases and one
+  reference-series row.

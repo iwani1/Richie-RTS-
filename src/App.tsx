@@ -3,6 +3,7 @@ import { AuditPage } from "./screens/Audit";
 import { SetupPage, SignInPage } from "./screens/Auth";
 import { DashboardPage } from "./screens/Dashboard";
 import { ClientsPage, DriversPage } from "./screens/Registers";
+import { ContractsPage } from "./screens/Contracts";
 import { RentalsPage } from "./screens/Rentals";
 import { InvoicesPage } from "./screens/Invoices";
 import { StatementsPage } from "./screens/Statements";
@@ -35,7 +36,7 @@ import { cn } from "./utils/cn";
 const NAV_GROUPS: { label: string; routes: Route[] }[] = [
   { label: "My desk", routes: ["driver_portal", "client_portal"] },
   { label: "Service desk", routes: ["dashboard", "finance", "rentals", "invoices", "statements", "expenses", "busing", "logistics", "fleetReadiness"] },
-  { label: "Fleet & clients", routes: ["compliance", "vehicles", "drivers", "clients"] },
+  { label: "Fleet & clients", routes: ["compliance", "vehicles", "drivers", "clients", "contracts"] },
   { label: "Analysis", routes: ["reports"] },
   { label: "Administration", routes: ["users", "settings", "audit", "profile"] },
 ];
@@ -55,6 +56,7 @@ const ROUTE_ICONS: Record<Route, IconName> = {
   vehicles: "vehicle",
   drivers: "driver",
   clients: "client",
+  contracts: "client",
   users: "user",
   settings: "settings",
   audit: "audit",
@@ -206,6 +208,7 @@ function Shell() {
       case "vehicles": return <VehiclesPage navigate={navigate} />;
       case "drivers": return <DriversPage />;
       case "clients": return <ClientsPage />;
+      case "contracts": return <ContractsPage />;
       case "users": return <UsersPage />;
       case "settings": return <SettingsPage />;
       case "audit": return <AuditPage />;

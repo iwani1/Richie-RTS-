@@ -92,7 +92,7 @@ export interface FinancialReport {
 
 const ymd = (iso: string) => iso.slice(0, 10);
 
-/** What was sold. Only hire invoices exist in this build; a contract invoice would add a row. */
+/** What was sold. Only hire invoices exist in this build; an agreement invoice would add a row (FIN-02). */
 const SERVICE_LABELS: Record<Invoice["kind"], string> = { rental: "Vehicle hire" };
 
 /**

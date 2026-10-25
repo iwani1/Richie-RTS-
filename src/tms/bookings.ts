@@ -10,6 +10,7 @@
 // waiter and stays offered until a person confirms it (BKG-05): an automatic confirmation would
 // promise a seat to someone who may have stopped waiting.
 import { can } from "./permissions";
+import { bookingContractProblem } from "./contracts";
 import { allocateReference } from "./references";
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
 import {
@@ -255,6 +256,10 @@ export function executeBookings(db: Database, actor: Actor | null, command: Book
 
       const created: Booking[] = [];
       const skipped: string[] = [];
+      // D-95: a contract that covers the date and is not active stops a new seat, and so does a
+      // contract that ran out. A client with no contract on file is unaffected — the system does not
+      // invent an agreement in order to refuse work under it.
+      let contractRefusal: string | null = null;
       // A single-date request that fails the seat checks reports the reason on the field the person
       // can fix, not only in a sentence; a series reports each date it could not take.
       let seatRefusal: Errors | null = null;
@@ -263,6 +268,12 @@ export function executeBookings(db: Database, actor: Actor | null, command: Book
         const trip = runs[index];
         if (!trip) {
           skipped.push(`${date} (nothing scheduled)`);
+          return;
+        }
+        const contractIssue = route ? bookingContractProblem(db, route.clientId, date, now.slice(0, 10)) : null;
+        if (contractIssue) {
+          contractRefusal = contractIssue;
+          skipped.push(`${date} (no active contract covering that date)`);
           return;
         }
         if (db.bookings.some((booking) => booking.tripId === trip.id && booking.passengerId === passengerId && LIVE_BOOKING_STATUSES.includes(booking.status))) {
@@ -319,6 +330,7 @@ export function executeBookings(db: Database, actor: Actor | null, command: Book
       });
 
       if (created.length === 0) {
+        if (dates.length === 1 && contractRefusal) return fail(contractRefusal, { serviceDate: contractRefusal });
         if (dates.length === 1 && seatRefusal) return fail(`No seat could be requested: ${skipped.join("; ")}.`, seatRefusal);
         return fail(`No seat could be requested: ${skipped.join("; ")}.`, { serviceDate: skipped[0] ?? "Nothing to book." });
       }
@@ -356,6 +368,11 @@ export function executeBookings(db: Database, actor: Actor | null, command: Book
         return fail(`Only a requested, offered or waitlisted booking can be confirmed (this one is ${statusWord(existing).toLowerCase()}).`);
       const trip = db.trips.find((candidate) => candidate.id === existing.tripId);
       if (!trip) return fail("The run this seat was booked on no longer exists.");
+
+      // A contract can be suspended or run out between the request and the confirmation, so the check
+      // is repeated here rather than trusted from the day the seat was asked for (D-95).
+      const contractIssue = bookingContractProblem(db, existing.clientId, existing.serviceDate, now.slice(0, 10));
+      if (contractIssue) return fail(contractIssue, { tripId: contractIssue });
 
       const seat = seatErrors(db, trip, existing.passengerId, now, existing.id);
       if (Object.keys(seat).length) {

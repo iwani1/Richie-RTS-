@@ -58,6 +58,12 @@ export const PERMISSIONS = [
   "maintenance:release",
   "maintenance:cost",
   "costs:read",
+  // Contracts (brief CLI-02, D-95). A contract states what was agreed with a client, so reading it is
+  // ordinary office work; approving, suspending or ending one is a management act.
+  "contracts:read",
+  "contracts:create",
+  "contracts:update",
+  "contracts:advance",
   // Spending that is not a repair (D-93). Recording it is a money job; operations reads it because
   // fuel and tolls are how its own runs are priced, but does not enter it.
   "expenses:read",
@@ -110,6 +116,12 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "drivers:create",
     "drivers:update",
     "clients:read",
+    // Contracts (CLI-02, D-95): operations runs the corporate services, so it drafts, corrects and
+    // moves a contract through approval. Ending one a client is still being carried under is auditable.
+    "contracts:read",
+    "contracts:create",
+    "contracts:update",
+    "contracts:advance",
     "rentals:read",
     "rentals:create",
     "rentals:update",
@@ -166,6 +178,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "clients:read",
     "clients:create",
     "clients:update",
+    // A contract states the price basis and payment terms behind the bills (D-95). Finance reads it to
+    // invoice against it; approving or ending it is not a finance act.
+    "contracts:read",
     "vehicles:read",
     "drivers:read",
     "rentals:read",
@@ -210,7 +225,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // rental requests, and may raise a rental request for that client.
   // A client's own contact books seats for that client's people and can cancel them; it cannot
   // confirm a seat, because capacity is the office's judgement (BKG-03, D-83).
-  client_contact: ["routes:read", "passengers:read", "rentals:read", "rentals:create", "bookings:read", "bookings:create"],
+  // contracts:read is own-record: a client's own contact sees the agreement the office runs for them,
+  // which is what makes the portal answer "what did we agree?" without a phone call (CLI-03, D-95).
+  client_contact: ["routes:read", "passengers:read", "rentals:read", "rentals:create", "bookings:read", "bookings:create", "contracts:read"],
 };
 
 // Record-bound roles hold their permissions against their own records only. The same
@@ -230,6 +247,7 @@ const OWN_SCOPED_FOR_BOUND_ROLES: readonly Permission[] = [
   "rentals:create",
   "bookings:read",
   "bookings:create",
+  "contracts:read",
 ];
 
 export function isOwnScoped(role: Role, permission: Permission): boolean {

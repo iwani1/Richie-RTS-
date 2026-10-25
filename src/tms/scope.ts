@@ -20,6 +20,7 @@ import type {
   BusRoute,
   Client,
   ComplianceDocument,
+  Contract,
   Database,
   Driver,
   Incident,
@@ -80,6 +81,7 @@ export function scopedView(db: Database, actor: Actor | null) {
       workOrders: db.workOrders,
       documents: db.documents,
       bookings: db.bookings,
+      contracts: db.contracts,
     };
   }
 
@@ -117,6 +119,8 @@ export function scopedView(db: Database, actor: Actor | null) {
       // A driver sees the seats booked on the runs they are driving, so nobody is turned away for a
       // seat the office already sold.
       bookings: db.bookings.filter((booking) => tripIds.has(booking.tripId)),
+      // A driver has no business reading what the company agreed to charge a client (D-95).
+      contracts: [] as Contract[],
     };
   }
 
@@ -136,6 +140,10 @@ export function scopedView(db: Database, actor: Actor | null) {
       // A client contact has no compliance-document access; those concern the fleet.
       documents: [] as ComplianceDocument[],
       bookings: db.bookings.filter((booking) => booking.clientId === link.client!.id),
+      // D-95: a client contact sees the agreements that cover its own account — the term, the service
+      // and which routes are in scope — which is what its dashboard is for (CLI-03). Nothing about
+      // another client's contract can reach it.
+      contracts: db.contracts.filter((contract) => contract.clientId === link.client!.id),
     };
   }
 
@@ -152,6 +160,7 @@ export function scopedView(db: Database, actor: Actor | null) {
     workOrders: [],
     documents: [] as ComplianceDocument[],
     bookings: [] as Booking[],
+    contracts: [] as Contract[],
   };
 }
 

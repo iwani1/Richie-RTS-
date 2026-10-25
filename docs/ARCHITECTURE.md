@@ -7,8 +7,10 @@
   more — the page needs a server, because that is where authority lives.
 - Runtime: one Node.js process on the operator's workstation (Fedora), plus PostgreSQL. The
   database is the source of truth. See `docs/SETUP_AND_DEPLOYMENT.md` for the install and run commands.
-- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (18 tables: `refund` arrived in
-  `010_refunds.sql`, D-92, and `expense` in `011_expenses.sql`, D-93; `012_reference_counter_scopes.sql`
+- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (19 tables: `refund` arrived in
+  `010_refunds.sql`, D-92, `expense` in `011_expenses.sql`, D-93, and `contract` in
+  `015_contracts.sql`, D-95; `013` and `014` replace the two ceiling functions so a cancellation is
+  not counted against itself (D-94); `012_reference_counter_scopes.sql`
   widens the numbering-series constraint to match `REFERENCE_SERIES`; `btree_gist` +
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
@@ -28,23 +30,23 @@
 
 ## Interface system
 
-The interface is a purpose-built "operations ledger", not a component-kit default:
+The interface is the **Daylight** direction (`docs/DESIGN.md` §4, which superseded D-41): a light operations workspace, not a component-kit
+default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 
-- **Type.** Fraunces (display headings, auth poster), Archivo (body/UI), IBM Plex Mono (eyebrows,
-  labels, nav indices, table heads, badges). Loaded via Google Fonts with serif/sans/mono
-  fallbacks so the app still renders offline.
-- **Palette.** Ink `#14231d`, paper `#f2ecdf`, card `#fbf7ec`, hairline `#cfc5ae`, signal amber
-  `#e0a43c`, brass `#b08b3e`, rust `#a24a30`. Tokens are `--rts-*` custom properties.
-- **Form.** Square corners, 1px ink rules, hard offset shadows, numbered/grouped ledger rail,
-  dotted-grid desk surface, dashed tape motif in the rail.
-- **Implementation.** `src/ui/primitives.tsx` is the single component seam; layout classes live at
-  the end of `src/index.css` under the RICHIE OPERATIONS LEDGER block. Shell and navigation are in
-  `src/App.tsx`; authentication in `src/pages/Auth.tsx`. The source-document viewer keeps its own
-  document styling.
-- **Verification.** Headless Chromium at 1440px and 390px: fonts loaded, 0px radii, offset shadows,
-  one active nav item, mobile rail off-canvas with visible menu trigger, no horizontal overflow, no
-  page errors, and sampled small text at >=4.5:1 contrast. All 118 behavioural tests remain green;
-  D-41 records the design decision.
+- **Type.** Inter Variable for every word and figure; IBM Plex Mono only for machine data —
+  references, plates, times, money in tables. Figures are tabular.
+- **Palette.** Canvas `#f5f6f9`, card `#ffffff`, hairline `#e7e9ef`, ink `#0f172a`, muted `#4a5468`,
+  and **one** accent, indigo `#4453f0`. State colours (green, amber, red) appear only as a pill with
+  its word, never as the sole carrier of meaning.
+- **Form.** One elevation level: anything on the canvas casts the same soft shadow, anything inside a
+  card casts none. Cards have one head, one line of qualifying text and one action. Corners are 8–14px.
+  There is no per-destination colour: the accent marks the active destination and the primary action.
+- **Implementation.** `src/ui/primitives.tsx` is the single component seam; `src/index.css` holds the
+  tokens and the layout classes. Shell and navigation are in `src/App.tsx`; authentication in
+  `src/screens/Auth.tsx`. The source-document viewer keeps its own document styling.
+- **Verification.** Accessible names on every control, a skip link, a 2px focus ring with 2px offset,
+  state never carried by colour alone, and no decorative motion, glass or gradient. Contrast is held
+  at 4.5:1 for text; the accent measures 5.61 on white.
 
 ## Modules
 
@@ -64,6 +66,8 @@ The interface is a purpose-built "operations ledger", not a component-kit defaul
 | `src/tms/financeHome.ts` | The finance home's figures: the period totals from `financialReport`, overdue invoices and unbilled hires as at today, payments to verify, and a margin that is withheld unless both sides of the period are complete |
 | `src/tms/kpis.ts` | KPI calculations. Each result carries period, numerator, denominator, coverage and an explicit status |
 | `src/tms/costs.ts` | Recorded-cost report with period, total, entries and data coverage. Counts incident and work-order costs and standalone expenses in one figure (D-93) |
+| `src/tms/contracts.ts` | Corporate agreements (D-95): the transcribed term and commercial terms, `contractStateOf` (expiry derived from the end date, never stored), `isContractEditable`, the status moves, the overlap rule, `bookingContractProblem` (the booking gate) and `contractsDueForRenewal` |
+| `src/screens/Contracts.tsx` | The contract register: term, client, service and derived state; draft and correct while unapproved; approve, suspend and terminate with a reason; the renewal watch |
 | `src/tms/expenses.ts` | Spending that is not a repair: `record_expense` / `void_expense`, numbered `EXP-YYYY-NNNN`, with the receipt number and whether the paper is held (D-93) |
 | `src/tms/commands.ts` | `executeCommand()`: the single router for every write (`AnyCommand`) |
 | `src/tms/crypto.ts` | PBKDF2-SHA256 password hashing via Web Crypto |

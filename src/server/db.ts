@@ -132,6 +132,18 @@ export interface PassengerRow {
   data: Json;
 }
 
+export interface ContractRow {
+  id: string;
+  reference: string;
+  client_id: string;
+  start_date: DateOnly;
+  end_date: DateOnly | null;
+  status: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  data: Json;
+}
+
 export interface BookingRow {
   id: string;
   reference: string;
@@ -361,6 +373,7 @@ export interface KyselyDatabase {
   passenger: PassengerRow;
   trip: TripRow;
   booking: BookingRow;
+  contract: ContractRow;
   incident: IncidentRow;
   work_order: WorkOrderRow;
   compliance_document: ComplianceDocumentRow;

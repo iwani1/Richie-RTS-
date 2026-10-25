@@ -471,3 +471,55 @@ describe("expense scope", () => {
     }
   });
 });
+
+// Contracts (CLI-02, D-95). A contract is the price and the terms agreed with one client, so it is
+// information about that client's relationship with the office — not something the whole company sees
+// through a driver's phone, and not another client's to read.
+describe("contract scope", () => {
+  function withContracts(): Database {
+    const w = world();
+    const base = {
+      serviceType: "staff_transport" as const,
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+      status: "active" as const,
+      routeIds: [],
+      weekdays: [],
+      shiftIds: [],
+      vehicleCategoryId: "",
+      pricingModel: "",
+      billingFrequency: "",
+      paymentTerms: "",
+      serviceLevelTargets: "",
+      notes: "",
+      replacesId: null,
+      history: [],
+      createdBy: "Ops",
+      createdAt: at,
+      updatedAt: at,
+    };
+    w.contracts = [
+      { ...base, id: "ct1", reference: "CT-0001", clientId: "c1", clientName: "Client c1" },
+      { ...base, id: "ct2", reference: "CT-0002", clientId: "c2", clientName: "Client c2" },
+    ];
+    return w;
+  }
+
+  it("sends a client contact only its own client's contracts", () => {
+    const visible = scopeDatabase(withContracts(), actor("client-user", "client_contact"))!;
+    expect(visible.contracts.map((contract) => contract.reference)).toEqual(["CT-0001"]);
+  });
+
+  it("never sends a contract to a driver", () => {
+    for (const who of [actor("driver-user", "driver"), actor("other-driver-user", "driver")]) {
+      expect(scopeDatabase(withContracts(), who)!.contracts).toEqual([]);
+    }
+  });
+
+  it("sends the office every contract, and finance the terms it invoices against", () => {
+    for (const who of [actor("admin", "administrator"), actor("fin", "finance"), actor("ops", "operations")]) {
+      const visible = scopeDatabase(withContracts(), who)!;
+      expect(visible.contracts.map((contract) => contract.reference)).toEqual(["CT-0001", "CT-0002"]);
+    }
+  });
+});

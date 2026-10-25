@@ -15,6 +15,7 @@ export type Route =
   | "vehicles"
   | "drivers"
   | "clients"
+  | "contracts"
   | "users"
   | "settings"
   | "audit"
@@ -58,6 +59,9 @@ export const NAV_ITEMS: NavItem[] = [
   { route: "vehicles", label: "Vehicles", caption: "Fleet register", permission: "vehicles:read" },
   { route: "drivers", label: "Drivers", caption: "Driver register", permission: "drivers:read" },
   { route: "clients", label: "Clients", caption: "Corporate accounts", permission: "clients:read" },
+  // The agreements behind the accounts (CLI-02, D-95). Read on its own permission: a client's own
+  // contact also holds it, scoped to its own account.
+  { route: "contracts", label: "Contracts", caption: "Agreements and renewals", permission: "contracts:read" },
   { route: "users", label: "Users", caption: "Accounts and roles", permission: "users:read" },
   { route: "settings", label: "Settings", caption: "Business rules", permission: "settings:read" },
   { route: "audit", label: "Audit log", caption: "Who changed what", permission: "audit:read" },

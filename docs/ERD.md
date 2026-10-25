@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 18). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
+The app stores these as arrays inside one JSON document (schema version 19). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
 erDiagram
@@ -63,6 +63,20 @@ erDiagram
     uuid category_id FK
     text direction
     text status
+  }
+  CONTRACT {
+    uuid id PK
+    text reference UK
+    uuid client_id FK
+    uuid replaces_id FK
+    date start_date
+    date end_date
+    text status
+    text created_by
+  }
+  CONTRACT_ROUTE {
+    uuid contract_id FK
+    uuid route_id FK
   }
   ROUTE_DAY {
     uuid route_id FK
@@ -133,6 +147,10 @@ erDiagram
   VEHICLE_CATEGORY ||--o{ ROUTE : requires
   CLIENT ||--o{ RENTAL : books
   CLIENT ||--o{ ROUTE : served_by
+  CLIENT ||--o{ CONTRACT : agreed_with
+  CONTRACT ||--o{ CONTRACT_ROUTE : covers
+  ROUTE ||--o{ CONTRACT_ROUTE : named_in
+  CONTRACT o|--o| CONTRACT : replaces
   CLIENT ||--o{ PASSENGER : employs
   SHIFT o|--o{ ROUTE : scheduled_in
   VEHICLE o|--o{ RENTAL : assigned_to
@@ -164,6 +182,9 @@ erDiagram
 | Trip to boardings | One boarding record per rider expected on the trip: every active roster passenger **and** every booking on that run that still holds a seat (`confirmed` or `offered`, D-85). Inactive roster members are excluded; a cancelled or rejected booking is not expected aboard. |
 | Trip to bookings | A booking names one rider's seat on one run. It is **not** a roster row: the roster is how a client's staff travel every day, and a booking covers the seat that has to be named — a visitor, a new hire, somebody from a sister company (D-83). Capacity is `vehicle.seat_capacity − active roster on the route − confirmed/offered bookings`, checked in the booking command. |
 | Booking to passenger | One live booking per rider per run. A rider who is already on that run's route roster is refused, because the roster already holds their seat. A booking that holds a seat is also a row on the run's manifest, so its rider receives a boarding outcome like any roster rider. |
+| Contract to client and routes | A contract belongs to one client and names the routes in scope; every named route must already belong to that client. Its dates are a closed term or open-ended (`end_date` null), and the end date is never before the start. |
+| Contract to contract | Two **live** contracts may not cover the same day for one client (a suspended or terminated one does not block). A renewal names the contract it replaces (`replaces_id`) and must still start after that contract ends — naming it does not waive the overlap rule. |
+| Contract to bookings | A booking request is refused when the covering contract is not `active`, or when the last one ended before the service date and nothing replaced it. A client with no contract on file is not blocked. |
 | Trip to vehicle and driver | Set at assignment, required at dispatch. The vehicle must be in the route's category and status Available. The driver's licence must be valid on the service date. |
 
 ## Unique constraints
@@ -177,6 +198,7 @@ erDiagram
 | DRIVER | `licence_number` unique (upper-cased) |
 | RENTAL | `reference` unique |
 | ROUTE | `reference` unique |
+| CONTRACT | `reference` unique and shaped `CT-nnnn`; `end_date >= start_date` where set; status one of `draft`, `pending_approval`, `active`, `suspended`, `terminated` (**`expired` is never stored** — it is derived from `end_date`, D-95) |
 | ROUTE_STOP | `(route_id, sequence)` unique |
 | PASSENGER | `(client_id, employee_ref)` unique where `employee_ref <> ''` |
 | TRIP | `(route_id, service_date)` unique **where `origin = 'schedule'`** (migration 006); `reference` unique; `origin` is one of `schedule`, `adhoc` |
@@ -191,6 +213,26 @@ erDiagram
 - `AUDIT_ENTRY (entity, entity_id)` and `AUDIT_ENTRY (at DESC)`.
 - `PASSENGER (client_id, status)`.
 - `BOOKING (service_date, status)` for the day's seat view, and `BOOKING (client_id)` for a client contact's own scope.
+- `CONTRACT (client_id)`, `CONTRACT (end_date)` for the renewal watch, and `CONTRACT (status)`.
+
+## Contracts
+
+`db/migrations/015_contracts.sql`. The row keeps the fields a query joins on and the whole transcribed
+agreement in a `data` column, the same shape as the other documents in this build:
+
+```
+CONTRACT
+  id, reference ('CT-0001'), client_id, start_date, end_date (null = open-ended),
+  status, created_by, created_at, updated_at,
+  data -> clientName, serviceType, routeIds[], weekdays[], shiftIds[], vehicleCategoryId,
+          pricingModel, billingFrequency, paymentTerms, serviceLevelTargets, notes,
+          replacesId, history[]
+```
+
+`contract_frozen()` refuses any change to those terms once the row is `active`, `suspended` or
+`terminated` (the status may still move, and its history grows); `contract_no_delete()` refuses every
+delete. Both read the terms from `data`, so a column added later has to be named in the trigger — that
+is deliberate: a new term should be a decision, not an oversight.
 
 ## Compliance documents
 

@@ -62,6 +62,7 @@ describe("reference series", () => {
       payment: "PAY-2026-0001",
       refund: "REF-2026-0001",
       expense: "EXP-2026-0001",
+      contract: "CT-0001",
       booking: "BK-0001",
     });
     expect(seriesPeriod("rental", "2026")).toBe("all");

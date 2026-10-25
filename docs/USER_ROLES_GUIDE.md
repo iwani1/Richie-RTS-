@@ -16,7 +16,7 @@ information in the language of the business.
 | **Operations / dispatch** | the person who runs the day | vehicles, drivers, rentals, routes, trips, dispatch, passengers, incidents, maintenance, documents |
 | **Finance** | the person who bills and reconciles | quotations' confirmation step, invoices, payments, costs, the rental report |
 | **Driver** | a driver, on their own phone | their own runs only: open a trip, board passengers, record a no-show, complete, report a defect |
-| **Client contact** | a corporate client's office | their own client's routes, roster and rental requests; can raise a request, not confirm one |
+| **Client contact** | a corporate client's office | their own client's routes, roster, agreement and rental requests; can raise a request, not confirm one |
 
 There is one installation per company. Nobody signs in and sees another company's data, because there
 is no other company in the database.
@@ -62,14 +62,16 @@ IP addresses. Entries cannot be edited or deleted by anyone, including an admini
 **Can:** add and edit vehicles and drivers; record odometer readings; create rental requests, quote
 them, dispatch and complete them; create routes and stops; generate trips; assign vehicles and
 drivers; create and manage passengers; report incidents, advance them, record costs; create work
-orders, advance them, record costs; record compliance documents; read the audit log.
+orders, advance them, record costs; record compliance documents; draft a client's agreement, approve
+it, suspend it or end it with a reason; read the audit log.
 
 **Also sees, but cannot change:** the **Expenses** screen. Fuel, tolls and permits are part of what a run
 costs, so operations reads them; entering or voiding that spending is the finance officer's job, and
 the button is simply not offered.
 
 **Cannot:** confirm a rental or take a deposit; issue an invoice or record a payment; record or void an
-expense; change settings; create accounts.
+expense; change the terms of an agreement that has been approved (a change is a new agreement);
+change settings; create accounts.
 
 **The dispatch day:**
 
@@ -211,11 +213,14 @@ If the phone has no signal, record the stop when it returns. Offline queuing is 
 
 ## Client contact
 
-**Can:** see their own client's record, its routes and stops, the staff roster assigned to those
+**Can:** see their own client's record, its agreement — the service, the term and whether it is
+active, suspended or has lapsed — its routes and stops, the staff roster assigned to those
 routes (names and stops, not phone numbers) and that client's rental requests; raise a rental request;
 request a seat on a run for one of their own company's people, and cancel a seat booking they made.
 
-**Cannot:** see any other client, any billing, staff phone numbers, invoices or payments; cannot
+**Cannot:** see any other client or another company's agreement, any billing, the price on their own
+agreement (the screen states the service and the term, not the money), staff phone numbers, invoices or
+payments; cannot draft, approve or end a contract; cannot
 confirm a rental or accept a quotation (that step belongs to finance); cannot **confirm** a booked
 seat (the office confirms it once the seats are counted) and cannot book a seat for another company.
 

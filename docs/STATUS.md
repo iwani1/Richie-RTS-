@@ -8,15 +8,15 @@ One page, in plain words, for anyone who does not want to read the phase log.
 work — vehicles, drivers, customers, bus rentals from enquiry to paid invoice, staff bus runs,
 logistics, reports, the public enquiry form — is built, enforced on the server, and tested.
 
-**It is not "everything in the brief".** The brief describes a larger product with three further
-stages of work (contracts, notifications and GPS, payment integrations and payroll).
-Those are named below, marked as not built, and were never part of this build's agreed scope.
+**It is not "everything in the brief".** The brief describes a larger product with further stages of
+work (notifications and GPS, payment integrations and payroll). Those are named below, marked as not
+built, and were never part of this build's agreed scope.
 
 Two different things are called "phase" in this repository, which is why the question is confusing:
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–41** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 42 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–46** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 47 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -26,12 +26,12 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 | Phase | What it covers | Verdict |
 |---|---|---|
 | **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 9 fully met, 20 met but narrower than the brief, **0 unbuilt** |
-| **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting | **Mostly built.** 25 IDs: 10 met, 13 partial, 2 not built — contracts and the route planning aid |
+| **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting, corporate agreements | **Mostly built.** 25 IDs: 11 met, 13 partial, 1 not built — the route planning aid. Contracts arrived in Phase 46: a transcribed term, the lifecycle, renewals and a booking gate |
 | **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Mostly built.** 6 IDs: 1 met (finance dashboard), 4 partial, 1 not built (passenger portal) |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
 | **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs, 6 deferred, 1 met (expenses with a receipt number and whether the paper is held — no scanned copy yet) |
 
-Totals across all 78 brief requirements: **21 met · 40 partial · 3 not built · 14 deferred.**
+Totals across all 78 brief requirements: **22 met · 39 partial · 2 not built · 14 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -105,16 +105,15 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
 - A finance home: what came in and went out in a chosen period, who is late paying and by how many
   days, which completed hires have no invoice yet, and which payments still need verifying. The
   period figures are the same ones the Reports screen produces, and a margin is shown only when both
-  sides of the ledger are complete for that period — otherwise the screen says what is missing.
+  sides of the account are complete for that period — otherwise the screen says what is missing.
 - Driver and client portals showing only their own records.
 
 ## What is not built
 
-**Whole features absent** (3 brief IDs):
+**Whole features absent** (2 brief IDs):
 
 | Missing | What it means in practice | Why |
 |---|---|---|
-| Contracts (CLI-02) | No contract record, so corporate terms live in the quotation and the invoice rather than in an agreement with dates and a status | Phase 1B; needs the owner's contract wording |
 | Route planning aid (RTE-04) | Dispatchers choose vehicles manually; nothing suggests a plan | Phase 1B |
 | Passenger portal (PAX-01) | Passengers cannot sign in to see their own journeys | Phase 1C |
 
@@ -150,11 +149,12 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**625 passed, 21 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**661 passed, 26 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
-- 18 integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
-  the database refusing to credit an invoice past its own total, and the database refusing to
-  un-cancel a payment or to cancel one without a reason.
+- Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
+  the database refusing to credit an invoice past its own total, the database refusing to un-cancel a
+  payment or to cancel one without a reason, and the database refusing to rewrite an approved
+  contract's terms or delete a contract at all.
 - `npm run e2e` — 39 checks against the built, started application over HTTP.
 - The trial on real data: §1–§10 passed on a copy of the database on 2026-10-25 (recorded in
   `docs/REAL_DATA_TRIAL.md` §10), including the invoice arithmetic checked to the pesewa.
@@ -166,9 +166,10 @@ These work, and the difference is worth knowing before relying on them:
 
 1. **Repeat the trial's §5–§8 on the live database** (port 3000). The copy passed; this is the step
    that says the system is ready for a working day.
-2. **Contracts (CLI-02)** — the contract record and the terms wording it needs from the owner; the
-   seat bookings that depend on it are built (`BKG-01…06`, Phase 33) and credit notes now cover the
-   billing corrections (Phase 36).
+2. **The agreement's own words** — contracts are built (CLI-02, Phase 46) and bookings are gated on
+   them, but the pricing basis, billing frequency and payment terms are free text the office types
+   from the signed paper. The owner should decide the wording those four fields usually carry, so a
+   clerk is choosing rather than composing (Q-13).
 3. **Passenger portal (PAX-01)** — passengers cannot sign in to see their own journeys; the public
    booking path does not exist yet.
 4. **Sending the documents** — an invoice and a credit note now print or save as a PDF, but nothing is

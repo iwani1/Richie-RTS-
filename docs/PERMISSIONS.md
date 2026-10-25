@@ -212,6 +212,34 @@ Additional invariants enforced by the service:
 
 The role list and assignments are a proposal pending Q-21 in `OPEN_QUESTIONS.md`.
 
+## Corporate agreements (CLI-02, D-95)
+
+| Permission | administrator | operations | finance | driver | client_contact |
+|---|:-:|:-:|:-:|:-:|:-:|
+| clients:read | x | x | x | | |
+| clients:create / update | x | x | x | | |
+| contracts:read | x | x | x | | x (own client only) |
+| contracts:create / contracts:update | x | x | | | |
+| contracts:advance | x | x | | | |
+
+Reading an agreement and changing one are separate. `contracts:update` corrects the terms of a
+**draft** or a contract awaiting approval; once it is active the terms are frozen (D-95) and a change
+is a new numbered contract. `contracts:advance` is what moves the status — approving, suspending,
+terminating — and each of those moves writes an audit entry naming the person and the reason.
+
+**Finance reads contracts** because the pricing model, billing frequency and payment terms on the
+agreement are what it invoices against; it does not draft or approve them, because an agreement is a
+commitment the office makes, not a billing task.
+
+**A client contact sees its own client's contracts** and no other client's, because the agreement is
+about that company. It reads; it never writes. Drivers receive no contract at all: a driver has no
+reason to know what a client pays. This is own-record scope, enforced by `contracts:read` together
+with the snapshot's client binding (`visibility.ts`, `scope.ts`).
+
+The booking gate uses the same records rather than a second copy of "is this account current": a
+request is refused when the covering contract is not `active`, and again at confirmation in case it
+was suspended in between.
+
 ## The public enquiry form (WEB-01)
 
 One command and two endpoints need no permission at all, because they are reached by people who have

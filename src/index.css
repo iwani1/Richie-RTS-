@@ -92,9 +92,8 @@
   --body: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Section accent: used for the active destination, its icon and its count, nothing else. */
-  --rubric: var(--accent);
-  --rubric-ink: #ffffff;
+  /* One accent (Direction E, D-41 superseded): the active destination, its icon and the page
+     eyebrow. There are no per-section colours — a destination is not a category. */
 
   /* compatibility aliases */
   --rts-ink: var(--ink);
@@ -335,12 +334,12 @@ h1, h2, h3, h4 { text-wrap: balance; }
 
 .rts-nav-item[aria-current="page"] {
   background: var(--accent-soft);
-  color: var(--rubric);
+  color: var(--accent);
   font-weight: 600;
   box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 
-/* a 2px rubric tick on the active destination — the only decoration in the rail */
+/* a 2px accent tick on the active destination — the only mark in the rail */
 .rts-nav-item[aria-current="page"]::before {
   content: "";
   position: absolute;
@@ -349,13 +348,13 @@ h1, h2, h3, h4 { text-wrap: balance; }
   width: 2px;
   height: 15px;
   border-radius: 0 2px 2px 0;
-  background: var(--rubric);
+  background: var(--accent);
   transform: translateY(-50%);
 }
 
 .rts-nav-icon { width: 16px; height: 16px; flex: 0 0 auto; color: var(--faint); }
 .rts-nav-item:hover .rts-nav-icon { color: var(--muted); }
-.rts-nav-item[aria-current="page"] .rts-nav-icon { color: var(--rubric); }
+.rts-nav-item[aria-current="page"] .rts-nav-icon { color: var(--accent); }
 
 .rts-nav-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -524,7 +523,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
   align-items: center;
   gap: 6px;
   margin: 0 0 6px;
-  color: var(--rubric);
+  color: var(--accent);
   font-family: var(--body);
   font-size: 10.5px;
   font-weight: 700;

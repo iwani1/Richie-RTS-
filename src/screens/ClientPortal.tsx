@@ -1,7 +1,10 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { RentalRequestInput } from "../tms/service";
 import { scopedView } from "../tms/scope";
+import { contractStateOf } from "../tms/contracts";
 import {
+  CONTRACT_SERVICE_LABELS,
+  CONTRACT_STATUS_LABELS,
   DIRECTION_LABELS,
   RENTAL_STATUS_LABELS,
   type BusRoute,
@@ -67,6 +70,37 @@ export function ClientPortalPage() {
 
       {client && (
         <>
+          {/* CLI-03, D-95: the agreement itself, stated plainly — term, service and state, so the
+              answer to "what did we agree, and until when?" does not need a phone call. */}
+          <Card title="Your agreement" description="What Richie Transport Services has agreed with your organisation.">
+            {view.contracts.length === 0 ? (
+              <EmptyState title="No contract on file" body="Your account manager keeps the signed agreement. When it is entered here, its term and service appear in this space." />
+            ) : (
+              <ul className="space-y-3">
+                {[...view.contracts]
+                  .sort((a, b) => (a.startDate < b.startDate ? 1 : -1))
+                  .map((contract) => {
+                    const state = contractStateOf(contract, todayYmd());
+                    return (
+                      <li key={contract.id} className="rounded-sm border border-stone-200 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rts-mono text-xs font-semibold">{contract.reference}</span>
+                          <Badge tone={state === "active" ? "success" : state === "draft" || state === "terminated" ? "neutral" : "warning"}>
+                            {CONTRACT_STATUS_LABELS[state]}
+                          </Badge>
+                          <span className="text-xs text-stone-600">{CONTRACT_SERVICE_LABELS[contract.serviceType]}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-stone-700">
+                          {contract.endDate ? `${formatDate(contract.startDate)} to ${formatDate(contract.endDate)}` : `From ${formatDate(contract.startDate)}, open-ended`}
+                        </p>
+                      </li>
+                    );
+                  })}
+              </ul>
+            )}
+          </Card>
+
+          <div className="mt-5">
           <Card title="Contracted routes" description="Routes Richie Transport Services runs for your organisation.">
             {view.routes.length === 0 ? (
               <EmptyState title="No routes yet" body="Routes agreed with your account manager appear here." />
@@ -95,6 +129,7 @@ export function ClientPortalPage() {
               </ul>
             )}
           </Card>
+          </div>
 
           <div className="mt-5">
             <Card title="Staff on these routes" description="Names and pickup stops only. Contact details are held by your account manager.">

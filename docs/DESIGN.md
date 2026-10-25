@@ -1,6 +1,6 @@
 # Interface design: research, decision and system
 
-This is the design record for the Richie Transport Services ledger. It explains what the interface
+This is the design record for the Richie Transport Services application. It explains what the interface
 had to become, which references informed it, what was rejected, and the system that came out.
 
 ## 1. What this interface is for
@@ -110,8 +110,7 @@ software, not of a document.
 - **One canvas, one card level.** Canvas `#f5f6f9`, card `#ffffff`, hairline `#e7e9ef`. Anything on
   the canvas casts the same shadow; anything inside a card casts none. There is no second elevation.
 - **One accent for action.** Indigo `#4453f0` marks the primary button, the active destination, a link
-  and a focus ring. The per-section colour (`--rubric`) recolours only the active nav item, its icon
-  and its badge — it never becomes a background wash, a chart series or a heading.
+  and a focus ring. It never becomes a background wash, a chart series or a heading.
 - **Status is a pill, and the pill carries its word.** Green, amber and red appear as a tint plus a
   6px dot plus the state in words. Colour is never the only carrier.
 - **Cards have one head and one body.** Title (14px, 660), one line of qualifying text, the action at
@@ -173,9 +172,9 @@ Two families of colour, one rule: the vivid values pass 3:1 and are used for mar
 values pass 4.5:1 and are used for words. `--faint` (`#98a2b3`) survives as an edge token only —
 group labels, placeholders and footnotes were moved to `--muted` so nothing readable sits below 4.5:1.
 
-Rubric map: `dashboard`, `users`, `settings`, `audit` → indigo · `busing`, portals → teal ·
-`rentals`, `vehicles`, `drivers`, `clients` → blue · `readiness` → amber · `logistics` → green ·
-`compliance` → red.
+There is **no** per-destination colour. An earlier pass gave each section its own hue; that map is
+gone, and `--accent` is now the only accent in the sheet. A destination is not a category, and a
+second colour competing with the primary button made "what do I press here" harder to answer.
 
 **Type** — Inter Variable, 13px base. Display 25 / 14 / 13.5px at 660–690 weight, tracking −0.015 to
 −0.045em. Text 12.5 / 12 / 11.5 / 11px. Figures 29px in a stat card, 21px in a rail; `tabular-nums`
@@ -226,7 +225,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **625 passed, 21 skipped** across 62 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **661 passed, 26 skipped** across 65 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are

@@ -28,6 +28,8 @@ export const REFERENCE_SERIES: Record<ReferenceScope, { prefix: string; width: n
   trip: { prefix: "TR", width: 4, perYear: false },
   incident: { prefix: "IN", width: 4, perYear: false },
   workOrder: { prefix: "WO", width: 4, perYear: false },
+  // A contract is quoted on the phone and on the renewal letter, so it is continuous like a rental.
+  contract: { prefix: "CT", width: 4, perYear: false },
   // A booking reference is quoted to the person travelling, so it stays short and continuous.
   booking: { prefix: "BK", width: 4, perYear: false },
   // Financial documents restart each year: INV-2026-0001 is what an accountant and a tax inspector
@@ -73,6 +75,8 @@ function existingReferences(db: Database, scope: ReferenceScope): string[] {
       return db.refunds.map((record) => record.reference);
     case "expense":
       return db.expenses.map((record) => record.reference);
+    case "contract":
+      return db.contracts.map((record) => record.reference);
     case "booking":
       return db.bookings.map((record) => record.reference);
     default:

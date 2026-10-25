@@ -157,7 +157,7 @@ export function ClientsPage() {
       <PageHeader
         eyebrow="Master data"
         title="Corporate clients"
-        description="Organisations served by staff busing and bus rentals. Contracts, routes and billing attach to these records in later phases."
+        description="Organisations served by staff busing and bus rentals. Routes, agreements and billing attach to these records; the agreement itself is drafted on the Contracts screen."
         actions={
           allowed("clients:create") ? (
             <div className="flex flex-wrap gap-2">
