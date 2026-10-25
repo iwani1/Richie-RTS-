@@ -187,16 +187,20 @@ suite("PostgreSQL constraints, through the repository", () => {
       createdAt: NOW,
       updatedAt: NOW,
     });
-    const base = emptyDatabase();
+    // Diffed against what is already there, so unrelated rows from earlier tests stay put (a
+    // vehicle cannot be deleted while odometer readings still point at it).
+    const before = await loadDatabase();
     const database: Database = {
-      ...base,
-      settings: { ...base.settings, rental: emptyRentalSettings() },
-      clients: [{ id: "client-1", name: "Northstar Foods", contactName: "", contactPhone: "", contactEmail: "", status: "active", createdAt: NOW, updatedAt: NOW }],
-      users: [account("user-1", "ops@northstar.test", false), account("user-2", "accounts@northstar.test", true)],
+      ...before,
+      clients: [
+        ...before.clients,
+        { id: "client-1", name: "Northstar Foods", contactName: "", contactPhone: "", contactEmail: "", status: "active", createdAt: NOW, updatedAt: NOW },
+      ],
+      users: [...before.users, account("user-1", "ops@northstar.test", false), account("user-2", "accounts@northstar.test", true)],
     };
 
     // Before migration 005 the unique index on app_user.client_id refused the second row outright.
-    await write(database);
+    await write(database, before);
     const reloaded = await loadDatabase();
     const accounts = reloaded.users.filter((u) => u.clientId === "client-1");
     expect(accounts.map((u) => u.email).sort()).toEqual(["accounts@northstar.test", "ops@northstar.test"]);
@@ -207,7 +211,7 @@ suite("PostgreSQL constraints, through the repository", () => {
   it("still refuses a second account for the same driver record", async () => {
     const insert = (id: string) => sql`
       insert into app_user (id, full_name, email, role, active, driver_id, client_id, password_hash, password_salt, created_at, updated_at, data)
-      values (${id}, 'Driver ${id}', ${`${id}@example.test`}, 'driver', true, 'driver-1', null, 'hash', 'salt', now(), now(), ${JSON.stringify({ id })}::jsonb)
+      values (${id}, ${`Driver ${id}`}, ${`${id}@example.test`}, 'driver', true, 'driver-1', null, 'hash', 'salt', now(), now(), ${JSON.stringify({ id })}::jsonb)
     `.execute(db());
     await insert("driver-user-1");
     await expect(insert("driver-user-2")).rejects.toThrow();
