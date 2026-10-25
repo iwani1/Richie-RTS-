@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { formatAmount, fromMinor, lineAmount, linesTotalFromText, percentOf, toMinor } from "../tms/money";
 import { rentalQuotingReady, type AssignmentInput, type DepositInput, type QuoteInput, type QuoteLineInput, type RentalRequestInput } from "../tms/service";
+import { readinessReport } from "../tms/maintenance";
 import { useTms } from "../tms/useTms";
 import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, type Rental, type RentalStatus } from "../tms/types";
 import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
@@ -466,13 +467,19 @@ function AssignForm({ rental, needsDriver, onClose, onSubmit }: { rental: Rental
   const [errors, setErrors] = useState<Errors>({});
   const vehicles = db.vehicles.filter((v) => v.categoryId === rental.vehicleCategoryId && v.status !== "retired" && v.status !== "out_of_service");
   const drivers = db.drivers.filter((d) => d.status === "active");
+  // Q-43: said in the list itself, before the vehicle is chosen.
+  const overdue = new Set(readinessReport(db, todayYmd()).vehicles.filter((v) => v.status === "overdue").map((v) => v.vehicleId));
   return (
     <Panel title={`Assign resources: ${rental.reference}`} description={`Matching category only. ${formatDate(rental.startDate)} - ${formatDate(rental.endDate)}.`} onClose={onClose}>
       <form onSubmit={async (e) => { e.preventDefault(); setErrors(await onSubmit(values)); }} className="space-y-4">
         <Field label="Vehicle" error={errors.vehicleId}>
           <Select value={values.vehicleId} onChange={(e) => setValues({ ...values, vehicleId: e.target.value })} invalid={!!errors.vehicleId}>
             <option value="">Select a vehicle</option>
-            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registration} ({v.seatCapacity} seats, {v.status})</option>)}
+            {vehicles.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.registration} ({v.seatCapacity} seats, {v.status}){overdue.has(v.id) ? " - service overdue" : ""}
+              </option>
+            ))}
           </Select>
         </Field>
         {vehicles.length === 0 && <Notice tone="warning">No available vehicles match the requested category.</Notice>}

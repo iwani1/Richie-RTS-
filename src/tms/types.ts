@@ -182,10 +182,18 @@ export interface ServiceSchedule {
 
 export interface MaintenanceSettings {
   schedules: ServiceSchedule[];
+  /**
+   * Q-43 (D-80). An overdue routine service is a **warning** by default: it shows on readiness and
+   * on the vehicle list, and the work still goes out. Turning this on makes the same condition
+   * refuse assignment, dispatch and start. A safety defect blocks either way — that is not a
+   * setting, because a vehicle reported with a breakdown, accident or safety concern is already
+   * taken out of service by the incident itself.
+   */
+  blockOnOverdueService: boolean;
 }
 
 export function emptyMaintenanceSettings(): MaintenanceSettings {
-  return { schedules: [] };
+  return { schedules: [], blockOnOverdueService: false };
 }
 
 export const RENTAL_STATUSES = ["draft", "quoted", "confirmed", "in_progress", "completed", "declined", "cancelled"] as const;
@@ -815,7 +823,13 @@ export function migrate(value: unknown): Database | null {
       // Records written before the list existed keep the approved six rather than an empty list.
       workTypes: Array.isArray(settings.workTypes) ? (settings.workTypes as string[]) : [...DEFAULT_WORK_TYPES],
       costCategories: Array.isArray(settings.costCategories) ? (settings.costCategories as string[]) : [],
-      maintenance: { ...emptyMaintenanceSettings(), ...((settings.maintenance as Partial<MaintenanceSettings>) ?? {}) },
+      // Stored settings keep the default (warning, not blocking) unless the flag was written as a
+      // real `true`, so an older backup cannot start blocking dispatch by accident (Q-43, D-80).
+      maintenance: {
+        ...emptyMaintenanceSettings(),
+        ...((settings.maintenance as Partial<MaintenanceSettings>) ?? {}),
+        blockOnOverdueService: (settings.maintenance as Partial<MaintenanceSettings> | undefined)?.blockOnOverdueService === true,
+      },
     },
     audit: v.audit as Database["audit"],
   };

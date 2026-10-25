@@ -519,6 +519,26 @@ export function SettingsPage() {
             ))}
           </ul>
         )}
+        <div className="mt-3 rounded-sm border border-stone-200 p-3">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={draft.maintenance.blockOnOverdueService === true}
+              disabled={!editable}
+              onChange={(e) => update({ maintenance: { ...draft.maintenance, blockOnOverdueService: e.target.checked } })}
+            />
+            <span>
+              <span className="font-medium">Block work on an overdue routine service</span>
+              <span className="mt-1 block text-xs text-stone-600">
+                Off by default. While it is off, a vehicle past its interval still goes out and the office is
+                told in the message after assignment or dispatch. While it is on, that vehicle cannot be
+                assigned, dispatched, started or hired until the service is recorded. A safety defect stops
+                a vehicle either way: this switch is only about routine service (Q-43).
+              </span>
+            </span>
+          </label>
+        </div>
         <p className="mt-3 text-xs text-stone-500">
           A service counts as &ldquo;done&rdquo; only when a work order is completed and marked as resetting the interval. The system never infers that from a repair.
         </p>

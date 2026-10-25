@@ -202,6 +202,12 @@ with `required: true` refuses assignment while it is missing or lapsed on the da
 
 Distinct from `drivers.licence_expiry`, which continues to gate trip and rental assignment.
 
+`settings.maintenance` holds the service intervals (one per vehicle category) and one switch,
+`blockOnOverdueService`, which decides whether an overdue routine service refuses work or is only
+reported (D-75). It is a setting rather than a column on the vehicle because the rule is the
+company's, not the vehicle's; the vehicle's own state is on `VEHICLE.status`, which an incident
+changes when a defect takes it off the road.
+
 Two other catalogues live in settings rather than in their own tables: `settings.workTypes` (what a
 work order is for) and `settings.costCategories` (what a recorded cost was for). A work order and a
 cost entry store the name they were given, so renaming a catalogue entry never rewrites history

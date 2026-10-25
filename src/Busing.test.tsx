@@ -23,7 +23,7 @@ afterEach(cleanup);
 
 // Seeds a signed-in administrator with one client, route, passenger and today's trip,
 // so the UI test starts directly on the Staff busing screen.
-function seed(): { vehicleId: string; driverId: string } {
+function seed(options: { overdue?: boolean } = {}): { vehicleId: string; driverId: string } {
   const today = new Date().toISOString().slice(0, 10);
   let db: Database = emptyDatabase();
   const setup = execute(db, null, { type: "setup_administrator", input: { fullName: "Admin", email: "admin@example.test" }, credential: fakeCred }, NOW);
@@ -53,13 +53,39 @@ function seed(): { vehicleId: string; driverId: string } {
       invoiceDueDays: null,
       workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
       costCategories: ["Parts", "Labour", "Tyres"],
-      maintenance: { schedules: [] },
+      maintenance: { schedules: [], blockOnOverdueService: false },
     },
   });
   const categoryId = db.settings.vehicleCategories[0].id;
   run({ type: "create_client", input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
   run({ type: "create_vehicle", input: { registration: "GT 900-26", categoryId, make: "", model: "", seatCapacity: "30", notes: "" } });
   run({ type: "create_driver", input: { fullName: "Kojo Driver", phone: "024", licenceNumber: "DRV-1", licenceExpiry: "2030-01-01", status: "active" } });
+
+  if (options.overdue) {
+    // The workshop serviced it at 120,000 km and the odometer has since passed the 10,000 km
+    // interval. Q-43's rule is off, so this is a warning rather than a block.
+    run({
+      type: "update_settings",
+      input: {
+        ...db.settings,
+        maintenance: {
+          blockOnOverdueService: false,
+          schedules: [{ categoryId, intervalKm: 10000, intervalDays: null, remindLeadKm: null, remindLeadDays: null }],
+        },
+      },
+    });
+    const vehicleId = db.vehicles[0].id;
+    run({
+      type: "create_work_order",
+      input: { vehicleId, title: "Major service", workType: "Service", workshop: "", description: "", reportedOdometer: "120000", plannedDate: "", incidentId: "", resetsServiceInterval: true },
+    });
+    const orderId = db.workOrders[db.workOrders.length - 1].id;
+    run({ type: "advance_work_order", id: orderId, input: { to: "in_progress", note: "Booked in", costsConfirmedComplete: false, vehicleRestoredTo: "unchanged" } });
+    run({ type: "advance_work_order", id: orderId, input: { to: "completed", note: "Filters and oil", costsConfirmedComplete: true, vehicleRestoredTo: "unchanged" } });
+    run({ type: "advance_work_order", id: orderId, input: { to: "closed", note: "Costs reviewed", costsConfirmedComplete: true, vehicleRestoredTo: "available" } });
+    run({ type: "record_odometer", input: { vehicleId, readingKm: "135000", readingDate: "2026-06-01", note: "" } });
+  }
+
   run({
     type: "create_route",
     input: {
@@ -199,4 +225,28 @@ describe("Staff busing end-to-end (jsdom)", () => {
     expect(db.trips[0].boardings).toHaveLength(2);
     expect(db.audit.some((entry) => entry.summary.includes("Mid-trip addition"))).toBe(true);
   }, 30000);
+});
+
+describe("an overdue routine service, seen by the dispatcher (Q-43, D-80)", () => {
+  it("says so in the vehicle list and in the message after dispatch while the rule only warns", async () => {
+    const { vehicleId, driverId } = seed({ overdue: true });
+    await renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: /Staff busing/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Trips$/ }));
+    expect(await screen.findByText("TR-0001")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Assign$/ }));
+    const dialog = screen.getByRole("dialog");
+    // The warning is in the list itself, before anything is chosen.
+    expect(within(dialog).getByRole("option", { name: /GT 900-26.*service overdue/ })).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText(/^Vehicle/), { target: { value: vehicleId } });
+    fireEvent.change(within(dialog).getByLabelText(/^Driver/), { target: { value: driverId } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Save assignment/i }));
+
+    // The run still goes out, and the office is told why the note is there.
+    expect(await screen.findByText(/overdue for routine service/i)).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: /^Dispatch$/ }));
+    expect(await screen.findByText(/dispatched\..*overdue for routine service/i)).toBeTruthy();
+  });
 });

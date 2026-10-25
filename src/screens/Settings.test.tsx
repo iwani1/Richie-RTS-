@@ -157,3 +157,30 @@ describe("the lists the company keeps itself", () => {
     expect(screen.getByLabelText("Work type 6")).toHaveProperty("value", "Other");
   });
 });
+
+describe("the overdue-service switch (Q-43, D-80)", () => {
+  it("is off, says what being off means, and saves as a block when ticked", async () => {
+    const db = settingsDb(false);
+    const tms = makeTms(db);
+    render(
+      <TmsContext.Provider value={tms}>
+        <SettingsPage />
+      </TmsContext.Provider>,
+    );
+
+    const box = screen.getByRole("checkbox", { name: /block work on an overdue routine service/i }) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    // The screen has to say what the switch does, because a warning that silently becomes a block
+    // would be discovered by a dispatcher at the worst moment.
+    expect(screen.getByText(/While it is off, a vehicle past its interval still goes out/i)).toBeTruthy();
+    expect(screen.getByText(/A safety defect stops\s+a vehicle either way/i)).toBeTruthy();
+
+    fireEvent.click(box);
+    save();
+
+    await vi.waitFor(() => expect(tms.dispatch).toHaveBeenCalled());
+    const command = (tms.dispatch as unknown as { mock: { calls: [{ type: string; input: { maintenance: { blockOnOverdueService: boolean } } }][] } }).mock.calls[0][0];
+    expect(command.type).toBe("update_settings");
+    expect(command.input.maintenance.blockOnOverdueService).toBe(true);
+  });
+});

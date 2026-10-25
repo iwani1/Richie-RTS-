@@ -47,7 +47,7 @@ const settings = (overrides: Record<string, unknown> = {}) => ({
   invoiceDueDays: 14,
   workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
   costCategories: ["Parts", "Labour", "Tyres"],
-  maintenance: { schedules: [] },
+  maintenance: { schedules: [], blockOnOverdueService: false },
   ...overrides,
 });
 

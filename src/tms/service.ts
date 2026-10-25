@@ -3,6 +3,7 @@
 // unchanged. In this environment it runs in the browser (see docs/DECISIONS.md D-01).
 
 import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
+import { overdueServiceFor } from "./maintenance";
 import { can, type Permission } from "./permissions";
 import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
@@ -544,6 +545,9 @@ export function validateSettings(db: Database, input: Settings) {
   const costCategories = validateNameList(input.costCategories ?? [], "costCategories", errors, 40);
 
   const maintenance = {
+    // Q-43 (D-80): only a stored `true` turns the warning into a block. Anything else — a missing
+    // field from an older backup, a stray string — leaves the vehicle able to work.
+    blockOnOverdueService: input.maintenance.blockOnOverdueService === true,
     schedules: input.maintenance.schedules.map((schedule) => ({
       categoryId: schedule.categoryId,
       intervalKm: schedule.intervalKm,
@@ -589,6 +593,16 @@ export function validateSettings(db: Database, input: Settings) {
       maintenance,
     },
   };
+}
+
+/**
+ * Q-43 (D-80). While the strict rule is off, an overdue routine service is said in the message the
+ * office reads after assigning or starting a hire — the only place left, since nothing was refused.
+ */
+function rentalServiceNotice(db: Database, vehicleId: string | null, now: string): string {
+  if (!vehicleId) return "";
+  const overdue = overdueServiceFor(db, vehicleId, now.slice(0, 10));
+  return overdue ? ` Note: ${overdue} Settings allows this because an overdue service only warns.` : "";
 }
 
 // Returns true once management has supplied the rules quoting depends on (see OPEN_QUESTIONS Q-03,07,08,09,15).
@@ -1215,6 +1229,12 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         // job is no better than one that was never recorded.
         const gaps = requiredDocumentGaps(db, "vehicle", vehicle.id, existing.startDate);
         if (gaps.length) errors.vehicleId = describeDocumentGaps(`Vehicle ${vehicle.registration}`, gaps);
+        else if (db.settings.maintenance.blockOnOverdueService) {
+          // Q-43 (D-80): the same rule for a hire as for a run — a routine service that has run past
+          // its interval stops the vehicle being put to work. Judged as at today.
+          const overdue = overdueServiceFor(db, vehicle.id, now.slice(0, 10));
+          if (overdue) errors.vehicleId = `${overdue} The vehicle cannot be hired until it is serviced: Settings blocks an overdue service.`;
+        }
       }
 
       const needsDriver = existing.driverRequired || db.settings.rental.driversAlwaysIncluded === true;
@@ -1260,7 +1280,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         entityId: updated.id,
         summary: `${updated.reference} assigned vehicle ${vehicle!.registration}${driver ? ` and driver ${driver.fullName}` : ""}.`,
       }, now);
-      return { ok: true, db: next, message: `Resources assigned to ${updated.reference}.` };
+      return { ok: true, db: next, message: `Resources assigned to ${updated.reference}.${rentalServiceNotice(db, updated.assignedVehicleId, now)}` };
     }
 
     case "start_rental": {
@@ -1284,6 +1304,11 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
           const gaps = requiredDocumentGaps(db, "driver", driver.id, now.slice(0, 10));
           if (gaps.length) return fail(describeDocumentGaps(`Driver ${driver.fullName}`, gaps));
         }
+        // And the routine service, re-checked on the day for the same reason as the papers.
+        if (vehicle && db.settings.maintenance.blockOnOverdueService) {
+          const overdue = overdueServiceFor(db, vehicle.id, now.slice(0, 10));
+          if (overdue) return fail(`${overdue} The vehicle cannot be hired until it is serviced: Settings blocks an overdue service.`);
+        }
       }
       // Ghana has no daylight saving, so the UTC calendar day is the business day (brief 5.5).
       // A hire cannot start before its booked date, nor after the day it was due back.
@@ -1299,7 +1324,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         entityId: updated.id,
         summary: `${updated.reference} started (in progress).`,
       }, now);
-      return { ok: true, db: next, message: `${updated.reference} is now in progress.` };
+      return { ok: true, db: next, message: `${updated.reference} is now in progress.${rentalServiceNotice(db, updated.assignedVehicleId, now)}` };
     }
 
     case "complete_rental": {

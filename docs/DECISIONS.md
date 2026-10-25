@@ -954,6 +954,29 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 - **Consequence.** Dispatch can refuse a vehicle for two different reasons, and the message says
   which. The stricter rule is one switch, so the owner can tighten it without a code change.
 
+### Applied in Phase 30: the switch exists
+
+The decision above was written as a recommendation and is now the behaviour.
+
+- **Setting.** `settings.maintenance.blockOnOverdueService`, off by default, edited in Settings under
+  Service schedules. Only a stored `true` blocks: an older backup that never had the field loads as
+  "warn", so restoring data cannot silently stop the fleet.
+- **Warned.** Assignment, dispatch, start and rental assignment all re-run the same check. While the
+  switch is off, the command still succeeds and its message carries the sentence — "Vehicle GT
+  900-26 is overdue for routine service (5,000 km past the 10,000 km interval). Last service:
+  2026-06-01. Settings allows this because an overdue service only warns." The vehicle list in both
+  assignment forms also marks the vehicle "service overdue" before anything is chosen.
+- **Blocked.** With the switch on, the same sentence is a field error, so assignment, dispatch, start
+  and hire are refused. A hire is re-checked on the day it starts, like a lapsed certificate.
+- **Judged as at today**, not the service date: "overdue" is a fact about the vehicle now. A run
+  arranged for next week is re-checked when it is dispatched and again when it starts.
+- **Safety is not a setting.** A vehicle reported with a breakdown, accident or safety concern is
+  taken out of service by the incident itself, so it is not "available" and cannot be assigned at
+  all. That path never consults this switch.
+- **Not done.** No new permission and no override: a dispatcher cannot wave an overdue service
+  through while the switch is on. Turning the switch off is an administrator's act, recorded in the
+  audit log.
+
 ### Applied in Phase 25: a run stopped mid-way
 
 Q-47 put the same question in the middle of a journey: what does operations do when a run has started

@@ -70,7 +70,7 @@ function build(): World {
       invoiceDueDays: null,
       workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
       costCategories: ["Parts", "Labour", "Tyres"],
-      maintenance: { schedules: [] },
+      maintenance: { schedules: [], blockOnOverdueService: false },
     },
   });
   const coaster = w.db.settings.vehicleCategories[0].id;
@@ -1225,5 +1225,113 @@ describe("the driver is marked when the roster changes mid-run (Q-48, D-79)", ()
     const finished = tripIn(w, tripId);
     expect(finished.status).toBe("completed");
     expect(finished.rosterChanges).toHaveLength(1);
+  });
+});
+
+describe("an overdue routine service warns, and blocks only when asked to (Q-43, D-80)", () => {
+  /**
+   * Walks the first vehicle past a 10,000 km interval the way the workshop would record it: a
+   * completed work order marked as a service at 120,000 km, then a reading at 135,000 km. Only the
+   * setting decides what that means for the run.
+   */
+  function overdueVehicle(w: World, blockOnOverdueService: boolean) {
+    const vehicle = w.db.vehicles[0];
+    step(w, "admin", {
+      type: "update_settings",
+      input: {
+        ...w.db.settings,
+        maintenance: {
+          blockOnOverdueService,
+          schedules: [{ categoryId: vehicle.categoryId, intervalKm: 10000, intervalDays: null, remindLeadKm: null, remindLeadDays: null }],
+        },
+      },
+    });
+    step(w, "ops", {
+      type: "create_work_order",
+      input: { vehicleId: vehicle.id, title: "Major service", workType: "Service", workshop: "", description: "", reportedOdometer: "120000", plannedDate: "", incidentId: "", resetsServiceInterval: true },
+    });
+    const orderId = w.db.workOrders[w.db.workOrders.length - 1].id;
+    step(w, "ops", { type: "advance_work_order", id: orderId, input: { to: "in_progress", note: "Booked in", costsConfirmedComplete: false, vehicleRestoredTo: "unchanged" } });
+    step(w, "ops", { type: "advance_work_order", id: orderId, input: { to: "completed", note: "Filters and oil", costsConfirmedComplete: true, vehicleRestoredTo: "unchanged" } });
+    // Closing is what releases the vehicle back to the road (the workshop's own step).
+    step(w, "ops", { type: "advance_work_order", id: orderId, input: { to: "closed", note: "Costs reviewed", costsConfirmedComplete: true, vehicleRestoredTo: "available" } });
+    step(w, "ops", { type: "record_odometer", input: { vehicleId: vehicle.id, readingKm: "135000", readingDate: "2026-06-01", note: "" } });
+    return vehicle.id;
+  }
+
+  /** A run on the first vehicle, ready to be assigned and dispatched on the world's own date. */
+  function plannedRun(w: World, vehicleId: string) {
+    const routeId = createRoute(w);
+    const tripId = generate(w, routeId, "2026-06-01");
+    return { tripId, assign: { type: "assign_trip" as const, id: tripId, input: { vehicleId, driverId: w.db.drivers[0].id } } };
+  }
+
+  it("still lets the run go out while the strict rule is off, and says why in the message", () => {
+    const w = build();
+    const vehicleId = overdueVehicle(w, false);
+    const { tripId, assign } = plannedRun(w, vehicleId);
+
+    const assigned = attempt(w, "ops", assign);
+    expect(assigned.ok).toBe(true);
+    if (!assigned.ok) return;
+    w.db = assigned.db;
+    expect(assigned.message).toContain("Note: Vehicle GT 900-26 is overdue for routine service (5,000 km past the 10,000 km interval).");
+    expect(assigned.message).toContain("Settings allows this because an overdue service only warns.");
+
+    const dispatched = attempt(w, "ops", { type: "dispatch_trip", id: tripId });
+    expect(dispatched.ok).toBe(true);
+    if (!dispatched.ok) return;
+    expect(dispatched.message).toContain("overdue for routine service");
+    expect(dispatched.db.trips.find((t) => t.id === tripId)!.status).toBe("dispatched");
+  });
+
+  it("refuses assignment and dispatch once the strict rule is on, naming the vehicle", () => {
+    const w = build();
+    const vehicleId = overdueVehicle(w, true);
+    const { tripId, assign } = plannedRun(w, vehicleId);
+
+    const assigned = attempt(w, "ops", assign);
+    expect(assigned.ok).toBe(false);
+    if (assigned.ok) return;
+    expect(assigned.errors.vehicleId).toContain("is overdue for routine service");
+    expect(assigned.errors.vehicleId).toContain("Settings blocks an overdue service");
+
+    // The block is not a one-off at assignment: a vehicle pushed past its interval after the run was
+    // planned is refused at dispatch too, because dispatch re-checks the same rule.
+    const planned = w.db.trips.find((t) => t.id === tripId)!;
+    w.db = { ...w.db, trips: w.db.trips.map((t) => (t.id === planned.id ? { ...t, vehicleId, driverId: w.db.drivers[0].id } : t)) };
+    const dispatched = attempt(w, "ops", { type: "dispatch_trip", id: tripId });
+    expect(dispatched.ok).toBe(false);
+    if (!dispatched.ok) expect(dispatched.message).toContain("Dispatch blocked: Vehicle GT 900-26 is overdue for routine service");
+  });
+
+  it("says nothing, and blocks nothing, for a vehicle that is merely due soon", () => {
+    const w = build();
+    const vehicle = w.db.vehicles[0];
+    step(w, "admin", {
+      type: "update_settings",
+      input: {
+        ...w.db.settings,
+        maintenance: {
+          blockOnOverdueService: true,
+          schedules: [{ categoryId: vehicle.categoryId, intervalKm: 10000, intervalDays: null, remindLeadKm: 6000, remindLeadDays: null }],
+        },
+      },
+    });
+    step(w, "ops", {
+      type: "create_work_order",
+      input: { vehicleId: vehicle.id, title: "Major service", workType: "Service", workshop: "", description: "", reportedOdometer: "120000", plannedDate: "", incidentId: "", resetsServiceInterval: true },
+    });
+    const orderId = w.db.workOrders[w.db.workOrders.length - 1].id;
+    step(w, "ops", { type: "advance_work_order", id: orderId, input: { to: "in_progress", note: "", costsConfirmedComplete: false, vehicleRestoredTo: "unchanged" } });
+    step(w, "ops", { type: "advance_work_order", id: orderId, input: { to: "completed", note: "Filters and oil", costsConfirmedComplete: true, vehicleRestoredTo: "unchanged" } });
+    step(w, "ops", { type: "advance_work_order", id: orderId, input: { to: "closed", note: "Costs reviewed", costsConfirmedComplete: true, vehicleRestoredTo: "available" } });
+    // 5,000 km used of 10,000: inside the interval, but within the 6,000 km warning lead.
+    step(w, "ops", { type: "record_odometer", input: { vehicleId: vehicle.id, readingKm: "125000", readingDate: "2026-06-01", note: "" } });
+
+    const { assign } = plannedRun(w, vehicle.id);
+    const assigned = attempt(w, "ops", assign);
+    expect(assigned.ok).toBe(true);
+    if (assigned.ok) expect(assigned.message).not.toContain("overdue");
   });
 });

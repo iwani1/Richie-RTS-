@@ -423,6 +423,78 @@ describe("rentals - full lifecycle", () => {
     });
   });
 
+  it("treats an overdue routine service as a warning, or as a block when the rule is on (Q-43, D-80)", () => {
+    const base = rentalReady();
+    let db = base.db;
+    const v = addVehicle(db, base.admin, base.catId, "GT 500-26");
+    db = v.db;
+
+    const configure = (blockOnOverdueService: boolean) => {
+      const r = execute(db, base.admin, { type: "update_settings", input: { ...db.settings, maintenance: { blockOnOverdueService, schedules: [{ categoryId: base.catId, intervalKm: 10000, intervalDays: null, remindLeadKm: null, remindLeadDays: null }] } } }, NOW);
+      if (!r.ok) throw new Error(r.message);
+      db = r.db;
+    };
+    const advance = (to: "in_progress" | "completed" | "closed", vehicleRestoredTo: "unchanged" | "available") => {
+      const id = db.workOrders[db.workOrders.length - 1].id;
+      const r = executeCommand(db, base.admin, { type: "advance_work_order", id, input: { to, note: "Filters and oil", costsConfirmedComplete: true, vehicleRestoredTo } }, NOW);
+      if (!r.ok) throw new Error(`${to}: ${r.message} ${JSON.stringify(r.errors)}`);
+      db = r.db;
+    };
+
+    configure(false);
+    const order = executeCommand(db, base.admin, { type: "create_work_order", input: { vehicleId: v.id, title: "Major service", workType: "Service", workshop: "", description: "", reportedOdometer: "120000", plannedDate: "", incidentId: "", resetsServiceInterval: true } }, NOW);
+    if (!order.ok) throw new Error(order.message);
+    db = order.db;
+    advance("in_progress", "unchanged");
+    advance("completed", "unchanged");
+    advance("closed", "available");
+    const reading = executeCommand(db, base.admin, { type: "record_odometer", input: { vehicleId: v.id, readingKm: "135000", readingDate: "2026-01-01", note: "" } }, NOW);
+    if (!reading.ok) throw new Error(reading.message);
+    db = reading.db;
+    expect(db.vehicles.find((vehicle) => vehicle.id === v.id)?.status).toBe("available");
+
+    // A confirmed booking, ready for a vehicle.
+    const booking = (start: string, end: string) => {
+      const created = execute(db, base.admin, requestInput(base.catId, start, end), NOW);
+      if (!created.ok) throw new Error(created.message);
+      db = created.db;
+      const id = db.rentals[db.rentals.length - 1].id;
+      const quote = execute(db, base.admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
+      if (!quote.ok) throw new Error(quote.message);
+      db = quote.db;
+      const confirm = execute(db, base.admin, { type: "confirm_rental", id, input: { amount: "250", method: "Bank transfer", reference: "TX" } }, NOW);
+      if (!confirm.ok) throw new Error(confirm.message);
+      db = confirm.db;
+      return id;
+    };
+
+    const warned = booking("2026-03-01", "2026-03-03");
+    const assigned = execute(db, base.admin, { type: "assign_rental", id: warned, input: { vehicleId: v.id, driverId: "" } }, NOW);
+    expect(assigned.ok).toBe(true);
+    if (!assigned.ok) return;
+    expect(assigned.message).toContain("Note: Vehicle GT 500-26 is overdue for routine service");
+    db = assigned.db;
+
+    // The strict rule refuses the hire, and says which vehicle and why.
+    configure(true);
+    const second = booking("2026-03-10", "2026-03-12");
+    const blocked = execute(db, base.admin, { type: "assign_rental", id: second, input: { vehicleId: v.id, driverId: "" } }, NOW);
+    expect(blocked.ok).toBe(false);
+    if (blocked.ok) return;
+    expect(blocked.errors.vehicleId).toContain("is overdue for routine service");
+    expect(blocked.errors.vehicleId).toContain("cannot be hired until it is serviced");
+
+    // And it is re-checked on the day, exactly like a lapsed certificate.
+    configure(false);
+    const late = execute(db, base.admin, { type: "assign_rental", id: second, input: { vehicleId: v.id, driverId: "" } }, NOW);
+    if (!late.ok) throw new Error(late.message);
+    db = late.db;
+    configure(true);
+    const start = execute(db, base.admin, { type: "start_rental", id: second }, "2026-03-10T08:00:00.000Z");
+    expect(start.ok).toBe(false);
+    if (!start.ok) expect(start.message).toContain("is overdue for routine service");
+  });
+
   it("prevents double-booking a vehicle over overlapping dates", () => {
     const base = rentalReady();
     let db = base.db;

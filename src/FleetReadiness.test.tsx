@@ -34,7 +34,7 @@ function seed() {
     db = result.db;
   };
 
-  run({ type: "update_settings", input: { ...db.settings, companyName: "Richie Transport Services", vehicleCategories: [{ id: "", name: "Coach" }], maintenance: { schedules: [] } } });
+  run({ type: "update_settings", input: { ...db.settings, companyName: "Richie Transport Services", vehicleCategories: [{ id: "", name: "Coach" }], maintenance: { blockOnOverdueService: false, schedules: [] } } });
   run({ type: "create_vehicle", input: { registration: "GT 7-26", categoryId: db.settings.vehicleCategories[0].id, make: "", model: "", seatCapacity: "30", notes: "" } });
   run({
     type: "create_work_order",

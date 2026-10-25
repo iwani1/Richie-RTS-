@@ -69,6 +69,31 @@ export function scheduleFor(db: Database, categoryId: string): ServiceSchedule |
   return db.settings.maintenance.schedules.find((schedule) => schedule.categoryId === categoryId) ?? null;
 }
 
+// ---------- overdue service, said in one sentence ----------
+
+/**
+ * Q-43 (D-80). One sentence, for whoever is about to put a vehicle on the road. Returns null when
+ * the vehicle is not past an interval — including when no schedule exists, because "we never set an
+ * interval" is not the same as "this service is overdue" and must not be reported as one.
+ *
+ * Only `overdue` is spoken about here: a service that is merely *due soon* is a planning hint, and
+ * treating it as a dispatch problem would train the office to ignore the line.
+ */
+export function overdueServiceFor(db: Database, vehicleId: string, asOf: string): string | null {
+  const row = readinessReport(db, asOf).vehicles.find((vehicle) => vehicle.vehicleId === vehicleId);
+  if (!row || row.status !== "overdue") return null;
+  const passed = row.bases.filter((basis) => basis.remaining <= 0);
+  const detail = passed
+    .map((basis) =>
+      basis.basis === "km"
+        ? `${Math.abs(basis.remaining).toLocaleString("en-GB")} km past the ${basis.interval.toLocaleString("en-GB")} km interval`
+        : `${Math.abs(basis.remaining)} day${Math.abs(basis.remaining) === 1 ? "" : "s"} past the ${basis.interval} day interval`,
+    )
+    .join(" and ");
+  const since = row.lastServiceDate ? ` Last service: ${row.lastServiceDate}.` : "";
+  return `Vehicle ${row.registration} is overdue for routine service (${detail}).${since}`;
+}
+
 // ---------- readiness ----------
 
 export type ReadinessStatus = "ok" | "due" | "overdue" | "no_data" | "no_schedule";

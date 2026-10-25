@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { executeCommand, type AnyCommand } from "./commands";
 import type { WorkOrderInput } from "./logistics";
-import { lastServiceFor, latestOdometer, readinessReport } from "./maintenance";
+import { lastServiceFor, latestOdometer, overdueServiceFor, readinessReport } from "./maintenance";
 import type { Actor, Credential } from "./service";
 import { emptyDatabase, migrate, SCHEMA_VERSION, type Database, type ServiceSchedule } from "./types";
 
@@ -55,7 +55,7 @@ function build(options: { secondVehicle?: boolean } = {}): World {
 
   result = run(db, admin, {
     type: "update_settings",
-    input: { ...db.settings, vehicleCategories: [{ id: "", name: "Coach" }], maintenance: { schedules: [] } },
+    input: { ...db.settings, vehicleCategories: [{ id: "", name: "Coach" }], maintenance: { blockOnOverdueService: false, schedules: [] } },
   });
   if (!result.ok) throw new Error(result.message);
   db = result.db;
@@ -82,7 +82,7 @@ const schedule = (categoryId: string, values: Partial<ServiceSchedule> = {}): Se
 });
 
 function setSchedules(world: World, schedules: ServiceSchedule[]) {
-  step(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { schedules } } });
+  step(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { blockOnOverdueService: false, schedules } } });
 }
 
 function workOrder(vehicleId: string, over: Partial<WorkOrderInput> = {}): WorkOrderInput {
@@ -117,17 +117,17 @@ function recordReading(world: World, vehicleId: string, km: string, date = "2026
 describe("service schedule settings", () => {
   it("requires at least one interval basis and a known, unique category", () => {
     const world = build();
-    const empty = attempt(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { schedules: [schedule(world.categoryId)] } } });
+    const empty = attempt(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { blockOnOverdueService: false, schedules: [schedule(world.categoryId)] } } });
     expect(empty.ok).toBe(false);
     expect(errorsOf(empty)["maintenance.schedules.0"]).toMatch(/km interval, a day interval/);
 
-    const unknown = attempt(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { schedules: [schedule("missing", { intervalDays: 90 })] } } });
+    const unknown = attempt(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { blockOnOverdueService: false, schedules: [schedule("missing", { intervalDays: 90 })] } } });
     expect(errorsOf(unknown)["maintenance.schedules.0"]).toMatch(/category not found/i);
 
-    const duplicate = attempt(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { schedules: [schedule(world.categoryId, { intervalDays: 90 }), schedule(world.categoryId, { intervalDays: 60 })] } } });
+    const duplicate = attempt(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { blockOnOverdueService: false, schedules: [schedule(world.categoryId, { intervalDays: 90 }), schedule(world.categoryId, { intervalDays: 60 })] } } });
     expect(errorsOf(duplicate)["maintenance.schedules.1"]).toMatch(/only one schedule/);
 
-    const negative = attempt(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { schedules: [schedule(world.categoryId, { intervalDays: -1 })] } } });
+    const negative = attempt(world, world.admin, { type: "update_settings", input: { ...world.db.settings, maintenance: { blockOnOverdueService: false, schedules: [schedule(world.categoryId, { intervalDays: -1 })] } } });
     expect(errorsOf(negative)["maintenance.schedules.0"]).toMatch(/whole number/);
   });
 });
@@ -297,5 +297,41 @@ describe("migration", () => {
     expect(migrated.workOrders[0].resetsServiceInterval).toBe(false);
     expect(migrated.workOrders[0].completedAt).toBeNull();
     expect(lastServiceFor(migrated, world.vehicleId)).toBeNull();
+  });
+});
+
+describe("an overdue routine service, said in one sentence (Q-43, D-80)", () => {
+  it("says nothing while the vehicle is inside its interval, or when no schedule exists", () => {
+    const world = build();
+    // No schedule at all: "we never set an interval" is not "this service is overdue".
+    expect(overdueServiceFor(world.db, world.vehicleId, AS_OF)).toBeNull();
+
+    setSchedules(world, [schedule(world.categoryId, { intervalDays: 30 })]);
+    completeWorkOrder(world, world.vehicleId);
+    // 19 days after the service, inside a 30 day interval.
+    expect(overdueServiceFor(world.db, world.vehicleId, "2026-06-20")).toBeNull();
+  });
+
+  it("names the vehicle, how far past the interval it is, and when it was last serviced", () => {
+    const world = build();
+    setSchedules(world, [schedule(world.categoryId, { intervalDays: 30 })]);
+    completeWorkOrder(world, world.vehicleId);
+    const asOf = "2026-09-15";
+    // Readiness measures days remaining until the next service; negative means past the due date.
+    const row = readinessReport(world.db, asOf).vehicles.find((v) => v.vehicleId === world.vehicleId)!;
+    expect(row.status).toBe("overdue");
+    const days = Math.abs(row.bases[0].remaining);
+    expect(overdueServiceFor(world.db, world.vehicleId, asOf)).toBe(
+      `Vehicle GT 1-26 is overdue for routine service (${days} days past the 30 day interval). Last service: ${lastServiceFor(world.db, world.vehicleId)!.serviceDate}.`,
+    );
+  });
+
+  it("reads the kilometres basis the same way", () => {
+    const world = build();
+    setSchedules(world, [schedule(world.categoryId, { intervalKm: 10000 })]);
+    completeWorkOrder(world, world.vehicleId, { reportedOdometer: "120000" });
+    recordReading(world, world.vehicleId, "135000");
+    const sentence = overdueServiceFor(world.db, world.vehicleId, AS_OF);
+    expect(sentence).toMatch(/^Vehicle GT 1-26 is overdue for routine service \(5,000 km past the 10,000 km interval\)\. Last service: \d{4}-\d{2}-\d{2}\.$/);
   });
 });

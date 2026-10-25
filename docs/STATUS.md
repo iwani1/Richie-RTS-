@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–22** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, and so on | **All 23 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–30** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 31 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -42,7 +42,9 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
 - Company settings that start empty — nothing is invented, and a feature stays blocked until the rule
   it needs is set (tax position, deposit %, payment terms, vehicle categories).
 - Vehicles, drivers, corporate clients, compliance documents with expiry dates, odometer, service
-  intervals and a fleet-readiness view.
+  intervals and a fleet-readiness view. A vehicle past its service interval is named to the
+  dispatcher before it is chosen, and can be blocked outright with one setting; a safety defect
+  always takes it off the road.
 - CSV import for vehicles, drivers and clients: preview first, every rejected row named by line
   number, nothing merged or silently dropped.
 - Bus rentals: request → quotation (with revisions) → deposit → vehicle and driver assignment →

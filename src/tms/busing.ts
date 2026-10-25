@@ -4,6 +4,7 @@
 // enforces the trip state machine and writes an audit entry.
 
 import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
+import { overdueServiceFor } from "./maintenance";
 import { audit, authorise, fail, isValidDate, makeId, norm, TIME_RE, type Actor, type CommandResult, type Errors } from "./service";
 import { allocateReference } from "./references";
 import { mayActOnTrip } from "./scope";
@@ -362,13 +363,24 @@ function midRunCapacityErrors(db: Database, routeId: string | null, extraActive:
   return {};
 }
 
+/**
+ * Q-43 (D-80). An overdue routine service does not stop the work while the strict rule is off, so the
+ * only place to say it is the message the office reads after pressing the button. Naming the vehicle
+ * and the interval it has passed is the difference between a warning and noise.
+ */
+function serviceNotice(db: Database, vehicleId: string | null, today: string): string {
+  if (!vehicleId) return "";
+  const overdue = overdueServiceFor(db, vehicleId, today);
+  return overdue ? ` Note: ${overdue} Settings allows this because an overdue service only warns.` : "";
+}
+
 /** Dispatch and start have no fields to point at, so the reason has to be in the message itself. */
 function blockedReason(label: string, errors: Errors): string {
   const details = Object.values(errors).filter((text): text is string => Boolean(text));
   return details.length ? `${label} blocked: ${details.join(" ")}` : `${label} blocked: the assigned resources are no longer valid.`;
 }
 
-function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: string, driverId: string): Errors {
+function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: string, driverId: string, today: string): Errors {
   const errors: Errors = {};
 
   const vehicle = db.vehicles.find((v) => v.id === vehicleId);
@@ -382,6 +394,13 @@ function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: s
     // Mandatory papers are checked against the service date of the run (Q-16, D-76).
     const gaps = requiredDocumentGaps(db, "vehicle", vehicle.id, trip.serviceDate);
     if (gaps.length) errors.vehicleId = describeDocumentGaps(`Vehicle ${vehicle.registration}`, gaps);
+    else if (db.settings.maintenance.blockOnOverdueService) {
+      // Q-43 (D-80): a safety defect already took the vehicle out of service, so the only thing left
+      // to decide is a *routine* service. Overdue is judged as at today: it is a fact about the
+      // vehicle now, and a run arranged for next week is re-checked on the day it is dispatched.
+      const overdue = overdueServiceFor(db, vehicle.id, today);
+      if (overdue) errors.vehicleId = `${overdue} The vehicle cannot be used until it is serviced: Settings blocks an overdue service.`;
+    }
   }
 
   const driver = db.drivers.find((d) => d.id === driverId);
@@ -622,7 +641,8 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       if (existing.status !== "planned") return fail(`Only planned trips can be assigned (this trip is ${existing.status}).`);
       const route = db.routes.find((r) => r.id === existing.routeId);
       if (!route) return fail("Route not found.");
-      const errors = assessResources(db, route, existing, command.input.vehicleId, command.input.driverId);
+      const today = now.slice(0, 10);
+      const errors = assessResources(db, route, existing, command.input.vehicleId, command.input.driverId, today);
       if (Object.keys(errors).length) return fail("Assignment blocked. See the highlighted fields.", errors);
       const vehicle = db.vehicles.find((v) => v.id === command.input.vehicleId);
       const updated: Trip = { ...existing, vehicleId: command.input.vehicleId, driverId: command.input.driverId, updatedAt: now };
@@ -632,7 +652,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         entityId: updated.id,
         summary: `${updated.reference} assigned vehicle ${vehicle?.registration ?? "-"} and a driver.`,
       }, now);
-      return { ok: true, db: next, message: `${updated.reference} assigned.` };
+      return { ok: true, db: next, message: `${updated.reference} assigned.${serviceNotice(db, updated.vehicleId, today)}` };
     }
 
     case "dispatch_trip": {
@@ -645,7 +665,8 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       if (!route) return fail("Route not found.");
       if (route.status !== "active") return fail(`Route is ${route.status}; its trips cannot be dispatched.`);
       if (!existing.vehicleId || !existing.driverId) return fail("Assign a vehicle and a driver before dispatch.");
-      const errors = assessResources(db, route, existing, existing.vehicleId, existing.driverId);
+      const today = now.slice(0, 10);
+      const errors = assessResources(db, route, existing, existing.vehicleId, existing.driverId, today);
       if (Object.keys(errors).length) return fail(blockedReason("Dispatch", errors), errors);
       const updated: Trip = { ...existing, status: "dispatched", dispatchedAt: now, updatedAt: now };
       const next = audit({ ...db, trips: db.trips.map((t) => (t.id === updated.id ? updated : t)) }, actor, {
@@ -654,7 +675,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         entityId: updated.id,
         summary: `${updated.reference} dispatched.`,
       }, now);
-      return { ok: true, db: next, message: `${updated.reference} dispatched.` };
+      return { ok: true, db: next, message: `${updated.reference} dispatched.${serviceNotice(db, updated.vehicleId, today)}` };
     }
 
     case "start_trip": {
@@ -677,7 +698,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       if (new Date(today).getTime() - new Date(existing.serviceDate).getTime() > 86_400_000)
         return fail(`${existing.reference} was scheduled for ${existing.serviceDate}. Cancel it and generate the run you actually worked.`);
       if (!existing.vehicleId || !existing.driverId) return fail("The trip has no assigned vehicle and driver.");
-      const errors = assessResources(db, route, existing, existing.vehicleId, existing.driverId);
+      const errors = assessResources(db, route, existing, existing.vehicleId, existing.driverId, today);
       if (Object.keys(errors).length) return fail(blockedReason("Start", errors), errors);
       const updated: Trip = { ...existing, status: "in_progress", startedAt: now, updatedAt: now };
       const next = audit({ ...db, trips: db.trips.map((t) => (t.id === updated.id ? updated : t)) }, actor, {
@@ -686,7 +707,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         entityId: updated.id,
         summary: `${updated.reference} started by its assigned driver.`,
       }, now);
-      return { ok: true, db: next, message: `${updated.reference} started. Record each stop as you reach it.` };
+      return { ok: true, db: next, message: `${updated.reference} started. Record each stop as you reach it.${serviceNotice(db, updated.vehicleId, today)}` };
     }
 
     case "record_trip_stop": {

@@ -56,7 +56,7 @@ function seed(): { vehicleId: string } {
       invoiceDueDays: null,
       workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
       costCategories: ["Parts", "Labour", "Tyres"],
-      maintenance: { schedules: [] },
+      maintenance: { schedules: [], blockOnOverdueService: false },
     },
   });
   const categoryId = db.settings.vehicleCategories[0].id;

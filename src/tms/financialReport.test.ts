@@ -24,7 +24,7 @@ const settings = (overrides: Partial<Database["settings"]> = {}) => ({
   invoiceDueDays: 14,
   workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
   costCategories: ["Parts", "Labour"],
-  maintenance: { schedules: [] },
+  maintenance: { schedules: [], blockOnOverdueService: false },
   ...overrides,
 });
 

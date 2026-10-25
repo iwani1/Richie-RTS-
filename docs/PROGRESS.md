@@ -281,7 +281,7 @@ Totals in this session: **89 tests passing** across 11 test files; `npm run type
 | Settings card, readiness screen, odometer log and dashboard notice | Done (verified) | `FleetReadiness.test.tsx` |
 | Schema 6 to 7 migration never invents a legacy service | Done (verified) | `maintenance.test.ts` |
 | Scheduled email/SMS reminders | Blocked | No worker or provider; on-screen only |
-| Blocking dispatch on an overdue service | Blocked | Policy unanswered (Q-43) |
+| Blocking dispatch on an overdue service | Done in Phase 30 | Policy answered in Q-43; a setting (`blockOnOverdueService`) turns the warning into a block (D-75) |
 | Automatic odometer feeds (telematics) | Blocked | No provider configured (Q-45) |
 
 Totals in this session: **104 tests passing** across 13 test files; `npm run typecheck`,
@@ -639,7 +639,7 @@ in this phase: the answers are accepted-or-not first, and the code follows in th
 | Answered by confirming today's behaviour (no code) | Done | Q-19 no boarding codes, Q-33 drivers already report breakdowns, Q-45 hand-recorded odometer, Q-46 renewal uses current settings |
 | Answered by statement (no code) | Done | Q-01/Q-50 one office machine on the LAN, Caddy or nginx in front; Q-49 proprietary and private, `LICENSE` added and `README.md` updated |
 | Decisions recorded | Done | D-73 (the set), D-74 (a wrong trip entry is corrected, never edited), D-75 (safety defects block; an overdue routine service warns) |
-| **Code queued, in this order** | In progress | 1. Q-42 correction entries + `trips:correct` (Phase 24); 2. Q-47 cancel an in-progress run with a reason and optional incident (Phase 25); 3. Q-16 mandatory insurance and roadworthiness before assignment (Phase 26); 4. Q-38 several client contacts (Phase 27); 5. Q-34 work-type list and Q-29 report definitions, with RPT-03 (Phase 28); 6. Q-48 roster-change marker; 7. Q-43 the stricter dispatch switch |
+| **Code queued, in this order** | In progress | 1. Q-42 correction entries + `trips:correct` (Phase 24); 2. Q-47 cancel an in-progress run with a reason and optional incident (Phase 25); 3. Q-16 mandatory insurance and roadworthiness before assignment (Phase 26); 4. Q-38 several client contacts (Phase 27); 5. Q-34 work-type list and Q-29 report definitions, with RPT-03 (Phase 28); 6. Q-48 roster-change marker (Phase 29); 7. Q-43 the stricter dispatch switch (Phase 30) |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **328 passed, 14 skipped**, `build`
 succeeds. Documentation and one licence file only; no behaviour changed.
@@ -794,3 +794,27 @@ succeeds.
 
 Next on the queued list: Q-43, the stricter dispatch switch (safety blocks, overdue routine service
 warns).
+
+## Phase 30 - Safety blocks, an overdue service warns (item 7, Q-43 / D-75)
+
+The last of the queued answers. Readiness already reported an overdue service, and dispatch already
+ignored it — the decision was written down in D-75 but never built.
+
+| Item | Status | Evidence |
+|---|---|---|
+| The decision is a setting, off by default | Done (verified) | `MaintenanceSettings.blockOnOverdueService`, validated in `validateSettings` (only a stored `true` counts, so an older backup cannot start blocking), edited in Settings under Service schedules |
+| Safety still blocks, and is not a setting | Done (verified) | A breakdown, accident or safety concern puts the vehicle out of service; `assessResources` and `assign_rental` refuse anything not Available. The switch is never consulted on that path |
+| A warned vehicle still goes out, and is named | Done (verified) | `overdueServiceFor` (`src/tms/maintenance.ts`) writes one sentence: the vehicle, how far past which interval, and the last service date. Assignment, dispatch and start append it to their message (`busing.test.ts` "still lets the run go out while the strict rule is off"); a hire does the same (`service.test.ts` "treats an overdue routine service as a warning…") |
+| The dispatcher sees it before choosing | Done (verified) | Both assignment forms mark the vehicle "service overdue" in the list (jsdom test "says so in the vehicle list and in the message after dispatch") |
+| Turned on, it refuses the work | Done (verified) | Field error naming the vehicle at assignment, dispatch, start and hire assignment; "refuses assignment and dispatch once the strict rule is on" and the hire test's blocked case |
+| Re-checked on the day | Done (verified) | Dispatch and start re-run the same check, and a hire is re-checked when it starts, exactly like a lapsed certificate (hire test, "re-checked on the day") |
+| A vehicle that is merely due soon is left alone | Done (verified) | Only `overdue` is spoken about; "says nothing, and blocks nothing, for a vehicle that is merely due soon" |
+| No schedule is not an overdue service | Done (verified) | `overdueServiceFor` returns nothing when the category has no interval, so an unconfigured company is never blocked by a guess |
+| Tests | Done (verified) | 3 domain (`maintenance.test.ts`), 3 domain (`busing.test.ts`), 1 domain (`service.test.ts`), 1 screen (`Settings.test.tsx`), 1 jsdom (`Busing.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **411 passed, 16 skipped**, `build`
+succeeds.
+
+That closes the seven queued items from the recommended answers. What is left in the register is what
+needs the owner or a provider: the live-database repeat of the trial, bookings and contracts, SMS and
+GPS (no channel, no hardware), and VAT/GRA e-VAT (no rates supplied).

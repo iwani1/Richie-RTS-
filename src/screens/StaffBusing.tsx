@@ -4,6 +4,7 @@ import { TripStopForm } from "./TripStopForm";
 import { onTimeReport } from "../tms/kpis";
 import type { Permission } from "../tms/permissions";
 import type { CommandResult } from "../tms/service";
+import { readinessReport } from "../tms/maintenance";
 import { useTms } from "../tms/useTms";
 import {
   DIRECTIONS,
@@ -779,6 +780,8 @@ function AssignForm({ trip, route, onClose, onSubmit }: { trip: Trip; route: Bus
   const [errors, setErrors] = useState<Errors>({});
   const vehicles = db.vehicles.filter((v) => v.categoryId === route.vehicleCategoryId && v.status !== "retired");
   const drivers = db.drivers.filter((d) => d.status === "active");
+  // Q-43: the overdue service is named in the list itself, so the dispatcher sees it before choosing.
+  const overdue = new Set(readinessReport(db, todayYmd()).vehicles.filter((v) => v.status === "overdue").map((v) => v.vehicleId));
 
   return (
     <Panel title={`Assign ${trip.reference}`} description={`${route.name} on ${formatDate(trip.serviceDate)}. The system blocks overlapping runs and rental clashes.`} onClose={onClose}>
@@ -787,7 +790,9 @@ function AssignForm({ trip, route, onClose, onSubmit }: { trip: Trip; route: Bus
           <Select value={values.vehicleId} onChange={(e) => setValues({ ...values, vehicleId: e.target.value })} invalid={!!errors.vehicleId}>
             <option value="">Select a vehicle</option>
             {vehicles.map((v) => (
-              <option key={v.id} value={v.id}>{v.registration} ({v.seatCapacity} seats, {VEHICLE_STATUS_LABELS[v.status]})</option>
+              <option key={v.id} value={v.id}>
+                {v.registration} ({v.seatCapacity} seats, {VEHICLE_STATUS_LABELS[v.status]}){overdue.has(v.id) ? " - service overdue" : ""}
+              </option>
             ))}
           </Select>
         </Field>
