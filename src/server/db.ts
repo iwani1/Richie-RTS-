@@ -138,6 +138,8 @@ export interface TripRow {
   route_id: string;
   service_date: DateOnly;
   status: string;
+  /** `schedule` or `adhoc`; decides the partial unique index on (route_id, service_date) (D-82). */
+  origin: string;
   vehicle_id: string | null;
   driver_id: string | null;
   dispatched_at: Timestamp | null;

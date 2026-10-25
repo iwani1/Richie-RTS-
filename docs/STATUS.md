@@ -26,12 +26,12 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 | Phase | What it covers | Verdict |
 |---|---|---|
 | **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 9 fully met, 20 met but narrower than the brief, **0 unbuilt** |
-| **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, on-time reporting | **Mostly built.** 25 IDs: 5 met, 11 partial, 9 not built — the 9 are seat-level bookings (BKG-01…06), contracts, the route planning aid and emergency trip creation |
+| **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, on-time reporting | **Mostly built.** 25 IDs: 6 met, 11 partial, 8 not built — the 8 are seat-level bookings (BKG-01…06), contracts and the route planning aid |
 | **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Partly built.** 6 IDs: 4 partial, 2 not built (passenger portal, finance dashboard) |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
 | **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Not started.** 7 IDs, 6 deferred, 1 partial (cost entries without receipts) |
 
-Totals across all 78 brief requirements: **14 met · 39 partial · 11 not built · 14 deferred.**
+Totals across all 78 brief requirements: **15 met · 39 partial · 10 not built · 14 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -54,7 +54,9 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
 - Invoices numbered per year, with your tax lines, discounts, due dates, voiding, part payments and
   exact settlement. Money is computed in whole pesewas with one rounding rule.
 - Staff busing: routes, rosters, trip generation, dispatch, progressive boarding capture, on-time
-  reporting, mid-run passenger changes with a seat-capacity check.
+  reporting, mid-run passenger changes with a seat-capacity check, and a run created outside the
+  schedule when a bus fails or a one-off movement appears — with a written reason, and checked
+  exactly as a planned run is.
 - Staff logistics: incidents, work orders with costs, and a vehicle release that needs its own
   permission and records who released it and when.
 - Reports: rental report with a date range, coverage and CSV; fleet readiness; cost report;
@@ -66,7 +68,7 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
 
 ## What is not built
 
-**Whole features absent** (11 brief IDs):
+**Whole features absent** (10 brief IDs):
 
 | Missing | What it means in practice | Why |
 |---|---|---|
@@ -75,7 +77,6 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
 | Route planning aid (RTE-04) | Dispatchers choose vehicles manually; nothing suggests a plan | Phase 1B |
 | Finance dashboard (FIN-07) | Finance sees the operations dashboard; there is no money-only home screen | Phase 1C |
 | Passenger portal (PAX-01) | Passengers cannot sign in to see their own journeys | Phase 1C |
-| Emergency trip creation (DSP-03) | A trip exists only if a route generates it | Phase 1B |
 
 **Deferred to Phase 2/3** (14 IDs): SMS and email, in-app notifications, GPS tracking, two-factor
 sign-in, offline driver mode, boarding codes/OTP, payment gateway, payroll and driver allowances,

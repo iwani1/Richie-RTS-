@@ -711,6 +711,34 @@ describe("staff busing - migration", () => {
     }
   });
 
+  it("loads an older trip as a scheduled run, and keeps an ad hoc run's reason", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    const tripId = generate(w, routeId, "2026-06-15");
+    const oldTrip = { ...w.db.trips.find((trip) => trip.id === tripId)! } as Record<string, unknown>;
+    // Backups written before DSP-03 have no origin at all on their trips.
+    delete oldTrip.origin;
+    delete oldTrip.originReason;
+    const legacy = { ...w.db, schemaVersion: 12, trips: [oldTrip] } as unknown as Database;
+    const loaded = executeCommand(w.db, actorOf(w.db, "admin"), { type: "import_backup", database: legacy }, NOW);
+    expect(loaded.ok).toBe(true);
+    if (loaded.ok) {
+      expect(loaded.db.trips[0].origin).toBe("schedule");
+      expect(loaded.db.trips[0].originReason).toBeNull();
+    }
+
+    // A run created outside the schedule survives a round trip with its reason intact.
+    const adhoc = attempt(w, "ops", { type: "create_adhoc_trip", input: { routeId, serviceDate: "2026-06-20", reason: "Replacement bus.", vehicleId: "", driverId: "" } });
+    if (!adhoc.ok) throw new Error(adhoc.message);
+    const again = executeCommand(adhoc.db, actorOf(adhoc.db, "admin"), { type: "import_backup", database: adhoc.db }, NOW);
+    expect(again.ok).toBe(true);
+    if (again.ok) {
+      const kept = again.db.trips.find((trip) => trip.serviceDate === "2026-06-20")!;
+      expect(kept.origin).toBe("adhoc");
+      expect(kept.originReason).toBe("Replacement bus.");
+    }
+  });
+
   it("imports a schema-9 backup and backfills startedAt without changing existing trip state", () => {
     const w = build();
     const routeId = createRoute(w);
@@ -1333,5 +1361,127 @@ describe("an overdue routine service warns, and blocks only when asked to (Q-43,
     const assigned = attempt(w, "ops", assign);
     expect(assigned.ok).toBe(true);
     if (assigned.ok) expect(assigned.message).not.toContain("overdue");
+  });
+});
+
+describe("a run outside the schedule (DSP-03, D-82)", () => {
+  const adhoc = (w: World, over: Partial<{ routeId: string; serviceDate: string; reason: string; vehicleId: string; driverId: string }> = {}) => ({
+    type: "create_adhoc_trip" as const,
+    input: { routeId: w.db.routes[0].id, serviceDate: "2026-06-01", reason: "Bus broke down before the first stop.", vehicleId: "", driverId: "", ...over },
+  });
+
+  it("creates a run on a day the route does not operate, and keeps the reason", () => {
+    const w = build();
+    // A route that runs Monday to Friday: 2026-06-06 is a Saturday.
+    const routeId = createRoute(w, { weekdays: [1, 2, 3, 4, 5] });
+    const generated = attempt(w, "ops", { type: "generate_trips", routeId, fromDate: "2026-06-06", toDate: "2026-06-06" });
+    expect(generated.ok).toBe(false);
+    expect(generated.ok ? "" : generated.message).toMatch(/no operating dates/);
+
+    const created = attempt(w, "ops", adhoc(w, { routeId, serviceDate: "2026-06-06", reason: "Saturday evacuation rehearsal." }));
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const trip = created.db.trips[0];
+    expect(trip.origin).toBe("adhoc");
+    expect(trip.originReason).toBe("Saturday evacuation rehearsal.");
+    expect(trip.status).toBe("planned");
+    expect(trip.stopLogs).toEqual([]);
+    expect(created.message).toMatch(/created as an ad hoc run/);
+    expect(created.db.audit[0].action).toBe("trips:adhoc");
+    expect(created.db.audit[0].summary).toMatch(/outside the schedule.*Saturday evacuation rehearsal/);
+  });
+
+  it("lets a replacement run exist beside the scheduled one that was cancelled", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    const tripId = generate(w, routeId, "2026-06-01");
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "cancel_trip", id: tripId, reason: "Bus would not start." });
+
+    const created = attempt(w, "ops", adhoc(w, { routeId, serviceDate: "2026-06-01", reason: "Replacement for the run that would not start." }));
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const runs = created.db.trips.filter((t) => t.routeId === routeId && t.serviceDate === "2026-06-01");
+    expect(runs).toHaveLength(2);
+    expect(runs.filter((t) => t.origin === "schedule")).toHaveLength(1);
+    expect(runs.filter((t) => t.origin === "adhoc")).toHaveLength(1);
+  });
+
+  it("refuses a second ad hoc run for the same route and date", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    step(w, "ops", adhoc(w, { routeId, reason: "One off." }));
+    const again = attempt(w, "ops", adhoc(w, { routeId, reason: "Pressed twice." }));
+    expect(again.ok).toBe(false);
+    if (again.ok) return;
+    expect(again.message).toMatch(/already an ad hoc run for/);
+    expect(again.errors.routeId).toMatch(/already exists/);
+  });
+
+  it("requires a reason, a real date, and a date that has not passed", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    const noReason = attempt(w, "ops", adhoc(w, { routeId, reason: "   " }));
+    expect(noReason.ok).toBe(false);
+    if (!noReason.ok) expect(noReason.errors.reason).toMatch(/Say why this run is needed/);
+
+    const gone = attempt(w, "ops", adhoc(w, { routeId, serviceDate: "2026-05-31", reason: "Late entry." }));
+    expect(gone.ok).toBe(false);
+    if (!gone.ok) expect(gone.errors.serviceDate).toMatch(/date that has passed/);
+
+    const nonsense = attempt(w, "ops", adhoc(w, { routeId, serviceDate: "next Tuesday", reason: "Typo." }));
+    expect(nonsense.ok).toBe(false);
+    if (!nonsense.ok) expect(nonsense.errors.serviceDate).toBeDefined();
+
+    const noRoute = attempt(w, "ops", adhoc(w, { routeId: "", reason: "No route." }));
+    expect(noRoute.ok).toBe(false);
+    if (!noRoute.ok) expect(noRoute.errors.routeId).toMatch(/Choose the route/);
+
+    const unknownRoute = attempt(w, "ops", adhoc(w, { routeId: "nope", reason: "Unknown route." }));
+    expect(unknownRoute.ok).toBe(false);
+    if (!unknownRoute.ok) expect(unknownRoute.errors.routeId).toMatch(/Unknown route/);
+
+    // A route that has ended cannot gain a run: there is no roster left to serve.
+    step(w, "ops", { type: "update_route", id: routeId, input: { ...asInput(w.db.routes[0]), status: "ended" } });
+    const ended = attempt(w, "ops", adhoc(w, { routeId, reason: "Ended route." }));
+    expect(ended.ok).toBe(false);
+    if (!ended.ok) expect(ended.errors.routeId).toMatch(/Route is ended/);
+  });
+
+  it("checks the vehicle and driver the same way assignment would", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    // The minibus is a different category from the route, so it cannot run it.
+    const minibus = w.db.vehicles[2].id;
+    const wrongCategory = attempt(w, "ops", adhoc(w, { routeId, vehicleId: minibus, driverId: w.db.drivers[0].id }));
+    expect(wrongCategory.ok).toBe(false);
+    if (!wrongCategory.ok) expect(wrongCategory.errors.vehicleId).toMatch(/category does not match/);
+
+    const halfAssigned = attempt(w, "ops", adhoc(w, { routeId, vehicleId: w.db.vehicles[0].id }));
+    expect(halfAssigned.ok).toBe(false);
+    if (!halfAssigned.ok) expect(halfAssigned.errors.driverId).toMatch(/Choose a driver/);
+
+    const full = attempt(w, "ops", adhoc(w, { routeId, vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id }));
+    expect(full.ok).toBe(true);
+    if (full.ok) expect(full.db.trips[0].vehicleId).toBe(w.db.vehicles[0].id);
+  });
+
+  it("is dispatch work, so a driver and finance cannot create one", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    for (const who of ["finance", "driver"] as const) {
+      const denied = attempt(w, who, adhoc(w, { routeId, reason: "Not my job." }));
+      expect(denied.ok).toBe(false);
+      if (!denied.ok) expect(denied.message).toMatch(/Not permitted/);
+    }
+  });
+
+  it("does not stop the normal schedule being generated for the same day", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    step(w, "ops", adhoc(w, { routeId, reason: "Extra run for a meeting." }));
+    step(w, "ops", { type: "generate_trips", routeId, fromDate: "2026-06-01", toDate: "2026-06-01" });
+    const runs = w.db.trips.filter((t) => t.routeId === routeId && t.serviceDate === "2026-06-01");
+    expect(runs.map((t) => t.origin).sort()).toEqual(["adhoc", "schedule"]);
   });
 });

@@ -394,12 +394,31 @@ export interface RosterChange {
   summary: string;
 }
 
+/**
+ * Where a run came from (DSP-03, D-82).
+ *
+ * `schedule` — the route's operating days produced it, one per route per date, and that is still
+ * guaranteed by a partial unique index. `adhoc` — a dispatcher created it by hand for a day the
+ * schedule did not cover, or to replace a run that could not go out; it needs a written reason and
+ * is allowed alongside the scheduled run for the same route and date.
+ */
+export const TRIP_ORIGINS = ["schedule", "adhoc"] as const;
+export type TripOrigin = (typeof TRIP_ORIGINS)[number];
+export const TRIP_ORIGIN_LABELS: Record<TripOrigin, string> = {
+  schedule: "Scheduled",
+  adhoc: "Ad hoc",
+};
+
 export interface Trip {
   id: string;
   reference: string; // TR-0001
   routeId: string;
   serviceDate: string; // YYYY-MM-DD
   status: TripStatus;
+  /** How this run came to exist. Older stored runs load as `schedule` (they were). */
+  origin: TripOrigin;
+  /** Why an ad hoc run was needed. Null on a scheduled run, required on an ad hoc one. */
+  originReason: string | null;
   vehicleId: string | null;
   driverId: string | null;
   dispatchedAt: string | null;
@@ -780,6 +799,8 @@ export function migrate(value: unknown): Database | null {
           // Records written before corrections existed simply have none.
           corrections: Array.isArray(trip.corrections) ? trip.corrections : [],
           rosterChanges: Array.isArray(trip.rosterChanges) ? trip.rosterChanges : [],
+          origin: trip.origin === "adhoc" ? ("adhoc" as const) : ("schedule" as const),
+          originReason: typeof trip.originReason === "string" && trip.originReason !== "" ? trip.originReason : null,
           // Likewise for a run stopped mid-way: older records only carry the reason.
           cancelledAt: trip.cancelledAt ?? null,
           cancelledBy: trip.cancelledBy ?? null,

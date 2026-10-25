@@ -79,6 +79,8 @@ const trip = (id: string, driverId: string, vehicleId: string, routeId: string):
   boardings: [],
   onTimeThresholdMinutes: null,
   corrections: [], rosterChanges: [],
+  origin: "schedule",
+  originReason: null,
   createdAt: at,
   updatedAt: at,
 });

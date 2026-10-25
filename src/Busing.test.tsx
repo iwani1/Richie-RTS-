@@ -275,3 +275,41 @@ describe("importing a roster from the passengers tab (EMP-02)", () => {
     expect(await within(dialog).findByText(/already exists for this client/i)).toBeTruthy();
   });
 });
+
+describe("a run outside the schedule, from the dispatch screen (DSP-03)", () => {
+  it("creates a run for a day the route does not operate and shows it with its reason", async () => {
+    seed();
+    await renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: /Staff busing/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Trips$/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Add an ad hoc run/i }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/Add a run outside the schedule/i)).toBeTruthy();
+
+    // A date the seeded route does operate on, so the run sits beside a scheduled one.
+    const today = new Date().toISOString().slice(0, 10);
+    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: today } });
+    fireEvent.change(within(dialog).getByLabelText(/Why is this run needed/i), { target: { value: "Second bus for the audit team." } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Create run/i }));
+
+    // The run appears on the sheet, marked as an exception with the reason the dispatcher typed.
+    expect(await screen.findByText(/Second bus for the audit team\./)).toBeTruthy();
+    expect(screen.getAllByText(/ad hoc/).length).toBeGreaterThan(0);
+  });
+
+  it("refuses a run with no reason, and keeps the dialog open", async () => {
+    seed();
+    await renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: /Staff busing/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Trips$/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Add an ad hoc run/i }));
+
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: /Create run/i }));
+    expect(await within(dialog).findByText(/Say why this run is needed/i)).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+});

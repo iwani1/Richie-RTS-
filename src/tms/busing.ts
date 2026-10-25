@@ -33,6 +33,7 @@ export const BUSING_COMMAND_TYPES = [
   "create_passenger",
   "update_passenger",
   "generate_trips",
+  "create_adhoc_trip",
   "assign_trip",
   "dispatch_trip",
   "start_trip",
@@ -81,6 +82,20 @@ export interface CompleteTripInput {
   boardings: { passengerId: string; outcome: BoardingOutcome }[];
 }
 
+/**
+ * A run that the schedule did not produce (DSP-03, D-82). The reason is not optional: an out-of-
+ * schedule run is an exception, and the record has to say why it happened while the people who know
+ * are still in the room.
+ */
+export interface AdhocTripInput {
+  routeId: string;
+  serviceDate: string;
+  reason: string;
+  /** Both or neither. A run can be created before a vehicle is free and assigned later. */
+  vehicleId: string;
+  driverId: string;
+}
+
 export interface ProgressiveStopInput {
   stopId: string;
   actualTime: string;
@@ -107,6 +122,7 @@ export type BusingCommand =
   | { type: "create_passenger"; input: PassengerInput }
   | { type: "update_passenger"; id: string; input: PassengerInput }
   | { type: "generate_trips"; routeId: string; fromDate: string; toDate: string }
+  | { type: "create_adhoc_trip"; input: AdhocTripInput }
   | { type: "assign_trip"; id: string; input: TripAssignInput }
   | { type: "dispatch_trip"; id: string }
   | { type: "start_trip"; id: string }
@@ -595,7 +611,9 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         if (date < route.startDate) continue;
         if (route.endDate && date > route.endDate) continue;
         if (!route.weekdays.includes(weekdayOf(date))) continue;
-        if (db.trips.some((t) => t.routeId === route.id && t.serviceDate === date)) continue;
+        // Only a scheduled run blocks generation. An ad hoc run on that date was created for a
+        // reason (DSP-03) and must not suppress the day's normal service.
+        if (db.trips.some((t) => t.routeId === route.id && t.serviceDate === date && t.origin === "schedule")) continue;
         const allocated = allocateReference({ ...db, referenceCounters: counters }, "trip", now.slice(0, 4));
         counters = allocated.counters;
         created.push({
@@ -618,6 +636,8 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
           onTimeThresholdMinutes: null,
           corrections: [],
           rosterChanges: [],
+          origin: "schedule",
+          originReason: null,
           createdAt: now,
           updatedAt: now,
         });
@@ -631,6 +651,94 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         summary: `${created.length} trip(s) generated for ${route.reference} (${command.fromDate} to ${command.toDate}).`,
       }, now);
       return { ok: true, db: next, message: `${created.length} trip(s) generated for ${route.reference}.` };
+    }
+
+    case "create_adhoc_trip": {
+      // Dispatch work, not planning work: the person who has to get people to work today creates it.
+      const denied = authorise(actor, "trips:dispatch");
+      if (denied) return denied;
+      const { routeId, serviceDate, reason, vehicleId, driverId } = command.input;
+      const errors: Errors = {};
+
+      const route = db.routes.find((r) => r.id === routeId);
+      if (!routeId) errors.routeId = "Choose the route this run serves.";
+      else if (!route) errors.routeId = "Unknown route.";
+      else if (route.status !== "active") errors.routeId = `Route is ${route.status}; a run cannot be created for it.`;
+
+      // Today or later. Yesterday's work is recorded as it happened, not invented afterwards.
+      if (!isValidDate(serviceDate)) errors.serviceDate = "Enter a valid date.";
+      else if (serviceDate < now.slice(0, 10)) errors.serviceDate = "A run cannot be created for a date that has passed.";
+      else if (inclusiveDays(now.slice(0, 10), serviceDate) > MAX_GENERATE_DAYS)
+        errors.serviceDate = `Create a run at most ${MAX_GENERATE_DAYS} days ahead.`;
+
+      const why = reason.trim();
+      if (!why) errors.reason = "Say why this run is needed. The reason is part of the record.";
+
+      if (vehicleId || driverId) {
+        if (!vehicleId) errors.vehicleId = "Choose a vehicle, or leave both blank and assign one later.";
+        if (!driverId) errors.driverId = "Choose a driver, or leave both blank and assign one later.";
+      }
+
+      if (Object.keys(errors).length) return fail("This run cannot be created yet.", errors);
+
+      // One ad hoc run per route per date: a second press of the button, or a second dispatcher on
+      // the same problem, must not quietly produce two runs and two sets of drivers' instructions.
+      const twin = db.trips.find((t) => t.routeId === routeId && t.serviceDate === serviceDate && t.origin === "adhoc");
+      if (twin)
+        return fail(
+          `${twin.reference} is already an ad hoc run for ${route!.reference} on ${serviceDate}. Use that run rather than creating another.`,
+          { routeId: "An ad hoc run already exists for this route and date." },
+        );
+
+      // A run created with a vehicle is checked exactly as a planned run would be: papers, capacity,
+      // licence, overlaps and rental clashes all apply on the day, not at the moment of creation.
+      const draft: Trip = {
+        id: makeId(),
+        reference: "-",
+        routeId,
+        serviceDate,
+        status: "planned",
+        origin: "adhoc",
+        originReason: why,
+        vehicleId: vehicleId || null,
+        driverId: driverId || null,
+        dispatchedAt: null,
+        startedAt: null,
+        completedAt: null,
+        cancelReason: null,
+        cancelledAt: null,
+        cancelledBy: null,
+        incidentId: null,
+        stopLogs: [],
+        boardings: [],
+        onTimeThresholdMinutes: null,
+        corrections: [],
+        rosterChanges: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (vehicleId && driverId && route) {
+        const resourceErrors = assessResources(db, route, draft, vehicleId, driverId, now.slice(0, 10));
+        if (Object.keys(resourceErrors).length) return fail("This run cannot be created with that vehicle and driver.", resourceErrors);
+      }
+
+      const allocated = allocateReference(db, "trip", now.slice(0, 4));
+      const created: Trip = { ...draft, reference: allocated.reference };
+      const vehicle = vehicleId ? db.vehicles.find((v) => v.id === vehicleId) : null;
+      const next = audit(
+        { ...db, referenceCounters: allocated.counters, trips: [...db.trips, created] },
+        actor,
+        {
+          action: "trips:adhoc",
+          entity: "trip",
+          entityId: created.id,
+          summary: `${created.reference} created outside the schedule for ${route!.reference} on ${serviceDate}: ${why}${
+            vehicle ? ` Vehicle ${vehicle.registration}.` : ""
+          }`,
+        },
+        now,
+      );
+      return { ok: true, db: next, message: `${created.reference} created as an ad hoc run for ${route!.reference} on ${serviceDate}.` };
     }
 
     case "assign_trip": {

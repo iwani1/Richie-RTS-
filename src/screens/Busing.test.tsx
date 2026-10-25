@@ -84,6 +84,8 @@ const trip: Trip = {
   onTimeThresholdMinutes: 5,
   corrections: [],
   rosterChanges: [],
+  origin: "schedule",
+  originReason: null,
   createdAt: at,
   updatedAt: at,
 };

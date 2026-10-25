@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { MAX_GENERATE_DAYS, type CompleteTripInput, type PassengerInput, type RouteInput, type TripAssignInput, type TripCorrectionInput } from "../tms/busing";
+import { MAX_GENERATE_DAYS, type AdhocTripInput, type CompleteTripInput, type PassengerInput, type RouteInput, type TripAssignInput, type TripCorrectionInput } from "../tms/busing";
 import { TripStopForm } from "./TripStopForm";
 import { onTimeReport } from "../tms/kpis";
 import type { Permission } from "../tms/permissions";
@@ -546,6 +546,7 @@ function TripsTab() {
   const { db, allowed, dispatch, setFlash } = useTms();
   const [date, setDate] = useState(todayYmd());
   const [panel, setPanel] = useState<{ mode: "assign" | "complete" | "stop" | "cancel" | "correct"; trip: Trip } | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const trips = db.trips.filter((t) => t.serviceDate === date).sort((a, b) => a.reference.localeCompare(b.reference));
   const routeOf = (routeId: string) => db.routes.find((r) => r.id === routeId);
@@ -605,6 +606,11 @@ function TripsTab() {
           <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
         <Button onClick={() => setDate(todayYmd())}>Today</Button>
+        {allowed("trips:dispatch") && (
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            Add an ad hoc run
+          </Button>
+        )}
         <p className="rts-toolbar-note">
           {trips.length} run{trips.length === 1 ? "" : "s"} on {formatDate(date)}
           {trips.length > 0 && ` · first at ${startOf(trips[0]) || "—"}`}
@@ -623,7 +629,10 @@ function TripsTab() {
 
           {trips.length === 0 ? (
             <div className="rts-card-body">
-              <EmptyState title="No trips on this date" body="Generate trips from a route on the Routes tab. Nothing is scheduled automatically." />
+              <EmptyState
+                title="No trips on this date"
+                body="Generate trips from a route on the Routes tab. Nothing is scheduled automatically. If a bus is needed outside the schedule, add an ad hoc run."
+              />
             </div>
           ) : (
             <div className="rts-runs">
@@ -646,6 +655,13 @@ function TripsTab() {
                         )}
                         {t.rosterChanges.length > 0 && (
                           <span className="rts-run-ref"> · roster changed {t.rosterChanges.length}×</span>
+                        )}
+                        {/* DSP-03: an out-of-schedule run says so, and says why, on the sheet itself. */}
+                        {t.origin === "adhoc" && (
+                          <>
+                            <span className="rts-run-ref rts-run-ref--adhoc">{" "}ad hoc</span>
+                            {t.originReason && <span className="rts-run-why"> · {t.originReason}</span>}
+                          </>
                         )}
                       </p>
                       <p className="rts-run-crew">
@@ -768,6 +784,22 @@ function TripsTab() {
           }}
         />
       )}
+      {creating && (
+        <AdhocForm
+          defaultDate={date}
+          onClose={() => setCreating(false)}
+          onSubmit={async (input) => {
+            const result = await dispatch({ type: "create_adhoc_trip", input });
+            report(result);
+            if (result.ok) {
+              setCreating(false);
+              // Show the day the run was made for, so the dispatcher sees the thing they just created.
+              setDate(input.serviceDate);
+            }
+            return result.ok ? {} : result.errors;
+          }}
+        />
+      )}
       {panel && panel.mode === "cancel" && (
         <CancelForm
           trip={panel.trip}
@@ -781,6 +813,85 @@ function TripsTab() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * An ad hoc run (DSP-03). Three things have to be true and the form asks for all three plainly: which
+ * route, which day, and why. The vehicle and driver are optional because a run is often created while
+ * the only free bus is still out; it can be assigned once it comes back.
+ */
+function AdhocForm({
+  defaultDate,
+  onClose,
+  onSubmit,
+}: {
+  defaultDate: string;
+  onClose: () => void;
+  onSubmit: (input: AdhocTripInput) => Errors | Promise<Errors>;
+}) {
+  const { db } = useTms();
+  const routes = db.routes.filter((r) => r.status === "active");
+  const [values, setValues] = useState<AdhocTripInput>({ routeId: routes[0]?.id ?? "", serviceDate: defaultDate, reason: "", vehicleId: "", driverId: "" });
+  const [errors, setErrors] = useState<Errors>({});
+  const route = db.routes.find((r) => r.id === values.routeId);
+  const vehicles = db.vehicles.filter((v) => v.status !== "retired" && (!route || v.categoryId === route.vehicleCategoryId));
+  const drivers = db.drivers.filter((d) => d.status === "active");
+
+  return (
+    <Panel
+      title="Add a run outside the schedule"
+      description="For a day the route does not operate, or to replace a run that could not go out. It carries its own reference and appears on the run sheet like any other run."
+      onClose={onClose}
+    >
+      <form onSubmit={async (e) => { e.preventDefault(); setErrors(await onSubmit(values)); }} className="space-y-4">
+        {routes.length === 0 ? (
+          <Notice tone="warning">No active routes exist. Create a route first: a run always serves a route's roster.</Notice>
+        ) : (
+          <>
+            <Field label="Route" error={errors.routeId}>
+              <Select value={values.routeId} onChange={(e) => setValues({ ...values, routeId: e.target.value, vehicleId: "", driverId: "" })} invalid={!!errors.routeId}>
+                {routes.map((r) => (
+                  <option key={r.id} value={r.id}>{r.reference} · {r.name}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Date" hint="Today or later. A date that has passed is recorded as it happened, not invented." error={errors.serviceDate}>
+              <TextInput type="date" value={values.serviceDate} onChange={(e) => setValues({ ...values, serviceDate: e.target.value })} invalid={!!errors.serviceDate} />
+            </Field>
+            {route && !route.weekdays.includes(new Date(`${values.serviceDate}T00:00:00Z`).getUTCDay()) && values.serviceDate && (
+              <Notice tone="info">This route does not normally operate on that day, which is exactly what an ad hoc run is for.</Notice>
+            )}
+            <Field label="Why is this run needed?" hint="Kept with the run and in the audit log." error={errors.reason}>
+              <TextInput value={values.reason} onChange={(e) => setValues({ ...values, reason: e.target.value })} invalid={!!errors.reason} placeholder="Replacement for TR-0004, which would not start" />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Vehicle (optional)" error={errors.vehicleId}>
+                <Select value={values.vehicleId} onChange={(e) => setValues({ ...values, vehicleId: e.target.value })} invalid={!!errors.vehicleId}>
+                  <option value="">Assign later</option>
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>{v.registration} ({v.seatCapacity} seats, {VEHICLE_STATUS_LABELS[v.status]})</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Driver (optional)" error={errors.driverId}>
+                <Select value={values.driverId} onChange={(e) => setValues({ ...values, driverId: e.target.value })} invalid={!!errors.driverId}>
+                  <option value="">Assign later</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>{d.fullName}</option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <Notice tone="info">The same checks apply as for any run: papers, category, seats, licence and double-booking. Only one ad hoc run can exist per route per day.</Notice>
+          </>
+        )}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={routes.length === 0}>Create run</Button>
+        </div>
+      </form>
+    </Panel>
   );
 }
 

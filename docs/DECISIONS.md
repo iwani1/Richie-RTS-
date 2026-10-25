@@ -1100,3 +1100,31 @@ decision the office makes, not one the system invents.
   marked **Check**, with both references named in the preview and a count in the import message. The
   operator decides. Route and stop must be given together: a rider may be imported with no route (a
   roster is often typed before the runs exist) but not onto a route with nowhere to be picked up.
+
+## D-82 A run can exist outside the schedule, and it has to say why
+
+- **Context.** DSP-03. Until now a trip existed only because a route generated one, and the database
+  enforced "one trip per route per service date" with a unique index. That is right for generation and
+  wrong in two real cases: a bus that will not start at 05:30 leaves a cancelled run and sixty people
+  with no way to work, and a one-off movement (a Saturday shift, an extra run for a meeting) has no
+  day in the schedule to live on. The office's only workaround was to fake a route, which corrupts the
+  register.
+- **Decision.** A dispatcher with `trips:dispatch` can create a run **outside the schedule**: any date
+  from today onward, a route, and a **written reason**. It gets its own TR number, sits on the run
+  sheet like any other run, and is marked "ad hoc" with its reason beside it. The database rule is
+  **narrowed, not deleted** (migration 006): a partial unique index keeps *scheduled* runs to one per
+  route per date, so an emergency run can stand next to the day's scheduled run — which is exactly the
+  replacement case.
+- **Rejected.** Dropping the unique index outright (two runs generated for the same route and day is
+  the bug it was written for, and generation would stop being idempotent). Allowing a replacement only
+  by editing the cancelled run's date or route (it rewrites history: the cancelled run never happened
+  on another day). Requiring a vehicle and driver up front (in a breakdown the only free bus is often
+  still out; a run that exists unassigned can be filled in ten minutes). Allowing yesterday (a run for
+  a date that has passed is a retrospective claim; the honest record for work already done is a
+  correction to the run that happened). Two ad hoc runs for the same route and date (a second press
+  of the button, or two dispatchers on the same problem, would produce two sets of driver
+  instructions).
+- **Consequence.** The same checks run whether a run was generated or created by hand: vehicle
+  category, seats against the roster, mandatory papers, licence expiry, time overlaps and rental
+  clashes. A route's normal generation is unaffected by an ad hoc run on the same date — the schedule
+  is the schedule. The reason is in the run, in the audit entry (`trips:adhoc`) and on the run sheet.

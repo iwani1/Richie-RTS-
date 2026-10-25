@@ -160,6 +160,8 @@ describe("operations board", () => {
       onTimeThresholdMinutes: null,
       corrections: [],
     rosterChanges: [],
+    origin: "schedule",
+    originReason: null,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     };

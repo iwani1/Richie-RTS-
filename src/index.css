@@ -1437,6 +1437,11 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   white-space: nowrap;
 }
 
+/* An ad hoc run is not an error, but it is an exception: the marker is a quiet amber, never the
+   only thing that says so (the reason is in the run's title attribute and in the audit log). */
+.rts-run-ref--adhoc { background: #fdf3dc; color: #7a4c05; }
+.rts-run-why { color: #7a4c05; }
+
 .rts-run-meta { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 
 .rts-run-crew { display: flex; flex-direction: column; gap: 1px; margin: 0; min-width: 0; color: var(--ink-2); font-size: 11.5px; line-height: 1.45; }

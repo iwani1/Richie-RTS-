@@ -64,7 +64,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | TRP-02 | 1B | Passenger manifests. | Met | Per-trip manifest from the route roster with boarding outcomes. |
 | DSP-01 | 1B | Daily dispatch board (table or calendar): today's trips, upcoming departures, active, completed, delayed, cancelled, unassigned bookings, available… | Partial | Today's departures on the dashboard plus a filterable trip table. **No calendar, no unassigned list, no capacity-warning panel, no maintenance-block view.** |
 | DSP-02 | 1B | Assign and reassign vehicle and driver, validating availability, qualifications, vehicle condition, capacity and conflicts. Overrides need permission… | Partial | Validation of category, status, roster capacity, licence expiry, time overlaps, rental clashes, vehicle/driver double-booking. **No permission-and-reason override.** |
-| DSP-03 | 1B | Emergency trip creation. | Not built | A trip exists only if a route generates it. |
+| DSP-03 | 1B | Emergency trip creation. | Met | `create_adhoc_trip` (Phase 32, D-82): a run outside the schedule for any date from today, with a written reason and its own TR number; migration 006 narrows the one-per-day index to scheduled runs so a replacement can stand beside the cancelled one. Created from **Add an ad hoc run** on the Trips tab, marked "ad hoc" with its reason on the run sheet, and checked exactly as a planned run is. |
 | DSP-04 | 1B | Record no-shows and delays; cancel or interrupt trips. | Partial | No-show recorded per passenger; trips can be cancelled with a reason. **No delay recording, no interruption, no repair transition.** |
 | DRV-01 | 1B | Mobile-first driver home: profile, today's assignments, next trip, departure time, route and stops, passenger count, vehicle, alerts, history. | Met | Driver portal: today's assignments, next departure, route and stops, passenger count, vehicle, history. |
 | DRV-02 | 1B | Driver actions: open trip, view manifest, open external navigation, mark ready, start, confirm boarding, record no-show, confirm drop-off, report… | Partial | Open trip, manifest, start, board, no-show, complete. **No external navigation, no mark-ready, no delay report, and no idempotency key (5.8).** |
@@ -839,4 +839,27 @@ rather than with a second importer.
 | Tests | Done (verified) | 8 domain (`import.test.ts` "importing a staff roster"), 1 jsdom (`Busing.test.tsx`) |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **420 passed, 16 skipped**, `build`
+succeeds.
+
+## Phase 32 - A run outside the schedule (DSP-03, D-82)
+
+The register's last self-contained dispatch gap: a trip existed only if a route generated one, so a
+bus that would not start at 05:30 left a cancelled run and nowhere to put the replacement, and a
+one-off movement had no day to live on.
+
+| Item | Status | Evidence |
+|---|---|---|
+| A run can be created for a date the schedule does not cover | Done (verified) | `create_adhoc_trip` (`src/tms/busing.ts`); a Saturday on a Monday–Friday route is accepted while generation refuses it ("creates a run on a day the route does not operate") |
+| The reason is part of the record | Done (verified) | `Trip.originReason`; empty reason refused; the reason is in the run sheet, the audit entry `trips:adhoc` and the success message |
+| A replacement can stand beside the cancelled scheduled run | Done (verified) | Migration `006_adhoc_trips.sql`: the unique index on `(route_id, service_date)` became partial (`where origin = 'schedule'`), plus `Trip.origin` and a check constraint. Test "lets a replacement run exist beside the scheduled one that was cancelled" |
+| Generation is still one per route per day | Done (verified) | The partial index, and `generate_trips` now ignores an ad hoc run when deciding what already exists ("does not stop the normal schedule being generated for the same day") |
+| No second ad hoc run for the same route and date | Done (verified) | "refuses a second ad hoc run for the same route and date", naming the existing reference |
+| The same dispatch checks apply | Done (verified) | Vehicle category, seats, papers, licence, overlaps, rental clashes via `assessResources`; "checks the vehicle and driver the same way assignment would" |
+| Only from today, and not far ahead | Done (verified) | A past date is refused with "recorded as it happened, not invented"; the 62-day generation window is reused |
+| Dispatch work, not planning work | Done (verified) | `trips:dispatch`; finance and drivers refused ("is dispatch work, so a driver and finance cannot create one") |
+| Old backups load as scheduled runs | Done (verified) | Legacy default in the loader; "loads an older trip as a scheduled run, and keeps an ad hoc run's reason" |
+| From the dispatch screen | Done (verified) | **Add an ad hoc run** on the Trips tab opens a panel (route, date, reason, optional vehicle and driver); the run sheet marks it "ad hoc" with the reason (jsdom tests "creates a run for a day the route does not operate…", "refuses a run with no reason…") |
+| Tests | Done (verified) | 8 domain (`busing.test.ts` "a run outside the schedule"), 2 jsdom (`Busing.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **430 passed, 16 skipped**, `build`
 succeeds.

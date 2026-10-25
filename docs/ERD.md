@@ -92,6 +92,7 @@ erDiagram
     uuid vehicle_id FK
     uuid driver_id FK
     text status
+    text origin
     timestamptz started_at
     int threshold_snapshot
   }
@@ -145,7 +146,7 @@ erDiagram
 | Relationship | Rule |
 |---|---|
 | Route to stops | One route has two or more ordered stops. Stop names are unique within a route. Times never decrease along the route. |
-| Route to trips | One trip per route per service date. Trips are generated only on the route's operating weekdays, inside its start and end dates. |
+| Route to trips | One **scheduled** trip per route per service date. Scheduled trips are generated only on the route's operating weekdays, inside its start and end dates. An **ad hoc** trip (\`origin = 'adhoc'\`) may exist on any date, including a date the route does not operate, and may sit beside a cancelled scheduled run; it carries a written reason (D-82). |
 | Passenger to route | A passenger has at most one route and one pickup stop (a limit; see OPEN_QUESTIONS Q-30). The stop must belong to that route, and the route must belong to the passenger's client. |
 | Trip to boardings | One boarding record per active roster passenger per completed trip. Inactive passengers are excluded. |
 | Trip to vehicle and driver | Set at assignment, required at dispatch. The vehicle must be in the route's category and status Available. The driver's licence must be valid on the service date. |
@@ -163,7 +164,7 @@ erDiagram
 | ROUTE | `reference` unique |
 | ROUTE_STOP | `(route_id, sequence)` unique |
 | PASSENGER | `(client_id, employee_ref)` unique where `employee_ref <> ''` |
-| TRIP | `(route_id, service_date)` unique; `reference` unique |
+| TRIP | `(route_id, service_date)` unique **where `origin = 'schedule'`** (migration 006); `reference` unique; `origin` is one of `schedule`, `adhoc` |
 | BOARDING | `(trip_id, passenger_id)` unique |
 
 ## Indexes
@@ -212,6 +213,11 @@ Two other catalogues live in settings rather than in their own tables: `settings
 work order is for) and `settings.costCategories` (what a recorded cost was for). A work order and a
 cost entry store the name they were given, so renaming a catalogue entry never rewrites history
 (D-78).
+
+`Trip.origin` is a column rather than a value inside the row's JSON because a database constraint has
+to read it: migration 006 replaced the whole-table unique index with a partial one, so the rule "one
+scheduled run per route per day" survives while an emergency run can still be created (D-82). The
+reason for an ad hoc run stays in the row's data, because nothing queries it.
 
 `Trip.corrections` and `Trip.rosterChanges` are embedded on the trip rather than kept in tables of
 their own: both are append-only notes about one run (a corrected fact; a rider added, removed or

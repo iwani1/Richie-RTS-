@@ -163,6 +163,8 @@ const tripRow = (t: Trip): Row => ({
   route_id: t.routeId,
   service_date: t.serviceDate,
   status: t.status,
+  // The column decides which rows the one-scheduled-run-per-day index covers (DSP-03, D-82).
+  origin: t.origin ?? "schedule",
   vehicle_id: t.vehicleId ?? null,
   driver_id: t.driverId ?? null,
   dispatched_at: at(t.dispatchedAt),
