@@ -68,6 +68,7 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 | `src/tms/costs.ts` | Recorded-cost report with period, total, entries and data coverage. Counts incident and work-order costs and standalone expenses in one figure (D-93) |
 | `src/tms/contracts.ts` | Corporate agreements (D-95): the transcribed term and commercial terms, `contractStateOf` (expiry derived from the end date, never stored), `isContractEditable`, the status moves, the overlap rule, `bookingContractProblem` (the booking gate) and `contractsDueForRenewal` |
 | `src/screens/Contracts.tsx` | The contract register: term, client, service and derived state; draft and correct while unapproved; approve, suspend and terminate with a reason; the renewal watch |
+| `src/tms/planning.ts` | The planning aid (RTE-04, D-96): every vehicle-and-driver pair for a run, judged by the same rule the save enforces, ranked with a sentence each, plus `PLANNING_LIMITS` — the facts the records do not hold. Reads only; assigns nothing |
 | `src/tms/expenses.ts` | Spending that is not a repair: `record_expense` / `void_expense`, numbered `EXP-YYYY-NNNN`, with the receipt number and whether the paper is held (D-93) |
 | `src/tms/commands.ts` | `executeCommand()`: the single router for every write (`AnyCommand`) |
 | `src/tms/crypto.ts` | PBKDF2-SHA256 password hashing via Web Crypto |

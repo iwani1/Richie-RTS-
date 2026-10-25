@@ -1681,3 +1681,47 @@ decision the office makes, not one the system invents.
   `contract_no_delete()`; bookings gain a contract check on request and on confirmation; commands 55
   to 58. 31 new tests (22 domain, 9 screen) plus 3 snapshot-scope cases, 2 booking cases and one
   reference-series row.
+
+## D-96 A planning aid answers with a reason, and still lets the dispatcher choose
+
+- **Context.** Brief item RTE-04 asks for an "explainable planning aid that considers pickup
+  locations, destinations, capacity, required arrival times, durations, availability, existing
+  commitments". Dispatch in this build was manual: the assign panel offered two long dropdowns and
+  the office worked out the pairing in their head. Two things were wrong with that. The knowledge was
+  in one person's head (which bus is free at 06:00, whose licence is about to lapse, which run already
+  has a bus under maintenance), and a wrong pairing only surfaced as an error after the choice was
+  made. What was *not* wrong, and must not become wrong, is who decides: dispatch is a judgement about
+  a yard, a driver and a client, and a tool that assigns by itself would be taking that judgement away
+  from the person answerable for it.
+- **Decision.** A read-only aid, `src/tms/planning.ts`, that answers "who can take this run?" with a
+  ranked list and a sentence per pair.
+  - **It reads the same rule the save enforces.** It calls `assessResources` — exported from
+    `busing.ts` for exactly this — for every vehicle-and-driver pair, so a suggestion it offers cannot
+    then be refused, and a pair it rules out is ruled out by the code that would have refused the
+    save. Two tests hold the two directions: everything offered is accepted by `assign_trip`, and
+    everything refused is refused by it too.
+  - **Nothing is assigned.** In the assign panel a suggestion fills the two fields; the dispatcher
+    still presses save. From the desk, an "Assign" button carries that person's name into the audit
+    entry, because they pressed it.
+  - **The ranking is explainable in one line each.** Workable before refused; no notes before notes;
+    then the **smallest vehicle that still fits** (so the 45-seaters stay free for the runs that need
+    them), then the least loaded driver and vehicle that day, then registration and name so the same
+    records always produce the same order. Nothing is weighted by a hidden score.
+  - **A refusal is a sentence, never an empty list.** "There is no bus" and "there is a bus but it is
+    under maintenance" are different problems with different answers, so the screen says which, and
+    names the run or the hire that is in the way.
+  - **It says what it cannot see.** Stops carry a name and a scheduled time — no coordinates, no
+    travel time, no separate required-arrival field, and no hours-on-duty record. Rather than invent a
+    distance or a speed, `PLANNING_LIMITS` is printed behind a "What this aid cannot see" disclosure.
+    This is why RTE-04 is **Met with a stated limit** rather than claimed whole: the arithmetic the
+    brief asks for (capacity, availability, existing commitments, arrival time as the timetable
+    states it) is there and explained; the geometry needs data the system does not hold (RTE-01).
+  - **Notes are not refusals.** An overdue routine service (Q-43) and a licence inside the reminder
+    window are printed against the pair and do not block it, because the setting that turns an overdue
+    service into a block already exists and is the owner's choice, not the aid's.
+  - **It is offered only where it can be acted on.** The desk suggestion renders for a role holding
+    `trips:assign`; a role that may read the day but not crew it is not shown a button it cannot press.
+- **Consequence.** New module `src/tms/planning.ts` (`planRun`, `planDay`, `PLANNING_LIMITS`), two
+  exports from `busing.ts` (`assessResources`, `rosterCount`), the aid in the assign panel and the
+  dispatch desk, a `.rts-plan` block in `src/index.css`, and 19 new tests (13 domain, 6 screen). No
+  new command, no new permission, no new table: the aid adds no way to change anything.

@@ -202,7 +202,7 @@ from its own button, the scrim and Escape.
 | Overview (dashboard) | Decide what to do next | Wrong today, then what leaves | Page head, four stat cards, then attention · run sheet · rentals beside a rail of readiness ring, setup checklist and quick actions |
 | Registers (vehicles, drivers, clients) | Find and change one record | The record and what is wrong with it | Page head, then a register card: title and count, filters inside the card, sticky table header, side panel for the form |
 | Rentals | Move a request through its states | The state machine of the selected record | Request list in a register card; then a five-step strip, request and quote side by side, actions for that state |
-| Busing | Run the day | Today's runs and the next action on each | Tabs, run sheet (departure in the gutter, route and crew in the middle, next action at the right), dispatch desk beside it |
+| Busing | Run the day | Today's runs and the next action on each | Tabs, run sheet (departure in the gutter, route and crew in the middle, next action at the right), dispatch desk beside it. The planning aid sits inside the assign panel as one line of conclusion over three ranked pairs, each with its reason, and collapses what it cannot see behind a disclosure (D-96) |
 | Logistics | Close the response to a breakdown | What is open and what it costs | Incidents beside the work orders they raise; the cost report as a statement with coverage figures |
 | Compliance / Readiness | Prevent an unroadworthy dispatch | Expiry and overdue, soonest first | Summary cards, urgency-sorted table, timing in words, interval bars per basis |
 | Settings | Supply the company's real rules | Nothing prefilled; what is still missing | "Rules to supply" read from the saved record, then one card per rule |
@@ -225,7 +225,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **661 passed, 26 skipped** across 65 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **680 passed, 26 skipped** across 67 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are

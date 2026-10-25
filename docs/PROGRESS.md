@@ -52,7 +52,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RTE-01 | 1B | Locations and stops: coordinates, landmark description, optional Ghana digital address. | Partial | Stops have a name and a scheduled time only. |
 | RTE-02 | 1B | Routes: reference, name, service type, client, origin/destination, ordered pickup and drop-off stops, operating days, shifts, planned start, expected… | Partial | Reference, name, client, direction, shift, category, weekdays, date range, ordered stops, status. **No expected duration or capacity requirement.** |
 | RTE-03 | 1B | Recurring schedules by day and shift, one-time trips, copy a previous schedule, conflict detection. | Met | Live: 10 trips generated across weekdays for a date range; duplicate guard in the trip unique constraint. "Copy previous schedule" is absent. |
-| RTE-04 | 1B | Explainable planning aid that considers pickup locations, destinations, capacity, required arrival times, durations, availability, existing… | Not built | No planning aid; dispatchers choose manually. |
+| RTE-04 | 1B | Explainable planning aid that considers pickup locations, destinations, capacity, required arrival times, durations, availability, existing… | Met | `src/tms/planning.ts` (Phase 47, D-96). Every vehicle-and-driver pair is judged by the **same rule the save enforces** (`assessResources`), ranked with a sentence per pair, and offered in the assign panel and on the dispatch desk. It considers capacity (roster **and** booked seats), availability and existing commitments (other runs and hires that day), vehicle state, papers, licence and service intervals, and the timetable window — and it **assigns nothing**: the dispatcher still presses save. **Stated limit:** stops have no coordinates and no travel time is recorded, so distance and duration cannot be weighed — the aid says so on screen rather than guessing (RTE-01). |
 | RTE-05 | 3 | Interface for a later vehicle-routing optimisation service. | Deferred | Phase 3. |
 | BKG-01 | 1B | Booking types: home-to-office, office-to-home, one-time, recurring, approved ad-hoc, emergency, return, additional approved destination. | Partial | One **one-time** booking or a **recurring** series (one booking per operating day, at most 62 days); the direction of travel — to work, from work, other — comes from the route, and a booking may be made on a scheduled or an ad hoc (emergency) run. **No separate return or additional-destination booking type, and no distinct approved-ad hoc type** beyond the ad hoc run (DSP-03). |
 | BKG-02 | 1B | Validation: eligibility, contract status, company policy, cut-off times, duplicates (unique constraint on employee and journey). | Partial | Eligibility: the rider must be active, must belong to the same client as the route, and must **not** already be on that route's roster (booking would count the seat twice). Duplicates: a partial unique index on `(trip_id, passenger_id)` for live statuses. Cut-offs: `settings.booking.requestCutoffMinutes` / `cancellationCutoffMinutes`, whole minutes, blank = no deadline. The run must exist and not be cancelled, completed or already departed. Contract status: a request is refused when the covering agreement is not active, or when the last one ended before the date and nothing replaced it (Phase 46, D-95), checked again at confirmation. **No company-policy rules.** |
@@ -93,7 +93,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RPT-05 | 3 | PDF reports. | Deferred | Phase 3. |
 | GPS-01 | 2 | Provider interface; last reported location with timestamp; clear distinction between live, stale and simulated locations; never fabricate… | Deferred | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
 
-**78 IDs: 22 met, 39 partial, 2 not built, 14 deferred.** Phase 1A: 29 IDs - 9 met, 20 partial, 0 not built.
+**78 IDs: 23 met, 38 partial, 1 not built, 14 deferred.** Phase 1A: 29 IDs - 9 met, 20 partial, 0 not built.
 
 ## Phase 0 - Inspect and plan (approved)
 
@@ -1127,4 +1127,29 @@ calculated, and makes the booking desk read it. `docs/DECISIONS.md` D-95 records
 | Tests | Done (verified) | 22 domain (`contracts.test.ts`), 9 screen (`Contracts.test.tsx`), 3 snapshot scope, 2 booking gate, 1 reference series, and 5 against real PostgreSQL (`contracts.integration.test.ts`, CI only) |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **661 passed, 26 skipped**, `build`
+succeeds.
+
+## Phase 47 - An aid that says who can take the run, and why (RTE-04, D-96)
+
+Dispatch could be done, but it was done in somebody's head: two long dropdowns, and the knowledge of
+which bus was free at six, whose licence was about to lapse and which run already had a bus in the
+workshop. This phase puts that reading of the records on the screen — ranked, reasoned, and read-only.
+`docs/DECISIONS.md` D-96 records the reasoning.
+
+| Item | Status | Evidence |
+|---|---|---|
+| It answers "who can take this run?" | Done (verified) | `planRun` / `planDay` in `src/tms/planning.ts`, shown in the assign panel and on the dispatch desk; "sends the smallest bus that fits, and says the numbers it fitted" |
+| It reads the rule the save enforces, so it cannot suggest what would be refused | Done (verified) | `assessResources` and `rosterCount` are exported from `busing.ts` and called per pair; two tests hold both directions — "everything it offers, the save accepts" and "nothing it refuses, the save would accept" |
+| It counts the seats actually needed | Done (verified) | Roster **and** sold seats, as the save does: "counts a sold seat against the vehicle, the same way the save does" (13 seats, 12 riders, 1 booked — exactly full, no spare) |
+| It weighs what is already in the day | Done (verified) | Other runs and confirmed hires on that date are named: "refuses a bus already out on an overlapping run, naming that run"; between equals it picks the driver with less on ("spreads the day") |
+| It explains, in sentences | Done (verified) | Every pair carries its seats, its window and its load; a refusal is the rule's own words, e.g. "must be Available to be assigned (currently under maintenance)" |
+| It is honest about its blind spots | Done (verified) | `PLANNING_LIMITS`, printed behind "What this aid cannot see": no coordinates, no travel time, no separate arrival field, no hours on duty. Tested |
+| It does not assign anything | Done (verified) | A suggestion fills the two fields and the dispatcher's own button saves ("fills both fields from a suggestion, and saves only when the dispatcher presses save"); the desk button carries that person's name into the audit entry |
+| It says why there is nobody, not just that there is nobody | Done (verified) | With only a bus under maintenance: "No pair can take this run", the reason, and "Nobody free to send" at the desk rather than an empty list |
+| Notes are not refusals | Done (verified) | An overdue service and a licence inside the reminder window are printed against the pair and do not block it — the block itself stays the owner's setting (Q-43) |
+| Offered only to a role that can act | Done (verified) | The desk suggestion renders for `trips:assign`; a read-only role is not shown a button it cannot press |
+| No new command, permission or table | Done (verified) | `commandTypes.ts` unchanged; the aid only reads. Nothing it does can change a record without a person pressing a button |
+| Tests | Done (verified) | 13 domain (`planning.test.ts`), 6 screen (`Planning.test.tsx`), and the existing busing and dispatch suites unchanged and green |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **680 passed, 26 skipped**, `build`
 succeeds.

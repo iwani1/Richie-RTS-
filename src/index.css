@@ -1502,6 +1502,45 @@ select.rts-input option { background: var(--card); color: var(--ink); }
 
 .rts-desk-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 
+/* ---------- the planning aid (RTE-04, D-96) ----------------------------------------------------------------------
+   A reading of the records, not a control panel: one line of conclusion, then the pairs behind it with
+   the reason each one works or cannot. No colour is used to say "good" or "bad" — the sentence does. */
+
+.rts-plan { padding: 12px 14px; border: 1px solid var(--accent-line); border-radius: 12px; background: var(--accent-soft); }
+
+.rts-plan-head { margin: 0; color: var(--ink); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
+.rts-plan-window { margin-left: 6px; color: var(--muted); font-family: var(--mono); font-size: 10.5px; font-weight: 500; }
+
+.rts-plan-line { margin: 4px 0 0; color: var(--ink); font-size: 12.5px; line-height: 1.5; }
+.rts-plan-meta { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+.rts-plan-list { margin: 10px 0 0; padding: 0; list-style: none; }
+
+.rts-plan-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--accent-line);
+}
+
+.rts-plan-list li:first-child { border-top: 0; padding-top: 2px; }
+.rts-plan-pick { margin: 0; color: var(--ink); font-size: 12px; font-weight: 600; }
+.rts-plan-no { color: var(--red-ink); font-weight: 600; }
+.rts-plan-reason { margin: 2px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.rts-plan-note { margin: 2px 0 0; color: var(--amber-ink); font-size: 11px; line-height: 1.5; }
+
+.rts-plan-limits { margin-top: 10px; border-top: 1px solid var(--accent-line); padding-top: 8px; }
+.rts-plan-limits summary { color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; }
+.rts-plan-limits ul { margin: 6px 0 0; padding-left: 16px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.rts-plan-limits li { margin-bottom: 3px; }
+
+.rts-desk-wait { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.rts-desk-suggest { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 11px; }
+.rts-desk-suggest--none { color: var(--muted); font-style: italic; }
+.rts-desk-suggest .rts-btn { padding: 1px 7px; font-size: 10.5px; }
+
 /* ---------- the cost report --------------------------------------------------------------------------------------- */
 
 .rts-report-total {

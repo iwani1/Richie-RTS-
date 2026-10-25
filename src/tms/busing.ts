@@ -348,14 +348,13 @@ function midTripPassengerErrors(
   return errors;
 }
 
-// Vehicle and driver checks for a trip, including same-day time overlaps and rental clashes.
 /**
  * How many people the run must carry: every active passenger on the route. A passenger outside
  * the vehicle's seats is a refusal, never a warning — capacity is a safety limit, not a metric
  * (brief 5.1 and 12). The number is recomputed at assign, dispatch and start, so a roster that
  * grew after the vehicle was chosen cannot slip through.
  */
-function activeRoster(db: Database, routeId: string): number {
+export function rosterCount(db: Database, routeId: string): number {
   return db.passengers.filter((passenger) => passenger.routeId === routeId && passenger.status === "active").length;
 }
 
@@ -371,7 +370,7 @@ function midRunCapacityErrors(db: Database, routeId: string | null, extraActive:
   for (const trip of running) {
     // D-85: the seats sold for this run are already on the bus, so a rider added mid-run is measured
     // against them too.
-    const count = activeRoster(db, routeId) + extraActive + seatsHeld(db, trip.id);
+    const count = rosterCount(db, routeId) + extraActive + seatsHeld(db, trip.id);
     const vehicle = db.vehicles.find((candidate) => candidate.id === trip.vehicleId);
     if (vehicle && vehicle.seatCapacity < count) {
       return {
@@ -399,7 +398,14 @@ function blockedReason(label: string, errors: Errors): string {
   return details.length ? `${label} blocked: ${details.join(" ")}` : `${label} blocked: the assigned resources are no longer valid.`;
 }
 
-function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: string, driverId: string, today: string): Errors {
+/**
+ * Vehicle and driver checks for a trip, including same-day time overlaps and rental clashes.
+ *
+ * Exported because the planning aid (RTE-04, D-96) asks exactly this question of every pair it can
+ * offer: the aid may only suggest an assignment this function would accept, so a dispatcher who takes
+ * a suggestion cannot be refused by the save that follows.
+ */
+export function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: string, driverId: string, today: string): Errors {
   const errors: Errors = {};
 
   const vehicle = db.vehicles.find((v) => v.id === vehicleId);
@@ -407,11 +413,11 @@ function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: s
   else if (!vehicle) errors.vehicleId = "Unknown vehicle.";
   else if (vehicle.categoryId !== route.vehicleCategoryId) errors.vehicleId = "Vehicle category does not match the route.";
   else if (vehicle.status !== "available") errors.vehicleId = `Vehicle must be Available to be assigned (currently ${VEHICLE_STATUS_LABELS[vehicle.status].toLowerCase()}).`;
-  else if (vehicle.seatCapacity < activeRoster(db, route.id) + seatsHeld(db, trip.id))
+  else if (vehicle.seatCapacity < rosterCount(db, route.id) + seatsHeld(db, trip.id))
     // D-85: the roster and the seats sold for this run are carried by the same vehicle, so the
     // vehicle is judged against both. Without this, reassigning to a smaller bus would strand a
     // booked visitor whose seat the office has already promised.
-    errors.vehicleId = `This vehicle seats ${vehicle.seatCapacity}; ${route.reference} has ${activeRoster(db, route.id)} active passengers and ${seatsHeld(db, trip.id)} booked seat(s). Use a larger vehicle, or take staff off the roster first.`;
+    errors.vehicleId = `This vehicle seats ${vehicle.seatCapacity}; ${route.reference} has ${rosterCount(db, route.id)} active passengers and ${seatsHeld(db, trip.id)} booked seat(s). Use a larger vehicle, or take staff off the roster first.`;
   else {
     // Mandatory papers are checked against the service date of the run (Q-16, D-76).
     const gaps = requiredDocumentGaps(db, "vehicle", vehicle.id, trip.serviceDate);

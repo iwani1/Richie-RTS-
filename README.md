@@ -94,9 +94,10 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Public enquiry form, embeddable on the company website | Works; throttled, spam-trapped, creates a draft only |
 | CSV import for vehicles, drivers, clients and staff rosters | Works; rejects a row with its line number, never merges an existing person |
 | Corporate agreements: term, service, routes, pricing and payment terms transcribed from the signed paper, with approval, suspension, termination and a renewal watch | Works; an approved agreement's terms are frozen by the database, a booking is refused under an agreement that is not active, and expiry is read from the end date rather than recorded |
+| Planning aid for dispatch: who can take each run, ranked, with the reason each pair works or cannot | Works; it reads the same rule the save enforces, so a suggestion is never refused, and it assigns nothing — the dispatcher still presses save |
 | Notifications, driver app, GPS, passenger portal | **Not built** — see `docs/PROGRESS.md` |
 
-661 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+680 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

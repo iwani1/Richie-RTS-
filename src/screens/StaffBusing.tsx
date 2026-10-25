@@ -6,6 +6,7 @@ import { onTimeReport } from "../tms/kpis";
 import type { Permission } from "../tms/permissions";
 import type { CommandResult } from "../tms/service";
 import { readinessReport } from "../tms/maintenance";
+import { PLAN_SHORTLIST, PLANNING_LIMITS, planDay, planRun, type PlanCandidate, type RunPlan } from "../tms/planning";
 import { ImportPanel } from "../ui/ImportPanel";
 import { useTms, type Tone } from "../tms/useTms";
 import {
@@ -604,6 +605,11 @@ function TripsTab() {
   // The day at a glance, derived from the runs actually on the sheet — no stored counters.
   const byStatus = (status: TripStatus) => trips.filter((t) => t.status === status).length;
   const unassigned = trips.filter((t) => !t.vehicleId || !t.driverId);
+  // RTE-04: the day's still-to-crew runs, each with its ranked pairs. Read for the desk only — the
+  // aid is a list of suggestions, not a queue of jobs it has done.
+  const plans = new Map(planDay(db, date, todayYmd()).map((plan) => [plan.tripId, plan]));
+  const assignFromPlan = (tripId: string, candidate: PlanCandidate) =>
+    void report(dispatch({ type: "assign_trip", id: tripId, input: { vehicleId: candidate.vehicleId, driverId: candidate.driverId } }));
   const nextToLeave = trips.find((t) => t.status === "planned" || t.status === "dispatched");
   const startOf = (t: Trip) => routeOf(t.routeId)?.stops[0]?.scheduledTime ?? "";
 
@@ -719,20 +725,45 @@ function TripsTab() {
             <p className="rts-band-empty">Every run on this date has a vehicle and a driver.</p>
           ) : (
             <ul className="rts-desk-list">
-              {unassigned.map((t) => (
-                // Times and the missing part only: the run sheet already carries the reference, and
-                // repeating it here would make an operator read the same line twice.
-                <li key={t.id}>
-                  <span>{startOf(t) || "No time"}</span>
-                  <span>{t.vehicleId ? "no driver" : t.driverId ? "no vehicle" : "no vehicle, no driver"}</span>
-                </li>
-              ))}
+              {unassigned.map((t) => {
+                const plan = plans.get(t.id);
+                const suggestion = plan?.workable[0];
+                return (
+                  <li key={t.id}>
+                    {/* Times and the missing part only: the run sheet already carries the reference,
+                        and repeating it here would make an operator read the same line twice. */}
+                    <span>{startOf(t) || "No time"}</span>
+                    <span className="rts-desk-wait">
+                      {t.vehicleId ? "no driver" : t.driverId ? "no vehicle" : "no vehicle, no driver"}
+                      {/* The aid's own sentence, so the desk says who to send rather than only what
+                          is missing. Nothing is assigned without the operator's press. */}
+                      {/* Offered only to the role that can act on it: a suggestion a reader cannot
+                          take is a line of text pretending to be an action. */}
+                      {!allowed("trips:assign") ? null : suggestion ? (
+                        <span className="rts-desk-suggest">
+                          Send {suggestion.vehicleLabel} + {suggestion.driverLabel}
+                          <Button
+                            variant="ghost"
+                            onClick={() => assignFromPlan(t.id, suggestion)}
+                            aria-label={`Assign ${suggestion.vehicleLabel} and ${suggestion.driverLabel} to ${t.reference}`}
+                          >
+                            Assign
+                          </Button>
+                        </span>
+                      ) : (
+                        plan && <span className="rts-desk-suggest rts-desk-suggest--none">Nobody free to send</span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
           <p className="rts-desk-note">
             A run can only be dispatched once a vehicle and a driver are assigned. Both lists come from
-            the registers — nothing is assumed by the system.
+            the registers — nothing is assumed by the system. A suggestion is the pairing the rules
+            would accept, best first; the choice stays with you.
           </p>
         </aside>
       </div>
@@ -903,10 +934,88 @@ function AdhocForm({
   );
 }
 
+/**
+ * The planning aid's face (RTE-04, D-96).
+ *
+ * It answers "who can take this run?" with the pairs the save would accept, best first, and says what
+ * makes each one workable. Nothing here assigns anything: a suggestion fills the two fields below and
+ * the dispatcher's own button saves it, so the aid can never put a bus on the road behind a person's
+ * back. A pair it would not accept is stated as a reason, not hidden — "there is no bus" and "there is
+ * a bus but it is under maintenance" are different problems.
+ */
+function PlanSuggestions({ plan, onPick }: { plan: RunPlan; onPick: (candidate: PlanCandidate) => void }) {
+  const shortlist = plan.workable.slice(0, PLAN_SHORTLIST);
+  return (
+    <section className="rts-plan" aria-label="Planning aid">
+      <p className="rts-plan-head">
+        Who can take this run <span className="rts-plan-window">{plan.window}</span>
+      </p>
+      <p className="rts-plan-line">{plan.headline}</p>
+      <p className="rts-plan-meta">
+        {plan.needs.riders} to carry ({plan.needs.roster} on the roster
+        {plan.needs.booked > 0 ? `, ${plan.needs.booked} booked seat${plan.needs.booked === 1 ? "" : "s"}` : ""}) ·{" "}
+        {plan.workable.length} of {plan.examined} vehicle-and-driver pairs can take it
+      </p>
+
+      {shortlist.length > 0 && (
+        <ul className="rts-plan-list">
+          {shortlist.map((candidate) => (
+            <li key={`${candidate.vehicleId}:${candidate.driverId}`}>
+              <div className="min-w-0">
+                <p className="rts-plan-pick">
+                  {candidate.vehicleLabel} with {candidate.driverLabel}
+                </p>
+                {candidate.reasons.map((reason) => (
+                  <p key={reason} className="rts-plan-reason">{reason}</p>
+                ))}
+                {candidate.notes.map((note) => (
+                  <p key={note} className="rts-plan-note">Worth reading: {note}</p>
+                ))}
+              </div>
+              <Button variant="ghost" onClick={() => onPick(candidate)} aria-label={`Use ${candidate.vehicleLabel} with ${candidate.driverLabel}`}>
+                Use this pair
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {plan.workable.length === 0 && plan.refusals.length > 0 && (
+        <ul className="rts-plan-list">
+          {plan.refusals.map((refusal) => (
+            <li key={`${refusal.vehicleId}:${refusal.driverId}`}>
+              <div className="min-w-0">
+                <p className="rts-plan-pick">
+                  {refusal.vehicleLabel} with {refusal.driverLabel} <span className="rts-plan-no">cannot</span>
+                </p>
+                {refusal.reasons.map((reason) => (
+                  <p key={reason} className="rts-plan-reason">{reason}</p>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <details className="rts-plan-limits">
+        <summary>What this aid cannot see</summary>
+        <ul>
+          {PLANNING_LIMITS.map((limit) => (
+            <li key={limit}>{limit}</li>
+          ))}
+        </ul>
+      </details>
+    </section>
+  );
+}
+
 function AssignForm({ trip, route, onClose, onSubmit }: { trip: Trip; route: BusRoute; onClose: () => void; onSubmit: (input: TripAssignInput) => Errors | Promise<Errors> }) {
   const { db } = useTms();
   const [values, setValues] = useState<TripAssignInput>({ vehicleId: trip.vehicleId ?? "", driverId: trip.driverId ?? "" });
   const [errors, setErrors] = useState<Errors>({});
+  // RTE-04 (D-96): the aid is a reading of the records, offered here because this panel is where the
+  // two decisions are made. It fills the fields and never saves — the panel's own button still does.
+  const plan = planRun(db, trip.id, todayYmd());
   const vehicles = db.vehicles.filter((v) => v.categoryId === route.vehicleCategoryId && v.status !== "retired");
   const drivers = db.drivers.filter((d) => d.status === "active");
   // Q-43: the overdue service is named in the list itself, so the dispatcher sees it before choosing.
@@ -915,6 +1024,7 @@ function AssignForm({ trip, route, onClose, onSubmit }: { trip: Trip; route: Bus
   return (
     <Panel title={`Assign ${trip.reference}`} description={`${route.name} on ${formatDate(trip.serviceDate)}. The system blocks overlapping runs and rental clashes.`} onClose={onClose}>
       <form onSubmit={async (e) => { e.preventDefault(); setErrors(await onSubmit(values)); }} className="space-y-4">
+        {plan && <PlanSuggestions plan={plan} onPick={(candidate) => setValues({ vehicleId: candidate.vehicleId, driverId: candidate.driverId })} />}
         <Field label="Vehicle" error={errors.vehicleId}>
           <Select value={values.vehicleId} onChange={(e) => setValues({ ...values, vehicleId: e.target.value })} invalid={!!errors.vehicleId}>
             <option value="">Select a vehicle</option>
