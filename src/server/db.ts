@@ -113,6 +113,7 @@ export interface BusRouteRow {
   start_date: DateOnly;
   end_date: DateOnly | null;
   status: string;
+  created_by: string;
   created_at: Timestamp;
   updated_at: Timestamp;
   data: Json;

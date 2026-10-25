@@ -201,6 +201,7 @@ const contractRow = (c: Contract): Row => ({
   start_date: c.startDate,
   end_date: c.endDate,
   status: c.status,
+  created_by: c.createdBy,
   created_at: c.createdAt,
   updated_at: c.updatedAt,
   data: json(c),
