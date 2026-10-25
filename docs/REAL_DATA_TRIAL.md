@@ -36,8 +36,16 @@ DATABASE_URL="postgresql://richie:<your-password>@127.0.0.1:5432/richie_tms_tria
   npm start -- -p 3001
 ```
 
-Open <http://localhost:3001>. The environment variable wins over `.env`, so the real database is
-never touched by these commands.
+Open <http://localhost:3001>. The environment variable wins over `.env` (`scripts/env-loader.ts`
+skips any key the shell already set, and Next does the same), so the real database is never touched
+by these commands.
+
+Stop the server that is serving port 3000 before running `npm run build`: the build rewrites `.next`,
+which that server is reading from. Two production servers from the same checkout are otherwise fine —
+the trial one reads the same build and points at the copy.
+
+`next start` listens on every interface, so a phone on the same network can open
+`http://<this-machine>:3001/enquiry` in §8. Find the address with `hostname -I`.
 
 At the end, `podman exec richie-db dropdb -U richie richie_tms_trial` discards the trial. Do that
 only after §10's sign-off, and only if you want the space back.
@@ -49,15 +57,27 @@ only after §10's sign-off, and only if you want the space back.
 Before changing anything, write down what the system says it has. You will compare against this.
 
 - **Dashboard**: the counts for vehicles, drivers, rentals and money outstanding.
-- **`GET /api/health`** in a browser: `ok: true`, and the migration list.
+- **`GET /api/health`**: whether the app is up and whether it can reach PostgreSQL.
 
 ```bash
 curl -s http://localhost:3001/api/health
 ```
 
-**Expected:** `ok: true` and the three migrations (`001_init.sql`, `002_resource_reservations.sql`,
-`003_invoices_and_payments.sql`). A `503` here is a database problem — stop and read
-`SETUP_AND_DEPLOYMENT.md` §5 before going on.
+**Expected:** `{"ok":true,"service":"richie-tms","database":"reachable","time":"…"}`. A `503` here is a
+database problem — stop and read `SETUP_AND_DEPLOYMENT.md` §5 before going on.
+
+Under `npm start` the endpoint deliberately reports only that the database is *reachable*; the
+server version and migration list are shown in development. Ask the database directly for the second
+check:
+
+```bash
+podman exec richie-db psql -U richie -d richie_tms_trial -c "select version from schema_migrations order by version"
+```
+
+**Expected:** four rows — `001_init.sql`, `002_resource_reservations.sql`,
+`003_invoices_and_payments.sql`, `004_reference_series.sql`. The trial copy is dumped from the live
+database, so it already has every migration the live one has; `db:migrate` in §0 is what applies any
+that are missing, and reports the rest as *already applied*.
 
 ---
 
@@ -69,8 +89,14 @@ A backup nobody has restored is a hope, not a backup.
 npm run db:backup -- ./backups/trial-start.json
 podman exec richie-db createdb -U richie richie_tms_restore_check
 DATABASE_URL="postgresql://richie:<your-password>@127.0.0.1:5432/richie_tms_restore_check" \
+  npm run db:migrate
+DATABASE_URL="postgresql://richie:<your-password>@127.0.0.1:5432/richie_tms_restore_check" \
   npm run db:restore -- ./backups/trial-start.json
 ```
+
+`db:restore` writes rows into a database that already has the schema; it does not create tables. A
+fresh database therefore needs `db:migrate` first, which is also true of the real installation on a
+new machine.
 
 **Expected:** the restore reports the records it wrote. Compare the vehicle, driver, rental and
 invoice counts with §1 — they must be identical. Then:
@@ -193,11 +219,13 @@ up as a difference, so write down the three numbers rather than just ticking the
 ## 9. Restart, and check it is still there (5 minutes)
 
 ```bash
-# stop the server (Ctrl-C), then
-npm run build && npm start
+# stop the trial server (Ctrl-C), then restart it against the same copy
+DATABASE_URL="postgresql://richie:<your-password>@127.0.0.1:5432/richie_tms_trial" \
+  npm start -- -p 3001
 ```
 
-Reload the rental and the invoice from §5.
+`npm run build` is only needed if the code changed, not to prove the data survived — but rebuild if
+you want the restart to be identical to a deployment. Reload the rental and the invoice from §5.
 
 **Expected:** the same records, the same statuses, the same numbers — and the same sign-in still
 works. Data lives in PostgreSQL, not in a browser tab.
@@ -211,7 +239,7 @@ on screen and (if it is a money or booking issue) the reference in question.
 
 | Step | Expected | Observed | Pass? |
 |---|---|---|---|
-| 1 | Health ok, three migrations | | |
+| 1 | Health `ok`, four migrations in `schema_migrations` | | |
 | 2 | Restore reproduces every count | | |
 | 3 | Invoice refused until tax position set | | |
 | 4 | Bad rows rejected by line, duplicates refused | | |
