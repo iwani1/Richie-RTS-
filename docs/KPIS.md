@@ -80,10 +80,19 @@ prints it under the rental report, sharing the same period.
 | Cost per trip | recorded expenses ÷ scheduled runs completed in the period | Null ("Not available") when no run was completed. This is the Q-29 definition |
 | Cost per passenger | recorded expenses ÷ riders recorded as boarded on those completed runs | A no-show is not a passenger carried. Null when nobody boarded |
 
-**What it deliberately does not do.** It does not compute profit, margin or cost per vehicle: the
-recorded costs are maintenance and incident costs only (no fuel, driver pay or tolls are captured),
-so a margin would flatter the business. That limitation is printed under the figures rather than
-buried here.
+**What it deliberately does not do.** It does not compute profit or cost per vehicle: the recorded
+costs are maintenance and incident costs only (no fuel, driver pay or tolls are captured), so a margin
+would flatter the business. That limitation is printed under the figures rather than buried here.
+
+**Margin, and the rule that keeps it honest (FIN-07, D-84).** One figure is called margin, and it is
+withheld unless all four of these are true: the company currency is set; at least one non-void invoice
+was issued in the period; at least one cost line was recorded in it; and **no hire completed in the
+period is left unbilled**. The last condition is the important one — an unbilled hire is revenue that
+exists and has not been written down, so a margin computed over it overstates the business. When the
+rule fails the screen prints the reason instead of the number. Margin is `invoiced − expenses`, shown
+with its percentage of revenue; it is **not** profit (tax owed, deposits held and fuel are not in it).
+Cash movement (payments received minus recorded spend) is shown beside it, because the two answer
+different questions.
 
 **Coverage shown with the report.** Uncategorised cost lines; invoices with no customer name;
 completed runs with no vehicle recorded; and the revenue-by-service line, which makes the
@@ -101,7 +110,8 @@ report shows that line instead of hiding it. This is what makes "how much did ty
 2. Always show the numerator and denominator, or the counts behind them.
 3. Always show data coverage.
 4. Never show a KPI as verified when an input is missing (Integrity rule 4).
-5. Do not compute profit or margin until revenue and cost inputs exist.
+5. Do not compute profit or margin until revenue and cost inputs exist, and never while work done in
+   the period is still unbilled (the FIN-07 margin rule above).
 
 ## Rental report (RPT-01, implemented)
 

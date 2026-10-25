@@ -3,6 +3,7 @@ import type { Role } from "./tms/types";
 
 export type Route =
   | "dashboard"
+  | "finance"
   | "rentals"
   | "invoices"
   | "reports"
@@ -32,6 +33,11 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { route: "dashboard", label: "Dashboard", caption: "Setup and overview", permission: null },
+  // FIN-07: finance lands on the money home, not the operations board. The gate is the invoice read
+  // permission, not the KPI one: this screen is about invoiced money, payments and what is owed, and
+  // operations holds no invoice access at all (D-60). The server narrows the payload the same way, so
+  // an account that may not read invoices receives no invoices to total.
+  { route: "finance", label: "Finance", caption: "Money in, out and owed", permission: "invoices:read" },
   { route: "driver_portal", label: "My runs", caption: "Assigned work and problems", permission: null, roles: ["driver"] },
   { route: "client_portal", label: "My account", caption: "Routes, staff and rentals", permission: null, roles: ["client_contact"] },
   { route: "rentals", label: "Bus rentals", caption: "Requests to billing", permission: "rentals:read" },

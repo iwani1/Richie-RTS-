@@ -86,7 +86,11 @@ the person who reported the defect be the only sign-off.
 
 **Can:** see rentals, clients, vehicles, trips, incidents and maintenance costs; prepare quotations;
 confirm rentals and record the deposit; issue and void invoices; record payments and advance them to
-verified and reconciled; read the rental report.
+verified and reconciled; read the rental report. **Lands on the Finance screen**, which is where the
+money work starts: money in and out for a period, who is late paying and by how many days, completed
+hires nobody has invoiced yet, and payments still to verify or reconcile. The "Margin" figure appears
+only when both sides of the period are complete (an invoice and a cost line in the period, and no
+completed hire left unbilled); when it says "Not available", the reason under it says what is missing.
 
 **Cannot:** see the employee roster, staff phone numbers, vehicle or driver documents, accounts, or
 the audit log. This is not a display choice: those collections are removed from the data the finance

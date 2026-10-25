@@ -1175,3 +1175,42 @@ decision the office makes, not one the system invents.
   booking's own history. Migration `007_bookings.sql` stores the booking with a **partial unique index**
   on `(trip_id, passenger_id)` for live statuses only, so a rider who was refused or cancelled can ask
   again while a duplicate live seat is impossible.
+
+## D-84 Finance gets a money home of its own, and margin is withheld until it can be trusted
+
+- **Context.** FIN-07. Until now a finance officer signed in and landed on the operations dashboard:
+  today's runs, the fleet's readiness, rosters. The money was two clicks away inside Reports, mixed
+  in with rentals and utilisation. The brief asks for a finance dashboard whose totals reconcile to
+  the transaction records, and says margin may be shown "only when cost and revenue data are
+  sufficient" — a condition nobody had written down, so nobody could satisfy it.
+- **Decision.** A **Finance** destination, and it is where a finance account lands. It shows, for a
+  chosen period: invoiced, received, costs recorded, margin, the per-customer revenue table and the
+  per-category spend table; and, measured **as at today rather than inside the period**: what is
+  overdue, which completed hires have no invoice, and which recorded payments still need verifying or
+  reconciling.
+  - **One set of books.** The period figures are `financialReport(db, from, to)` — the exact function
+    behind the Reports screen and its CSV (Q-29, D-78). The finance home adds no figure of its own, so
+    the two screens cannot disagree.
+  - **Open work is not a period figure.** A late invoice, an unbilled hire and a payment still to
+    verify are things to do now. Filtering the period back to last month must not make them vanish, so
+    they are dated as at today and say so on the screen.
+  - **Margin has a written rule.** It is shown only when the currency is set, at least one invoice was
+    issued in the period, at least one cost line was recorded, and **no hire completed in the period
+    is still unbilled** (an unbilled hire is revenue not yet written down, which would overstate the
+    margin). Otherwise the screen names the missing ingredient instead of the number. Margin is
+    `invoiced − expenses` with its percentage of revenue, and is labelled as not being profit: tax
+    owed, deposits held and fuel are not in it. Cash movement (payments in minus spend) is shown
+    beside it, because cash and margin are different questions and blending them is how a business
+    talks itself into a bad month.
+- **Rejected.** A second calculation of the money figures just for this screen (two implementations of
+  one definition is how a dashboard and its report end up disagreeing). Showing margin always, with a
+  footnote (a number on a screen is read as a fact; a footnote under it is not). Calling cash movement
+  "profit" (it is not: an unpaid invoice earns nothing yet, and a deposit is not income). Gating the
+  screen on `kpis:read` (operations holds it and may read no invoices at all — the gate is
+  `invoices:read`, and the server sends no invoice rows to a role without it). Making the overdue list
+  part of the period (see above).
+- **Consequence.** New route `finance` (nav "Finance", under Service desk, icon a coin) and
+  `src/screens/FinanceHome.tsx` reading `src/tms/financeHome.ts`, which is tested on its own (15
+  domain tests, 5 screen tests). A finance account opens there instead of the operations board; every
+  other role keeps the operations board and can reach the finance home only if it may read invoices
+  (administrator). Amounts are withheld, in words, when the company currency is not set.

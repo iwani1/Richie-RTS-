@@ -7,6 +7,7 @@ import { RentalsPage } from "./screens/Rentals";
 import { InvoicesPage } from "./screens/Invoices";
 import { ProfilePage } from "./screens/Profile";
 import { ReportsPage } from "./screens/Reports";
+import { FinanceHomePage } from "./screens/FinanceHome";
 import { StaffBusingPage } from "./screens/StaffBusing";
 import { StaffLogisticsPage } from "./screens/StaffLogistics";
 import { CompliancePage } from "./screens/Compliance";
@@ -31,7 +32,7 @@ import { cn } from "./utils/cn";
 
 const NAV_GROUPS: { label: string; routes: Route[] }[] = [
   { label: "My desk", routes: ["driver_portal", "client_portal"] },
-  { label: "Service desk", routes: ["dashboard", "rentals", "invoices", "busing", "logistics", "fleetReadiness"] },
+  { label: "Service desk", routes: ["dashboard", "finance", "rentals", "invoices", "busing", "logistics", "fleetReadiness"] },
   { label: "Fleet & clients", routes: ["compliance", "vehicles", "drivers", "clients"] },
   { label: "Analysis", routes: ["reports"] },
   { label: "Administration", routes: ["users", "settings", "audit", "profile"] },
@@ -39,6 +40,7 @@ const NAV_GROUPS: { label: string; routes: Route[] }[] = [
 
 const ROUTE_ICONS: Record<Route, IconName> = {
   dashboard: "dashboard",
+  finance: "money",
   rentals: "rental",
   invoices: "invoice",
   reports: "reports",
@@ -135,8 +137,10 @@ function Shell() {
   // The internal screens read company-wide records, so those roles must not reach them.
   const portalRoute: Route | null =
     actor?.role === "driver" ? "driver_portal" : actor?.role === "client_contact" ? "client_portal" : null;
+  // A finance account opens on the money home (FIN-07); everybody else opens on the operations board.
+  const homeRoute: Route = actor?.role === "finance" ? "finance" : (portalRoute ?? "dashboard");
   const bound = actor ? isRecordBound(actor.role) : false;
-  const [requestedRoute, setRoute] = useState<Route>(portalRoute ?? "dashboard");
+  const [requestedRoute, setRoute] = useState<Route>(homeRoute);
   const [navOpen, setNavOpen] = useState(false);
   // The board carries a clock because a dispatcher reads this screen against the wall clock. It is
   // rendered only after mount, so the server and the first client render cannot disagree.
@@ -149,7 +153,7 @@ function Shell() {
 
   // Derive the route actually shown during render, rather than correcting state after the
   // fact in an effect. A record-bound role never gets a render of a screen outside its scope.
-  const route: Route = items.some((i) => i.route === requestedRoute) ? requestedRoute : (portalRoute ?? "dashboard");
+  const route: Route = items.some((i) => i.route === requestedRoute) ? requestedRoute : homeRoute;
 
   const navigate = (next: Route) => {
     setRoute(next);
@@ -185,6 +189,7 @@ function Shell() {
     switch (route) {
       case "rentals": return <RentalsPage navigate={navigate} />;
       case "invoices": return <InvoicesPage />;
+      case "finance": return <FinanceHomePage navigate={navigate} />;
       case "reports": return <ReportsPage />;
       case "busing": return <StaffBusingPage />;
       case "logistics": return <StaffLogisticsPage />;

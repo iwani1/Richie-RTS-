@@ -4,6 +4,7 @@ import type { ReactElement, SVGProps } from "react";
 
 type IconName =
   | "dashboard"
+  | "money"
   | "rental"
   | "invoice"
   | "reports"
@@ -30,6 +31,13 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <path d="M3 17h14" />
       <path d="M5.5 17v-5M10 17V7M14.5 17v-8" />
+    </>
+  ),
+  // A cedi-ish coin with a bar through it: money as a total, not a document.
+  money: (
+    <>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 3.2v13.6M7.2 6.8h4.2a2.4 2.4 0 0 1 0 4.8H7.2h5.6" />
     </>
   ),
   // A document with a folded corner and a ruled line — a bill, not a page of editorial text.

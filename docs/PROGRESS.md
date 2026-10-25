@@ -81,7 +81,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | FIN-04 | 3 | Payment provider integration (for example Paystack or Flutterwave): verify webhook signatures, idempotent handling, never trust a browser redirect,… | Deferred | Phase 3. |
 | FIN-05 | 3 | Expenses: reference, date, category (fuel, maintenance, repairs, tyres, tolls, other), vehicle, trip, supplier, amount, method, receipt, recorded-by,… | Partial | Cost entries on incidents/work orders (category, amount, date, description). **No supplier, method, receipt or approval.** |
 | FIN-06 | 3 | Driver allowances, trip payments, overtime and payroll export, with configurable rules and approval. | Deferred | Phase 3. |
-| FIN-07 | 1C | Finance dashboard whose totals reconcile to transaction records. Margin is shown only when cost and revenue data are sufficient. | Not built | Finance sees the operations dashboard; there is no money view. |
+| FIN-07 | 1C | Finance dashboard whose totals reconcile to transaction records. Margin is shown only when cost and revenue data are sufficient. | Met | `src/tms/financeHome.ts` + `src/screens/FinanceHome.tsx` (Phase 34, D-84): a finance account lands on **Finance**; the period figures are `financialReport` itself, so they cannot disagree with the report and CSV behind them; overdue invoices, unbilled completed hires and payments still to verify are measured **as at today**, not inside the period. **Margin** is shown only under a written sufficiency rule (currency set, an invoice and a cost line in the period, and no hire completed in the period left unbilled) and otherwise names what is missing; it is labelled as not profit, with cash movement beside it. Tests: 15 domain (`financeHome.test.ts`), 5 screen (`FinanceHome.test.tsx`). |
 | FIN-08 | 3 | Payment reconciliation records. | Deferred | Phase 3. |
 | NTF-01 | 2 | Notification service: in-app channel first, provider interface for others, configurable templates, stored status, retry on failure, duplicate-event… | Deferred | Phase 2. No notification code exists at all. |
 | NTF-02 | 2 | SMS adapter through a Ghana-capable provider (candidates: Hubtel, Arkesel, mNotify; verify availability and pricing). SMS is the channel most staff… | Deferred | Phase 2. |
@@ -888,4 +888,23 @@ rider's seat on one run, and counts against the same seats as the roster.
 | Tests | Done (verified) | 16 domain (`bookings.test.ts`), 4 jsdom (`Bookings.test.tsx`), 1 settings (`Settings.test.tsx`) |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **451 passed, 16 skipped**, `build`
+succeeds.
+
+## Phase 34 - A money home for finance (FIN-07, D-84)
+
+Finance signed in and landed on the operations board: today's runs and the fleet, with the money two
+clicks away inside Reports. This gives the money side its own screen, built entirely out of the
+figures that already exist.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Finance lands on a money home, not the operations board | Done (verified) | `finance` route in `src/routes.ts`; `homeRoute` in `src/App.tsx` sends a finance account there; the nav entry is gated on `invoices:read`, so operations (which may read no invoices) does not see it |
+| The totals reconcile to the transaction records | Done (verified) | Every period figure is `financialReport(db, from, to)` — the same function behind the Reports screen and its CSV; the screen test asserts the two agree field by field |
+| Margin only when cost and revenue data are sufficient | Done (verified) | `margin` in `src/tms/financeHome.ts` with a written rule: currency set, ≥1 invoice issued, ≥1 cost line recorded, and **no hire completed in the period left unbilled**; otherwise the reason is shown. Five domain tests, one screen test |
+| What is late, what is unbilled, what still needs checking | Done (verified) | Overdue invoices (valued at what is still owed, longest overdue first), completed hires with no invoice, and payments recorded but not verified or reconciled, each measured **as at today** and saying so |
+| Money is withheld when there is no currency | Done (verified) | `status: "currency_not_set"`; the screen prints "Not configured" per cell and says why in the notice |
+| Coverage stated, nothing invented | Done (verified) | Invoice, customer-name, cost-category and completed-run coverage printed under the tables; "not profit" said in words beside margin and cash movement |
+| Tests | Done (verified) | 15 domain (`financeHome.test.ts`), 5 screen (`FinanceHome.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **471 passed, 16 skipped**, `build`
 succeeds.
