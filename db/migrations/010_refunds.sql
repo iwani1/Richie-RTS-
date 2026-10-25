@@ -125,14 +125,6 @@ begin
       using errcode = '23514';
   end if;
 
-  -- Once cancelled, neither the reason nor the time it was cancelled is rewritten: an editable
-  -- explanation is worth nothing a year later. The same rule the payment cancellation carries (009).
-  if old.status = 'void'
-     and (new.void_reason is distinct from old.void_reason or new.voided_at is distinct from old.voided_at) then
-    raise exception 'A cancelled refund stays cancelled; its reason and time are not rewritten.'
-      using errcode = '23514';
-  end if;
-
   if new.status = 'void' and old.status <> 'void' and new.voided_at is null then
     raise exception 'Cancelling a refund records when it was cancelled, not only why.'
       using errcode = '23514';

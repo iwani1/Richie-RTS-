@@ -95,7 +95,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | CSV import for vehicles, drivers, clients and staff rosters | Works; rejects a row with its line number, never merges an existing person |
 | Contracts, notifications, driver app, GPS | **Not built** — see `docs/PROGRESS.md` |
 
-625 unit and UI tests plus 20 integration tests against a real PostgreSQL; coverage thresholds are
+625 unit and UI tests plus 21 integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

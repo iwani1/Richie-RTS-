@@ -251,6 +251,20 @@ suite("workflow C and concurrency, against PostgreSQL", () => {
     // A deleted or edited credit note is refused outright, like an invoice.
     await expect(sql`delete from credit_note where id = ${note.id}`.execute(db())).rejects.toThrow(/never deleted/);
     await expect(sql`update credit_note set total = 1 where id = ${note.id}`.execute(db())).rejects.toThrow(/immutable/);
+
+    // A credit for the whole invoice, then voided: the ceiling must not count the row being written.
+    // Before 014 this was refused — "Credit of 3450.00 exceeds the 0.00 left" — because the void was
+    // saved through an insert statement and the row still counted as issued against itself.
+    const big = await step(
+      "issue_credit_note",
+      { input: { invoiceId: invoice.id, issuedOn: "2026-06-06", amount: "3000", description: "Whole hire not operated", reason: "Cancelled by the customer" } } as never,
+      adminId,
+      "2026-06-06T10:00:00.000Z",
+    );
+    const bigNote = big.creditNotes.find((entry) => entry.id !== note.id);
+    expect(bigNote).toMatchObject({ reference: "CN-2026-0002", total: 3450 });
+    const voidedBig = await step("void_credit_note", { id: bigNote!.id, reason: "Entered twice" } as never, adminId, "2026-06-06T11:00:00.000Z");
+    expect(voidedBig.creditNotes.find((entry) => entry.id === bigNote!.id)).toMatchObject({ status: "void", voidReason: "Entered twice" });
   }, 60_000);
 
   it("cancels a payment recorded in error, and the database refuses to un-cancel it (D-88)", async () => {

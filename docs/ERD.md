@@ -461,6 +461,10 @@ Constraints and triggers:
   constraint; `refund_frozen_trg` keeps the financial fields immutable and allows the cancellation to be
   set once; `refund_no_delete_trg` refuses a delete. A refund does **not** change `payment`, and the
   invoice's `amount_paid` is untouched by it.
+- **Ceilings on update (`013`, `014`, D-94).** `credit_note_within_invoice()` and `refund_within_due()`
+  run on INSERT, and records are saved with one `insert … on conflict (id) do update`, so they also ran
+  when a row was voided or cancelled — and counted that row against itself. Both now ignore a row that
+  is not live and exclude the row being written from the sum.
 - **`expense` (migration `011_expenses.sql`, D-93).** Money spent that is not a repair. Checks:
   `reference ~ '^EXP-[0-9]{4}-[0-9]{4,}$'`, `amount > 0`, `status in ('recorded','void')`,
   `expense_void_has_reason` (a void carries a reason and a time), `expense_held_has_reference` (the

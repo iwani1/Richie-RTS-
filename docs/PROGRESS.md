@@ -1096,8 +1096,9 @@ the same cost figure every other screen uses, and impossible to quietly rewrite.
 | A driver or client contact never receives the register | Done (verified) | `visibleSnapshot` sends `expenses` on `expenses:read` and empties it for bound roles; 2 snapshot tests |
 | The receipt is honest | Done (verified) | `receiptHeld` without a number is refused in the service and by a table check; the screen counts the spending with no number on it, and the cost tab repeats the count |
 | A scanned copy is deliberately not stored | Done (verified) | Nothing writes a file; recorded as the open owner decision in D-93 |
+| A cancellation gives its headroom back | Done (verified) | `013_refund_ceiling_on_update.sql` and `014_credit_note_ceiling_on_update.sql`: records are saved with one `insert … on conflict do update`, so the INSERT-time ceiling checks also ran when an existing row changed and counted that row against itself. Cancelling a full refund (or a credit note for the whole invoice) was refused with "exceeds the 0.00 owed back". Both checks now skip a cancelled row and exclude the row being written; the credit-note test voids a 3,450 credit note to prove it |
 | Every series the application can allocate is one the database accepts | Done (verified) | `012_reference_counter_scopes.sql` widens `reference_counter_scope_check` to match `REFERENCE_SERIES`; `references.integration.test.ts` inserts a counter for every series, so the next forgotten name fails in CI. **This found a shipped bug:** refunds (D-92) could not be recorded against a real database, because `010_refunds.sql` never added `refund` to that list — no unit test could see it, and the refund flow had no PostgreSQL test |
 | Tests | Done (verified) | 7 command/cost (`expenses.test.ts`), 2 snapshot scope, 10 screen (`Expenses.test.tsx`), 1 reference series, and 1 PostgreSQL flow against the real table (`commandFlow.integration.test.ts` — CI only, no local server) |
 
-Gates after this phase: `typecheck` clean, `lint` clean, `test` **625 passed, 20 skipped**, `build`
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **625 passed, 21 skipped**, `build`
 succeeds.

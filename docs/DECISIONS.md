@@ -1599,3 +1599,23 @@ decision the office makes, not one the system invents.
   `record_refund` on a real database returned a 400. `012_reference_counter_scopes.sql` widens the
   constraint, and `references.integration.test.ts` now inserts a counter for **every** series, so the
   next forgotten name fails in CI instead of in front of a finance officer.
+
+## D-94 A ceiling is measured without the row being written
+
+- **Context.** Two ceilings are enforced by a BEFORE INSERT trigger under a row lock: a credit note
+  may not take an invoice below zero (`008_credit_notes.sql`, D-86), and a refund may not pay back more
+  than is owed (`010_refunds.sql`, D-92). Both were right about the arithmetic and wrong about when they
+  run. Every save goes through one `insert … on conflict (id) do update` statement, and PostgreSQL fires
+  BEFORE INSERT row triggers for those rows even when the row is being updated. So:
+  - **cancelling a refund** was refused, because the row being cancelled still counted as paid out;
+  - **voiding a credit note** was accepted only while the note was small enough for the doubled figure
+    to still fit under the invoice — a fixture-dependent bug, hidden by a 1,150 credit on a 3,450
+    invoice.
+- **Decision.** A ceiling check does two things it did not do before: it **ignores a row that is not
+  live** (a void credit note took nothing off the bill; a cancelled refund gave nothing back), and it
+  **excludes the row being written** by id from the sum it compares against. `013` and `014` replace the
+  two functions rather than editing `008` and `010`, because migrations are applied once and recorded —
+  a change made inside an applied file never reaches the databases that already have it.
+- **Consequence.** Cancelling a refund and voiding a credit note both work against a real database, and
+  give the headroom back. `commandFlow.integration.test.ts` voids a credit note for the invoice's whole
+  total, which is the case the old trigger refused, so the bug cannot return quietly.
