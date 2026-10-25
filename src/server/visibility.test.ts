@@ -5,7 +5,7 @@
 // They assert the shape of the payload the HTTP layer sends, not what a screen chooses to render.
 import { describe, expect, it } from "vitest";
 import { SNAPSHOT_AUDIT_LIMIT, scopeDatabase, visibleSnapshot } from "./visibility";
-import { emptyDatabase, type AuditEntry, type Client, type Database, type Driver, type Trip, type User, type Vehicle } from "../tms/types";
+import { emptyDatabase, type AuditEntry, type Booking, type Client, type Database, type Driver, type Trip, type User, type Vehicle } from "../tms/types";
 
 const at = "2026-01-01T00:00:00.000Z";
 
@@ -81,6 +81,27 @@ const trip = (id: string, driverId: string, vehicleId: string, routeId: string):
   corrections: [], rosterChanges: [],
   origin: "schedule",
   originReason: null,
+  createdAt: at,
+  updatedAt: at,
+});
+
+const booking = (id: string, tripId: string, passengerId: string, clientId: string, reference: string): Booking => ({
+  id,
+  reference,
+  passengerId,
+  clientId,
+  routeId: "r1",
+  stopId: null,
+  tripId,
+  serviceDate: "2026-01-01",
+  type: "one_time",
+  status: "confirmed",
+  note: "",
+  seriesId: null,
+  offeredAt: null,
+  cancelledAt: null,
+  cancelledBy: null,
+  history: [],
   createdAt: at,
   updatedAt: at,
 });
@@ -247,5 +268,44 @@ describe("snapshot scope", () => {
     const visible = visibleSnapshot(world(), actor("driver-user", "driver"));
     expect(visible.database!.audit).toEqual([]);
     expect(visible.auditTotal).toBe(1200);
+  });
+});
+
+describe("the seats a bound account may see (D-85)", () => {
+  /** A visitor with no route of their own, holding a booked seat on the driver's run, plus another client's booking. */
+  function withBookings(): Database {
+    const w = world();
+    w.passengers = [
+      { id: "p1", clientId: "c1", fullName: "Ama Boateng", employeeRef: "E-1", phone: "+233200000001", routeId: "r1", stopId: null, status: "active", createdAt: at, updatedAt: at },
+      { id: "p2", clientId: "c1", fullName: "Visiting Vic", employeeRef: "", phone: "+233200000002", routeId: "", stopId: "", status: "active", createdAt: at, updatedAt: at },
+      { id: "p3", clientId: "c2", fullName: "Other Client Rider", employeeRef: "", phone: "", routeId: "", stopId: "", status: "active", createdAt: at, updatedAt: at },
+    ];
+    w.bookings = [booking("b1", "t1", "p2", "c1", "BK-0001"), booking("b2", "t2", "p3", "c2", "BK-0002")];
+    return w;
+  }
+
+  it("sends a driver the seats on their own run and the name to collect, and nothing else", () => {
+    const visible = scopeDatabase(withBookings(), actor("driver-user", "driver"))!;
+    expect(visible.bookings.map((b) => b.reference)).toEqual(["BK-0001"]);
+    // Without the visitor's passenger record the driver would have a seat and nobody to call for.
+    expect(visible.passengers.map((p) => p.fullName)).toContain("Visiting Vic");
+    expect(visible.passengers.map((p) => p.fullName)).not.toContain("Other Client Rider");
+  });
+
+  it("sends a client contact only its own client's seats, never the whole register", () => {
+    const visible = scopeDatabase(withBookings(), actor("client-user", "client_contact"))!;
+    expect(visible.bookings.map((b) => b.reference)).toEqual(["BK-0001"]);
+  });
+
+  it("sends a role that may not read bookings none at all", () => {
+    const visible = scopeDatabase(withBookings(), actor("fin", "finance"))!;
+    expect(visible.bookings).toEqual([]);
+  });
+
+  it("still leaves the booking register out of a bound account's view of another record", () => {
+    // The snapshot for a bound role is a whitelist; this pins the seats to that role's own records.
+    const visible = scopeDatabase(withBookings(), actor("other-driver-user", "driver"))!;
+    expect(visible.bookings.map((b) => b.reference)).toEqual(["BK-0002"]);
+    expect(visible.passengers.map((p) => p.fullName)).toContain("Other Client Rider");
   });
 });

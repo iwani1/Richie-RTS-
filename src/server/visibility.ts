@@ -106,6 +106,9 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       vehicles: view.vehicles,
       workOrders: view.workOrders,
       documents: view.documents,
+      // D-85: a bound role gets the seats it may see and nothing else. Leaving this collection out of
+      // the narrowed snapshot handed the whole bookings table to a client contact or a driver.
+      bookings: view.bookings,
       odometerReadings: database.odometerReadings.filter((reading) => vehicleIds.has(reading.vehicleId)),
       invoices: [],
       payments: [],

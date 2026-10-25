@@ -164,7 +164,7 @@ describe("Driver portal (jsdom)", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Record next stop/i }));
     dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/Actual arrival at Alpha office/i), { target: { value: "06:31" } });
-    expect(within(dialog).getByText(/No active passengers are assigned to this stop/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Nobody is expected at this stop/i)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: /Save stop/i }));
     await screen.findByText(/Alpha office recorded/i);
 

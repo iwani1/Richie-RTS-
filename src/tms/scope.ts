@@ -88,6 +88,16 @@ export function scopedView(db: Database, actor: Actor | null) {
     const tripIds = new Set(trips.map((t) => t.id));
     const vehicleIds = new Set(trips.map((t) => t.vehicleId).filter(Boolean) as string[]);
     const routeIds = new Set(trips.map((t) => t.routeId));
+    // D-85: a booked rider usually has no route of their own, so "passengers on my routes" would
+    // leave the driver with a seat and no name to call. A rider holding a confirmed seat on one of
+    // this driver's runs is part of that run's list of people, and nothing else about them is shown.
+    // Only a seat that still holds one: a request or a waiting-list place is not a passenger this
+    // driver is collecting, and nothing about it belongs in their payload.
+    const bookedOnMyRuns = new Set(
+      db.bookings
+        .filter((booking) => tripIds.has(booking.tripId) && (booking.status === "confirmed" || booking.status === "offered"))
+        .map((booking) => booking.passengerId),
+    );
     return {
       link,
       trips,
@@ -95,7 +105,7 @@ export function scopedView(db: Database, actor: Actor | null) {
       incidents: db.incidents.filter((i) => (i.tripId !== null && tripIds.has(i.tripId)) || (i.vehicleId !== null && vehicleIds.has(i.vehicleId))),
       routes: db.routes.filter((r) => routeIds.has(r.id)),
       // Roster details are minimised in the portal; only name and pickup stop are shown.
-      passengers: db.passengers.filter((p) => p.routeId !== null && routeIds.has(p.routeId)),
+      passengers: db.passengers.filter((p) => (p.routeId !== null && routeIds.has(p.routeId)) || bookedOnMyRuns.has(p.id)),
       rentals: [] as Rental[],
       vehicles: db.vehicles.filter((v) => vehicleIds.has(v.id)),
       workOrders: [],

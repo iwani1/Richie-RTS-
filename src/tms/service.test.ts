@@ -33,7 +33,7 @@ function withCategory(db: Database, admin: Actor): Database {
 describe("permissions", () => {
   it("administrator has every permission; record-bound roles get only their own-record set", () => {
     expect(can("administrator", "settings:update")).toBe(true);
-    expect(ROLE_PERMISSIONS.driver).toEqual(["trips:read", "trips:start", "trips:record", "trips:complete", "incidents:read", "incidents:create", "documents:read"]);
+    expect(ROLE_PERMISSIONS.driver).toEqual(["trips:read", "trips:start", "trips:record", "trips:complete", "incidents:read", "incidents:create", "documents:read", "bookings:read"]);
     expect(ROLE_PERMISSIONS.client_contact).toEqual(["routes:read", "passengers:read", "rentals:read", "rentals:create", "bookings:read", "bookings:create"]);
     // Record-bound roles never reach internal administration.
     expect(can("driver", "settings:update")).toBe(false);

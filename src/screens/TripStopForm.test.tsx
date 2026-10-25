@@ -4,6 +4,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TripStopForm } from "./TripStopForm";
+import type { ManifestRider } from "../tms/bookings";
 import type { BusRoute, Passenger, Trip } from "../tms/types";
 
 afterEach(cleanup);
@@ -70,8 +71,11 @@ const rider = (fullName: string, id: string): Passenger => ({
   updatedAt: at,
 });
 
-const renderForm = (t: Trip, roster: Passenger[] = [rider("Ama Boateng", "p1")]) =>
-  render(<TripStopForm trip={t} route={route} roster={roster} onClose={() => {}} onSubmit={vi.fn(async () => ({}))} />);
+const manifestOf = (passengers: Passenger[] = [rider("Ama Boateng", "p1")]): ManifestRider[] =>
+  passengers.map((passenger) => ({ passenger, source: "roster" as const, bookingReference: null, pickupStopId: passenger.stopId ?? "s1" }));
+
+const renderForm = (t: Trip, passengers: Passenger[] = [rider("Ama Boateng", "p1")]) =>
+  render(<TripStopForm trip={t} route={route} manifest={manifestOf(passengers)} onClose={() => {}} onSubmit={vi.fn(async () => ({}))} />);
 
 describe("the roster marker on the driver's stop form", () => {
   it("says nothing when the roster has not moved since the run started", () => {
@@ -102,7 +106,7 @@ describe("the roster marker on the driver's stop form", () => {
     );
     expect(screen.getByLabelText(/Actual arrival at Estate gate/)).toBeTruthy();
     expect(screen.getByLabelText(/Ama Boateng/)).toBeTruthy();
-    // The rider list is the roster as it is now, and the banner says so.
-    expect(screen.getByText(/The list of riders below is the roster as it is now/i)).toBeTruthy();
+    // The rider list is the roster and the booked seats as they are now, and the banner says so.
+    expect(screen.getByText(/is the roster and the seats booked for this run, as they are now/i)).toBeTruthy();
   });
 });

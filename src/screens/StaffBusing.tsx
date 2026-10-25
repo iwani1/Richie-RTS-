@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { MAX_GENERATE_DAYS, type AdhocTripInput, type CompleteTripInput, type PassengerInput, type RouteInput, type TripAssignInput, type TripCorrectionInput } from "../tms/busing";
-import { capacityOf, type BookingRequestInput } from "../tms/bookings";
+import { capacityOf, manifestFor, type BookingRequestInput, type ManifestRider } from "../tms/bookings";
 import { TripStopForm } from "./TripStopForm";
 import { onTimeReport } from "../tms/kpis";
 import type { Permission } from "../tms/permissions";
@@ -598,7 +598,8 @@ function TripsTab() {
   };
 
   const panelRoute = panel ? routeOf(panel.trip.routeId) : undefined;
-  const roster = panel ? db.passengers.filter((p) => p.routeId === panel.trip.routeId && p.status === "active") : [];
+  // D-85: the people a run is expected to carry are the roster *and* the seats sold for it.
+  const manifest: ManifestRider[] = panel ? manifestFor(db, panel.trip) : [];
 
   // The day at a glance, derived from the runs actually on the sheet — no stored counters.
   const byStatus = (status: TripStatus) => trips.filter((t) => t.status === status).length;
@@ -753,7 +754,7 @@ function TripsTab() {
         <CompleteForm
           trip={panel.trip}
           route={panelRoute}
-          roster={roster}
+          manifest={manifest}
           onClose={() => setPanel(null)}
           onSubmit={async (input) => {
             const result = await dispatch({ type: "complete_trip", id: panel.trip.id, input });
@@ -767,7 +768,7 @@ function TripsTab() {
         <TripStopForm
           trip={panel.trip}
           route={panelRoute}
-          roster={roster}
+          manifest={manifest}
           onClose={() => setPanel(null)}
           onSubmit={async (input) => {
             const result = await dispatch({ type: "record_trip_stop", id: panel.trip.id, input });
@@ -781,7 +782,7 @@ function TripsTab() {
         <CorrectForm
           trip={panel.trip}
           route={panelRoute}
-          roster={db.passengers.filter((p) => p.routeId === panel.trip.routeId)}
+          riders={manifest.map((entry) => entry.passenger)}
           onClose={() => setPanel(null)}
           onSubmit={async (input) => {
             const result = await dispatch({ type: "correct_trip_record", id: panel.trip.id, input });
@@ -944,13 +945,13 @@ function AssignForm({ trip, route, onClose, onSubmit }: { trip: Trip; route: Bus
 function CompleteForm({
   trip,
   route,
-  roster,
+  manifest,
   onClose,
   onSubmit,
 }: {
   trip: Trip;
   route: BusRoute;
-  roster: Passenger[];
+  manifest: ManifestRider[];
   onClose: () => void;
   onSubmit: (input: CompleteTripInput) => Errors | Promise<Errors>;
 }) {
@@ -963,7 +964,7 @@ function CompleteForm({
     setErrors(
       (await onSubmit({
         stopTimes: route.stops.map((s) => ({ stopId: s.id, actualTime: times[s.id] ?? "" })),
-        boardings: roster.map((p) => ({ passengerId: p.id, outcome: outcomes[p.id] ?? "boarded" })),
+        boardings: manifest.map((entry) => ({ passengerId: entry.passenger.id, outcome: outcomes[entry.passenger.id] ?? "boarded" })),
       })) ?? {},
     );
   };
@@ -971,7 +972,7 @@ function CompleteForm({
   return (
     <Panel
       title={`Record completion: ${trip.reference}`}
-      description="Enter the actual time at every stop and an outcome for every active passenger on this route."
+      description="Enter the actual time at every stop and an outcome for everyone this run is expected to carry — the roster and any booked seats."
       onClose={onClose}
     >
       <form onSubmit={submit} className="space-y-5">
@@ -992,17 +993,26 @@ function CompleteForm({
         </section>
 
         <section>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-stone-500">Passengers ({roster.length})</h3>
-          {roster.length === 0 ? (
-            <p className="text-xs text-stone-500">No active passengers are on this route. The trip can be completed with stop times only.</p>
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-stone-500">Riders ({manifest.length})</h3>
+          {manifest.length === 0 ? (
+            <p className="text-xs text-stone-500">Nobody is expected on this run. It can be completed with stop times only.</p>
           ) : (
             <ul className="space-y-2">
-              {roster.map((p) => {
-                const stop = route.stops.find((s) => s.id === p.stopId);
+              {manifest.map((entry) => {
+                const stop = route.stops.find((s) => s.id === entry.pickupStopId);
+                const hint =
+                  entry.source === "booking"
+                    ? `Booked seat ${entry.bookingReference ?? ""}${stop ? ` · pickup ${stop.name}` : ""}`
+                    : stop
+                      ? `Pickup: ${stop.name}`
+                      : undefined;
                 return (
-                  <li key={p.id}>
-                    <Field label={`Outcome for ${p.fullName}`} hint={stop ? `Pickup: ${stop.name}` : undefined}>
-                      <Select value={outcomes[p.id] ?? "boarded"} onChange={(e) => setOutcomes({ ...outcomes, [p.id]: e.target.value as BoardingOutcome })}>
+                  <li key={entry.passenger.id}>
+                    <Field label={`Outcome for ${entry.passenger.fullName}`} hint={hint}>
+                      <Select
+                        value={outcomes[entry.passenger.id] ?? "boarded"}
+                        onChange={(e) => setOutcomes({ ...outcomes, [entry.passenger.id]: e.target.value as BoardingOutcome })}
+                      >
                         <option value="boarded">Boarded</option>
                         <option value="no_show">No-show</option>
                       </Select>
@@ -1108,13 +1118,14 @@ function CancelForm({
 function CorrectForm({
   trip,
   route,
-  roster,
+  riders,
   onClose,
   onSubmit,
 }: {
   trip: Trip;
   route: BusRoute;
-  roster: Passenger[];
+  /** Only used to put a name against a recorded outcome, which may belong to a booked rider (D-85). */
+  riders: Passenger[];
   onClose: () => void;
   onSubmit: (input: TripCorrectionInput) => Errors | Promise<Errors>;
 }) {
@@ -1129,7 +1140,7 @@ function CorrectForm({
     .map((log) => ({ log, stop: route.stops.find((candidate) => candidate.id === log.stopId) }))
     .filter((entry) => entry.stop);
   const stopBoardings = trip.boardings.filter((record) => record.stopId === stopId);
-  const nameOf = (id: string) => roster.find((p) => p.id === id)?.fullName ?? "Former rider";
+  const nameOf = (id: string) => riders.find((p) => p.id === id)?.fullName ?? "Former rider";
   const currentTime = trip.stopLogs.find((log) => log.stopId === stopId)?.actualTime ?? "";
   const currentOutcome = trip.boardings.find((record) => record.passengerId === passengerId && record.stopId === stopId)?.outcome ?? "";
 

@@ -5,7 +5,7 @@
 // waiting list that is *offered* a freed seat and never auto-confirmed, cancellation with a reason
 // and a cut-off, and a history of what changed.
 import { describe, expect, it } from "vitest";
-import { capacityOf, seatsHeld } from "./bookings";
+import { capacityOf, manifestAtStop, manifestFor, seatsHeld } from "./bookings";
 import { executeCommand, type AnyCommand } from "./commands";
 import { execute, type Actor, type CommandResult, type Credential } from "./service";
 import type { RouteInput } from "./busing";
@@ -456,5 +456,138 @@ describe("bookings - who may book and cancel (D-60)", () => {
     const confirm = attempt(own.db, contact, { type: "confirm_booking", id: own.db.bookings[0].id });
     expect(confirm.ok).toBe(false);
     if (!confirm.ok) expect(confirm.message).toMatch(/Not permitted/);
+  });
+});
+
+describe("bookings - a booked seat is on the run's list of people (D-85)", () => {
+  /** A confirmed booked seat for the visitor, on the fixture's 06:00 run. */
+  function withBookedSeat(w: World) {
+    let db = run(w.db, w.ops, request(w, { note: "Interview candidate." }));
+    const bookingId = db.bookings[0].id;
+    db = run(db, w.ops, { type: "confirm_booking", id: bookingId });
+    return { db, bookingId };
+  }
+
+  it("puts a confirmed seat on the manifest at its pickup stop, and leaves a request off it", () => {
+    const w = build();
+    // A request holds nothing, so nobody is expected aboard yet.
+    const requested = run(w.db, w.ops, request(w));
+    expect(manifestFor(requested, tripOf(requested, w.tripId))).toHaveLength(w.rosterIds.length);
+
+    const confirmed = run(requested, w.ops, { type: "confirm_booking", id: requested.bookings[0].id });
+    const manifest = manifestFor(confirmed, tripOf(confirmed, w.tripId));
+    expect(manifest).toHaveLength(w.rosterIds.length + 1);
+    const visitor = manifest.find((entry) => entry.source === "booking")!;
+    expect(visitor.passenger.fullName).toBe("Visiting Vic");
+    expect(visitor.bookingReference).toBe("BK-0001");
+    // A visitor with no stop of their own gets on at the first stop, where the bus actually is.
+    expect(visitor.pickupStopId).toBe(confirmed.routes[0].stops[0].id);
+    expect(manifestAtStop(confirmed, tripOf(confirmed, w.tripId), visitor.pickupStopId)).toHaveLength(3);
+  });
+
+  it("takes a cancelled seat off the manifest", () => {
+    const w = build();
+    const { db, bookingId } = withBookedSeat(w);
+    const cancelled = run(db, w.ops, { type: "cancel_booking", id: bookingId, reason: "Interview cancelled." });
+    expect(manifestFor(cancelled, tripOf(cancelled, w.tripId)).some((entry) => entry.source === "booking")).toBe(false);
+  });
+
+  it("counts a rider once, as a roster rider, if they are on the roster and hold a seat", () => {
+    const w = build();
+    const { db } = withBookedSeat(w);
+    // Reach into the record the way a later roster change would: the visitor joins this route's roster.
+    const rid = db.bookings[0].passengerId;
+    const edited: Database = {
+      ...db,
+      passengers: db.passengers.map((passenger) => (passenger.id === rid ? { ...passenger, routeId: w.routeId, stopId: db.routes[0].stops[0].id } : passenger)),
+    };
+    const manifest = manifestFor(edited, tripOf(edited, w.tripId));
+    expect(manifest.filter((entry) => entry.passenger.id === rid)).toHaveLength(1);
+    expect(manifest.find((entry) => entry.passenger.id === rid)!.source).toBe("roster");
+  });
+
+  it("will not record a stop that leaves the booked visitor unaccounted for", () => {
+    const w = build();
+    const { db } = withBookedSeat(w);
+    const dispatched = run(db, w.ops, { type: "dispatch_trip", id: w.tripId });
+    const started = run(dispatched, w.ops, { type: "start_trip", id: w.tripId });
+    const stopId = started.routes[0].stops[0].id;
+
+    // The two roster riders are not the whole list any more.
+    const partial = attempt(started, w.ops, {
+      type: "record_trip_stop",
+      id: w.tripId,
+      input: { stopId, actualTime: "06:03", boardings: w.rosterIds.map((passengerId) => ({ passengerId, outcome: "boarded" as const })) },
+    });
+    expect(partial.ok).toBe(false);
+    if (!partial.ok) expect(partial.errors.boardings).toMatch(/every rider expected at Estate gate \(3\)/);
+
+    const visitorId = started.bookings[0].passengerId;
+    const complete = attempt(started, w.ops, {
+      type: "record_trip_stop",
+      id: w.tripId,
+      input: {
+        stopId,
+        actualTime: "06:03",
+        boardings: [...w.rosterIds.map((passengerId) => ({ passengerId, outcome: "boarded" as const })), { passengerId: visitorId, outcome: "boarded" as const }],
+      },
+    });
+    expect(complete.ok).toBe(true);
+    if (complete.ok) expect(complete.db.trips.find((trip) => trip.id === w.tripId)!.boardings).toHaveLength(3);
+  });
+
+  it("will not complete a run that leaves the booked visitor unaccounted for", () => {
+    const w = build();
+    const { db } = withBookedSeat(w);
+    const dispatched = run(db, w.ops, { type: "dispatch_trip", id: w.tripId });
+    const stops = dispatched.routes[0].stops;
+    const visitorId = db.bookings[0].passengerId;
+    const times = stops.map((stop) => ({ stopId: stop.id, actualTime: "06:05" }));
+
+    const partial = attempt(dispatched, w.ops, {
+      type: "complete_trip",
+      id: w.tripId,
+      input: { stopTimes: times, boardings: w.rosterIds.map((passengerId) => ({ passengerId, outcome: "boarded" as const })) },
+    });
+    expect(partial.ok).toBe(false);
+    if (!partial.ok) expect(partial.errors.boardings).toMatch(/1 still to record/);
+
+    const complete = attempt(dispatched, w.ops, {
+      type: "complete_trip",
+      id: w.tripId,
+      input: {
+        stopTimes: times,
+        boardings: [...w.rosterIds.map((passengerId) => ({ passengerId, outcome: "boarded" as const })), { passengerId: visitorId, outcome: "no_show" as const }],
+      },
+    });
+    expect(complete.ok).toBe(true);
+    if (!complete.ok) return;
+    const trip = complete.db.trips.find((candidate) => candidate.id === w.tripId)!;
+    expect(trip.status).toBe("completed");
+    expect(trip.boardings.find((record) => record.passengerId === visitorId)!.outcome).toBe("no_show");
+    expect(complete.message).toMatch(/On time/);
+  });
+
+  it("refuses a new seat once the run is under way, because the list of people is fixed", () => {
+    const w = build();
+    const dispatched = run(w.db, w.ops, { type: "dispatch_trip", id: w.tripId });
+    const started = run(dispatched, w.ops, { type: "start_trip", id: w.tripId });
+    const late = attempt(started, w.ops, request(w));
+    expect(late.ok).toBe(false);
+    if (!late.ok) expect(late.message).toMatch(/already under way; its list of riders is fixed/);
+  });
+
+  it("will not move the run to a smaller vehicle than the roster and the sold seats need", () => {
+    const w = build({ seats: "4", rosterSize: 2 });
+    const guest = addVisitor(w, "Third Guest");
+    let db = run(guest.db, w.ops, request(w, { passengerId: guest.id }));
+    db = run(db, w.ops, { type: "confirm_booking", id: db.bookings[0].id });
+
+    // A second, smaller bus in the same category: 2 seats cannot carry 2 roster riders + 1 booked seat.
+    db = run(db, w.ops, { type: "create_vehicle", input: { registration: "GT 902-26", categoryId: db.settings.vehicleCategories[0].id, make: "", model: "", seatCapacity: "2", notes: "" } });
+    const small = db.vehicles[db.vehicles.length - 1].id;
+    const reassign = attempt(db, w.ops, { type: "assign_trip", id: w.tripId, input: { vehicleId: small, driverId: db.drivers[0].id } });
+    expect(reassign.ok).toBe(false);
+    if (!reassign.ok) expect(reassign.errors.vehicleId).toMatch(/booked seat\(s\)/);
   });
 });

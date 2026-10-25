@@ -3,6 +3,7 @@
 // Every write goes through executeBusing(), which checks permissions, validates input,
 // enforces the trip state machine and writes an audit entry.
 
+import { manifestAtStop, manifestFor, seatsHeld } from "./bookings";
 import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
 import { overdueServiceFor } from "./maintenance";
 import { audit, authorise, fail, isValidDate, makeId, norm, TIME_RE, type Actor, type CommandResult, type Errors } from "./service";
@@ -367,8 +368,10 @@ function activeRoster(db: Database, routeId: string): number {
 function midRunCapacityErrors(db: Database, routeId: string | null, extraActive: number): Errors {
   if (!routeId || extraActive <= 0) return {};
   const running = db.trips.filter((trip) => trip.routeId === routeId && trip.status === "in_progress" && trip.vehicleId);
-  const count = activeRoster(db, routeId) + extraActive;
   for (const trip of running) {
+    // D-85: the seats sold for this run are already on the bus, so a rider added mid-run is measured
+    // against them too.
+    const count = activeRoster(db, routeId) + extraActive + seatsHeld(db, trip.id);
     const vehicle = db.vehicles.find((candidate) => candidate.id === trip.vehicleId);
     if (vehicle && vehicle.seatCapacity < count) {
       return {
@@ -404,8 +407,11 @@ function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: s
   else if (!vehicle) errors.vehicleId = "Unknown vehicle.";
   else if (vehicle.categoryId !== route.vehicleCategoryId) errors.vehicleId = "Vehicle category does not match the route.";
   else if (vehicle.status !== "available") errors.vehicleId = `Vehicle must be Available to be assigned (currently ${VEHICLE_STATUS_LABELS[vehicle.status].toLowerCase()}).`;
-  else if (vehicle.seatCapacity < activeRoster(db, route.id))
-    errors.vehicleId = `This vehicle seats ${vehicle.seatCapacity}; ${route.reference} has ${activeRoster(db, route.id)} active passengers. Use a larger vehicle or take staff off the roster first.`;
+  else if (vehicle.seatCapacity < activeRoster(db, route.id) + seatsHeld(db, trip.id))
+    // D-85: the roster and the seats sold for this run are carried by the same vehicle, so the
+    // vehicle is judged against both. Without this, reassigning to a smaller bus would strand a
+    // booked visitor whose seat the office has already promised.
+    errors.vehicleId = `This vehicle seats ${vehicle.seatCapacity}; ${route.reference} has ${activeRoster(db, route.id)} active passengers and ${seatsHeld(db, trip.id)} booked seat(s). Use a larger vehicle, or take staff off the roster first.`;
   else {
     // Mandatory papers are checked against the service date of the run (Q-16, D-76).
     const gaps = requiredDocumentGaps(db, "vehicle", vehicle.id, trip.serviceDate);
@@ -840,13 +846,17 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       if (TIME_RE.test(actualTime) && previousTime && actualTime < previousTime)
         errors.actualTime = `Actual time cannot go backwards from the previous stop (${previousTime}).`;
 
-      const expected = db.passengers.filter((p) => p.routeId === route.id && p.stopId === nextStop.id && p.status === "active");
+      // D-85: the people to account for at this stop are the roster *and* whoever holds a booked
+      // seat here. A visitor left off the list is a visitor nobody records.
+      const expected = manifestAtStop(db, existing, nextStop.id)
+        .map((entry) => entry.passenger)
+        .filter((passenger) => !existing.boardings.some((record) => record.passengerId === passenger.id));
       const seen = new Set<string>();
       const newBoardings: BoardingRecord[] = [];
       for (const item of command.input.boardings) {
         const passenger = expected.find((p) => p.id === item.passengerId);
         if (!passenger) {
-          errors.boardings = "A passenger is not on the active roster for this stop.";
+          errors.boardings = "A rider is not expected at this stop on this run.";
           continue;
         }
         if (seen.has(passenger.id) || existing.boardings.some((record) => record.passengerId === passenger.id)) {
@@ -861,7 +871,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         newBoardings.push({ passengerId: passenger.id, stopId: nextStop.id, outcome: item.outcome });
       }
       if (!errors.boardings && seen.size !== expected.length)
-        errors.boardings = `Record an outcome for every active passenger at ${nextStop.name} (${expected.length}).`;
+        errors.boardings = `Record an outcome for every rider expected at ${nextStop.name} (${expected.length}).`;
       if (Object.keys(errors).length) return fail("This stop record is incomplete. See the highlighted fields.", errors);
 
       const updated: Trip = {
@@ -910,28 +920,34 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         if (!TIME_RE.test(times.get(s.id) ?? "")) errors[`stopTimes.${i}`] = "Enter the actual time at this stop (HH:MM).";
       });
 
-      const roster = db.passengers.filter((p) => p.routeId === route.id && p.status === "active");
+      // D-85: the manifest is the roster plus the seats that were sold for this run.
+      const manifest = manifestFor(db, existing);
+      const expected = new Map(manifest.map((entry) => [entry.passenger.id, entry]));
       const boardings: BoardingRecord[] = [...existing.boardings];
       const seen = new Set<string>();
       for (const b of command.input?.boardings ?? []) {
-        const passenger = roster.find((p) => p.id === b.passengerId);
-        if (!passenger) {
-          errors.boardings = "A recorded passenger is not on this route's active roster.";
+        const entry = expected.get(b.passengerId);
+        if (!entry) {
+          errors.boardings = "A recorded rider is not expected on this run.";
           continue;
         }
-        if (seen.has(passenger.id) || boardings.some((record) => record.passengerId === passenger.id)) {
-          errors.boardings = "A passenger has more than one outcome recorded.";
+        if (seen.has(b.passengerId) || boardings.some((record) => record.passengerId === b.passengerId)) {
+          errors.boardings = "A rider has more than one outcome recorded.";
           continue;
         }
         if (b.outcome !== "boarded" && b.outcome !== "no_show") {
           errors.boardings = "Invalid boarding outcome.";
           continue;
         }
-        seen.add(passenger.id);
-        boardings.push({ passengerId: passenger.id, stopId: passenger.stopId ?? "", outcome: b.outcome });
+        seen.add(b.passengerId);
+        boardings.push({ passengerId: b.passengerId, stopId: entry.pickupStopId, outcome: b.outcome });
       }
-      if (!errors.boardings && boardings.length !== roster.length)
-        errors.boardings = `Record an outcome for every active passenger on this route (${roster.length}).`;
+      // Every rider expected on the run must be accounted for. A record already on the run counts:
+      // it was made when that rider was expected, and a roster or a booking change since then does
+      // not turn a recorded boarding into a missing one.
+      const unaccounted = manifest.filter((entry) => !boardings.some((record) => record.passengerId === entry.passenger.id));
+      if (!errors.boardings && unaccounted.length > 0)
+        errors.boardings = `Record an outcome for every rider expected on this run (${unaccounted.length} still to record).`;
       if (Object.keys(errors).length) return fail("The trip record is incomplete. See the highlighted fields.", errors);
 
       const threshold = db.settings.onTimeThresholdMinutes;

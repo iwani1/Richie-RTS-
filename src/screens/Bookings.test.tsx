@@ -190,6 +190,71 @@ const openBookings = (db: Database, dispatch: Tms["dispatch"]) => {
   fireEvent.click(screen.getByRole("tab", { name: /Bookings/i }));
 };
 
+describe("booked riders on the run's list of people (D-85)", () => {
+  const openTrips = (db: Database, dispatch: Tms["dispatch"]) => {
+    render(
+      <TmsContext.Provider value={makeTms(db, dispatch)}>
+        <StaffBusingPage />
+      </TmsContext.Provider>,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /Trips/i }));
+  };
+
+  it("asks for a booked visitor by name when the next stop is recorded", () => {
+    const { db, dispatch } = world();
+    const running: Database = { ...db, trips: [{ ...trip, status: "in_progress", startedAt: at }] };
+    openTrips(running, dispatch);
+
+    fireEvent.click(screen.getByRole("button", { name: /Record next stop/i }));
+    // The roster riders at this stop, and the three seats that still hold one.
+    expect(screen.getByText(/Boarding at this stop \(5\)/)).toBeTruthy();
+    expect(screen.getByText(/Booked seat BK-0001 — not on the regular roster/i)).toBeTruthy();
+    expect(screen.getByText(/Booked seat BK-0003 — not on the regular roster/i)).toBeTruthy();
+    // A requested or waitlisted seat is not a person to collect.
+    expect(screen.queryByText(/BK-0004/)).toBeNull();
+  });
+
+  it("sends an outcome for every expected rider, booked seats included", () => {
+    const { db, dispatch } = world();
+    const running: Database = { ...db, trips: [{ ...trip, status: "in_progress", startedAt: at }] };
+    openTrips(running, dispatch);
+
+    fireEvent.click(screen.getByRole("button", { name: /Record next stop/i }));
+    fireEvent.change(screen.getByLabelText(/Actual arrival at Estate gate/i), { target: { value: "06:03" } });
+    for (const name of ["Roster One", "Roster Two", "Visiting Vic", "New Hire Naa", "Waiter One"]) {
+      fireEvent.change(screen.getByLabelText(new RegExp(`^${name}`)), { target: { value: "boarded" } });
+    }
+    fireEvent.click(screen.getByRole("button", { name: /Save stop/i }));
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "record_trip_stop",
+      id: "t1",
+      input: {
+        stopId: "s1",
+        actualTime: "06:03",
+        boardings: [
+          { passengerId: "p1", outcome: "boarded" },
+          { passengerId: "p2", outcome: "boarded" },
+          { passengerId: "p3", outcome: "boarded" },
+          { passengerId: "p4", outcome: "boarded" },
+          { passengerId: "p5", outcome: "boarded" },
+        ],
+      },
+    });
+  });
+
+  it("shows the booked riders in the full completion form, with the seat they hold", () => {
+    const { db, dispatch } = world();
+    const dispatched: Database = { ...db, trips: [{ ...trip, status: "dispatched", dispatchedAt: at }] };
+    openTrips(dispatched, dispatch);
+
+    fireEvent.click(screen.getByRole("button", { name: /Record full completion/i }));
+    expect(screen.getByText(/Riders \(5\)/)).toBeTruthy();
+    expect(screen.getByLabelText(/Outcome for Visiting Vic/i)).toBeTruthy();
+    expect(screen.getByText(/Booked seat BK-0001/i)).toBeTruthy();
+  });
+});
+
 describe("bookings tab", () => {
   it("shows the seats held against the vehicle, counting the roster and the bookings", () => {
     const { db, dispatch } = world();

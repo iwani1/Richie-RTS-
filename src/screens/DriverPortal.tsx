@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { documentStatus } from "../tms/compliance";
 import type { IncidentInput } from "../tms/logistics";
 import { TripStopForm } from "./TripStopForm";
+import { manifestFor } from "../tms/bookings";
 import { scopedView } from "../tms/scope";
 import {
   INCIDENT_SEVERITIES,
@@ -224,7 +225,7 @@ export function DriverPortalPage() {
         <TripStopForm
           trip={recordingStop}
           route={routeOf(recordingStop.routeId)!}
-          roster={view.passengers.filter((passenger) => passenger.routeId === recordingStop.routeId && passenger.status === "active")}
+          manifest={manifestFor(db, recordingStop)}
           onClose={() => setRecordingStop(null)}
           onSubmit={async (input) => {
             const result = await dispatch({ type: "record_trip_stop", id: recordingStop.id, input });

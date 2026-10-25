@@ -161,9 +161,9 @@ erDiagram
 | Route to stops | One route has two or more ordered stops. Stop names are unique within a route. Times never decrease along the route. |
 | Route to trips | One **scheduled** trip per route per service date. Scheduled trips are generated only on the route's operating weekdays, inside its start and end dates. An **ad hoc** trip (\`origin = 'adhoc'\`) may exist on any date, including a date the route does not operate, and may sit beside a cancelled scheduled run; it carries a written reason (D-82). |
 | Passenger to route | A passenger has at most one route and one pickup stop (a limit; see OPEN_QUESTIONS Q-30). The stop must belong to that route, and the route must belong to the passenger's client. |
-| Trip to boardings | One boarding record per active roster passenger per completed trip. Inactive passengers are excluded. |
+| Trip to boardings | One boarding record per rider expected on the trip: every active roster passenger **and** every booking on that run that still holds a seat (`confirmed` or `offered`, D-85). Inactive roster members are excluded; a cancelled or rejected booking is not expected aboard. |
 | Trip to bookings | A booking names one rider's seat on one run. It is **not** a roster row: the roster is how a client's staff travel every day, and a booking covers the seat that has to be named — a visitor, a new hire, somebody from a sister company (D-83). Capacity is `vehicle.seat_capacity − active roster on the route − confirmed/offered bookings`, checked in the booking command. |
-| Booking to passenger | One live booking per rider per run. A rider who is already on that run's route roster is refused, because the roster already holds their seat. |
+| Booking to passenger | One live booking per rider per run. A rider who is already on that run's route roster is refused, because the roster already holds their seat. A booking that holds a seat is also a row on the run's manifest, so its rider receives a boarding outcome like any roster rider. |
 | Trip to vehicle and driver | Set at assignment, required at dispatch. The vehicle must be in the route's category and status Available. The driver's licence must be valid on the service date. |
 
 ## Unique constraints

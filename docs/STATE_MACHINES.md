@@ -145,7 +145,7 @@ an audit entry.
 
 | From | To | Who | Preconditions |
 |---|---|---|---|
-| — | `requested` | `bookings:create` | Rider active, same client as the route, **not** already on the route's roster; a run exists on that date, is not cancelled, completed or departed; a vehicle is assigned so seats can be counted; a seat is free; outside the request cut-off (if one is set) |
+| — | `requested` | `bookings:create` | Rider active, same client as the route, **not** already on the route's roster; a run exists on that date, is not cancelled, completed, departed or **already under way**; a vehicle is assigned so seats can be counted; a seat is free; outside the request cut-off (if one is set) |
 | `requested` | `confirmed` | `bookings:manage` | A seat is still free, and the run has not left |
 | `requested` / `offered` | `waitlisted` | `bookings:manage` | Attempting to confirm when the run is full: the request moves to the waiting list instead of failing |
 | `waitlisted` | `offered` | automatic, on a cancellation | The oldest waiter on that run, and only when the freed seat actually makes room. **Never `confirmed`**: the offer waits for a person |
@@ -156,6 +156,11 @@ an audit entry.
 
 Both cut-offs are minutes before the run's first stop departs and both are **blank by default**: an
 unset cut-off means no deadline, not a guessed one. A booking never changes a trip or a roster row.
+
+A booking that holds a seat (`confirmed` or `offered`) is a person on the run's manifest (D-85): the
+stop record expects an outcome for them at their pickup stop, and the completion expects one for the
+run. The manifest is fixed once the run is `in_progress`, so no seat can be added to a bus that has
+left.
 
 ## Planned (not yet implemented)
 

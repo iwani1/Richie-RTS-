@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–34** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 35 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–35** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 36 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -61,7 +61,8 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   sister company. Each booking carries its own reference (BK-0001) and its own history; seats are
   counted as roster + bookings against the vehicle, a full run puts the request on a waiting list,
   and a freed seat is **offered** to the oldest waiter and confirmed by a person, never by the
-  system. Request and cancellation cut-offs are optional settings: blank means no deadline.
+  system. A booked seat is a person on that run's list: the driver sees who to collect and where, and
+  the run cannot be completed until somebody records whether they travelled. Request and cancellation cut-offs are optional settings: blank means no deadline.
 - Staff logistics: incidents, work orders with costs, and a vehicle release that needs its own
   permission and records who released it and when.
 - Reports: rental report with a date range, coverage and CSV; fleet readiness; cost report;
@@ -129,8 +130,8 @@ These work, and the difference is worth knowing before relying on them:
    corrected in-app. This is the largest gap in the money story.
 3. **Contracts (CLI-02)** — the contract record and the terms wording it needs from the owner; the
    seat bookings that depend on it are built (`BKG-01…06`, Phase 33).
-4. **Boarding booked seats** — a booked visitor holds a seat, but is not yet on the run's manifest, so
-   their boarding is not recorded on the trip. The roster manifest still works.
+4. **Passenger portal (PAX-01)** — passengers cannot sign in to see their own journeys; the public
+   booking path does not exist yet.
 
 Everything else on the missing list needs a provider (SMS, mail, GPS, card payments), hardware, or a
 business decision that has not been made.

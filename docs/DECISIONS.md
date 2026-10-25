@@ -1214,3 +1214,47 @@ decision the office makes, not one the system invents.
   domain tests, 5 screen tests). A finance account opens there instead of the operations board; every
   other role keeps the operations board and can reach the finance home only if it may read invoices
   (administrator). Amounts are withheld, in words, when the company currency is not set.
+
+## D-85 A booked seat is a person on the manifest, and a run's list of people is fixed once it leaves
+
+- **Context.** D-83 gave the office seat-level bookings, but nothing downstream knew about them. The
+  run's manifest was built from the route roster alone, so a visitor holding a confirmed seat was not
+  on the list the office records boardings against, was not on the driver's list, and never appeared
+  in a completion. The consequence was quiet and bad: an office could sell a seat, the driver could
+  leave without the person, and the system would report a complete run with nobody missing.
+- **Decision.** The **manifest** of a run is the route's active roster **plus** every booking on that
+  run that still holds a seat (confirmed or offered). Each entry is marked as a roster rider or a
+  booked seat, with the booking's reference and the stop where they get on — the booking's stop when it
+  names one on this route, and the first stop otherwise, because a name with nowhere to be collected is
+  not a manifest. Everything downstream now reads that one list:
+  - **Progressive stop records** expect an outcome for everyone due at that stop, roster and bookings
+    alike; the screen says "Boarded / Did not board" for a booked visitor with the seat reference beside
+    the name.
+  - **Full completion** requires an outcome for every rider expected on the run.
+  - **Corrections** can already address any recorded outcome, so a booked rider's outcome is correctable
+    on the same audited path.
+  - **Capacity** at assign, dispatch and start counts roster + sold seats, and a rider added to a roster
+    while a run is under way is measured against the same total. Reassigning to a smaller bus can no
+    longer strand somebody whose seat was already promised.
+  - **The driver's snapshot** carries the seats sold on their own runs, plus the name and pickup stop of
+    each rider holding one — and nothing else about them.
+- **A run under way takes no new seats.** A booking (or a confirmation) is refused once the run is
+  `in_progress`, because a rider added after the bus left is a name nobody was told to collect. The
+  list of people is therefore fixed for the life of the run, which is what makes "every rider has an
+  outcome" a rule the office can actually satisfy.
+- **Rejected.** Keeping the roster-only manifest and recording booked visitors nowhere (the seat is
+  sold; not recording whether they travelled is the failure this fixes). Building the manifest from
+  *requested* bookings as well (a request holds no seat and may be refused; the driver would hunt for
+  people who were never promised a place). Adding a second "booked riders" list beside the roster
+  (two lists to reconcile, and the driver's screen is the one place they must agree). Requiring an
+  outcome count exactly equal to the manifest (a rider cancelled or removed after a stop was recorded
+  would then block completion forever; the rule is that every *expected* rider is accounted for, and a
+  record already made stays). Hiding booked riders from the driver to protect personal data (the driver
+  is carrying them; the payload carries the same fields the roster already does and no more).
+- **Consequence.** `manifestFor` / `manifestAtStop` in `src/tms/bookings.ts`; `record_trip_stop`,
+  `complete_trip`, `assessResources` and a mid-run roster change all read it; the stop and completion
+  panels list booked riders with their seat reference; a driver holds `bookings:read` (own runs).
+  A leak found while doing this is fixed: the narrowed snapshot for a record-bound account listed every
+  collection it *was* allowed to see, and `bookings` — added after that whitelist was written — fell
+  through to the whole table. A client contact or driver was being sent every booking in the company.
+  The snapshot now narrows bookings with the rest, and three tests pin it.

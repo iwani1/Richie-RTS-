@@ -19,6 +19,7 @@ import {
   type BookingStatus,
   type BookingType,
   type Database,
+  type Passenger,
   type Trip,
 } from "./types";
 
@@ -58,6 +59,63 @@ export const SEAT_HOLDING_STATUSES: readonly BookingStatus[] = ["confirmed", "of
 /** Seats held by bookings on a run, which is what the capacity check has to subtract. */
 export function seatsHeld(db: Database, tripId: string): number {
   return db.bookings.filter((booking) => booking.tripId === tripId && SEAT_HOLDING_STATUSES.includes(booking.status)).length;
+}
+
+/**
+ * One person the run is expected to carry (D-85).
+ *
+ * The roster alone is not the manifest any more: a visitor holding a confirmed seat travels on the
+ * same bus and has to be recorded getting on or not, or the office never learns they were left
+ * behind. `source` lets the screen say which is which without a second lookup.
+ */
+export interface ManifestRider {
+  passenger: Passenger;
+  source: "roster" | "booking";
+  /** The booking that put them on this run; null for a roster rider. */
+  bookingReference: string | null;
+  /** Where they get on: their roster stop, or the stop named on the booking. */
+  pickupStopId: string;
+}
+
+/**
+ * Everyone the run is expected to carry: the active roster plus every booked seat that still holds
+ * one (confirmed or offered). A requested or waitlisted booking holds nothing and is not expected
+ * aboard; a cancelled or rejected one has gone.
+ *
+ * A booked rider whose stop cannot be found on this route gets on at the first stop, because a seat
+ * with no stop would leave the driver with a name and nowhere to collect them.
+ */
+export function manifestFor(db: Database, trip: Trip): ManifestRider[] {
+  const route = db.routes.find((candidate) => candidate.id === trip.routeId);
+  const firstStopId = route?.stops[0]?.id ?? "";
+  const stopOnRoute = (stopId: string) => (route?.stops.some((stop) => stop.id === stopId) ? stopId : firstStopId);
+
+  const roster: ManifestRider[] = db.passengers
+    .filter((passenger) => passenger.routeId === trip.routeId && passenger.status === "active")
+    .map((passenger) => ({
+      passenger,
+      source: "roster" as const,
+      bookingReference: null,
+      pickupStopId: passenger.stopId ? stopOnRoute(passenger.stopId) : firstStopId,
+    }));
+
+  const booked: ManifestRider[] = db.bookings
+    .filter((booking) => booking.tripId === trip.id && SEAT_HOLDING_STATUSES.includes(booking.status))
+    .flatMap((booking) => {
+      const passenger = db.passengers.find((candidate) => candidate.id === booking.passengerId);
+      // A seat whose rider record has gone is not a person to collect; the booking screen still shows it.
+      if (!passenger) return [];
+      // A rider who is already on the roster is one person, not two: the roster entry is the seat.
+      if (roster.some((entry) => entry.passenger.id === passenger.id)) return [];
+      return [{ passenger, source: "booking" as const, bookingReference: booking.reference, pickupStopId: stopOnRoute(booking.stopId ?? "") }];
+    });
+
+  return [...roster, ...booked];
+}
+
+/** Just the people expected at one stop of the run. */
+export function manifestAtStop(db: Database, trip: Trip, stopId: string): ManifestRider[] {
+  return manifestFor(db, trip).filter((entry) => entry.pickupStopId === stopId);
 }
 
 /** The route roster's active headcount: the seats already spoken for before any booking exists. */
@@ -126,6 +184,9 @@ function seatErrors(db: Database, trip: Trip, passengerId: string, now: string, 
 
   if (trip.status === "cancelled") errors.tripId = `${trip.reference} was cancelled. Book a seat on another run.`;
   else if (trip.status === "completed") errors.tripId = `${trip.reference} has already finished.`;
+  // D-85: a seat is sold before the bus leaves. Once a run is under way its manifest is fixed —
+  // a rider added now would be a name nobody was told to collect.
+  else if (trip.status === "in_progress") errors.tripId = `${trip.reference} is already under way; its list of riders is fixed. Book another run.`;
   else {
     const minutes = minutesToDeparture(db, trip, now);
     if (minutes !== null && minutes < 0) errors.tripId = `${trip.reference} has already departed (${route?.stops[0]?.scheduledTime ?? "—"}).`;

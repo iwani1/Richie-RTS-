@@ -173,7 +173,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // assigned run, records its next stop, then completes after every stop is logged.
   // documents:read is own-record: a driver sees compliance documents for its own
   // driver record and for vehicles it has been assigned to, read-only.
-  driver: ["trips:read", "trips:start", "trips:record", "trips:complete", "incidents:read", "incidents:create", "documents:read"],
+  // bookings:read is own-record: the seats sold on this driver's own runs, which is the run's list of
+  // people to collect (D-85). It is not the company's booking register.
+  driver: ["trips:read", "trips:start", "trips:record", "trips:complete", "incidents:read", "incidents:create", "documents:read", "bookings:read"],
   // Own-record scope: a client contact sees only its own client's routes, roster and
   // rental requests, and may raise a rental request for that client.
   // A client's own contact books seats for that client's people and can cancel them; it cannot

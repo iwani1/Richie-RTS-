@@ -330,7 +330,7 @@ describe("staff busing - progressive driver run", () => {
     expect(errorsOf(wrongStop).stopId).toMatch(/next stop is Estate gate/);
 
     const missingOutcome = attemptActor(w, driver, { type: "record_trip_stop", id: tripId, input: { stopId: route.stops[0].id, actualTime: "06:03", boardings: [] } });
-    expect(errorsOf(missingOutcome).boardings).toMatch(/every active passenger at Estate gate/);
+    expect(errorsOf(missingOutcome).boardings).toMatch(/every rider expected at Estate gate/);
 
     stepActor(w, driver, { type: "record_trip_stop", id: tripId, input: { stopId: route.stops[0].id, actualTime: "06:03", boardings: [{ passengerId: ama.id, outcome: "boarded" }] } });
     expect(w.db.trips.find((trip) => trip.id === tripId)?.stopLogs).toHaveLength(1);
@@ -600,7 +600,7 @@ describe("staff busing - completion and on-time", () => {
       id: tripId,
       input: { stopTimes: [...timesOk.slice(0, 2), { stopId: stops[2].id, actualTime: "06:31" }], boardings: [{ passengerId: ama, outcome: "boarded" }] },
     });
-    expect(errorsOf(missingOutcome).boardings).toMatch(/every active passenger/);
+    expect(errorsOf(missingOutcome).boardings).toMatch(/every rider expected/);
 
     const inactiveRecorded = attempt(w, "ops", {
       type: "complete_trip",
@@ -610,7 +610,7 @@ describe("staff busing - completion and on-time", () => {
         boardings: [{ passengerId: ama, outcome: "boarded" }, { passengerId: kofi, outcome: "no_show" }, { passengerId: w.db.passengers[2].id, outcome: "boarded" }],
       },
     });
-    expect(errorsOf(inactiveRecorded).boardings).toMatch(/not on this route/);
+    expect(errorsOf(inactiveRecorded).boardings).toMatch(/not expected on this run/);
 
     const input: CompleteTripInput = {
       stopTimes: [...timesOk.slice(0, 2), { stopId: stops[2].id, actualTime: "06:31" }],

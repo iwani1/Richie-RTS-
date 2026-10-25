@@ -501,7 +501,7 @@ describe("driver trip execution", () => {
       },
     });
     expect(missingPassenger.ok).toBe(false);
-    if (!missingPassenger.ok) expect(missingPassenger.errors.boardings).toMatch(/every active passenger/);
+    if (!missingPassenger.ok) expect(missingPassenger.errors.boardings).toMatch(/every rider expected/);
   });
 
   it("does not let a driver dispatch or cancel a run", () => {

@@ -131,6 +131,10 @@ register; cannot start a run that is not theirs, before its service day, or afte
 4. If the vehicle is unsafe, report a defect **before** setting off. It blocks the vehicle until
    maintenance releases it.
 
+A run's list of people is the roster **plus** the seats the office booked on it. A booked visitor
+appears with their seat reference beside the name ("Booked seat BK-0001"); record whether they
+boarded like anybody else. You cannot complete a run while anyone on the list has no outcome.
+
 If the phone has no signal, record the stop when it returns. Offline queuing is not built yet
 (Phase 2), so write the times down and enter them as soon as you are back in coverage.
 

@@ -1,27 +1,34 @@
 import { useState, type FormEvent } from "react";
+import type { ManifestRider } from "../tms/bookings";
 import type { ProgressiveStopInput } from "../tms/busing";
-import type { BoardingOutcome, BusRoute, Passenger, Trip } from "../tms/types";
+import type { BoardingOutcome, BusRoute, Trip } from "../tms/types";
 import { Button, Field, Notice, Panel, Select, TextInput, formatDateTime } from "../ui/primitives";
 
 type Errors = Record<string, string>;
 
-/** One immutable stop record: actual arrival time plus outcomes for this stop's roster. */
+/**
+ * One immutable stop record: actual arrival time plus an outcome for everyone expected here.
+ *
+ * The list is the run's manifest — the route roster *and* the riders holding a booked seat at this
+ * stop (D-85). A visitor left off it is a visitor nobody records, and the office would never know
+ * whether they were carried.
+ */
 export function TripStopForm({
   trip,
   route,
-  roster,
+  manifest,
   onClose,
   onSubmit,
 }: {
   trip: Trip;
   route: BusRoute;
-  roster: Passenger[];
+  manifest: ManifestRider[];
   onClose: () => void;
   onSubmit: (input: ProgressiveStopInput) => Errors | Promise<Errors>;
 }) {
   const stop = route.stops[trip.stopLogs.length];
   const passengers = stop
-    ? roster.filter((passenger) => passenger.status === "active" && passenger.stopId === stop.id && !trip.boardings.some((b) => b.passengerId === passenger.id))
+    ? manifest.filter((entry) => entry.pickupStopId === stop.id && !trip.boardings.some((b) => b.passengerId === entry.passenger.id))
     : [];
   const [actualTime, setActualTime] = useState("");
   const [outcomes, setOutcomes] = useState<Record<string, "" | BoardingOutcome>>({});
@@ -39,8 +46,8 @@ export function TripStopForm({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const localErrors: Errors = {};
-    const missing = passengers.find((passenger) => !outcomes[passenger.id]);
-    if (missing) localErrors.boardings = `Record whether ${missing.fullName} boarded at ${stop.name}.`;
+    const missing = passengers.find((entry) => !outcomes[entry.passenger.id]);
+    if (missing) localErrors.boardings = `Record whether ${missing.passenger.fullName} boarded at ${stop.name}.`;
     if (Object.keys(localErrors).length) {
       setErrors(localErrors);
       return;
@@ -48,7 +55,7 @@ export function TripStopForm({
     setErrors((await onSubmit({
       stopId: stop.id,
       actualTime,
-      boardings: passengers.map((passenger) => ({ passengerId: passenger.id, outcome: outcomes[passenger.id] as BoardingOutcome })),
+      boardings: passengers.map((entry) => ({ passengerId: entry.passenger.id, outcome: outcomes[entry.passenger.id] as BoardingOutcome })),
     })) ?? {});
   };
 
@@ -71,7 +78,8 @@ export function TripStopForm({
             ))}
           </ul>
           <p className="mt-2 text-xs text-stone-600">
-            The list of riders below is the roster as it is now. Record an outcome for everyone still shown at this stop.
+            The list of riders below is the roster and the seats booked for this run, as they are now. Record an
+            outcome for everyone still shown at this stop.
           </p>
         </Notice>
       )}
@@ -82,13 +90,23 @@ export function TripStopForm({
         <section>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Boarding at this stop ({passengers.length})</h3>
           {passengers.length === 0 ? (
-            <p className="text-sm text-stone-500">No active passengers are assigned to this stop. Only the arrival time will be recorded.</p>
+            <p className="text-sm text-stone-500">Nobody is expected at this stop. Only the arrival time will be recorded.</p>
           ) : (
             <ul className="space-y-2">
-              {passengers.map((passenger) => (
-                <li key={passenger.id}>
-                  <Field label={passenger.fullName} hint="No phone number or employee reference is shown.">
-                    <Select value={outcomes[passenger.id] ?? ""} onChange={(event) => setOutcomes({ ...outcomes, [passenger.id]: event.target.value as "" | BoardingOutcome })}>
+              {passengers.map((entry) => (
+                <li key={entry.passenger.id}>
+                  <Field
+                    label={entry.passenger.fullName}
+                    hint={
+                      entry.source === "booking"
+                        ? `Booked seat ${entry.bookingReference ?? ""} — not on the regular roster.`
+                        : "No phone number or employee reference is shown."
+                    }
+                  >
+                    <Select
+                      value={outcomes[entry.passenger.id] ?? ""}
+                      onChange={(event) => setOutcomes({ ...outcomes, [entry.passenger.id]: event.target.value as "" | BoardingOutcome })}
+                    >
                       <option value="">Select outcome</option>
                       <option value="boarded">Boarded</option>
                       <option value="no_show">Did not board</option>

@@ -61,13 +61,13 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | BKG-05 | 1B | Cancellation deadlines and reasons; waiting list; offer freed seats per policy and never auto-confirm unless policy permits. | Met | Cancellation requires a reason and is refused inside the configured cut-off; cancelling a held seat **offers** it to the oldest waiter (`offeredAt`) and stops — **nothing is auto-confirmed**, and there is no expiry timer (D-83). Tests: "offers the freed seat to the oldest waiter and confirms nobody", "applies a cancellation cut-off only when one is configured". |
 | BKG-06 | 1B | History of important booking changes. | Met | `Booking.history` keeps one entry per change (who, when, action, note) beside the audit log; shown as **Last change** on the Bookings tab. Test "keeps the whole history of what happened to the booking". |
 | TRP-01 | 1B | Trip records: reference, service type, related booking or rental, client or customer, route, ordered stops, planned and actual times, manifest,… | Partial | Reference, route, date, planned/actual stop times, manifest, driver, vehicle, status (5), completion. **No service type, rental link, delayed/interrupted states, notification or incident reference.** |
-| TRP-02 | 1B | Passenger manifests. | Met | Per-trip manifest from the route roster with boarding outcomes. |
+| TRP-02 | 1B | Passenger manifests. | Met | Per-trip manifest with boarding outcomes: the route roster **plus** the seats booked on that run (`manifestFor`, Phase 35, D-85), each rider marked roster or booked with the seat reference and pickup stop, on the office screen and the driver portal alike. |
 | DSP-01 | 1B | Daily dispatch board (table or calendar): today's trips, upcoming departures, active, completed, delayed, cancelled, unassigned bookings, available… | Partial | Today's departures on the dashboard plus a filterable trip table. **No calendar, no unassigned list, no capacity-warning panel, no maintenance-block view.** |
 | DSP-02 | 1B | Assign and reassign vehicle and driver, validating availability, qualifications, vehicle condition, capacity and conflicts. Overrides need permission… | Partial | Validation of category, status, roster capacity, licence expiry, time overlaps, rental clashes, vehicle/driver double-booking. **No permission-and-reason override.** |
 | DSP-03 | 1B | Emergency trip creation. | Met | `create_adhoc_trip` (Phase 32, D-82): a run outside the schedule for any date from today, with a written reason and its own TR number; migration 006 narrows the one-per-day index to scheduled runs so a replacement can stand beside the cancelled one. Created from **Add an ad hoc run** on the Trips tab, marked "ad hoc" with its reason on the run sheet, and checked exactly as a planned run is. |
 | DSP-04 | 1B | Record no-shows and delays; cancel or interrupt trips. | Partial | No-show recorded per passenger; trips can be cancelled with a reason. **No delay recording, no interruption, no repair transition.** |
 | DRV-01 | 1B | Mobile-first driver home: profile, today's assignments, next trip, departure time, route and stops, passenger count, vehicle, alerts, history. | Met | Driver portal: today's assignments, next departure, route and stops, passenger count, vehicle, history. |
-| DRV-02 | 1B | Driver actions: open trip, view manifest, open external navigation, mark ready, start, confirm boarding, record no-show, confirm drop-off, report… | Partial | Open trip, manifest, start, board, no-show, complete. **No external navigation, no mark-ready, no delay report, and no idempotency key (5.8).** |
+| DRV-02 | 1B | Driver actions: open trip, view manifest, open external navigation, mark ready, start, confirm boarding, record no-show, confirm drop-off, report… | Partial | Open trip, manifest (roster and booked seats, D-85), start, board, no-show, complete. **No external navigation, no mark-ready, no delay report, and no idempotency key (5.8).** |
 | DRV-03 | 2 | Boarding verification: trip-specific code or OTP from a secure random source, expiry, single use where policy requires, results recorded, minimal… | Deferred | Phase 2. |
 | DRV-04 | 1B | Vehicle defect report and breakdown/incident report (basic record; full handling in INC). | Met | Driver can raise an incident which blocks the vehicle and creates a work order. |
 | DRV-05 | 2 | Offline operation (progressive web app): queue status and boarding events locally with event IDs, sync when connectivity returns, show "pending sync"… | Deferred | Phase 2. |
@@ -884,7 +884,7 @@ rider's seat on one run, and counts against the same seats as the roster.
 | History of every change | Done (verified) | `Booking.history` + audit entries; shown as **Last change** on the Bookings tab |
 | Client contacts are confined to their own company | Done (verified) | `bookings:read\|create` for `client_contact`, own client only, may cancel its own bookings, may not confirm; "lets a client's own contact book and cancel its own staff, and nothing else" |
 | From the dispatch screen | Done (verified) | **Bookings** tab in `StaffBusing.tsx`: runs for a date with their seat line, the bookings on each run and the next action; **Request a seat** panel; refuse and cancel panels that require a reason (4 jsdom tests) |
-| **Gap:** boarding a booked rider | **Not built** | The run's manifest is still built from the roster, so a booked visitor's boarding or no-show is not recorded on the trip and the driver's portal does not list them. BKG-04 asks for the assignment and the capacity check, which are done; boarding capture for bookings is a follow-on and is recorded here rather than implied. |
+| Boarding a booked rider | Done (verified) | Phase 35, D-85: the run's manifest is the roster **plus** the seats that still hold one, so a booked visitor is expected at their stop, has to be given an outcome before the run can be completed, appears on the driver's stop form with their booking reference, and shows in the completion. Tests: 7 domain (`bookings.test.ts` "a booked seat is on the run's list of people"), 3 screen (`Bookings.test.tsx`) |
 | Tests | Done (verified) | 16 domain (`bookings.test.ts`), 4 jsdom (`Bookings.test.tsx`), 1 settings (`Settings.test.tsx`) |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **451 passed, 16 skipped**, `build`
@@ -907,4 +907,27 @@ figures that already exist.
 | Tests | Done (verified) | 15 domain (`financeHome.test.ts`), 5 screen (`FinanceHome.test.tsx`) |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **471 passed, 16 skipped**, `build`
+succeeds.
+
+## Phase 35 - A booked seat is a person on the run (D-85)
+
+Phase 33 sold seats; this makes the rest of the system know who is sitting in them. Until now a
+booked visitor held a seat the office had promised, and appeared on no manifest: not on the list the
+dispatcher records boardings against, not on the driver's screen, and not in the completion. A run
+could leave without them and still be reported complete.
+
+| Item | Status | Evidence |
+|---|---|---|
+| The run's list of people is the roster plus every seat that still holds one | Done (verified) | `manifestFor` / `manifestAtStop` (`src/tms/bookings.ts`); a requested or waitlisted seat is not expected aboard, a cancelled one is gone; a rider who is on both lists is counted once, as a roster rider |
+| A booked rider with no stop of their own gets on at the first stop | Done (verified) | `pickupStopId` falls back to the first stop of the route when the booking names none, or names one that is not on this route |
+| A stop cannot be recorded with the booked visitor unaccounted for | Done (verified) | `record_trip_stop` expects an outcome for everyone due at that stop; "every rider expected at Estate gate (3)" |
+| A run cannot be completed with a booked rider unaccounted for | Done (verified) | `complete_trip`; "1 still to record". A record made earlier still counts, so a later cancellation cannot block a completion |
+| Capacity at assign, dispatch and start counts sold seats | Done (verified) | `assessResources` uses roster + `seatsHeld`; a smaller bus is refused with "… and 1 booked seat(s)"; a roster addition during a run is measured the same way |
+| No new seat once the run is under way | Done (verified) | `seatErrors` refuses with "already under way; its list of riders is fixed" |
+| The office records it without leaving the screen | Done (verified) | `TripStopForm` and `CompleteForm` take the manifest; a booked rider is labelled "Booked seat BK-0001 — not on the regular roster" (3 jsdom tests in `Bookings.test.tsx`) |
+| The driver sees who is travelling | Done (verified) | Driver holds `bookings:read` (own runs); the driver portal's stop form is built from the manifest |
+| A bound account's snapshot carries only its own seats | Done (verified) | **Leak fixed:** the narrowed snapshot omitted `bookings`, so the whole table was being sent to a client contact or driver. `src/server/visibility.ts` now narrows it; 4 tests |
+| Tests | Done (verified) | 7 domain (`bookings.test.ts`), 3 screen (`Bookings.test.tsx`), 4 snapshot (`visibility.test.ts`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **485 passed, 16 skipped**, `build`
 succeeds.
