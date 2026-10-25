@@ -1592,3 +1592,10 @@ decision the office makes, not one the system invents.
   `expense_frozen()` and `expense_no_delete()`, the Expenses screen, expense figures on the cost tab,
   and 24 new tests (7 domain command, 2 snapshot scope, 10 screen, 1 reference series, plus the
   cost-report cases inside the command tests).
+- **One thing it exposed.** A series lives in two places: `REFERENCE_SERIES` and a check constraint on
+  `reference_counter`. Adding `expense` to the first and not the second is invisible to every unit test,
+  because numbering runs against the JSON snapshot — so it fails only against PostgreSQL. Writing the
+  expense flow's first PostgreSQL test found that **refunds had the same fault since D-92**: every
+  `record_refund` on a real database returned a 400. `012_reference_counter_scopes.sql` widens the
+  constraint, and `references.integration.test.ts` now inserts a counter for **every** series, so the
+  next forgotten name fails in CI instead of in front of a finance officer.

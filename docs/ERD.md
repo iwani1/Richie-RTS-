@@ -428,7 +428,7 @@ erDiagram
   }
 
   REFERENCE_COUNTER {
-    text scope PK "invoice|creditNote|payment|…"
+    text scope PK "invoice|creditNote|payment|refund|expense|… (012)"
     text period PK "YYYY|all"
     integer last
   }

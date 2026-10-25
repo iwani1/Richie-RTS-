@@ -8,7 +8,8 @@
 - Runtime: one Node.js process on the operator's workstation (Fedora), plus PostgreSQL. The
   database is the source of truth. See `docs/SETUP_AND_DEPLOYMENT.md` for the install and run commands.
 - Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (18 tables: `refund` arrived in
-  `010_refunds.sql`, D-92, and `expense` in `011_expenses.sql`, D-93; `btree_gist` +
+  `010_refunds.sql`, D-92, and `expense` in `011_expenses.sql`, D-93; `012_reference_counter_scopes.sql`
+  widens the numbering-series constraint to match `REFERENCE_SERIES`; `btree_gist` +
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
 - Session: `iron-session` sealed cookie; passwords Argon2id (`@node-rs/argon2`) — D-51.

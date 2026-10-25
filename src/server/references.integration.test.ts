@@ -15,6 +15,7 @@ import { runCommand } from "./commands";
 import { loadDatabase, truncateAll } from "./repository";
 import type { AnyCommand } from "../tms/commands";
 import { emptyDatabase, type Database } from "../tms/types";
+import { REFERENCE_SERIES } from "../tms/references";
 
 const connectionString = process.env.TEST_DATABASE_URL;
 const suite = connectionString ? describe : describe.skip;
@@ -144,5 +145,23 @@ suite("reference numbering, against PostgreSQL", () => {
     const invoice = await db().selectFrom("reference_counter").selectAll().where("scope", "=", "invoice").execute();
     expect(invoice).toHaveLength(0);
     expect(emptyDatabase().referenceCounters).toEqual([]);
+  });
+
+  it("lets the database store a counter for every series the application can allocate", async () => {
+    // A series is a name in `REFERENCE_SERIES` plus a check constraint listing which names
+    // `reference_counter` may hold. Adding one and forgetting the constraint is invisible to every
+    // unit test — the counter only meets the constraint where there is a database — and it showed up
+    // as a 400 on the screen for refunds (010) before this test existed.
+    const scopes = Object.keys(REFERENCE_SERIES);
+    expect(scopes.length).toBeGreaterThan(0);
+    for (const scope of scopes) {
+      await db()
+        .insertInto("reference_counter")
+        .values({ scope, period: "all", last: 1 })
+        .execute();
+    }
+
+    const stored = await db().selectFrom("reference_counter").select("scope").orderBy("scope").execute();
+    expect(stored.map((row) => row.scope).sort()).toEqual([...scopes].sort());
   });
 });
