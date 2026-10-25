@@ -4,6 +4,7 @@
 // enforces the trip state machine and writes an audit entry.
 
 import { audit, authorise, fail, isValidDate, makeId, norm, TIME_RE, type Actor, type CommandResult, type Errors } from "./service";
+import { allocateReference } from "./references";
 import { mayActOnTrip } from "./scope";
 import {
   DIRECTIONS,
@@ -358,14 +359,15 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       if (denied) return denied;
       const { errors, value } = validateRoute(db, command.input);
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
+      const { reference, counters } = allocateReference(db, "route", now.slice(0, 4));
       const created: BusRoute = {
         id: makeId(),
-        reference: `RT-${String(db.routes.length + 1).padStart(3, "0")}`,
+        reference,
         ...value,
         createdAt: now,
         updatedAt: now,
       };
-      const next = audit({ ...db, routes: [...db.routes, created] }, actor, {
+      const next = audit({ ...db, referenceCounters: counters, routes: [...db.routes, created] }, actor, {
         action: "routes:create",
         entity: "route",
         entityId: created.id,
@@ -461,17 +463,20 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       if (span > MAX_GENERATE_DAYS) return fail(`Generate at most ${MAX_GENERATE_DAYS} days at a time.`, { toDate: `Range is ${span} days. Generate at most ${MAX_GENERATE_DAYS} days at a time.` });
 
       const created: Trip[] = [];
-      let counter = db.trips.length;
+      // Each trip takes the next number in the series, and the counters move along with it: a
+      // generation of five days allocates five numbers in one transaction.
+      let counters = db.referenceCounters;
       for (let i = 0; i < span; i += 1) {
         const date = addDays(command.fromDate, i);
         if (date < route.startDate) continue;
         if (route.endDate && date > route.endDate) continue;
         if (!route.weekdays.includes(weekdayOf(date))) continue;
         if (db.trips.some((t) => t.routeId === route.id && t.serviceDate === date)) continue;
-        counter += 1;
+        const allocated = allocateReference({ ...db, referenceCounters: counters }, "trip", now.slice(0, 4));
+        counters = allocated.counters;
         created.push({
           id: makeId(),
-          reference: `TR-${String(counter).padStart(4, "0")}`,
+          reference: allocated.reference,
           routeId: route.id,
           serviceDate: date,
           status: "planned",
@@ -490,7 +495,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       }
       if (created.length === 0)
         return fail(`No trips generated: ${route.reference} has no operating dates in this range, or trips already exist for them.`);
-      const next = audit({ ...db, trips: [...db.trips, ...created] }, actor, {
+      const next = audit({ ...db, referenceCounters: counters, trips: [...db.trips, ...created] }, actor, {
         action: "trips:generate",
         entity: "route",
         entityId: route.id,

@@ -594,13 +594,20 @@ export interface TaxLineSetting {
 
 /** A per-scope, per-year number series (brief 5.6). Stored with the data so a restored backup
  *  never reissues a reference that was already printed on a document. */
+/**
+ * A numbering series. Rentals, routes, trips, incidents and work orders are numbered continuously
+ * and filed under the period `all`; invoices and payments restart each year (audit D-03).
+ */
+export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "payment"] as const;
+export type ReferenceScope = (typeof REFERENCE_SCOPES)[number];
+
 export interface ReferenceCounter {
-  scope: "invoice" | "payment";
-  period: string; // YYYY
+  scope: ReferenceScope;
+  period: string; // YYYY for invoices and payments, "all" for the rest
   last: number;
 }
 
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -668,7 +675,7 @@ export function emptyDatabase(): Database {
 export function migrate(value: unknown): Database | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(v.schemaVersion as number)) return null;
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(v.schemaVersion as number)) return null;
   if (!Array.isArray(v.users) || !Array.isArray(v.vehicles) || !Array.isArray(v.drivers) || !Array.isArray(v.clients) || !Array.isArray(v.audit)) return null;
   if (typeof v.settings !== "object" || v.settings === null) return null;
   const settings = v.settings as Record<string, unknown>;

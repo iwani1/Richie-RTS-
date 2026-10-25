@@ -133,9 +133,14 @@ browser sessions on the old machine cannot be used against the new one, which is
 
 - **It does not merge.** Every business table is replaced. Restoring an old backup discards everything
   recorded since it was taken. That is why step 3.1.2 exists.
-- **It does not renumber anything.** Invoice and payment numbers come from `reference_counter`, which
-  is part of the snapshot, so a reference that was printed on a document is never issued again. A
-  backup taken before a document existed will of course not contain that document.
+- **It does not renumber anything within the data it restores.** Every series (`reference_counter`:
+  rentals, routes, trips, incidents, work orders, invoices, payments) is part of the snapshot, so the
+  numbering resumes from where that backup left it rather than from a row count.
+- **It cannot protect numbers issued after the backup.** Restoring an older backup is a decision to
+  return the whole installation to an earlier moment: documents created since are gone, and their
+  numbers become available again. Nothing in the database can prevent that, because the record of
+  the number went with the data. If a document was printed on paper and the backup predates it, the
+  restore and the paper disagree — check before restoring in that situation.
 - **It does not restore files outside the database.** There are none today (no attachments are
   stored); when attachments arrive they will need their own backup procedure.
 - **It cannot undo a delete**, because the application does not delete: records are archived by status,

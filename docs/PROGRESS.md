@@ -535,7 +535,7 @@ AUTH-05, the Playwright proof for workflow C and a real parallel double-booking 
 | Parallel double-booking: six operators, one vehicle | Done (verified in CI) | `src/server/concurrency.integration.test.ts`: six concurrent `assign_rental` calls → 1 success, 5 × 409 with "already assigned to RR-…", exactly one `resource_reservation` row; and a second case with **no advisory lock in the way** (two overlapping `saveDatabase` transactions) where the exclusion constraint rejects the loser with SQLSTATE `23P01` |
 | A refusal caused by a clash returns 409, not 400 | Done (verified) | `Failure.kind = "conflict"` (`service.ts`), mapped in `runCommand`; only the assignment clash sets it today |
 | **Defect fixed:** number series were written but never read back | Done (verified) | `loadDatabase` now reads `reference_counter`; without it the second payment of the day reused `PAY-…-0001` and was refused by `payment_reference_key` (the integration test caught it) |
-| Vehicle release is a separate permission, and the releaser is recorded | Done (verified) | `maintenance:release` in `permissions.ts`; `advance_work_order` gate + `releasedBy`/`releasedAt`; audit action `maintenance:release`; tests "records who released the vehicle…" and "refuses to release a vehicle for an account that may advance work but not release it"; schema 12 (D-64) |
+| Vehicle release is a separate permission, and the releaser is recorded | Done (verified) | `maintenance:release` in `permissions.ts`; `advance_work_order` gate + `releasedBy`/`releasedAt`; audit action `maintenance:release`; tests "records who released the vehicle…" and "refuses to release a vehicle for an account that may advance work but not release it"; schema 12 (D-64), 13 from Phase 21 |
 | AUTH-05: own profile, own password, own sign-in history | Done (verified) | `src/screens/Profile.tsx` (nav "My account", every role), `GET/POST /api/profile`; commands `update_profile` and `change_own_password` need no administrative permission; sign-ins are read from `audit_entry`, and the screen says no address or device is kept; tests: 3 domain (`service.test.ts` "profile (AUTH-05)"), 3 screen (`Profile.test.tsx`). Changing a password re-seals the session, so the device that changed it stays signed in and every other one stops (D-69) |
 | Workflow C over HTTP: the built application, started for real, driven from setup to a paid invoice | Done (verified locally; CI job added) | `scripts/e2e-workflow-c.ts` (`npm run e2e`), 39 checks: health, 401 before sign-in, first-run setup, session, settings, the public enquiry form (WEB-01), vehicle, rental, quotation, deposit, assignment, start, completion, invoice (GHS 3,450 due in 14 days), two payments, reload, AUTH-05 profile + sign-in history, and 403 for cross-origin writes. New `e2e` job in `ci.yml` migrates, builds, starts `next start` and runs it (D-68: a substitute for Playwright, labelled as one) |
 | 78-ID register in `PROGRESS.md` | Done (verified) | The table at the top of this file: one row per brief ID with phase, status and evidence; closes D-02 |
@@ -562,3 +562,28 @@ After the trial, the remaining open work is what the brief puts in Phase 1B/1C a
 has recorded as deliberately absent: contracts, bookings, employee/passenger import (EMP-02), the
 financial reports (RPT-03), the browser automation the brief asks for (D-68), and the notification
 and GPS work that Phase 2 owns.
+
+## Phase 21 - Reference numbers: one allocator, and no way back (D-03)
+
+The last open data-integrity defect from the conformance report. Rentals, routes, trips, incidents
+and work orders were numbered `prefix + (records.length + 1)`: two commands at the same instant got
+the same number, and any archive-then-create handed a printed number to a new record.
+
+| Item | Status | Evidence |
+|---|---|---|
+| One allocator for all seven series | Done (verified) | `src/tms/references.ts` (`allocateReference`, `highestIssued`, `referencePattern`); used by `create_rental`, `submit_enquiry`, `create_route`, `generate_trips`, `create_incident`, `create_work_order`, `issue_rental_invoice`, `record_payment`. Formats unchanged: `RR-0001`, `RT-001`, `TR-0001`, `IN-0001`, `WO-0001`, `INV-2026-0001`, `PAY-2026-0001` |
+| Counter written with the record, in one transaction | Done (verified) | `referenceCounters` travels on the snapshot; `saveDatabase` mirrors it into `reference_counter`; `runCommand` holds the advisory lock. Integration test reads the row back straight from the table and reloads it (`references.integration.test.ts`) |
+| A deleted record's number is not reissued | Done (verified) | Integration test deletes `RR-0002` from the table, creates another rental through `runCommand`, and gets `RR-0003` |
+| A series cannot be rewound | Done (verified) | Trigger `reference_counter_no_rewind` (migration `004_reference_series.sql`) raises on any lower `last`; the failure is mapped to a readable 409 ("that backup is older than this installation's numbering"). `describeDatabaseError` test included |
+| A database written before this migration continues its series | Done (verified) | `highestIssued` derives the floor from the highest reference present, never from a count; unit tests cover the missing-counter and the stale-counter cases |
+| Schema | Done | `SCHEMA_VERSION` 13; migration `004_reference_series.sql` widens `reference_counter` scope and period (`all` for continuous series) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **302 passed, 14 skipped** (the 14
+are the four integration suites, which only run with `TEST_DATABASE_URL`), `build` succeeds,
+`npm run e2e` **39/39** against the built server, and the integration suite green against
+PostgreSQL (12 of 14 locally — the two concurrency cases need more than one live connection, which
+the local PGlite stand-in cannot give; they run in CI against `postgres:18-alpine`).
+
+Still open, and unchanged by this phase: D-04 (money is a JavaScript `number` in the domain layer;
+only the columns that reach PostgreSQL are `numeric(14,2)`), the Playwright requirement (D-68), and
+the trial on real data (`docs/REAL_DATA_TRIAL.md`).

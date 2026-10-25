@@ -8,6 +8,18 @@ const pgError = (code: string, extra: Record<string, string> = {}) =>
   Object.assign(new Error("postgres detail"), { code, ...extra });
 
 describe("database error messages", () => {
+  it("explains a refused counter rewind as an older backup, not as a bad date", () => {
+    const result = describeDatabaseError(pgError("23514", { constraint: "reference_counter_no_rewind" }));
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(409);
+    expect(result.message).toMatch(/older than this installation's numbering/);
+    expect(result.message).toMatch(/already been printed/);
+
+    // Any other check constraint keeps the plain message.
+    const other = describeDatabaseError(pgError("23514", { constraint: "invoice_paid_within_total" }));
+    expect(other.status).toBe(400);
+  });
+
   it("names the password as the problem, and says to restart", () => {
     const result = describeDatabaseError(pgError("28P01"));
     expect(result.ok).toBe(false);

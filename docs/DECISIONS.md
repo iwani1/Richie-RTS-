@@ -830,3 +830,32 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 - **Consequence.** The endpoint accepts anonymous writes, so it is throttled and every submission is a
   draft that a person still has to act on. `TRUST_PROXY=1` matters here for the same reason it matters
   at sign-in: without it every visitor shares one bucket.
+
+## D-71 Every reference comes from a counter, and a series cannot walk backwards
+
+- **Context.** Audit defect D-03: rentals, routes, trips, incidents and work orders were numbered
+  `prefix + (records.length + 1)`. Two commands at the same instant computed the same length and so
+  the same number; and because length is not history, deleting or archiving a record handed its
+  number to the next one. An invoice had been moved to `reference_counter` in Phase 16 (D-62); the
+  rest had not.
+- **Decision.** One allocator, `src/tms/references.ts`, for all seven series, plus `reference_counter`
+  widened by migration `004_reference_series.sql`:
+  - Number and counter are produced by the same pure function, so the counter is written in the same
+    transaction as the record. `runCommand` already holds the advisory lock, so two commands cannot
+    both read the same "last".
+  - Continuous series (rental `RR-`, route `RT-`, trip `TR-`, incident `IN-`, work order `WO-`) are
+    filed under the period `all`; money restarts each year (`INV-2026-…`, `PAY-2026-…`).
+  - A missing counter is recovered from the **highest reference already present**, never from a
+    count — so a database written before this migration continues its series on its next write
+    rather than restarting at 1.
+  - A trigger refuses any update that lowers a series. `saveDatabase` only ever raises it; an import
+    of an older backup is refused with a readable message ("that backup is older than this
+    installation's numbering") instead of quietly reissuing numbers.
+- **Rejected.** PostgreSQL `nextval()` sequences: they are outside the transaction and cannot be part
+  of the snapshot, so a restore, a test fixture or a backup import would each have to reason about
+  sequence state separately — and the number series would then be the one thing the test database
+  could not reproduce. A `select max(...)` on every write: correct but racy without the lock, and it
+  cannot see a record that was archived out of the table.
+- **Known limit.** `npm run db:restore` truncates and reloads, so it deliberately bypasses the
+  no-rewind trigger: restoring an older backup *does* make numbers issued after it available again.
+  That is the meaning of a restore, and it is stated in `docs/BACKUP_AND_RECOVERY.md` §4.

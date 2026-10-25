@@ -14,6 +14,7 @@ import {
   type CommandResult,
   type Errors,
 } from "./service";
+import { allocateReference } from "./references";
 import { actorLink, mayReportOnVehicle } from "./scope";
 import {
   INCIDENT_SEVERITIES,
@@ -317,7 +318,7 @@ export function executeLogistics(
       const incidentInput = link.bound ? { ...command.input, takeVehicleOutOfService: false } : command.input;
       const { errors, value } = validateIncident(db, incidentInput);
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
-      const reference = `IN-${String(db.incidents.length + 1).padStart(4, "0")}`;
+      const { reference, counters } = allocateReference(db, "incident", now.slice(0, 4));
       const created: Incident = {
         id: makeId(),
         reference,
@@ -332,7 +333,7 @@ export function executeLogistics(
       };
       created.log = [logEntry(actor, "Incident reported.", null, "reported", now)];
 
-      let next: Database = { ...db, incidents: [...db.incidents, created] };
+      let next: Database = { ...db, referenceCounters: counters, incidents: [...db.incidents, created] };
       let vehicleNote = "";
       if (value.takeVehicleOutOfService && value.vehicleId) {
         const applied = applyVehicleStatus(next, value.vehicleId, "out_of_service", now);
@@ -509,7 +510,7 @@ export function executeLogistics(
       if (denied) return denied;
       const { errors, value } = validateWorkOrder(db, command.input);
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
-      const reference = `WO-${String(db.workOrders.length + 1).padStart(4, "0")}`;
+      const { reference, counters } = allocateReference(db, "workOrder", now.slice(0, 4));
       const created: WorkOrder = {
         id: makeId(),
         reference,
@@ -527,7 +528,7 @@ export function executeLogistics(
         updatedAt: now,
       };
       created.log = [logEntry(actor, "Work order raised.", null, "open", now)];
-      const next = audit({ ...db, workOrders: [...db.workOrders, created] }, actor, {
+      const next = audit({ ...db, referenceCounters: counters, workOrders: [...db.workOrders, created] }, actor, {
         action: "maintenance:create",
         entity: "work_order",
         entityId: created.id,

@@ -5,6 +5,7 @@
 import { can, type Permission } from "./permissions";
 import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
+import { allocateReference } from "./references";
 import { confinedClientId } from "./scope";
 import {
   CLIENT_STATUSES,
@@ -944,7 +945,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       const scopedInput = confined === null ? command.input : { ...command.input, clientId: confined };
       const { errors, value } = validateRentalRequest(db, scopedInput);
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
-      const reference = `RR-${String(db.rentals.length + 1).padStart(4, "0")}`;
+      const { reference, counters } = allocateReference(db, "rental", now.slice(0, 4));
       const rental: Rental = {
         id: makeId(),
         reference,
@@ -960,7 +961,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         createdAt: now,
         updatedAt: now,
       };
-      const next = audit({ ...db, rentals: [...db.rentals, rental] }, actor, {
+      const next = audit({ ...db, referenceCounters: counters, rentals: [...db.rentals, rental] }, actor, {
         action: "rentals:create",
         entity: "rental",
         entityId: rental.id,
@@ -979,7 +980,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       }
       const { errors, value } = validateEnquiry(db, command.input, now.slice(0, 10));
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
-      const reference = `RR-${String(db.rentals.length + 1).padStart(4, "0")}`;
+      const { reference, counters } = allocateReference(db, "rental", now.slice(0, 4));
       const rental: Rental = {
         id: makeId(),
         reference,
@@ -995,7 +996,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         createdAt: now,
         updatedAt: now,
       };
-      const next = audit({ ...db, rentals: [...db.rentals, rental] }, actor, {
+      const next = audit({ ...db, referenceCounters: counters, rentals: [...db.rentals, rental] }, actor, {
         action: "rentals:enquiry",
         entity: "rental",
         entityId: rental.id,

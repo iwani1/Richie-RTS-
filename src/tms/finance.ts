@@ -6,11 +6,12 @@
 // settings. That is why an invoice cannot be issued for a rental that was never completed, and why
 // every total is derived rather than entered.
 //
-// Numbers come from referenceCounters, which the database mirrors in reference_counter so two
-// writers cannot allocate the same number. An issued invoice never changes: identity, dates, lines
+// Numbers come from the shared allocator in `references.ts` (audit D-03), which the database mirrors
+// into reference_counter so two writers cannot allocate the same number. An issued invoice never changes: identity, dates, lines
 // and totals are frozen here and by trigger in migration 003. Only its status, amount paid and void
 // note move, and the void path refuses once money has been recorded against it.
 
+import { allocateReference } from "./references";
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
 import type {
   Database,
@@ -20,7 +21,6 @@ import type {
   InvoiceTaxLine,
   Payment,
   PaymentStatus,
-  ReferenceCounter,
 } from "./types";
 import { PAYMENT_STATUSES } from "./types";
 
@@ -56,22 +56,6 @@ export function isFinanceCommand(command: { type: string }): command is FinanceC
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const PAYMENT_RANK: Record<PaymentStatus, number> = { recorded: 1, verified: 2, reconciled: 3 };
 
-const pad4 = (n: number) => String(n).padStart(4, "0");
-
-/** Allocate the next number in `scope` for the year `period`. Counters only move forwards. */
-export function allocateReference(
-  db: Database,
-  scope: ReferenceCounter["scope"],
-  period: string,
-): { reference: string; counters: ReferenceCounter[] } {
-  const existing = db.referenceCounters.find((counter) => counter.scope === scope && counter.period === period);
-  const next = (existing?.last ?? 0) + 1;
-  const counters = existing
-    ? db.referenceCounters.map((counter) => (counter === existing ? { ...counter, last: next } : counter))
-    : [...db.referenceCounters, { scope, period, last: next }];
-  const prefix = scope === "invoice" ? "INV" : "PAY";
-  return { reference: `${prefix}-${period}-${pad4(next)}`, counters };
-}
 
 /** What a rental can be billed for: the completion record, and nothing else. */
 export function billableEventFor(rentalId: string): string {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { can, ROLE_PERMISSIONS } from "./permissions";
 import { execute, VEHICLE_TRANSITIONS, type Actor, type Credential } from "./service";
-import { emptyDatabase, type Database } from "./types";
+import { emptyDatabase, SCHEMA_VERSION, type Database } from "./types";
 
 const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const NOW = "2026-01-01T00:00:00.000Z";
@@ -546,7 +546,7 @@ describe("rentals - full lifecycle", () => {
     const imported = execute(quoted.db, importer, { type: "import_backup", database: legacy }, NOW);
     expect(imported.ok).toBe(true);
     if (imported.ok) {
-      expect(imported.db.schemaVersion).toBe(12);
+      expect(imported.db.schemaVersion).toBe(SCHEMA_VERSION);
       expect(imported.db.rentals[0].quote).toEqual(quoted.db.rentals[0].quote);
       expect(imported.db.rentals[0].quoteHistory).toEqual([]);
       expect(imported.db.settings.rental.requotePolicy).toBeNull();

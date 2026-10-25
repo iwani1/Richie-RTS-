@@ -1,0 +1,117 @@
+// Reference numbers: one allocator for every record that a person quotes out loud.
+//
+// A reference was once `prefix + (records.length + 1)`. That is wrong twice over. It collides when
+// two commands run at the same moment — the length is the same for both, so both get the same
+// number. And it goes backwards: delete a record (a backup import does), and the next record is
+// handed a number that has already been printed on a quotation or an invoice (audit D-03).
+//
+// So numbers come from a counter, not from the size of a list:
+//
+//   * `referenceCounters` is part of the database snapshot, so the allocator is pure and testable,
+//     and `saveDatabase` mirrors it into `reference_counter` inside the same transaction — under
+//     the advisory lock `runCommand` takes, two commands cannot both read the same "last".
+//   * The database refuses an update that lowers a series (trigger `reference_counter_no_rewind`), so
+//     nothing in the application — an import, a hand-edited row — can walk a printed number back.
+//     `npm run db:restore` is the one exception by design: it truncates and reloads, because a
+//     restore is an explicit decision to return the whole installation to an earlier moment.
+//   * If a counter is missing — a database written before this existed, or a restore that dropped
+//     the table — the next number is taken from the highest reference already present, not from a
+//     count. Recovering the series is then guaranteed rather than hoped for.
+import type { Database, ReferenceCounter, ReferenceScope } from "./types";
+
+/** Every numbering series in the application, and its shape. */
+export const REFERENCE_SERIES: Record<ReferenceScope, { prefix: string; width: number; perYear: boolean }> = {
+  // Rentals, routes, trips and work orders are numbered continuously: the reference is quoted in
+  // conversation, and a year inside it earns nothing.
+  rental: { prefix: "RR", width: 4, perYear: false },
+  route: { prefix: "RT", width: 3, perYear: false },
+  trip: { prefix: "TR", width: 4, perYear: false },
+  incident: { prefix: "IN", width: 4, perYear: false },
+  workOrder: { prefix: "WO", width: 4, perYear: false },
+  // Financial documents restart each year: INV-2026-0001 is what an accountant and a tax inspector
+  // both expect to see.
+  invoice: { prefix: "INV", width: 4, perYear: true },
+  payment: { prefix: "PAY", width: 4, perYear: true },
+};
+
+/** The period a counter is filed under: the year for financial documents, `all` otherwise. */
+export function seriesPeriod(scope: ReferenceScope, year: string): string {
+  return REFERENCE_SERIES[scope].perYear ? year : "all";
+}
+
+/** Every reference already in use for a series, so a missing counter can be recovered. */
+function existingReferences(db: Database, scope: ReferenceScope): string[] {
+  switch (scope) {
+    case "rental":
+      return db.rentals.map((record) => record.reference);
+    case "route":
+      return db.routes.map((record) => record.reference);
+    case "trip":
+      return db.trips.map((record) => record.reference);
+    case "incident":
+      return db.incidents.map((record) => record.reference);
+    case "workOrder":
+      return db.workOrders.map((record) => record.reference);
+    case "invoice":
+      return db.invoices.map((record) => record.reference);
+    case "payment":
+      return db.payments.map((record) => record.reference);
+    default:
+      // Exhaustive by type; this keeps a future scope from silently numbering from zero.
+      return [];
+  }
+}
+
+/**
+ * The highest number this series has already reached, read back from the references themselves.
+ *
+ * Only used when no counter exists. Counts are not consulted on purpose: a count cannot tell a
+ * full series with a hole in it from a fresh one.
+ */
+export function highestIssued(db: Database, scope: ReferenceScope, period: string): number {
+  const { prefix, perYear } = REFERENCE_SERIES[scope];
+  const pattern = perYear ? new RegExp(`^${prefix}-${period}-(\\d+)$`) : new RegExp(`^${prefix}-(\\d+)$`);
+  let highest = 0;
+  for (const reference of existingReferences(db, scope)) {
+    const match = pattern.exec(reference);
+    if (!match) continue;
+    const issued = Number(match[1]);
+    if (Number.isSafeInteger(issued) && issued > highest) highest = issued;
+  }
+  return highest;
+}
+
+/**
+ * The next number in a series, and the counters with that fact recorded.
+ *
+ * Pure: the caller puts `counters` back on the snapshot it returns. That is what makes the
+ * allocator testable without a database, and what lets a command that writes several records (trip
+ * generation) allocate each number in turn.
+ */
+export function allocateReference(
+  db: Database,
+  scope: ReferenceScope,
+  year: string,
+): { reference: string; counters: ReferenceCounter[] } {
+  const { prefix, width, perYear } = REFERENCE_SERIES[scope];
+  const period = seriesPeriod(scope, year);
+  const existing = db.referenceCounters.find((counter) => counter.scope === scope && counter.period === period);
+
+  // A counter that lags behind the records (or does not exist at all) must not hand out a number
+  // that is already printed, so the floor is whichever is higher.
+  const floor = Math.max(existing?.last ?? 0, highestIssued(db, scope, period));
+  const next = floor + 1;
+  const counters = existing
+    ? db.referenceCounters.map((counter) => (counter === existing ? { ...counter, last: next } : counter))
+    : [...db.referenceCounters, { scope, period, last: next }];
+
+  const number = String(next).padStart(width, "0");
+  return { reference: perYear ? `${prefix}-${period}-${number}` : `${prefix}-${number}`, counters };
+}
+
+/** The shape a reference of this series must have today, for tests and for the importer's checks. */
+export function referencePattern(scope: ReferenceScope, period: string): RegExp {
+  const { prefix, width, perYear } = REFERENCE_SERIES[scope];
+  const digits = `\\d{${width},}`;
+  return perYear ? new RegExp(`^${prefix}-${period}-${digits}$`) : new RegExp(`^${prefix}-${digits}$`);
+}

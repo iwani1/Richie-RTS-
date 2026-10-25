@@ -154,6 +154,12 @@ export function describeDatabaseError(error: unknown): ServerFailure {
     case "23503":
       return conflict("A related record is missing or is still in use, so this change was not saved.");
     case "23514":
+      // A reference series is the one check constraint an operator can trip from the screen, by
+      // importing an older backup whose counters are behind: say that, rather than "a value was
+      // rejected", which would send them looking at dates and amounts (audit D-03).
+      if (pg.constraint === "reference_counter_no_rewind") {
+        return conflict("That backup is older than this installation's numbering, so restoring it would reissue references that have already been printed. Nothing was changed.");
+      }
       return { ok: false, status: 400, message: "A value was rejected by the database (check dates, amounts and counts).", errors: {} };
     case "OD-001":
       return { ok: false, status: 400, message: pg.message ?? "Odometer reading rejected.", errors: { readingKm: "Reading cannot be lower than the last recorded reading." } };
