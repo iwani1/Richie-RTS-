@@ -97,7 +97,7 @@ suite("contracts, against PostgreSQL", () => {
   it("takes its number from the counter, through the table's own scope list", async () => {
     const { adminId, clientId } = await world();
     const first = await step("create_contract", contract(clientId), adminId);
-    expect(first.contracts[0].reference).toBe("CT-0001");
+    expect(first.contracts.map((row) => row.reference)).toEqual(["CT-0001"]);
 
     // The counter row is written in the same transaction as the contract (D-03): if it were not, the
     // series would restart at 1 after a deploy.
@@ -105,10 +105,10 @@ suite("contracts, against PostgreSQL", () => {
     expect(stored).toEqual([{ scope: "contract", period: "all", last: 1 }]);
 
     const second = await step("create_contract", contract(clientId), adminId);
-    expect(second.contracts.map((row) => row.reference)).toEqual(["CT-0001", "CT-0002"]);
+    expect(second.contracts.map((row) => row.reference).sort()).toEqual(["CT-0001", "CT-0002"]);
 
     const reloaded = await loadDatabase();
-    expect(reloaded.contracts.map((row) => row.reference)).toEqual(["CT-0001", "CT-0002"]);
+    expect(reloaded.contracts.map((row) => row.reference).sort()).toEqual(["CT-0001", "CT-0002"]);
   });
 
   it("refuses to rewrite an approved contract's terms, whoever asks", async () => {
@@ -125,11 +125,16 @@ suite("contracts, against PostgreSQL", () => {
       db().updateTable("contract").set({ data: sql`jsonb_set(data, '{paymentTerms}', '"60 days"')` }).where("id", "=", id).execute(),
     ).rejects.toThrow(/not rewritten/);
 
-    // A draft may still be corrected — approval is the gate, not creation.
-    const draft = await step("create_contract", contract(clientId), adminId);
-    const draftId = draft.contracts[1].id;
+    // A draft may still be corrected — approval is the gate, not creation. It has its own term,
+    // because two live contracts may not cover the same days and this one is only here to be edited.
+    const draft = await step(
+      "create_contract",
+      { input: { ...contract(clientId).input, startDate: "2027-01-01", endDate: "2027-12-31" } },
+      adminId,
+    );
+    const draftId = draft.contracts.find((row) => row.status === "draft")!.id;
     await expect(
-      db().updateTable("contract").set({ start_date: "2026-03-01" }).where("id", "=", draftId).execute(),
+      db().updateTable("contract").set({ start_date: "2027-02-01" }).where("id", "=", draftId).execute(),
     ).resolves.toBeDefined();
   });
 
