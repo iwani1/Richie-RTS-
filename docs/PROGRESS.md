@@ -740,6 +740,8 @@ marked primary.
 | A database that predates this | Done (verified) | Migration 005 drops the index; if an unmigrated database refuses the row, the message says to run `npm run db:migrate` instead of a 500 |
 | Tests | Done (verified) | 5 domain (`scope.test.ts` "several contacts per client, one marked primary"), 4 screen (`Users.test.tsx`), 3 screen (`Registers.test.tsx`), 2 integration (`repository.integration.test.ts`) |
 
+| **Defect found by CI:** the new driver-account integration test would not run | Fixed | Run `40163522757`: `could not determine data type of parameter $2`, because the driver's name was interpolated inside a quoted SQL literal (`'Driver ${id}'`), leaving the parameter unused and untyped. The name is now built in JavaScript and passed as a normal parameter; the Q-38 test that this phase is about passed on that run. Run `40163880719` is green in all three jobs |
+
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **377 passed, 16 skipped** (the two new
 integration tests are among the skipped ones and run against PostgreSQL in CI), `build` succeeds.
 
