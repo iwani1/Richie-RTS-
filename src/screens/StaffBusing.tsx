@@ -1,13 +1,16 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { MAX_GENERATE_DAYS, type AdhocTripInput, type CompleteTripInput, type PassengerInput, type RouteInput, type TripAssignInput, type TripCorrectionInput } from "../tms/busing";
+import { capacityOf, type BookingRequestInput } from "../tms/bookings";
 import { TripStopForm } from "./TripStopForm";
 import { onTimeReport } from "../tms/kpis";
 import type { Permission } from "../tms/permissions";
 import type { CommandResult } from "../tms/service";
 import { readinessReport } from "../tms/maintenance";
 import { ImportPanel } from "../ui/ImportPanel";
-import { useTms } from "../tms/useTms";
+import { useTms, type Tone } from "../tms/useTms";
 import {
+  BOOKING_STATUS_LABELS,
+  BOOKING_TYPE_LABELS,
   DIRECTIONS,
   DIRECTION_LABELS,
   PASSENGER_STATUSES,
@@ -16,20 +19,23 @@ import {
   TRIP_STATUS_LABELS,
   VEHICLE_STATUS_LABELS,
   type BoardingOutcome,
+  type Booking,
+  type BookingStatus,
   type BusRoute,
   type Passenger,
   type Trip,
   type TripStatus,
 } from "../tms/types";
-import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, Stat, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, Stat, TableCard, TextArea, TextInput, formatDate, formatDateTime, todayYmd } from "../ui/primitives";
 
 type Errors = Record<string, string>;
-type Tab = "routes" | "passengers" | "trips" | "performance";
+type Tab = "routes" | "passengers" | "trips" | "bookings" | "performance";
 
 const TABS: { id: Tab; label: string; permission: Permission }[] = [
   { id: "routes", label: "Routes", permission: "routes:read" },
   { id: "passengers", label: "Passengers", permission: "passengers:read" },
   { id: "trips", label: "Trips", permission: "trips:read" },
+  { id: "bookings", label: "Bookings", permission: "bookings:read" },
   { id: "performance", label: "Performance", permission: "kpis:read" },
 ];
 
@@ -59,7 +65,7 @@ export function StaffBusingPage() {
       <PageHeader
         eyebrow="Service"
         title="Staff busing"
-        description="Recurring employee transport: routes and rosters, generated trips, dispatch, boarding records and on-time performance."
+        description="Recurring employee transport: routes and rosters, generated trips, dispatch, boarding records, booked seats and on-time performance."
       />
       <div role="tablist" aria-label="Staff busing sections" className="rts-tabs">
         {available.map((t) => (
@@ -78,6 +84,7 @@ export function StaffBusingPage() {
       {tab === "routes" && <RoutesTab />}
       {tab === "passengers" && <PassengersTab />}
       {tab === "trips" && <TripsTab />}
+      {tab === "bookings" && <BookingsTab />}
       {tab === "performance" && <PerformanceTab />}
     </div>
   );
@@ -1228,6 +1235,341 @@ function CorrectForm({
 }
 
 // ---------------- Performance ----------------
+
+// ---------------- Bookings (BKG-01..06, D-83) ----------------
+//
+// A booking is one named rider's seat on one named run — a visitor, a new hire, somebody from
+// another site. It is deliberately not a second roster: the roster is how a client's own staff
+// travel every day. The seat line counts both together, because that is what the vehicle carries.
+// Nothing here is confirmed by the system: a freed seat is offered to the oldest waiter, and a
+// person still has to confirm it.
+
+const BOOKING_TONE: Record<BookingStatus, Tone | "neutral"> = {
+  requested: "info",
+  confirmed: "success",
+  waitlisted: "neutral",
+  offered: "warning",
+  rejected: "error",
+  cancelled: "neutral",
+};
+
+/** Confirmed seats first, then offers, requests, the waiting list, and what is finished. */
+const BOOKING_ORDER: Record<BookingStatus, number> = {
+  confirmed: 0,
+  offered: 1,
+  requested: 2,
+  waitlisted: 3,
+  rejected: 4,
+  cancelled: 5,
+};
+
+type BookingPanel =
+  | { mode: "create" }
+  | { mode: "reject"; booking: Booking }
+  | { mode: "cancel"; booking: Booking }
+  | null;
+
+function BookingsTab() {
+  const { db, allowed, currentUser, dispatch, setFlash } = useTms();
+  const [date, setDate] = useState(todayYmd());
+  const [panel, setPanel] = useState<BookingPanel>(null);
+
+  const trips = db.trips.filter((trip) => trip.serviceDate === date).sort((a, b) => a.reference.localeCompare(b.reference));
+  const routeOf = (routeId: string) => db.routes.find((route) => route.id === routeId);
+  const riderOf = (passengerId: string) => db.passengers.find((passenger) => passenger.id === passengerId);
+  const riderName = (passengerId: string) => riderOf(passengerId)?.fullName ?? "Unknown rider";
+  const startOf = (trip: Trip) => routeOf(trip.routeId)?.stops[0]?.scheduledTime ?? "";
+
+  const report = async (pending: Promise<CommandResult>) => {
+    const result = await pending;
+    setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+    return result;
+  };
+
+  const bookingsFor = (tripId: string) =>
+    db.bookings
+      .filter((booking) => booking.tripId === tripId)
+      .sort((a, b) => (BOOKING_ORDER[a.status] === BOOKING_ORDER[b.status] ? a.reference.localeCompare(b.reference) : BOOKING_ORDER[a.status] - BOOKING_ORDER[b.status]));
+
+  const canDecide = allowed("bookings:manage");
+  // A client's own contact may cancel its own company's seats; the office may cancel anything.
+  const canCancel = canDecide || (currentUser?.role === "client_contact" && allowed("bookings:create"));
+  const tripIds = new Set(trips.map((trip) => trip.id));
+  const live = db.bookings.filter((booking) => tripIds.has(booking.tripId) && booking.status !== "cancelled" && booking.status !== "rejected").length;
+
+  const actions = (booking: Booking) => {
+    const out: ReactNode[] = [];
+    if (canDecide && (booking.status === "requested" || booking.status === "offered"))
+      out.push(
+        <Button key="confirm" variant="primary" onClick={() => void report(dispatch({ type: "confirm_booking", id: booking.id }))}>
+          Confirm
+        </Button>,
+      );
+    if (canDecide && ["requested", "offered", "waitlisted"].includes(booking.status))
+      out.push(
+        <Button key="reject" variant="ghost" onClick={() => setPanel({ mode: "reject", booking })}>
+          Refuse
+        </Button>,
+      );
+    if (canCancel && ["requested", "confirmed", "waitlisted", "offered"].includes(booking.status))
+      out.push(
+        <Button key="cancel" variant="danger" onClick={() => setPanel({ mode: "cancel", booking })}>
+          Cancel
+        </Button>,
+      );
+    return <div className="flex justify-end gap-1">{out}</div>;
+  };
+
+  return (
+    <div>
+      <div className="rts-toolbar">
+        <Field label="Service date">
+          <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Button onClick={() => setDate(todayYmd())}>Today</Button>
+        {allowed("bookings:create") && (
+          <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>
+            Request a seat
+          </Button>
+        )}
+        <p className="rts-toolbar-note">
+          {trips.length} run{trips.length === 1 ? "" : "s"} on {formatDate(date)} · {live} live booking{live === 1 ? "" : "s"} · seats count the roster and the bookings together
+        </p>
+      </div>
+
+      {trips.length === 0 ? (
+        <EmptyState
+          title="No runs on this date"
+          body="A seat is booked onto a run, so there has to be a run first. Generate trips from a route, or pick another date."
+        />
+      ) : (
+        <div className="space-y-4">
+          {trips.map((trip) => {
+            const route = routeOf(trip.routeId);
+            const capacity = capacityOf(db, trip);
+            const rows = bookingsFor(trip.id);
+            const seats = capacity.vehicle ? `${capacity.booked} of ${capacity.seats} seats held` : "seats unknown until a vehicle is assigned";
+            return (
+              <TableCard
+                key={trip.id}
+                title={`${route?.name ?? "Route missing"} · ${trip.reference}`}
+                summary={`${startOf(trip) || "—"} · ${capacity.vehicle ?? "no vehicle yet"} · ${seats} · ${capacity.roster} on the roster · ${capacity.free} free`}
+              >
+                <DataTable
+                  rows={rows}
+                  rowKey={(booking) => booking.id}
+                  emptyState={
+                    <EmptyState
+                      title="No bookings on this run"
+                      body="Only visitors and newcomers need a seat booked. The client's roster already travels."
+                    />
+                  }
+                  columns={[
+                    {
+                      key: "rider",
+                      header: "Rider",
+                      render: (booking) => (
+                        <div>
+                          <p className="font-medium text-stone-900">{riderName(booking.passengerId)}</p>
+                          <p className="text-xs text-stone-500">{riderOf(booking.passengerId)?.employeeRef || "no staff number"}</p>
+                        </div>
+                      ),
+                    },
+                    { key: "ref", header: "Booking", render: (booking) => <span className="font-mono text-xs font-semibold text-stone-900">{booking.reference}</span> },
+                    { key: "kind", header: "Kind", render: (booking) => <span className="text-xs text-stone-600">{BOOKING_TYPE_LABELS[booking.type]}</span> },
+                    { key: "status", header: "Status", render: (booking) => <Badge tone={BOOKING_TONE[booking.status]}>{BOOKING_STATUS_LABELS[booking.status]}</Badge> },
+                    {
+                      key: "last",
+                      header: "Last change",
+                      render: (booking) => {
+                        const last = booking.history[booking.history.length - 1];
+                        return (
+                          <div className="text-xs">
+                            <p className="text-stone-700">{last ? last.action : "Recorded"}</p>
+                            <p className="text-stone-500">{last ? `${last.by} · ${formatDateTime(last.at)}` : "—"}</p>
+                          </div>
+                        );
+                      },
+                    },
+                    { key: "actions", header: "Actions", render: actions, className: "text-right" },
+                  ]}
+                />
+              </TableCard>
+            );
+          })}
+          <p className="text-xs text-stone-500">
+            A full run does not lose the request: confirming it puts the rider on the waiting list. When a seat is
+            cancelled it is <em>offered</em> to the oldest waiter, and stays an offer until somebody confirms it.
+          </p>
+        </div>
+      )}
+
+      {panel?.mode === "create" && (
+        <BookingForm
+          onClose={() => setPanel(null)}
+          onSubmit={async (input) => {
+            const result = await report(dispatch({ type: "create_booking", input }));
+            if (result.ok) setPanel(null);
+            return result.ok ? {} : result.errors;
+          }}
+        />
+      )}
+      {panel?.mode === "reject" && (
+        <BookingReasonForm
+          title={`Refuse ${panel.booking.reference}`}
+          description={`${riderName(panel.booking.passengerId)} on ${formatDate(panel.booking.serviceDate)}. The reason is kept with the booking and in the audit log.`}
+          submitLabel="Refuse request"
+          onClose={() => setPanel(null)}
+          onSubmit={async (reason) => {
+            const result = await report(dispatch({ type: "reject_booking", id: panel.booking.id, reason }));
+            if (result.ok) setPanel(null);
+            return result.ok ? {} : result.errors;
+          }}
+        />
+      )}
+      {panel?.mode === "cancel" && (
+        <BookingReasonForm
+          title={`Cancel ${panel.booking.reference}`}
+          description={`${riderName(panel.booking.passengerId)} on ${formatDate(panel.booking.serviceDate)}. A held seat is offered to the oldest person waiting; nobody is confirmed automatically.`}
+          submitLabel="Cancel booking"
+          onClose={() => setPanel(null)}
+          onSubmit={async (reason) => {
+            const result = await report(dispatch({ type: "cancel_booking", id: panel.booking.id, reason }));
+            if (result.ok) setPanel(null);
+            return result.ok ? {} : result.errors;
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** One seat, one rider, one run — or the same seat on every operating day of a series. */
+function BookingForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (input: BookingRequestInput) => Errors | Promise<Errors> }) {
+  const { db, currentUser } = useTms();
+  const routes = db.routes.filter((route) => route.status !== "ended");
+  const riders = db.passengers.filter(
+    (passenger) => passenger.status === "active" && (currentUser?.role !== "client_contact" || passenger.clientId === currentUser.clientId),
+  );
+  const [values, setValues] = useState<BookingRequestInput>({
+    passengerId: "",
+    routeId: routes[0]?.id ?? "",
+    serviceDate: todayYmd(),
+    toDate: todayYmd(),
+    type: "one_time",
+    note: "",
+  });
+  const [errors, setErrors] = useState<Errors>({});
+  const blocked = riders.length === 0 || routes.length === 0;
+
+  return (
+    <Panel
+      title="Request a seat"
+      description="For somebody who is not already on the route's roster. The seat is requested first — the office confirms it once the vehicle's seats are counted."
+      onClose={onClose}
+    >
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setErrors(await onSubmit(values));
+        }}
+        className="space-y-4"
+      >
+        {riders.length === 0 && <Notice tone="warning">No active riders exist for you to book. Add the person to Passengers first.</Notice>}
+        {routes.length === 0 && <Notice tone="warning">No route is open. Create a route before booking a seat.</Notice>}
+        <Field label="Rider" hint="A rider already on the route's roster needs no booking." error={errors.passengerId}>
+          <Select value={values.passengerId} onChange={(e) => setValues({ ...values, passengerId: e.target.value })} invalid={!!errors.passengerId}>
+            <option value="">Select a rider</option>
+            {riders.map((rider) => (
+              <option key={rider.id} value={rider.id}>
+                {rider.fullName}
+                {rider.employeeRef ? ` (${rider.employeeRef})` : ""}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Route" error={errors.routeId}>
+          <Select value={values.routeId} onChange={(e) => setValues({ ...values, routeId: e.target.value })} invalid={!!errors.routeId}>
+            {routes.map((route) => (
+              <option key={route.id} value={route.id}>
+                {route.reference} · {route.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Date of travel" error={errors.serviceDate}>
+            <TextInput type="date" value={values.serviceDate} onChange={(e) => setValues({ ...values, serviceDate: e.target.value })} invalid={!!errors.serviceDate} />
+          </Field>
+          <Field label="How often" error={errors.type}>
+            <Select value={values.type} onChange={(e) => setValues({ ...values, type: e.target.value as BookingRequestInput["type"] })} invalid={!!errors.type}>
+              <option value="one_time">{BOOKING_TYPE_LABELS.one_time}</option>
+              <option value="recurring">{BOOKING_TYPE_LABELS.recurring}</option>
+            </Select>
+          </Field>
+        </div>
+        {values.type === "recurring" && (
+          <Field
+            label="Every operating day until"
+            hint="One booking per run, at most 62 days. Dates with no run are reported, not invented."
+            error={errors.toDate}
+          >
+            <TextInput type="date" value={values.toDate} onChange={(e) => setValues({ ...values, toDate: e.target.value })} invalid={!!errors.toDate} />
+          </Field>
+        )}
+        <Field label="Why is the seat needed? (optional)" hint="Kept with the booking and in its history.">
+          <TextInput value={values.note} onChange={(e) => setValues({ ...values, note: e.target.value })} placeholder="Interview candidate, covering for Ama" />
+        </Field>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={blocked}>
+            Request seat
+          </Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+/** Refusing or cancelling a booking: both require a reason, and both keep it. */
+function BookingReasonForm({
+  title,
+  description,
+  submitLabel,
+  onClose,
+  onSubmit,
+}: {
+  title: string;
+  description: string;
+  submitLabel: string;
+  onClose: () => void;
+  onSubmit: (reason: string) => Errors | Promise<Errors>;
+}) {
+  const [reason, setReason] = useState("");
+  const [errors, setErrors] = useState<Errors>({});
+
+  return (
+    <Panel title={title} description={description} onClose={onClose}>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setErrors(await onSubmit(reason));
+        }}
+        className="space-y-4"
+      >
+        <Field label="Reason" hint="Required. It is written into the booking's history." error={errors.reason}>
+          <TextArea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} invalid={!!errors.reason} />
+        </Field>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClose}>Keep it</Button>
+          <Button type="submit" variant="primary">
+            {submitLabel}
+          </Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
 
 function PerformanceTab() {
   const { db } = useTms();

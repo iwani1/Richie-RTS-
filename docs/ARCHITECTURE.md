@@ -48,12 +48,13 @@ The interface is a purpose-built "operations ledger", not a component-kit defaul
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 10`, `emptyDatabase()`, `migrate()` (accepts schema 1–10) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 14`, `emptyDatabase()`, `migrate()` (accepts schema 1–14) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `confinedClientId`. Confines `driver` and `client_contact` to their one linked record. Fails closed |
 | `src/tms/service.ts` | Core commands: setup, users, settings, vehicles, drivers, clients, rentals, backup import |
 | `src/tms/logistics.ts` | Staff logistics commands: incidents, work orders, cost entries, response and maintenance state machines |
 | `src/tms/busing.ts` | Staff busing commands: routes, passengers, trip generation, assignment, dispatch, progressive start/stop/boarding, completion, cancellation, conflict checks and on-time judgement |
+| `src/tms/bookings.ts` | Seat bookings: one named rider's seat on one run, capacity as roster + bookings, request/confirm/waitlist/reject/cancel, cut-offs, offers that are never auto-confirmed |
 | `src/tms/compliance.ts` | Vehicle/driver compliance documents, expiry status and reminder lead time |
 | `src/tms/maintenance.ts` | Odometer readings, last completed service anchor and fleet readiness evaluation per configured basis |
 | `src/tms/kpis.ts` | KPI calculations. Each result carries period, numerator, denominator, coverage and an explicit status |
@@ -61,11 +62,11 @@ The interface is a purpose-built "operations ledger", not a component-kit defaul
 | `src/tms/commands.ts` | `executeCommand()`: the single router for every write (`AnyCommand`) |
 | `src/tms/crypto.ts` | PBKDF2-SHA256 password hashing via Web Crypto |
 | `src/tms/useTms.ts` | React state, session, persistence, `dispatch()` |
-| `src/pages/*` | Screens. `StaffBusing.tsx` holds Routes, Passengers, Trips and Performance tabs |
+| `src/pages/*` | Screens. `StaffBusing.tsx` holds Routes, Passengers, Trips, Bookings and Performance tabs |
 | `src/ui/primitives.tsx` | Shared form, table, panel and notice components |
 | `src/docs/BriefDesk.tsx` | Read-only viewer for the source brief (kept per Integrity rule 6) |
 
-Dependency direction: pages depend on `useTms`, which depends on `commands`, which depends on `busing` and `service`. `busing` and `service` never import pages or React. `busing` imports helpers from `service` (`authorise`, `audit`, `fail`, validators). `service` does not import `busing`, so there is no cycle.
+Dependency direction: pages depend on `useTms`, which depends on `commands`, which depends on `busing` and `service`. `busing` and `service` never import pages or React. `busing` and `bookings` import helpers from `service` (`authorise`, `audit`, `fail`, validators). `service` imports neither, so there is no cycle.
 
 ## Request flow for a write
 

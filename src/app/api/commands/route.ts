@@ -26,6 +26,7 @@ const KNOWN_TYPES = [
   "create_route", "update_route", "generate_trips", "dispatch_trip", "assign_trip",
   "start_trip", "complete_trip", "cancel_trip", "record_trip_stop", "correct_trip_record",
   "create_passenger", "update_passenger",
+  "create_booking", "confirm_booking", "reject_booking", "cancel_booking",
   "create_incident", "update_incident", "advance_incident", "add_incident_cost", "remove_incident_cost",
   "create_work_order", "update_work_order", "advance_work_order", "add_work_order_cost", "remove_work_order_cost",
   "create_document", "update_document",

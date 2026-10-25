@@ -184,3 +184,30 @@ describe("the overdue-service switch (Q-43, D-80)", () => {
     expect(command.input.maintenance.blockOnOverdueService).toBe(true);
   });
 });
+
+describe("the seat-booking cut-offs (BKG-02, BKG-05, D-83)", () => {
+  it("leaves both blank by default, and saves a value once management supplies one", async () => {
+    const db = settingsDb(false);
+    const tms = makeTms(db);
+    render(
+      <TmsContext.Provider value={tms}>
+        <SettingsPage />
+      </TmsContext.Provider>,
+    );
+
+    // Nothing is assumed: the fields start empty, and the phone does not refuse a booking for a
+    // deadline nobody set.
+    const request = screen.getByRole("spinbutton", { name: /Booking cut-off/i }) as HTMLInputElement;
+    const cancellation = screen.getByRole("spinbutton", { name: /Cancellation cut-off/i }) as HTMLInputElement;
+    expect(request.value).toBe("");
+    expect(cancellation.value).toBe("");
+
+    fireEvent.change(request, { target: { value: "120" } });
+    fireEvent.change(cancellation, { target: { value: "60" } });
+    save();
+
+    await vi.waitFor(() => expect(tms.dispatch).toHaveBeenCalled());
+    const command = (tms.dispatch as unknown as { mock: { calls: [{ input: { booking: unknown } }][] } }).mock.calls[0][0];
+    expect(command.input.booking).toEqual({ requestCutoffMinutes: 120, cancellationCutoffMinutes: 60 });
+  });
+});

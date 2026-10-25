@@ -9,14 +9,14 @@ work — vehicles, drivers, customers, bus rentals from enquiry to paid invoice,
 logistics, reports, the public enquiry form — is built, enforced on the server, and tested.
 
 **It is not "everything in the brief".** The brief describes a larger product with three further
-stages of work (contracts and bookings, notifications and GPS, payment integrations and payroll).
+stages of work (contracts, notifications and GPS, payment integrations and payroll).
 Those are named below, marked as not built, and were never part of this build's agreed scope.
 
 Two different things are called "phase" in this repository, which is why the question is confusing:
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–30** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 31 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–33** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 34 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -26,12 +26,12 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 | Phase | What it covers | Verdict |
 |---|---|---|
 | **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 9 fully met, 20 met but narrower than the brief, **0 unbuilt** |
-| **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, on-time reporting | **Mostly built.** 25 IDs: 6 met, 11 partial, 8 not built — the 8 are seat-level bookings (BKG-01…06), contracts and the route planning aid |
+| **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting | **Mostly built.** 25 IDs: 10 met, 13 partial, 2 not built — contracts and the route planning aid |
 | **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Partly built.** 6 IDs: 4 partial, 2 not built (passenger portal, finance dashboard) |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
 | **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Not started.** 7 IDs, 6 deferred, 1 partial (cost entries without receipts) |
 
-Totals across all 78 brief requirements: **15 met · 39 partial · 10 not built · 14 deferred.**
+Totals across all 78 brief requirements: **19 met · 41 partial · 4 not built · 14 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -57,6 +57,11 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   reporting, mid-run passenger changes with a seat-capacity check, and a run created outside the
   schedule when a bus fails or a one-off movement appears — with a written reason, and checked
   exactly as a planned run is.
+- Seat bookings for the people who are not on the roster — a visitor, a new hire, somebody from a
+  sister company. Each booking carries its own reference (BK-0001) and its own history; seats are
+  counted as roster + bookings against the vehicle, a full run puts the request on a waiting list,
+  and a freed seat is **offered** to the oldest waiter and confirmed by a person, never by the
+  system. Request and cancellation cut-offs are optional settings: blank means no deadline.
 - Staff logistics: incidents, work orders with costs, and a vehicle release that needs its own
   permission and records who released it and when.
 - Reports: rental report with a date range, coverage and CSV; fleet readiness; cost report;
@@ -68,11 +73,10 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
 
 ## What is not built
 
-**Whole features absent** (10 brief IDs):
+**Whole features absent** (4 brief IDs):
 
 | Missing | What it means in practice | Why |
 |---|---|---|
-| Bookings (BKG-01…06) | Passengers cannot book a single seat on a scheduled run with a booking reference; journeys are modelled as a route roster and a trip | Phase 1B; a booking entity is a project of its own |
 | Contracts (CLI-02) | No contract record, so corporate terms live in the quotation and the invoice rather than in an agreement with dates and a status | Phase 1B; needs the owner's contract wording |
 | Route planning aid (RTE-04) | Dispatchers choose vehicles manually; nothing suggests a plan | Phase 1B |
 | Finance dashboard (FIN-07) | Finance sees the operations dashboard; there is no money-only home screen | Phase 1C |

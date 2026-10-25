@@ -135,10 +135,12 @@ If the phone has no signal, record the stop when it returns. Offline queuing is 
 ## Client contact
 
 **Can:** see their own client's record, its routes and stops, the staff roster assigned to those
-routes (names and stops, not phone numbers) and that client's rental requests; raise a rental request.
+routes (names and stops, not phone numbers) and that client's rental requests; raise a rental request;
+request a seat on a run for one of their own company's people, and cancel a seat booking they made.
 
 **Cannot:** see any other client, any billing, staff phone numbers, invoices or payments; cannot
-confirm a rental or accept a quotation (that step belongs to finance).
+confirm a rental or accept a quotation (that step belongs to finance); cannot **confirm** a booked
+seat (the office confirms it once the seats are counted) and cannot book a seat for another company.
 
 ---
 
@@ -166,7 +168,7 @@ always a setting:
 
 ## What is not built yet
 
-Contracts, employee bookings, notifications (SMS or email), offline driver mode, boarding codes,
+Contracts, notifications (SMS or email), offline driver mode, boarding codes,
 GPS tracking, credit notes and PDF documents. The screens do not offer them, and `docs/PROGRESS.md`
 records each one with its status. If a supervisor asks for one of these, the answer is that it is on
 the roadmap, not that it is hidden somewhere.

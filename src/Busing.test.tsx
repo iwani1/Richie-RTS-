@@ -54,6 +54,7 @@ function seed(options: { overdue?: boolean } = {}): { vehicleId: string; driverI
       workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
       costCategories: ["Parts", "Labour", "Tyres"],
       maintenance: { schedules: [], blockOnOverdueService: false },
+      booking: { requestCutoffMinutes: null, cancellationCutoffMinutes: null },
     },
   });
   const categoryId = db.settings.vehicleCategories[0].id;

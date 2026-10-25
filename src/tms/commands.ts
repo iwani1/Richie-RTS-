@@ -3,6 +3,7 @@
 // (Phase 3), the compliance documents module (Phase 6) or the maintenance/readiness
 // module (Phase 8). UI code calls executeCommand only.
 
+import { executeBookings, isBookingCommand, type BookingCommand } from "./bookings";
 import { executeBusing, isBusingCommand, type BusingCommand } from "./busing";
 import { executeCompliance, isComplianceCommand, type ComplianceCommand } from "./compliance";
 import { executeFinance, isFinanceCommand, type FinanceCommand } from "./finance";
@@ -19,10 +20,12 @@ export type AnyCommand =
   | ComplianceCommand
   | MaintenanceCommand
   | ImportCommand
-  | FinanceCommand;
+  | FinanceCommand
+  | BookingCommand;
 
 export function executeCommand(db: Database, actor: Actor | null, command: AnyCommand, now?: string): CommandResult {
   if (isImportCommand(command)) return executeImport(db, actor, command, now);
+  if (isBookingCommand(command)) return executeBookings(db, actor, command, now);
   if (isBusingCommand(command)) return executeBusing(db, actor, command, now);
   if (isLogisticsCommand(command)) return executeLogistics(db, actor, command, now);
   if (isComplianceCommand(command)) return executeCompliance(db, actor, command, now);

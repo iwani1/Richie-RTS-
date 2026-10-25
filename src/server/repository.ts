@@ -26,6 +26,7 @@ import {
   type Payment,
   type Passenger,
   type Rental,
+  type Booking,
   type Trip,
   type User,
   type Vehicle,
@@ -176,6 +177,19 @@ const tripRow = (t: Trip): Row => ({
   data: json(t),
 });
 
+const bookingRow = (b: Booking): Row => ({
+  id: b.id,
+  reference: b.reference,
+  trip_id: b.tripId,
+  passenger_id: b.passengerId,
+  client_id: b.clientId,
+  service_date: b.serviceDate,
+  status: b.status,
+  created_at: b.createdAt,
+  updated_at: b.updatedAt,
+  data: json(b),
+});
+
 const incidentRow = (i: Incident): Row => ({
   id: i.id,
   reference: i.reference,
@@ -318,7 +332,7 @@ async function auditRows(trx: Kysely<KyselyDatabase>, limit: number): Promise<Se
 
 /** Reads the whole working set. Audit is capped for the in-memory snapshot; the table keeps all. */
 export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Promise<Database> {
-  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, incidents, workOrders, documents, odometer, invoices, payments, counters, audit, settings] =
+  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, bookings, incidents, workOrders, documents, odometer, invoices, payments, counters, audit, settings] =
     await Promise.all([
       rows(executor, "app_user"),
       rows(executor, "vehicle"),
@@ -328,6 +342,7 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
       rows(executor, "bus_route"),
       rows(executor, "passenger"),
       rows(executor, "trip"),
+      rows(executor, "booking"),
       rows(executor, "incident"),
       rows(executor, "work_order"),
       rows(executor, "compliance_document"),
@@ -353,6 +368,7 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
     routes: routes.map((r) => r.data),
     passengers: passengers.map((r) => r.data),
     trips: trips.map((r) => r.data),
+    bookings: bookings.map((r) => r.data),
     incidents: incidents.map((r) => r.data),
     workOrders: workOrders.map((r) => r.data),
     documents: documents.map((r) => r.data),
@@ -507,6 +523,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   //    only reached when a backup import removes records.
   const order: (keyof Database)[] = [
     "payments",
+    "bookings",
     "invoices",
     "workOrders",
     "incidents",
@@ -523,6 +540,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   ];
   const tableOf: Record<string, keyof KyselyDatabase> = {
     payments: "payment",
+    bookings: "booking",
     invoices: "invoice",
     workOrders: "work_order",
     incidents: "incident",
@@ -566,6 +584,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   await write("odometer_reading", after.odometerReadings.map(odometerRow), before.odometerReadings.map(odometerRow));
   await write("invoice", after.invoices.map(invoiceRow), before.invoices.map(invoiceRow));
   await write("payment", after.payments.map(paymentRow), before.payments.map(paymentRow));
+  await write("booking", after.bookings.map(bookingRow), before.bookings.map(bookingRow));
 
   // 3b. Number series. Keyed by (scope, period) rather than an id, so the generic upsert helper
   //     above does not apply. Only ever moves forwards: a lowered counter could reissue a printed
@@ -618,7 +637,7 @@ export async function truncateAll(trx: Db | Trx): Promise<void> {
   await sql`
     truncate table resource_reservation, audit_entry, app_settings, odometer_reading,
       payment, invoice, reference_counter,
-      compliance_document, work_order, incident, trip, passenger, bus_route, rental,
+      compliance_document, work_order, incident, booking, trip, passenger, bus_route, rental,
       vehicle, driver, client, app_user restart identity cascade
   `.execute(trx);
 }

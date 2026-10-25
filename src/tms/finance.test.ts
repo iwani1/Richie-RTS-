@@ -48,6 +48,7 @@ const settings = (overrides: Record<string, unknown> = {}) => ({
   workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
   costCategories: ["Parts", "Labour", "Tyres"],
   maintenance: { schedules: [], blockOnOverdueService: false },
+      booking: { requestCutoffMinutes: null, cancellationCutoffMinutes: null },
   ...overrides,
 });
 

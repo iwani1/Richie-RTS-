@@ -544,9 +544,57 @@ export function SettingsPage() {
         </p>
       </Band>
 
+      <Band
+        label="Seat bookings"
+        note="How late a seat can still be requested, and how late it can be cancelled, counted in minutes before the run's first stop departs. Both are blank until management sets them: with no cut-off, a booking is accepted right up to departure and nothing is refused for a deadline nobody chose (BKG-02, BKG-05, D-83)."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Booking cut-off (minutes before departure)"
+            hint="Blank means no cut-off. A request inside it is refused and the message says why."
+            error={errors["booking.requestCutoffMinutes"]}
+          >
+            <TextInput
+              type="number"
+              min={0}
+              step={1}
+              value={draft.booking.requestCutoffMinutes ?? ""}
+              onChange={(e) =>
+                update({ booking: { ...draft.booking, requestCutoffMinutes: e.target.value === "" ? null : Number(e.target.value) } })
+              }
+              disabled={!editable}
+              placeholder="Not set"
+              invalid={!!errors["booking.requestCutoffMinutes"]}
+            />
+          </Field>
+          <Field
+            label="Cancellation cut-off (minutes before departure)"
+            hint="Blank means a booking can be cancelled at any time. Inside the cut-off the office has to cancel it."
+            error={errors["booking.cancellationCutoffMinutes"]}
+          >
+            <TextInput
+              type="number"
+              min={0}
+              step={1}
+              value={draft.booking.cancellationCutoffMinutes ?? ""}
+              onChange={(e) =>
+                update({ booking: { ...draft.booking, cancellationCutoffMinutes: e.target.value === "" ? null : Number(e.target.value) } })
+              }
+              disabled={!editable}
+              placeholder="Not set"
+              invalid={!!errors["booking.cancellationCutoffMinutes"]}
+            />
+          </Field>
+        </div>
+        <p className="mt-3 text-xs text-stone-500">
+          A cut-off applies to booked seats, not to the standing roster. Neither setting changes the audit trail: every booking
+          keeps its own history of who asked, who confirmed and who cancelled.
+        </p>
+      </Band>
+
       <Band label="Planned settings (not yet modelled)" note="These are open questions for management and will become settings in the phases that need them.">
         <ul className="grid gap-1 text-xs text-stone-600 sm:grid-cols-2">
-          {["Cancellation windows and refund rules", "VAT, levies and GRA e-VAT", "Retention periods", "Boarding-code policy", "Contract billing frequency and payment terms"].map((q) => (
+          {["Refund rules", "VAT, levies and GRA e-VAT", "Retention periods", "Boarding-code policy", "Contract billing frequency and payment terms"].map((q) => (
             <li key={q} className="flex items-center gap-2">
               <span className="h-1 w-1 rounded-full bg-stone-400" />
               {q}

@@ -78,16 +78,16 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Settings registry (no invented defaults) | Works; unset settings block their dependent actions |
 | Vehicles, drivers, clients, compliance documents | Works |
 | Bus rentals: request → quotation (versions) → deposit → assignment → trip → final invoice | Works; double booking refused **by the database** |
-| Staff busing: routes, rosters, trip generation, dispatch, progressive stop/boarding capture, on-time report | Works |
+| Staff busing: routes, rosters, trip generation, dispatch, progressive stop/boarding capture, seat bookings, on-time report | Works; a freed seat is offered to the waiting list, never auto-confirmed |
 | Staff logistics: incidents, work orders, cost report | Works |
 | Fleet readiness: service intervals, odometer, readiness | Works |
 | Driver and client portals (own-record scope) | Works |
 | Invoices and manual payments: numbered, voided, part-paid, settled | Works; numbers are per year and per kind |
 | Public enquiry form, embeddable on the company website | Works; throttled, spam-trapped, creates a draft only |
-| CSV import for vehicles, drivers and clients | Works; rejects a row with its line number, never merges |
-| Contracts, bookings, notifications, driver app, GPS | **Not built** — see `docs/PROGRESS.md` |
+| CSV import for vehicles, drivers, clients and staff rosters | Works; rejects a row with its line number, never merges an existing person |
+| Contracts, notifications, driver app, GPS | **Not built** — see `docs/PROGRESS.md` |
 
-328 unit and UI tests plus 14 integration tests against a real PostgreSQL; coverage thresholds are
+451 unit and UI tests plus 16 integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

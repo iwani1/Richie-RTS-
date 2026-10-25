@@ -43,6 +43,9 @@ export const PERMISSIONS = [
   // the driver at the door records the fact, operations corrects it afterwards and the correction is
   // attributed (D-74).
   "trips:correct",
+  "bookings:read",
+  "bookings:create",
+  "bookings:manage",
   "incidents:read",
   "incidents:create",
   "incidents:update",
@@ -113,6 +116,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "trips:complete",
     "trips:cancel",
     "trips:correct",
+    "bookings:read",
+    "bookings:create",
+    "bookings:manage",
     "incidents:read",
     "incidents:create",
     "incidents:update",
@@ -170,7 +176,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   driver: ["trips:read", "trips:start", "trips:record", "trips:complete", "incidents:read", "incidents:create", "documents:read"],
   // Own-record scope: a client contact sees only its own client's routes, roster and
   // rental requests, and may raise a rental request for that client.
-  client_contact: ["routes:read", "passengers:read", "rentals:read", "rentals:create"],
+  // A client's own contact books seats for that client's people and can cancel them; it cannot
+  // confirm a seat, because capacity is the office's judgement (BKG-03, D-83).
+  client_contact: ["routes:read", "passengers:read", "rentals:read", "rentals:create", "bookings:read", "bookings:create"],
 };
 
 // Record-bound roles hold their permissions against their own records only. The same
@@ -188,6 +196,8 @@ const OWN_SCOPED_FOR_BOUND_ROLES: readonly Permission[] = [
   "passengers:read",
   "rentals:read",
   "rentals:create",
+  "bookings:read",
+  "bookings:create",
 ];
 
 export function isOwnScoped(role: Role, permission: Permission): boolean {

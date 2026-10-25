@@ -38,7 +38,7 @@ export function inspectBackup(value: unknown): { database: Database | null; prob
   const problems: BackupProblem[] = [];
   const database = migrate(value);
   if (!database) {
-    return { database: null, problems: [{ path: "(root)", message: "Not a Richie TMS backup this build can read (schema version 1-10)." }] };
+    return { database: null, problems: [{ path: "(root)", message: "Not a Richie TMS backup this build can read (schema version 1-14)." }] };
   }
 
   const fail = (path: string, message: string) => {

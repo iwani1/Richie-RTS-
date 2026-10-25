@@ -132,6 +132,19 @@ export interface PassengerRow {
   data: Json;
 }
 
+export interface BookingRow {
+  id: string;
+  reference: string;
+  trip_id: string;
+  passenger_id: string;
+  client_id: string;
+  service_date: DateOnly;
+  status: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  data: Json;
+}
+
 export interface TripRow {
   id: string;
   reference: string;
@@ -282,6 +295,7 @@ export interface KyselyDatabase {
   bus_route: BusRouteRow;
   passenger: PassengerRow;
   trip: TripRow;
+  booking: BookingRow;
   incident: IncidentRow;
   work_order: WorkOrderRow;
   compliance_document: ComplianceDocumentRow;

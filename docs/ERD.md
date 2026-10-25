@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 10). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
+The app stores these as arrays inside one JSON document (schema version 14). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
 erDiagram
@@ -109,6 +109,16 @@ erDiagram
     uuid stop_id FK
     text outcome
   }
+  BOOKING {
+    uuid id PK
+    text reference UK
+    uuid trip_id FK
+    uuid passenger_id FK
+    uuid client_id FK
+    date service_date
+    text status
+    timestamptz created_at
+  }
   AUDIT_ENTRY {
     uuid id PK
     uuid actor_id FK
@@ -137,6 +147,9 @@ erDiagram
   TRIP ||--o{ TRIP_STOP_LOG : records
   ROUTE_STOP ||--o{ TRIP_STOP_LOG : measured_at
   TRIP ||--o{ BOARDING : records
+  TRIP ||--o{ BOOKING : carries
+  PASSENGER ||--o{ BOOKING : holds_seat
+  CLIENT ||--o{ BOOKING : booked_by
   PASSENGER ||--o{ BOARDING : boards
   USER ||--o{ AUDIT_ENTRY : performs
 ```
@@ -149,6 +162,8 @@ erDiagram
 | Route to trips | One **scheduled** trip per route per service date. Scheduled trips are generated only on the route's operating weekdays, inside its start and end dates. An **ad hoc** trip (\`origin = 'adhoc'\`) may exist on any date, including a date the route does not operate, and may sit beside a cancelled scheduled run; it carries a written reason (D-82). |
 | Passenger to route | A passenger has at most one route and one pickup stop (a limit; see OPEN_QUESTIONS Q-30). The stop must belong to that route, and the route must belong to the passenger's client. |
 | Trip to boardings | One boarding record per active roster passenger per completed trip. Inactive passengers are excluded. |
+| Trip to bookings | A booking names one rider's seat on one run. It is **not** a roster row: the roster is how a client's staff travel every day, and a booking covers the seat that has to be named — a visitor, a new hire, somebody from a sister company (D-83). Capacity is `vehicle.seat_capacity − active roster on the route − confirmed/offered bookings`, checked in the booking command. |
+| Booking to passenger | One live booking per rider per run. A rider who is already on that run's route roster is refused, because the roster already holds their seat. |
 | Trip to vehicle and driver | Set at assignment, required at dispatch. The vehicle must be in the route's category and status Available. The driver's licence must be valid on the service date. |
 
 ## Unique constraints
@@ -166,6 +181,7 @@ erDiagram
 | PASSENGER | `(client_id, employee_ref)` unique where `employee_ref <> ''` |
 | TRIP | `(route_id, service_date)` unique **where `origin = 'schedule'`** (migration 006); `reference` unique; `origin` is one of `schedule`, `adhoc` |
 | BOARDING | `(trip_id, passenger_id)` unique |
+| BOOKING | `reference` unique; `(trip_id, passenger_id)` unique **where `status in ('requested','confirmed','waitlisted','offered')`** (migration 007), so a refused or cancelled rider may ask for the seat again while a duplicate live seat is impossible |
 
 ## Indexes
 
@@ -174,6 +190,7 @@ erDiagram
 - `RENTAL (status, start_date, end_date)` for availability checks.
 - `AUDIT_ENTRY (entity, entity_id)` and `AUDIT_ENTRY (at DESC)`.
 - `PASSENGER (client_id, status)`.
+- `BOOKING (service_date, status)` for the day's seat view, and `BOOKING (client_id)` for a client contact's own scope.
 
 ## Compliance documents
 
@@ -218,6 +235,9 @@ cost entry store the name they were given, so renaming a catalogue entry never r
 to read it: migration 006 replaced the whole-table unique index with a partial one, so the rule "one
 scheduled run per route per day" survives while an emergency run can still be created (D-82). The
 reason for an ad hoc run stays in the row's data, because nothing queries it.
+
+`Booking.history` is embedded on the booking rather than kept in a table of its own: it is written
+once with the change it describes, never edited, and read whole beside the booking (BKG-06).
 
 `Trip.corrections` and `Trip.rosterChanges` are embedded on the trip rather than kept in tables of
 their own: both are append-only notes about one run (a corrected fact; a rider added, removed or

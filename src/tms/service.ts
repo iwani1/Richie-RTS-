@@ -544,6 +544,21 @@ export function validateSettings(db: Database, input: Settings) {
   const workTypes = validateNameList(input.workTypes ?? [], "workTypes", errors, 40);
   const costCategories = validateNameList(input.costCategories ?? [], "costCategories", errors, 40);
 
+  // BKG-02/BKG-05 (D-83). Both cut-offs are optional and both are minutes before departure. A
+  // negative or absurd value is refused here rather than silently ignored at booking time.
+  const booking = {
+    requestCutoffMinutes: input.booking?.requestCutoffMinutes ?? null,
+    cancellationCutoffMinutes: input.booking?.cancellationCutoffMinutes ?? null,
+  };
+  for (const [key, value] of [
+    ["requestCutoffMinutes", booking.requestCutoffMinutes],
+    ["cancellationCutoffMinutes", booking.cancellationCutoffMinutes],
+  ] as const) {
+    if (value === null) continue;
+    if (!Number.isInteger(value) || value < 0 || value > 7 * 24 * 60)
+      errors[`booking.${key}`] = "Enter a whole number of minutes (0 or more, up to a week).";
+  }
+
   const maintenance = {
     // Q-43 (D-80): only a stored `true` turns the warning into a block. Anything else — a missing
     // field from an older backup, a stray string — leaves the vehicle able to work.
@@ -591,6 +606,7 @@ export function validateSettings(db: Database, input: Settings) {
       workTypes,
       costCategories,
       maintenance,
+      booking,
     },
   };
 }

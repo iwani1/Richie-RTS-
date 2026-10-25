@@ -165,6 +165,25 @@ export interface Settings {
   // them, costs are recorded as "Uncategorised" and the report says so.
   costCategories: string[];
   maintenance: MaintenanceSettings;
+  booking: BookingSettings;
+}
+
+/**
+ * The two cut-offs a booking has (BKG-02, BKG-05, D-83). Both are null until management supplies
+ * them, and both are in **minutes before departure** — the departure being the first stop's
+ * scheduled time on the route.
+ *
+ * Null means "no cut-off configured", and the screens say exactly that rather than inventing a
+ * deadline. A cut-off that nobody chose would refuse real bookings for a reason the office cannot
+ * see in any document.
+ */
+export interface BookingSettings {
+  requestCutoffMinutes: number | null;
+  cancellationCutoffMinutes: number | null;
+}
+
+export function emptyBookingSettings(): BookingSettings {
+  return { requestCutoffMinutes: null, cancellationCutoffMinutes: null };
 }
 
 /** The work types the owner approved in Q-34. Editable in Settings; nothing else is inferred. */
@@ -694,7 +713,7 @@ export interface TaxLineSetting {
  * A numbering series. Rentals, routes, trips, incidents and work orders are numbered continuously
  * and filed under the period `all`; invoices and payments restart each year (audit D-03).
  */
-export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "payment"] as const;
+export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "invoice", "payment", "booking"] as const;
 export type ReferenceScope = (typeof REFERENCE_SCOPES)[number];
 
 export interface ReferenceCounter {
@@ -703,7 +722,64 @@ export interface ReferenceCounter {
   last: number;
 }
 
-export const SCHEMA_VERSION = 13;
+// ---- Bookings (brief 1B: BKG-01..06, D-83) ----
+//
+// A booking is one named rider's seat on one named run. It is deliberately *not* a second roster:
+// the standing roster is how a client's own staff travel every day, and a booking covers the seat
+// that has to be named — a visitor, a new hire before the roster is updated, someone from another
+// site. The two are counted together against the vehicle's seats, so a booking can never make a run
+// over capacity.
+export const BOOKING_TYPES = ["one_time", "recurring"] as const;
+export type BookingType = (typeof BOOKING_TYPES)[number];
+export const BOOKING_TYPE_LABELS: Record<BookingType, string> = {
+  one_time: "One journey",
+  recurring: "Every operating day",
+};
+
+export const BOOKING_STATUSES = ["requested", "confirmed", "waitlisted", "offered", "rejected", "cancelled"] as const;
+export type BookingStatus = (typeof BOOKING_STATUSES)[number];
+export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
+  requested: "Requested",
+  confirmed: "Confirmed",
+  waitlisted: "On the waiting list",
+  offered: "Seat offered",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+/** One entry in a booking's own history — who changed it, when, and what they did (BKG-06). */
+export interface BookingHistoryEntry {
+  at: string;
+  by: string;
+  action: string;
+  note: string;
+}
+
+export interface Booking {
+  id: string;
+  reference: string; // BK-0001
+  passengerId: string;
+  clientId: string;
+  routeId: string;
+  stopId: string | null;
+  tripId: string;
+  serviceDate: string;
+  type: BookingType;
+  status: BookingStatus;
+  /** Why it was rejected, cancelled, or offered the seat. Empty when nothing was refused. */
+  note: string;
+  /** A recurring request made one booking per run; this is the group they belong to. */
+  seriesId: string | null;
+  /** Set while a cancelled seat has been offered to this waiter, and cleared when answered. */
+  offeredAt: string | null;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  history: BookingHistoryEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const SCHEMA_VERSION = 14;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -721,6 +797,7 @@ export interface Database {
   odometerReadings: OdometerReading[];
   invoices: Invoice[];
   payments: Payment[];
+  bookings: Booking[];
   referenceCounters: ReferenceCounter[];
   settings: Settings;
   audit: AuditEntry[];
@@ -747,6 +824,7 @@ export function emptyDatabase(): Database {
     odometerReadings: [],
     invoices: [],
     payments: [],
+    bookings: [],
     referenceCounters: [],
     settings: {
       companyName: null,
@@ -763,6 +841,7 @@ export function emptyDatabase(): Database {
       workTypes: [...DEFAULT_WORK_TYPES],
       costCategories: [],
       maintenance: emptyMaintenanceSettings(),
+      booking: emptyBookingSettings(),
     },
     audit: [],
   };
@@ -773,7 +852,7 @@ export function emptyDatabase(): Database {
 export function migrate(value: unknown): Database | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(v.schemaVersion as number)) return null;
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(v.schemaVersion as number)) return null;
   if (!Array.isArray(v.users) || !Array.isArray(v.vehicles) || !Array.isArray(v.drivers) || !Array.isArray(v.clients) || !Array.isArray(v.audit)) return null;
   if (typeof v.settings !== "object" || v.settings === null) return null;
   const settings = v.settings as Record<string, unknown>;
@@ -826,6 +905,18 @@ export function migrate(value: unknown): Database | null {
       ? (v.invoices as Invoice[]).map((invoice) => ({ ...invoice, taxLines: invoice.taxLines ?? [] }))
       : [],
     payments: Array.isArray(v.payments) ? (v.payments as Payment[]) : [],
+    // Bookings arrived in schema 14; an older backup simply has none.
+    bookings: Array.isArray(v.bookings)
+      ? (v.bookings as Booking[]).map((booking) => ({
+          ...booking,
+          note: typeof booking.note === "string" ? booking.note : "",
+          seriesId: booking.seriesId ?? null,
+          offeredAt: booking.offeredAt ?? null,
+          cancelledAt: booking.cancelledAt ?? null,
+          cancelledBy: booking.cancelledBy ?? null,
+          history: Array.isArray(booking.history) ? booking.history : [],
+        }))
+      : [],
     // Counters arrive in schema 11. Older data had no invoices, so there is nothing to continue.
     referenceCounters: Array.isArray(v.referenceCounters) ? (v.referenceCounters as ReferenceCounter[]) : [],
     settings: {
@@ -846,6 +937,7 @@ export function migrate(value: unknown): Database | null {
       costCategories: Array.isArray(settings.costCategories) ? (settings.costCategories as string[]) : [],
       // Stored settings keep the default (warning, not blocking) unless the flag was written as a
       // real `true`, so an older backup cannot start blocking dispatch by accident (Q-43, D-80).
+      booking: { ...emptyBookingSettings(), ...((settings.booking as Partial<BookingSettings>) ?? {}) },
       maintenance: {
         ...emptyMaintenanceSettings(),
         ...((settings.maintenance as Partial<MaintenanceSettings>) ?? {}),

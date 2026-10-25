@@ -20,6 +20,7 @@ const settings = () => ({
   workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
   costCategories: [],
   maintenance: { schedules: [], blockOnOverdueService: false },
+      booking: { requestCutoffMinutes: null, cancellationCutoffMinutes: null },
 });
 
 function rental(overrides: Partial<Rental>): Rental {

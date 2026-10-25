@@ -16,6 +16,7 @@
 import { isRecordBound } from "./permissions";
 import type { Actor } from "./service";
 import type {
+  Booking,
   BusRoute,
   Client,
   ComplianceDocument,
@@ -78,6 +79,7 @@ export function scopedView(db: Database, actor: Actor | null) {
       vehicles: db.vehicles,
       workOrders: db.workOrders,
       documents: db.documents,
+      bookings: db.bookings,
     };
   }
 
@@ -102,6 +104,9 @@ export function scopedView(db: Database, actor: Actor | null) {
       documents: db.documents.filter(
         (doc) => (doc.ownerType === "driver" && doc.ownerId === link.driver!.id) || (doc.ownerType === "vehicle" && vehicleIds.has(doc.ownerId)),
       ),
+      // A driver sees the seats booked on the runs they are driving, so nobody is turned away for a
+      // seat the office already sold.
+      bookings: db.bookings.filter((booking) => tripIds.has(booking.tripId)),
     };
   }
 
@@ -120,6 +125,7 @@ export function scopedView(db: Database, actor: Actor | null) {
       workOrders: [],
       // A client contact has no compliance-document access; those concern the fleet.
       documents: [] as ComplianceDocument[],
+      bookings: db.bookings.filter((booking) => booking.clientId === link.client!.id),
     };
   }
 
@@ -135,6 +141,7 @@ export function scopedView(db: Database, actor: Actor | null) {
     vehicles: [] as Vehicle[],
     workOrders: [],
     documents: [] as ComplianceDocument[],
+    bookings: [] as Booking[],
   };
 }
 

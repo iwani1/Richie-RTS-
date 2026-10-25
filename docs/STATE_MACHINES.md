@@ -137,7 +137,27 @@ rows.
 Backwards transitions are refused in the service and by trigger. The financial fields are immutable
 after insert; only the status may move.
 
+## Booking (`Booking.status`, BKG-03…05, D-83)
+
+A booking is one named rider's seat on one named run — never a second roster. Every transition is
+authorised (`bookings:create` / `bookings:manage`) and writes both a history line on the booking and
+an audit entry.
+
+| From | To | Who | Preconditions |
+|---|---|---|---|
+| — | `requested` | `bookings:create` | Rider active, same client as the route, **not** already on the route's roster; a run exists on that date, is not cancelled, completed or departed; a vehicle is assigned so seats can be counted; a seat is free; outside the request cut-off (if one is set) |
+| `requested` | `confirmed` | `bookings:manage` | A seat is still free, and the run has not left |
+| `requested` / `offered` | `waitlisted` | `bookings:manage` | Attempting to confirm when the run is full: the request moves to the waiting list instead of failing |
+| `waitlisted` | `offered` | automatic, on a cancellation | The oldest waiter on that run, and only when the freed seat actually makes room. **Never `confirmed`**: the offer waits for a person |
+| `offered` / `requested` / `waitlisted` | `confirmed` | `bookings:manage` | A seat is free (`offered` already holds one) |
+| `requested` / `offered` / `waitlisted` / `confirmed` | `rejected` | `bookings:manage` | A reason is required; kept with the booking |
+| `requested` / `offered` / `waitlisted` / `confirmed` | `cancelled` | `bookings:manage`, or the client's own contact (`bookings:create`) for its own company | A reason is required; refused inside the cancellation cut-off when one is set; a held seat is offered to the oldest waiter |
+| `rejected` / `cancelled` | (none) | - | terminal — the record is kept, the seat is released |
+
+Both cut-offs are minutes before the run's first stop departs and both are **blank by default**: an
+unset cut-off means no deadline, not a guessed one. A booking never changes a trip or a roster row.
+
 ## Planned (not yet implemented)
 
-Quotation (as a standalone revisable document), booking vs trip split and contract state machines are
-still Not Started.
+Quotation (as a standalone revisable document), the rental-vs-trip split and contract state machines
+are still Not Started.

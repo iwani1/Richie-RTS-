@@ -12,6 +12,7 @@ Status: **draft proposal**. This is not legal advice. Ghana's Data Protection Ac
 | Passengers (employees of corporate clients) | Full name, employee reference, optional phone, route, pickup stop, status | Running staff busing routes | Operations (from the client's roster; source to be confirmed) | Operations (read/write); finance (read); administrator |
 | Boarding and stop-time records | Per trip: boarded or no-show per passenger; actual time at each stop | Attendance, on-time measurement | Operations at trip completion | Operations; administrator; KPI views show aggregates only |
 | Rental customers | Name, phone, email, purpose, pickup and drop-off locations | Quotation, booking, billing | Operations, finance | Finance; operations; administrator |
+| Seat bookings | Rider name (by reference to their passenger record), the run's date, a short note and the reason for a refusal or cancellation, plus a history of who changed what | Named single seats for visitors and newcomers, and an account of who decided what | Operations; the client's own contact for its own company's riders | Operations (read/write); the client's own contact (own company only); administrator. Finance and drivers cannot read bookings |
 
 Sensitivity notes:
 - A pickup stop reveals where an employee waits and, often, where they live. Treat it as sensitive location data.

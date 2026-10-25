@@ -1128,3 +1128,50 @@ decision the office makes, not one the system invents.
   category, seats against the roster, mandatory papers, licence expiry, time overlaps and rental
   clashes. A route's normal generation is unaffected by an ad hoc run on the same date — the schedule
   is the schedule. The reason is in the run, in the audit entry (`trips:adhoc`) and on the run sheet.
+
+## D-83 A booking is one named seat on one run — not a second roster
+
+- **Context.** BKG-01…06. The standing roster was the only way onto a bus: a passenger record on a
+  route travels every day the route operates. That is right for staff who commute, and wrong for
+  everybody else the office actually carries — an interview candidate, a new hire whose roster entry
+  has not been typed yet, somebody visiting from another site for a week. The only workarounds were to
+  add the visitor to the roster (where they stayed, and kept taking a seat after the visit ended) or to
+  write the name on the driver's paper manifest, where nothing counted it. The brief asks for a
+  booking entity with a reference, a status workflow, a capacity check and a history.
+- **Decision.** A **booking** is one named rider's seat on one named run. The roster stays exactly as
+  it is; a booking sits beside it, and the two are counted **together** against the vehicle's seats
+  (roster + confirmed/offered bookings), so a booking can never push a run over capacity. A rider who
+  is already on that route's roster is **refused** — the roster is already their seat, and booking one
+  would count them twice. A booking carries its own continuous reference (`BK-0001`, `BK-0002`…), a
+  status (`requested → confirmed | rejected | waitlisted`, and `waitlisted → offered → confirmed |
+  cancelled`), and its own history of who changed it, when and why.
+- **Nothing is confirmed by the system.** A request is a request. Confirming it on a full run does not
+  fail hard — the seat goes to the **waiting list** instead. Cancelling a held seat **offers** it to
+  the oldest waiter and stops there: an automatic confirmation would promise a seat to somebody who
+  may have long stopped waiting, and nobody would find out until the bus left without them. There is
+  no expiry timer either; an offer stays an offer until a person confirms, refuses or cancels it, and
+  the screen says "nobody is confirmed yet".
+- **Cut-offs are settings with no default.** Both cut-offs are whole minutes before the run's first
+  stop departs (`settings.booking.requestCutoffMinutes`, `cancellationCutoffMinutes`), **blank by
+  default**. A deadline nobody chose would refuse real bookings for a reason the office could not
+  explain; once management sets one, the refusal names the number of minutes.
+- **Recurring is one booking per run, not one booking with a repeat rule.** A recurring request books
+  the same rider on each operating day, at most 62 days, and reports the dates it could not take
+  (nothing scheduled, already booked, full, inside the cut-off) in the message and the `skipped` list
+  rather than failing the whole request. A dead-simple `seriesId` marks the group so the office can see
+  they belong together.
+- **Rejected.** Making a booking a roster row with a date range (it outlives the visit, and every
+  roster query would need to know about dates). Auto-confirming a freed seat (see above). Expiring an
+  offer on a timer (an offer that quietly disappears is worse than one that waits for an answer).
+  Counting capacity from seats alone (the roster already holds seats, and ignoring it would overbook
+  every run). Refusing a booking on a full run instead of waitlisting it (the request is information;
+  losing it loses the passenger). Inventing a default cut-off. Refusing a rider from another client
+  for the office (a visitor from a sister company is a real case) — but a client's own contact may
+  only book its own company's riders.
+- **Consequence.** Permissions: operations holds `bookings:read|create|manage`; a client contact holds
+  `bookings:read|create` for its own company's people and may cancel its own bookings, but may not
+  confirm (capacity is the office's judgement); finance and drivers hold none. Every change writes an
+  audit entry (`bookings:create`, `confirm`, `waitlist`, `reject`, `cancel`) and a line in the
+  booking's own history. Migration `007_bookings.sql` stores the booking with a **partial unique index**
+  on `(trip_id, passenger_id)` for live statuses only, so a rider who was refused or cancelled can ask
+  again while a duplicate live seat is impossible.

@@ -48,6 +48,7 @@ export interface VisibleSnapshot {
  */
 const SECTION_PERMISSIONS: { [K in keyof Database]?: Permission } = {
   audit: "audit:read",
+  bookings: "bookings:read",
   clients: "clients:read",
   documents: "documents:read",
   drivers: "drivers:read",
