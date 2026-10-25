@@ -26,7 +26,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | CUS-01 | 1A | Customer register (individual or organisation): reference, contact person, telephone, email, billing details, type, status, notes, history. Staff can… | Partial | `Client` has name, contact name/phone/email, status. **No reference number, no billing details, no type (individual/organisation), no notes, no history view.** |
 | RNT-01 | 1A | Rental request: customer, service date, departure time, return time or duration, pickup, destination, intermediate stops, passenger count, luggage or… | Partial | Has customer, start/end date, pickup, drop-off, passengers, purpose, category, driver requirement, notes. **Missing departure/return times, intermediate stops, luggage/special needs, trip contact, request source.** |
 | RNT-02 | 1A | Rental status workflow: Draft, Submitted, Under Review, Awaiting Quotation, Quotation Sent, Awaiting Customer Confirmation, Confirmed, Dispatched, In… | Partial | 7 states (`draft → quoted → confirmed → in_progress → completed`, plus `declined`, `cancelled`) with an explicit transition table and rejection of invalid moves. **No separate quotation/booking entities and no Submitted/Under Review/Awaiting Quotation/Dispatched states.** |
-| RNT-03 | 1A | Availability check by vehicle category, capacity, operating status and time range; driver availability when a driver is required. | Met | Live: wrong-category vehicle refused; overlapping assignment refused; driver licence expiry checked. Capacity checked at assignment against `passengers` (see D-01 for the mid-run gap). |
+| RNT-03 | 1A | Availability check by vehicle category, capacity, operating status and time range; driver availability when a driver is required. | Met | Live: wrong-category vehicle refused; overlapping assignment refused; driver licence expiry checked; a required document that is missing or lapsed on the hire date refuses the vehicle or the driver (Phase 26, D-76). Capacity checked at assignment against `passengers` (see D-01 for the mid-run gap). |
 | RNT-04 | 1A | Quotation builder: quotation number, versioned, line items (base charge, distance charge, driver charge, approved waiting/overtime, other charges),… | Partial | Line items, deposit, validity, currency, requote history (`quoteHistory`). **No quotation number, no tax lines, no discount line, no terms and conditions, no approval record.** Expiry is enforced on confirmation (live). |
 | RNT-05 | 1A | Confirmation: validate the request; check vehicle schedule, capacity, status and driver availability; detect conflicts; record customer acceptance… | Partial | Validation, conflict check, deposit-per-policy recorded, reservation created via constraint. **No customer acceptance record; no notification.** |
 | RNT-06 | 1A | Assign and reassign vehicle and driver, with history. | Met | Reassignment allowed while confirmed/in progress; each assignment writes an audit entry. History lives in the audit log, not a dedicated table. |
@@ -36,7 +36,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | WEB-01 | 1A | Public rental enquiry endpoint and embeddable form for the existing website, with rate limiting and spam protection. It creates a Submitted request… | Met | `GET/POST /api/enquiry` (unauthenticated, `src/app/api/enquiry/route.ts`) creates a draft request through the `submit_enquiry` command and returns the reference and a sentence — no records, no counts. Throttled 8 per 10 minutes per address (`rateLimit.take`), plus a signed time-trap (`src/server/enquiryToken.ts`) and a honeypot. The form is `src/screens/PublicEnquiry.tsx` at `/enquiry` (`?embed=1` for the website iframe), the only path allowed to be framed (`next.config.ts`). *Submitted* is a `draft` in the existing status vocabulary — the office still quotes and confirms. Adding to PROGRESS 2026-10-24: no acknowledgement email (no mail provider). |
 | FLT-01 | 1A | Vehicle register: ID, registration number, make/model, category, seats, photo, fuel type, ownership/leasing, odometer, insurance, roadworthiness,… | Partial | Registration, make, model, category, seats, status, notes, odometer readings. **No photo, fuel type, ownership/leasing, usual driver.** Insurance/roadworthiness exist as compliance documents. |
 | FLT-02 | 1A | Vehicle statuses: Available, Reserved, Assigned, On Trip, Under Maintenance, Out of Service, Pending Inspection. Define the rule for each state in… | Partial | 4 statuses (`available`, `maintenance`, `out_of_service`, `retired`); blocking enforced and observed. Reserved/Assigned/On Trip/Pending Inspection do not exist. |
-| FLT-03 | 1A | Vehicle documents with expiry dates and configurable reminders. | Partial | Document register with expiry and configurable lead time; status computed per day. **Reminders are not sent** (no job runner, no notifications). |
+| FLT-03 | 1A | Vehicle documents with expiry dates and configurable reminders. | Partial | Document register with expiry and configurable lead time; status computed per day. A type may be marked required, which blocks assignment while it is missing or lapsed (Phase 26). **Reminders are not sent** (no job runner, no notifications). |
 | FLT-04 | 1A | Driver register: licence class and expiry, qualifications, availability, status. | Partial | Name, phone, licence number, expiry, status. **No licence class, qualifications or availability.** |
 | FLT-05 | 1A | Fleet dashboard calculated from persisted records only: totals, availability, assigned, on trip, under maintenance, pending inspection, expiring… | Partial | Readiness and compliance screens give counts by status, overdue service and expiring documents. **No utilisation or downtime.** |
 | MNT-01 | 1A | Work orders: reference, vehicle, reported fault, work type, priority, date reported, odometer, assignee, required work, parts, labour cost, parts… | Partial | Reference, vehicle, fault, type, priority, date, odometer, workshop, assignee, costs, log, and a release recorded with `releasedBy`/`releasedAt`. **Statuses are 5, not 8; no parts list and no inspection record.** |
@@ -694,3 +694,28 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **350 passed, 14
 succeeds.
 
 Next on the queued list: Q-16, insurance and roadworthiness required before a vehicle is assigned.
+
+## Phase 26 - Papers that must be current before a vehicle works (item 3, Q-16)
+
+D-76 answers the half of Q-16 that was still open. A company may say that a document type is not
+merely tracked but **required**: while it is missing, or has an expiry date earlier than the day of
+the work, the vehicle or driver cannot be assigned. Nothing is required by default, so an existing
+install behaves exactly as it did.
+
+| Item | Status | Evidence |
+|---|---|---|
+| A per-type switch | Done (verified) | `DocumentType.required` (default false), set on the Settings screen under "Before assignment - must be current to assign"; records saved before this phase load as not required |
+| The check reads the day of the work, not today | Done (verified) | `requiredDocumentGaps(db, ownerType, ownerId, onDate)` in `src/tms/compliance.ts`. A rental is judged against its `startDate`, a run against its `serviceDate` |
+| The newest copy counts | Done (verified) | Where several copies of the same paper exist, the latest expiry is used; the expiry date itself is still a valid day |
+| It names the paper, not a code | Done (verified) | One sentence per gap, e.g. `Vehicle GT 500-26 cannot be assigned: its Insurance expired on 2026-08-01. Record the document in Compliance first.` Missing and expired are worded differently |
+| Both owners | Done (verified) | Vehicles and drivers; a "both" type is checked against each. A driver's paper never satisfies the vehicle's requirement, or the reverse |
+| Where it applies | Done (verified) | Rental assignment (`assign_rental`) against the hire's start date; busing assignment (`assessResources`, used by assign, dispatch and start) against the service date |
+| It cannot be worked around after the fact | Done (verified) | `start_rental` and `start_trip` re-check, because a certificate can lapse between assignment and the morning of the hire |
+| Dispatch and start say why | Done (verified) | Those two moves have no field to point at, so the message carries the reason instead of a bare "resources are no longer valid" |
+| Registration is untouched | Done (verified) | A vehicle can still be registered, imported and maintained while a paper is pending; the block is at assignment (the rule the answer chose) |
+| Tests | Done (verified) | 4 domain (`compliance.test.ts` "documents a company has made mandatory"), 4 domain (`service.test.ts` "mandatory documents gate assignment"), 4 domain (`busing.test.ts` "mandatory documents gate a run"), 3 screen (`Settings.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **365 passed, 14 skipped**, `build`
+succeeds.
+
+Next on the queued list: Q-38, several contacts per client.

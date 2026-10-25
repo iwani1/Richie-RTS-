@@ -2,6 +2,7 @@
 // Pure and synchronous so it can be unit-tested and, later, moved behind an HTTP API
 // unchanged. In this environment it runs in the browser (see docs/DECISIONS.md D-01).
 
+import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
 import { can, type Permission } from "./permissions";
 import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
@@ -437,7 +438,12 @@ export function validateSettings(db: Database, input: Settings) {
   if (rental.requotePolicy !== null && !REQUOTE_POLICIES.includes(rental.requotePolicy))
     errors["rental.requotePolicy"] = "Invalid expired-quotation policy.";
 
-  const documentTypes = input.documentTypes.map((d) => ({ id: d.id || makeId(), name: d.name.trim(), appliesTo: d.appliesTo }));
+  const documentTypes = input.documentTypes.map((d) => ({
+    id: d.id || makeId(),
+    name: d.name.trim(),
+    appliesTo: d.appliesTo,
+    required: d.required === true,
+  }));
   const seenDocType = new Set<string>();
   documentTypes.forEach((d, i) => {
     if (!d.name) errors[`documentTypes.${i}`] = "Document type name is required.";
@@ -1137,6 +1143,13 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       else if (vehicle.categoryId !== existing.vehicleCategoryId) errors.vehicleId = "Vehicle category does not match the requested category.";
       else if (vehicle.seatCapacity < existing.passengers)
         errors.vehicleId = `This vehicle seats ${vehicle.seatCapacity}; the request is for ${existing.passengers} passengers. Choose a larger vehicle or book two.`;
+      else {
+        // A company may declare a document mandatory before a vehicle carries passengers (Q-16,
+        // D-76). Checked against the hire's start date, not today: a paper that expires before the
+        // job is no better than one that was never recorded.
+        const gaps = requiredDocumentGaps(db, "vehicle", vehicle.id, existing.startDate);
+        if (gaps.length) errors.vehicleId = describeDocumentGaps(`Vehicle ${vehicle.registration}`, gaps);
+      }
 
       const needsDriver = existing.driverRequired || db.settings.rental.driversAlwaysIncluded === true;
       const driver = db.drivers.find((d) => d.id === command.input.driverId);
@@ -1145,6 +1158,10 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         else if (!driver) errors.driverId = "Unknown driver.";
         else if (driver.status !== "active") errors.driverId = `Driver is ${driver.status} and cannot be assigned.`;
         else if (driver.licenceExpiry < existing.endDate) errors.driverId = "Driver's licence expires before the rental end date.";
+        else {
+          const gaps = requiredDocumentGaps(db, "driver", driver.id, existing.startDate);
+          if (gaps.length) errors.driverId = describeDocumentGaps(`Driver ${driver.fullName}`, gaps);
+        }
       } else if (command.input.driverId && !driver) {
         errors.driverId = "Unknown driver.";
       }
@@ -1189,6 +1206,19 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (!existing.assignedVehicleId) return fail("Assign a vehicle before starting the rental.");
       const needsDriver = existing.driverRequired || db.settings.rental.driversAlwaysIncluded === true;
       if (needsDriver && !existing.assignedDriverId) return fail("Assign a driver before starting the rental.");
+      // Re-checked on the day: a certificate can lapse between assignment and the hire (D-76).
+      {
+        const vehicle = db.vehicles.find((v) => v.id === existing.assignedVehicleId);
+        if (vehicle) {
+          const gaps = requiredDocumentGaps(db, "vehicle", vehicle.id, now.slice(0, 10));
+          if (gaps.length) return fail(describeDocumentGaps(`Vehicle ${vehicle.registration}`, gaps));
+        }
+        const driver = db.drivers.find((d) => d.id === existing.assignedDriverId);
+        if (driver) {
+          const gaps = requiredDocumentGaps(db, "driver", driver.id, now.slice(0, 10));
+          if (gaps.length) return fail(describeDocumentGaps(`Driver ${driver.fullName}`, gaps));
+        }
+      }
       // Ghana has no daylight saving, so the UTC calendar day is the business day (brief 5.5).
       // A hire cannot start before its booked date, nor after the day it was due back.
       const today = now.slice(0, 10);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { can, ROLE_PERMISSIONS } from "./permissions";
+import { executeCommand } from "./commands";
 import { execute, VEHICLE_TRANSITIONS, type Actor, type Credential } from "./service";
 import { emptyDatabase, SCHEMA_VERSION, type Database } from "./types";
 
@@ -643,5 +644,108 @@ describe("profile (AUTH-05)", () => {
 
     const anonymous = execute(db, null, { type: "change_own_password", credential: next }, NOW);
     expect(anonymous.ok).toBe(false);
+  });
+});
+
+describe("mandatory documents gate assignment (Q-16, D-76)", () => {
+  /** A confirmed rental (quoted, deposit paid) with a vehicle in the requested category. */
+  function confirmedRental(startDate = "2026-01-01", endDate = "2026-01-03") {
+    const base = rentalReady();
+    let db = base.db;
+    const run = (command: Parameters<typeof execute>[2]) => {
+      const result = execute(db, base.admin, command, NOW);
+      if (!result.ok) throw new Error(`${command.type}: ${result.message} ${JSON.stringify(result.errors)}`);
+      db = result.db;
+    };
+    const settings = (patch: Partial<typeof db.settings>) => {
+      const result = execute(db, base.admin, { type: "update_settings", input: { ...db.settings, ...patch } }, NOW);
+      if (!result.ok) throw new Error(`${result.message} ${JSON.stringify(result.errors)}`);
+      db = result.db;
+    };
+    // Insurance is the paper this company insists on before a bus carries passengers.
+    settings({ documentTypes: [{ id: "", name: "Insurance", appliesTo: "vehicle", required: true }, { id: "", name: "Driver badge", appliesTo: "driver", required: false }] });
+    const vehicle = addVehicle(db, base.admin, base.catId, "GT 700-26");
+    db = vehicle.db;
+
+    run(requestInput(base.catId, startDate, endDate));
+    const id = db.rentals[0].id;
+    run({ type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } });
+    run({ type: "confirm_rental", id, input: { amount: "250", method: "Bank transfer", reference: "SLIP-1" } });
+    return { db: () => db, set: (next: typeof db) => { db = next; }, base, id, vehicleId: vehicle.id };
+  }
+
+  it("refuses a vehicle with no insurance, naming the paper", () => {
+    const w = confirmedRental();
+    const result = execute(w.db(), w.base.admin, { type: "assign_rental", id: w.id, input: { vehicleId: w.vehicleId, driverId: "" } }, NOW);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.vehicleId).toBe(
+      "Vehicle GT 700-26 cannot be assigned: no Insurance is recorded. Record the document in Compliance first.",
+    );
+  });
+
+  it("refuses a vehicle whose insurance lapses before the hire starts", () => {
+    // Booked for June; the certificate runs out in May. It is valid today, and useless for the job.
+    const w = confirmedRental("2026-06-01", "2026-06-03");
+    const documentTypeId = w.db().settings.documentTypes.find((d) => d.name === "Insurance")!.id;
+    const recorded = executeCommand(w.db(), w.base.ops, {
+      type: "create_document",
+      input: { ownerType: "vehicle", ownerId: w.vehicleId, documentTypeId, documentNumber: "INS-1", issuedDate: "2025-05-01", expiryDate: "2026-05-31", notes: "" },
+    }, NOW);
+    expect(recorded.ok).toBe(true);
+    if (!recorded.ok) return;
+    w.set(recorded.db);
+
+    const result = execute(w.db(), w.base.admin, { type: "assign_rental", id: w.id, input: { vehicleId: w.vehicleId, driverId: "" } }, NOW);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.vehicleId).toMatch(/its Insurance expired on 2026-05-31/);
+  });
+
+  it("assigns once the paper is current, and re-checks it on the day the hire starts", () => {
+    const w = confirmedRental();
+    const documentTypeId = w.db().settings.documentTypes.find((d) => d.name === "Insurance")!.id;
+    const recorded = executeCommand(w.db(), w.base.ops, {
+      type: "create_document",
+      input: { ownerType: "vehicle", ownerId: w.vehicleId, documentTypeId, documentNumber: "INS-2", issuedDate: "2026-01-01", expiryDate: "2027-01-01", notes: "" },
+    }, NOW);
+    expect(recorded.ok).toBe(true);
+    if (!recorded.ok) return;
+    w.set(recorded.db);
+
+    const assigned = execute(w.db(), w.base.admin, { type: "assign_rental", id: w.id, input: { vehicleId: w.vehicleId, driverId: "" } }, NOW);
+    expect(assigned.ok).toBe(true);
+    if (!assigned.ok) return;
+    w.set(assigned.db);
+    expect(w.db().rentals[0].status).toBe("confirmed");
+
+    // A certificate can lapse between assignment and the morning of the hire: starting is re-checked
+    // against today, and refused with the same sentence. (The hire is booked for today, so the
+    // start-date guard cannot be what refuses it.)
+    const lapsed = { ...w.db(), documents: w.db().documents.map((doc) => ({ ...doc, expiryDate: "2025-12-31" })) };
+    w.set(lapsed);
+    const started = execute(w.db(), w.base.admin, { type: "start_rental", id: w.id }, NOW);
+    expect(started.ok).toBe(false);
+    if (!started.ok) expect(started.message).toMatch(/Insurance expired on 2025-12-31/);
+  });
+
+  it("does not block anything when the company has made no paper mandatory", () => {
+    const base = rentalReady();
+    let db = base.db;
+    const vehicle = addVehicle(db, base.admin, base.catId, "GT 701-26");
+    db = vehicle.db;
+    const created = execute(db, base.admin, requestInput(base.catId, "2026-06-01", "2026-06-03"), NOW);
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    db = created.db;
+    const id = db.rentals[0].id;
+    const quoted = execute(db, base.admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
+    expect(quoted.ok).toBe(true);
+    if (!quoted.ok) return;
+    db = quoted.db;
+    const confirmed = execute(db, base.admin, { type: "confirm_rental", id, input: { amount: "250", method: "Bank transfer", reference: "SLIP-2" } }, NOW);
+    expect(confirmed.ok).toBe(true);
+    if (!confirmed.ok) return;
+    db = confirmed.db;
+    const assigned = execute(db, base.admin, { type: "assign_rental", id, input: { vehicleId: vehicle.id, driverId: "" } }, NOW);
+    expect(assigned.ok).toBe(true);
   });
 });

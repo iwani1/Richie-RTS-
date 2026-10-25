@@ -970,3 +970,22 @@ incident to be raised *before* cancelling (the dispatcher's priority is to close
 the crew; making him file the incident first means the run stays open while he does paperwork).
 Reassigning the remaining stops to another vehicle automatically: that needs spare capacity and a
 decision the office makes, not one the system invents.
+
+### D-76: a mandatory paper blocks the work, not the paperwork (Q-16)
+
+- **Question.** Q-16 asked which documents are mandatory and when they bite. The company had been
+  able to name its own document types since Phase 6 and to see them expire, but nothing stopped a
+  bus going out on a certificate that had lapsed the week before.
+- **Decision.** Each document type carries a company-declared flag, off by default. While a required
+  paper is missing, or its latest expiry date falls before the day of the work, the vehicle or driver
+  **cannot be assigned**: a rental is judged against its start date, a run against its service date,
+  and starting re-checks against today. Registration, import and maintenance are untouched — a
+  vehicle may be entered while its papers are still being collected.
+- **Rejected.** Blocking at registration (it produces invented dates, and a vehicle bought on Friday
+  could not be entered until the certificate arrived). Judging against "today" only (it passes a
+  three-week hire whose insurance runs out on day four). A blanket "documents invalid" refusal
+  without naming the paper (the person fixing it has to know which paper to chase). Sending a
+  reminder (no mail provider; the answer kept reminders in-app).
+- **Consequence.** Nothing changes for a company that ticks no switches. Ticking one turns a silent
+  gap into a refusal that quotes the paper and the date, and the same sentence appears on the
+  dispatch board and on the rental form.

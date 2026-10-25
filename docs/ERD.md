@@ -195,8 +195,9 @@ erDiagram
 `COMPLIANCE_DOCUMENT.owner_id` is polymorphic (vehicle or driver), so the foreign key is
 enforced by the service layer rather than a single SQL FK. There is no `document_type` table
 in this build: the catalogue lives in `settings.documentTypes` (id, name, appliesTo: vehicle |
-driver | both) and is company-configured with no seeded values (Q-16). A document type in use
-by any record cannot be removed. Owner and `document_type_id` are immutable after creation;
+driver | both, required: boolean) and is company-configured with no seeded values (Q-16). A type
+with `required: true` refuses assignment while it is missing or lapsed on the day of the work
+(D-76). A document type in use by any record cannot be removed. Owner and `document_type_id` are immutable after creation;
 `document_number`, `issued_date`, `expiry_date` and `notes` are editable (D-27).
 
 Distinct from `drivers.licence_expiry`, which continues to gate trip and rental assignment.

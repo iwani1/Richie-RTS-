@@ -67,6 +67,50 @@ export function daysUntil(date: string, today: string): number | null {
   return Math.round((to - from) / 86400000);
 }
 
+/**
+ * One missing or expired document that a company has declared mandatory (Q-16, D-76).
+ *
+ * `expiryDate` is null when no document of that type was ever recorded, so the caller can say
+ * "none recorded" rather than pretending one exists and has lapsed.
+ */
+export interface RequiredDocumentGap {
+  documentTypeId: string;
+  name: string;
+  expiryDate: string | null;
+  reason: "missing" | "expired";
+}
+
+/**
+ * The documents a vehicle or driver must hold on a given date, and does not.
+ *
+ * Only types the company marked as required are considered, and only on the date the work happens:
+ * a certificate that expires before the run is as useless as one that was never recorded. Returns an
+ * empty list when nothing is required, so a company that has not made that decision is never
+ * blocked by it.
+ */
+export function requiredDocumentGaps(db: Database, ownerType: "vehicle" | "driver", ownerId: string, onDate: string): RequiredDocumentGap[] {
+  const gaps: RequiredDocumentGap[] = [];
+  for (const type of db.settings.documentTypes) {
+    if (!type.required) continue;
+    if (type.appliesTo !== "both" && type.appliesTo !== ownerType) continue;
+    const recorded = db.documents.filter((doc) => doc.ownerType === ownerType && doc.ownerId === ownerId && doc.documentTypeId === type.id);
+    if (recorded.length === 0) {
+      gaps.push({ documentTypeId: type.id, name: type.name, expiryDate: null, reason: "missing" });
+      continue;
+    }
+    // The latest expiry wins: a renewed certificate replaces the old one.
+    const latest = recorded.map((doc) => doc.expiryDate).sort().at(-1) as string;
+    if (latest < onDate) gaps.push({ documentTypeId: type.id, name: type.name, expiryDate: latest, reason: "expired" });
+  }
+  return gaps;
+}
+
+/** The gap list as one sentence the operator can act on, naming the paper and the date. */
+export function describeDocumentGaps(label: string, gaps: readonly RequiredDocumentGap[]): string {
+  const parts = gaps.map((gap) => (gap.reason === "missing" ? `no ${gap.name} is recorded` : `its ${gap.name} expired on ${gap.expiryDate}`));
+  return `${label} cannot be assigned: ${parts.join("; ")}. Record the document in Compliance first.`;
+}
+
 function validateDocumentCore(db: Database, ownerType: "vehicle" | "driver", ownerId: string, documentTypeId: string): Errors {
   const errors: Errors = {};
   if (!DOCUMENT_OWNER_TYPES.includes(ownerType)) errors.ownerType = "Invalid owner type.";

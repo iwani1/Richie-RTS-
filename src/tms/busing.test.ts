@@ -1029,3 +1029,92 @@ describe("stopping a run that has already started (Q-47, D-75)", () => {
     if (!again.ok) expect(again.message).toMatch(/cancelled/);
   });
 });
+
+describe("mandatory documents gate a run (Q-16, D-76)", () => {
+  /** Settings demand an insurance paper for vehicles and a badge for drivers. */
+  function requiresPapers(w: World) {
+    const result = executeCommand(w.db, actorOf(w.db, "admin"), {
+      type: "update_settings",
+      input: {
+        ...w.db.settings,
+        documentTypes: [
+          { id: "", name: "Insurance", appliesTo: "vehicle", required: true },
+          { id: "", name: "Driver badge", appliesTo: "driver", required: true },
+        ],
+      },
+    }, NOW);
+    if (!result.ok) throw new Error(`${result.message} ${JSON.stringify(result.errors)}`);
+    w.db = result.db;
+  }
+
+  function record(w: World, ownerType: "vehicle" | "driver", ownerId: string, name: string, expiryDate: string) {
+    const documentTypeId = w.db.settings.documentTypes.find((d) => d.name === name)!.id;
+    const result = executeCommand(w.db, actorOf(w.db, "ops"), {
+      type: "create_document",
+      input: { ownerType, ownerId, documentTypeId, documentNumber: "DOC-1", issuedDate: "2025-01-01", expiryDate, notes: "" },
+    }, NOW);
+    if (!result.ok) throw new Error(`${result.message} ${JSON.stringify(result.errors)}`);
+    w.db = result.db;
+  }
+
+  it("refuses the assignment while the vehicle's insurance is missing, naming the paper", () => {
+    const w = build();
+    requiresPapers(w);
+    const routeId = createRoute(w);
+    const tripId = generate(w, routeId, "2026-06-01");
+
+    const result = attempt(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.vehicleId).toBe("Vehicle GT 900-26 cannot be assigned: no Insurance is recorded. Record the document in Compliance first.");
+  });
+
+  it("refuses the driver when the badge is missing, and the run once both are current", () => {
+    const w = build();
+    requiresPapers(w);
+    const routeId = createRoute(w);
+    const tripId = generate(w, routeId, "2026-06-01");
+    const vehicleId = w.db.vehicles[0].id;
+    const driverId = w.db.drivers[0].id;
+
+    record(w, "vehicle", vehicleId, "Insurance", "2027-01-01");
+    const noBadge = attempt(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId, driverId } });
+    expect(noBadge.ok).toBe(false);
+    if (!noBadge.ok) expect(noBadge.errors.driverId).toMatch(/no Driver badge is recorded/);
+
+    record(w, "driver", driverId, "Driver badge", "2027-01-01");
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId, driverId } });
+    expect(w.db.trips.find((t) => t.id === tripId)!.vehicleId).toBe(vehicleId);
+  });
+
+  it("checks the paper against the service date, so a future run is refused when it lapses first", () => {
+    const w = build();
+    requiresPapers(w);
+    const routeId = createRoute(w);
+    const tripId = generate(w, routeId, "2026-06-10");
+    record(w, "vehicle", w.db.vehicles[0].id, "Insurance", "2026-06-09");
+    record(w, "driver", w.db.drivers[0].id, "Driver badge", "2027-01-01");
+
+    const result = attempt(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.vehicleId).toMatch(/Insurance expired on 2026-06-09/);
+  });
+
+  it("stops a run from starting when the paper has lapsed since it was assigned", () => {
+    const w = build();
+    requiresPapers(w);
+    const routeId = createRoute(w);
+    const tripId = generate(w, routeId, "2026-06-01");
+    const vehicleId = w.db.vehicles[0].id;
+    record(w, "vehicle", vehicleId, "Insurance", "2027-01-01");
+    record(w, "driver", w.db.drivers[0].id, "Driver badge", "2027-01-01");
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "dispatch_trip", id: tripId });
+
+    // The certificate is re-dated into the past before the driver sets off.
+    w.db = { ...w.db, documents: w.db.documents.map((doc) => ({ ...doc, expiryDate: "2025-12-31" })) };
+    const started = attempt(w, "ops", { type: "start_trip", id: tripId });
+    expect(started.ok).toBe(false);
+    if (!started.ok) expect(started.message).toMatch(/Insurance expired on 2025-12-31/);
+    expect(w.db.trips.find((t) => t.id === tripId)!.status).toBe("dispatched");
+  });
+});

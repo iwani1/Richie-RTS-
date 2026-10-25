@@ -3,6 +3,7 @@
 // Every write goes through executeBusing(), which checks permissions, validates input,
 // enforces the trip state machine and writes an audit entry.
 
+import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
 import { audit, authorise, fail, isValidDate, makeId, norm, TIME_RE, type Actor, type CommandResult, type Errors } from "./service";
 import { allocateReference } from "./references";
 import { mayActOnTrip } from "./scope";
@@ -327,6 +328,12 @@ function midRunCapacityErrors(db: Database, routeId: string | null, extraActive:
   return {};
 }
 
+/** Dispatch and start have no fields to point at, so the reason has to be in the message itself. */
+function blockedReason(label: string, errors: Errors): string {
+  const details = Object.values(errors).filter((text): text is string => Boolean(text));
+  return details.length ? `${label} blocked: ${details.join(" ")}` : `${label} blocked: the assigned resources are no longer valid.`;
+}
+
 function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: string, driverId: string): Errors {
   const errors: Errors = {};
 
@@ -337,12 +344,21 @@ function assessResources(db: Database, route: BusRoute, trip: Trip, vehicleId: s
   else if (vehicle.status !== "available") errors.vehicleId = `Vehicle must be Available to be assigned (currently ${VEHICLE_STATUS_LABELS[vehicle.status].toLowerCase()}).`;
   else if (vehicle.seatCapacity < activeRoster(db, route.id))
     errors.vehicleId = `This vehicle seats ${vehicle.seatCapacity}; ${route.reference} has ${activeRoster(db, route.id)} active passengers. Use a larger vehicle or take staff off the roster first.`;
+  else {
+    // Mandatory papers are checked against the service date of the run (Q-16, D-76).
+    const gaps = requiredDocumentGaps(db, "vehicle", vehicle.id, trip.serviceDate);
+    if (gaps.length) errors.vehicleId = describeDocumentGaps(`Vehicle ${vehicle.registration}`, gaps);
+  }
 
   const driver = db.drivers.find((d) => d.id === driverId);
   if (!driverId) errors.driverId = "Select a driver.";
   else if (!driver) errors.driverId = "Unknown driver.";
   else if (driver.status !== "active") errors.driverId = `Driver is ${driver.status} and cannot be assigned.`;
   else if (driver.licenceExpiry < trip.serviceDate) errors.driverId = "Driver's licence expires before the service date.";
+  else {
+    const gaps = requiredDocumentGaps(db, "driver", driver.id, trip.serviceDate);
+    if (gaps.length) errors.driverId = describeDocumentGaps(`Driver ${driver.fullName}`, gaps);
+  }
 
   if (errors.vehicleId || errors.driverId) return errors;
 
@@ -558,7 +574,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       if (route.status !== "active") return fail(`Route is ${route.status}; its trips cannot be dispatched.`);
       if (!existing.vehicleId || !existing.driverId) return fail("Assign a vehicle and a driver before dispatch.");
       const errors = assessResources(db, route, existing, existing.vehicleId, existing.driverId);
-      if (Object.keys(errors).length) return fail("Dispatch blocked: the assigned resources are no longer valid.", errors);
+      if (Object.keys(errors).length) return fail(blockedReason("Dispatch", errors), errors);
       const updated: Trip = { ...existing, status: "dispatched", dispatchedAt: now, updatedAt: now };
       const next = audit({ ...db, trips: db.trips.map((t) => (t.id === updated.id ? updated : t)) }, actor, {
         action: "trips:dispatch",
@@ -590,7 +606,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         return fail(`${existing.reference} was scheduled for ${existing.serviceDate}. Cancel it and generate the run you actually worked.`);
       if (!existing.vehicleId || !existing.driverId) return fail("The trip has no assigned vehicle and driver.");
       const errors = assessResources(db, route, existing, existing.vehicleId, existing.driverId);
-      if (Object.keys(errors).length) return fail("Start blocked: the assigned resources are no longer valid.", errors);
+      if (Object.keys(errors).length) return fail(blockedReason("Start", errors), errors);
       const updated: Trip = { ...existing, status: "in_progress", startedAt: now, updatedAt: now };
       const next = audit({ ...db, trips: db.trips.map((t) => (t.id === updated.id ? updated : t)) }, actor, {
         action: "trips:start",

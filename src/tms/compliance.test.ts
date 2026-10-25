@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { executeCommand, type AnyCommand } from "./commands";
-import { daysUntil, documentStatus, type CreateDocumentInput } from "./compliance";
+import { daysUntil, documentStatus, describeDocumentGaps, requiredDocumentGaps, type CreateDocumentInput } from "./compliance";
 import type { Actor, Credential } from "./service";
 import { SCHEMA_VERSION, emptyDatabase, emptyRentalSettings, type Database } from "./types";
 
@@ -39,9 +39,9 @@ function world(options: { documentTypes?: boolean } = { documentTypes: true }): 
       vehicleCategories: [{ id: "", name: "Minibus" }],
       documentTypes: options.documentTypes
         ? [
-            { id: "", name: "Insurance", appliesTo: "vehicle" },
-            { id: "", name: "Roadworthy certificate", appliesTo: "vehicle" },
-            { id: "", name: "National ID", appliesTo: "both" },
+            { id: "", name: "Insurance", appliesTo: "vehicle", required: false },
+            { id: "", name: "Roadworthy certificate", appliesTo: "vehicle", required: false },
+            { id: "", name: "National ID", appliesTo: "both", required: false },
           ]
         : [],
       rental: emptyRentalSettings(),
@@ -213,7 +213,7 @@ describe("settings: document types and reminder lead time", () => {
     const w = world({ documentTypes: false });
     const dup = attempt(w, w.admin, {
       type: "update_settings",
-      input: { ...w.db.settings, documentTypes: [{ id: "", name: "Insurance", appliesTo: "vehicle" }, { id: "", name: "insurance", appliesTo: "driver" }] },
+      input: { ...w.db.settings, documentTypes: [{ id: "", name: "Insurance", appliesTo: "vehicle", required: false }, { id: "", name: "insurance", appliesTo: "driver", required: false }] },
     });
     expect(dup.ok).toBe(false);
     if (!dup.ok) expect(Object.values(dup.errors).some((m) => m.includes("Duplicate"))).toBe(true);
@@ -287,5 +287,74 @@ describe("daysUntil", () => {
   it("returns null for dates it cannot read instead of inventing a number", () => {
     expect(daysUntil("not-a-date", "2026-10-23")).toBeNull();
     expect(daysUntil("2026-10-23", "")).toBeNull();
+  });
+});
+
+describe("documents a company has made mandatory (Q-16, D-76)", () => {
+  const withRequired = (w: World, names: string[]) => {
+    const result = executeCommand(
+      w.db,
+      w.admin,
+      {
+        type: "update_settings",
+        input: {
+          ...w.db.settings,
+          documentTypes: w.db.settings.documentTypes.map((d) => ({ ...d, required: names.includes(d.name) })),
+        },
+      },
+      NOW,
+    );
+    if (!result.ok) throw new Error(result.message);
+    w.db = result.db;
+  };
+
+  const record = (w: World, over: Partial<CreateDocumentInput>) => {
+    const result = executeCommand(w.db, w.ops, { type: "create_document", input: insuranceInput(w, over) }, NOW);
+    if (!result.ok) throw new Error(`${result.message} ${JSON.stringify(result.errors)}`);
+    w.db = result.db;
+  };
+
+  it("reports nothing at all when no document type has been made mandatory", () => {
+    const w = world();
+    expect(requiredDocumentGaps(w.db, "vehicle", w.vehicleId, "2026-06-01")).toEqual([]);
+  });
+
+  it("names a missing paper and an expired one differently", () => {
+    const w = world();
+    withRequired(w, ["Insurance", "Roadworthy certificate"]);
+    record(w, { expiryDate: "2026-05-31" });
+
+    const gaps = requiredDocumentGaps(w.db, "vehicle", w.vehicleId, "2026-06-01");
+    expect(gaps).toEqual([
+      // Recorded, but it had lapsed by the day of the work.
+      { documentTypeId: expect.any(String), name: "Insurance", expiryDate: "2026-05-31", reason: "expired" },
+      // Never recorded at all.
+      { documentTypeId: expect.any(String), name: "Roadworthy certificate", expiryDate: null, reason: "missing" },
+    ]);
+    expect(describeDocumentGaps("Vehicle GT 100-26", gaps)).toBe(
+      "Vehicle GT 100-26 cannot be assigned: its Insurance expired on 2026-05-31; no Roadworthy certificate is recorded. Record the document in Compliance first.",
+    );
+  });
+
+  it("accepts the day of expiry, and the latest of several copies", () => {
+    const w = world();
+    withRequired(w, ["Insurance"]);
+    record(w, { documentNumber: "OLD", issuedDate: "2024-12-31", expiryDate: "2025-12-31" });
+    record(w, { documentNumber: "NEW", issuedDate: "2025-12-31", expiryDate: "2026-06-01" });
+    // The renewed certificate replaces the old one; the work happens on the last valid day.
+    expect(requiredDocumentGaps(w.db, "vehicle", w.vehicleId, "2026-06-01")).toEqual([]);
+    expect(requiredDocumentGaps(w.db, "vehicle", w.vehicleId, "2026-06-02")).toHaveLength(1);
+  });
+
+  it("applies a both-owners type to drivers as well as vehicles", () => {
+    const w = world();
+    withRequired(w, ["National ID"]);
+    expect(requiredDocumentGaps(w.db, "driver", w.driverId, "2026-06-01")).toEqual([
+      { documentTypeId: expect.any(String), name: "National ID", expiryDate: null, reason: "missing" },
+    ]);
+    record(w, { ownerType: "driver", ownerId: w.driverId, documentTypeId: w.db.settings.documentTypes.find((d) => d.name === "National ID")!.id, expiryDate: "2030-01-01" });
+    expect(requiredDocumentGaps(w.db, "driver", w.driverId, "2026-06-01")).toEqual([]);
+    // A driver's paper does not satisfy the vehicle's requirement, or the other way round.
+    expect(requiredDocumentGaps(w.db, "vehicle", w.vehicleId, "2026-06-01")).toHaveLength(1);
   });
 });

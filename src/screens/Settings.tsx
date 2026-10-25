@@ -329,8 +329,8 @@ export function SettingsPage() {
       </Band>
 
       <Band label="Compliance document types"
-        note="Required before any vehicle or driver document can be recorded (OPEN_QUESTIONS Q-16). The company names its own document types; none is assumed."
-        actions={editable ? <Button onClick={() => update({ documentTypes: [...draft.documentTypes, { id: "", name: "", appliesTo: "vehicle" }] })}>Add document type</Button> : undefined}
+        note={'The company names its own document types; none is assumed. A type ticked "must be current to assign" stops a vehicle, driver or run being assigned while that paper is missing or has expired (Q-16).'}
+        actions={editable ? <Button onClick={() => update({ documentTypes: [...draft.documentTypes, { id: "", name: "", appliesTo: "vehicle", required: false }] })}>Add document type</Button> : undefined}
       >
         {errors.documentTypes && <Notice tone="error" className="mb-3">{errors.documentTypes}</Notice>}
         {draft.documentTypes.length === 0 ? (
@@ -340,7 +340,7 @@ export function SettingsPage() {
             {draft.documentTypes.map((docType, i) => {
               const inUse = db.documents.some((d) => d.documentTypeId === docType.id);
               return (
-                <li key={docType.id || `new-${i}`} className="grid gap-2 sm:grid-cols-[1fr_160px_auto] sm:items-start">
+                <li key={docType.id || `new-${i}`} className="grid gap-2 sm:grid-cols-[1fr_160px_180px_auto] sm:items-start">
                   <Field label={`Document type ${i + 1}`} error={errors[`documentTypes.${i}`]}>
                     <TextInput
                       value={docType.name}
@@ -360,6 +360,17 @@ export function SettingsPage() {
                       <option value="driver">Drivers</option>
                       <option value="both">Both</option>
                     </Select>
+                  </Field>
+                  <Field label="Before assignment">
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={docType.required === true}
+                        disabled={!editable}
+                        onChange={(e) => update({ documentTypes: draft.documentTypes.map((d, j) => (j === i ? { ...d, required: e.target.checked } : d)) })}
+                      />
+                      <span>Must be current to assign</span>
+                    </label>
                   </Field>
                   {editable && (
                     <Button

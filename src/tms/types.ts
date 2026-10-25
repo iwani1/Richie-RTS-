@@ -129,6 +129,12 @@ export interface DocumentType {
   id: string;
   name: string;
   appliesTo: DocumentOwnerType;
+  /**
+   * When true, a vehicle or driver may not be assigned to work without a current copy of this
+   * document (Q-16, D-76). Defaults to false: a company that has not said a paper is mandatory must
+   * not be blocked by the system's guess.
+   */
+  required: boolean;
 }
 
 // Every field below is a business fact the company must supply. None has a default.
@@ -765,7 +771,8 @@ export function migrate(value: unknown): Database | null {
       vehicleCategories: (settings.vehicleCategories as VehicleCategory[]) ?? [],
       shifts: (settings.shifts as Shift[]) ?? [],
       rental,
-      documentTypes: (settings.documentTypes as DocumentType[]) ?? [],
+      // Records written before the flag existed are not required: the setting was never made.
+      documentTypes: ((settings.documentTypes as DocumentType[]) ?? []).map((d) => ({ ...d, required: d.required === true })),
       documentReminderLeadDays: (settings.documentReminderLeadDays as number | null) ?? null,
       taxPosition: (settings.taxPosition as TaxPosition | null) ?? null,
       taxLines: (settings.taxLines as TaxLineSetting[]) ?? [],

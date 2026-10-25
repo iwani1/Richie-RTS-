@@ -232,6 +232,11 @@ function CreateDocumentForm({
             ))}
           </Select>
         </Field>
+        {applicableTypes.find((t) => t.id === values.documentTypeId)?.required && (
+          <p className="text-xs text-stone-600">
+            The company requires this document: a {values.ownerType} cannot be assigned while it is missing or has expired on the day of the work. A record entered today with a past expiry date will not clear that block.
+          </p>
+        )}
         <Field label="Document number (optional)" error={errors.documentNumber}>
           <TextInput value={values.documentNumber} onChange={(e) => setValues({ ...values, documentNumber: e.target.value })} invalid={!!errors.documentNumber} />
         </Field>
