@@ -180,7 +180,25 @@ export function ClientsPage() {
         emptyState={<EmptyState title={db.clients.length ? "No clients match" : "No clients yet"} body="Add the organisations you transport staff for or hire vehicles to." />}
         columns={[
           { key: "name", header: "Client", render: (c) => <span className="font-semibold text-stone-900">{c.name}</span> },
-          { key: "contact", header: "Contact", render: (c) => c.contactName || <span className="text-stone-400">-</span> },
+          {
+            key: "contact",
+            header: "Contact",
+            render: (c) => {
+              const accounts = db.users.filter((u) => u.clientId === c.id && u.role === "client_contact");
+              const primary = accounts.find((u) => u.primaryContact);
+              return (
+                <div>
+                  {c.contactName || <span className="text-stone-400">-</span>}
+                  {accounts.length > 0 && (
+                    <div className="text-[11px] text-stone-500">
+                      {accounts.length} contact account{accounts.length === 1 ? "" : "s"}
+                      {primary ? ` · ${primary.fullName} is primary` : " · none marked primary"}
+                    </div>
+                  )}
+                </div>
+              );
+            },
+          },
           { key: "phone", header: "Phone", render: (c) => c.contactPhone || <span className="text-stone-400">-</span> },
           { key: "email", header: "Email", render: (c) => c.contactEmail || <span className="text-stone-400">-</span> },
           { key: "status", header: "Status", render: (c) => <Badge tone={c.status === "active" ? "success" : "neutral"}>{c.status}</Badge> },

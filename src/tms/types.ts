@@ -25,6 +25,9 @@ export interface User {
   // are null for internal staff, whose access is company-scoped.
   driverId: string | null;
   clientId: string | null;
+  // Which of a client's contact accounts is the one we ring first (Q-38, D-77). Only a
+  // client_contact account can hold it, and only one per client; everything else is false.
+  primaryContact: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -724,7 +727,7 @@ export function migrate(value: unknown): Database | null {
   };
   return {
     schemaVersion: SCHEMA_VERSION,
-    users: (v.users as User[]).map((u) => ({ ...u, driverId: u.driverId ?? null, clientId: u.clientId ?? null })),
+    users: (v.users as User[]).map((u) => ({ ...u, driverId: u.driverId ?? null, clientId: u.clientId ?? null, primaryContact: u.primaryContact === true })),
     vehicles: v.vehicles as Database["vehicles"],
     drivers: v.drivers as Database["drivers"],
     clients: v.clients as Database["clients"],

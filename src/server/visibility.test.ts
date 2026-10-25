@@ -17,6 +17,7 @@ const user = (id: string, role: User["role"], links: Partial<User> = {}): User =
   active: true,
   driverId: null,
   clientId: null,
+  primaryContact: false,
   passwordHash: `argon2id-hash-${id}`,
   passwordSalt: "",
   createdAt: at,

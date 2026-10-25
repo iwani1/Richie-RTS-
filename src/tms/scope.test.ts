@@ -125,7 +125,7 @@ describe("account-to-record links (validateUser)", () => {
     if (!missingClient.ok) expect(missingClient.errors.clientId).toMatch(/Link this account/);
   });
 
-  it("refuses to share one driver record or one client between two accounts", () => {
+  it("refuses to share one driver record, but allows a second contact at the same client", () => {
     const w = world();
     const duplicateDriver = attempt(w, w.admin, {
       type: "create_user",
@@ -135,13 +135,19 @@ describe("account-to-record links (validateUser)", () => {
     expect(duplicateDriver.ok).toBe(false);
     if (!duplicateDriver.ok) expect(duplicateDriver.errors.driverId).toMatch(/already linked/);
 
-    const duplicateClient = attempt(w, w.admin, {
+    // A company usually has an operations contact and an accounts contact. Share the password and
+    // nobody can tell who did what, so the second person gets their own login (Q-38, D-77).
+    const secondContact = attempt(w, w.admin, {
       type: "create_user",
       input: { fullName: "Copy2", email: "copy2@example.test", role: "client_contact", active: true, driverId: null, clientId: w.clientOneId },
       credential: cred,
     });
-    expect(duplicateClient.ok).toBe(false);
-    if (!duplicateClient.ok) expect(duplicateClient.errors.clientId).toMatch(/already has a contact account/);
+    expect(secondContact.ok).toBe(true);
+    if (secondContact.ok) {
+      expect(secondContact.db.users.filter((u) => u.clientId === w.clientOneId)).toHaveLength(2);
+      // Neither is marked primary unless the administrator says so.
+      expect(secondContact.db.users.some((u) => u.primaryContact)).toBe(false);
+    }
   });
 
   it("keeps internal roles unlinked", () => {
@@ -168,6 +174,115 @@ describe("permission scope classification", () => {
     expect(can("driver", "settings:update")).toBe(false);
     expect(ROLE_PERMISSIONS.driver).not.toContain("vehicles:read");
     expect(ROLE_PERMISSIONS.client_contact).not.toContain("trips:read");
+  });
+});
+
+describe("several contacts per client, one marked primary (Q-38, D-77)", () => {
+  const addContact = (db: Database, email: string, name: string, clientId: string, primaryContact = false) =>
+    executeCommand(db, { id: db.users[0].id, fullName: db.users[0].fullName, role: "administrator" }, {
+      type: "create_user",
+      input: { fullName: name, email, role: "client_contact", active: true, driverId: null, clientId, primaryContact },
+      credential: cred,
+    }, NOW);
+
+  const primaryOf = (db: Database, clientId: string) => db.users.find((u) => u.clientId === clientId && u.primaryContact);
+
+  it("gives each contact its own login, both confined to the same client", () => {
+    const w = world();
+    const second = addContact(w.db, "accounts@alpha.test", "Efua", w.clientOneId);
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    const accounts = second.db.users.filter((u) => u.clientId === w.clientOneId);
+    expect(accounts.map((u) => u.email)).toEqual(["client1@example.test", "accounts@alpha.test"]);
+
+    // Each is its own account with its own actor, and both see exactly the one client's work.
+    for (const account of accounts) {
+      const view = scopedView(second.db, { id: account.id, fullName: account.fullName, role: account.role });
+      expect(view.routes.map((r) => r.name)).toEqual(["Alpha run"]);
+      expect(view.trips).toHaveLength(1);
+    }
+  });
+
+  it("keeps one primary per client, taking the mark off the account that held it", () => {
+    const w = world();
+    const first = executeCommand(w.db, w.admin, {
+      type: "update_user",
+      id: w.clientOne.id,
+      input: { fullName: "Client One", email: "client1@example.test", role: "client_contact", active: true, driverId: null, clientId: w.clientOneId, primaryContact: true },
+    }, NOW);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(primaryOf(first.db, w.clientOneId)!.email).toBe("client1@example.test");
+
+    const second = addContact(first.db, "accounts@alpha.test", "Efua", w.clientOneId, true);
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    const primaries = second.db.users.filter((u) => u.clientId === w.clientOneId && u.primaryContact);
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0].email).toBe("accounts@alpha.test");
+
+    // The audit says whose mark moved, so the change is not silent.
+    // Newest first.
+    const last = second.db.audit[0];
+    expect(last.summary).toBe("Created user accounts@alpha.test (client_contact), primary contact for Alpha Ltd (mark taken from Client One).");
+  });
+
+  it("leaves the other client's primary alone", () => {
+    const w = world();
+    const betaAdmin = executeCommand(w.db, w.admin, {
+      type: "create_user",
+      input: { fullName: "Beta Contact", email: "beta@beta.test", role: "client_contact", active: true, driverId: null, clientId: w.db.clients[1].id, primaryContact: true },
+      credential: cred,
+    }, NOW);
+    expect(betaAdmin.ok).toBe(true);
+    if (!betaAdmin.ok) return;
+    const alpha = addContact(betaAdmin.db, "alpha2@alpha.test", "Yaa", w.clientOneId, true);
+    expect(alpha.ok).toBe(true);
+    if (!alpha.ok) return;
+    expect(primaryOf(alpha.db, w.clientOneId)!.email).toBe("alpha2@alpha.test");
+    expect(primaryOf(alpha.db, w.db.clients[1].id)!.email).toBe("beta@beta.test");
+  });
+
+  it("refuses a primary mark on anything but a client contact", () => {
+    const w = world();
+    const staff = attempt(w, w.admin, {
+      type: "create_user",
+      input: { fullName: "Staff", email: "staff@example.test", role: "operations", active: true, primaryContact: true },
+      credential: cred,
+    });
+    expect(staff.ok).toBe(false);
+    if (!staff.ok) expect(staff.errors.primaryContact).toMatch(/Only a client contact account/);
+  });
+
+  it("clears the mark when the account stops being a contact, and follows it to a new client", () => {
+    const w = world();
+    const made = addContact(w.db, "ops@alpha.test", "Efua", w.clientOneId, true);
+    expect(made.ok).toBe(true);
+    if (!made.ok) return;
+    const id = made.db.users.find((u) => u.email === "ops@alpha.test")!.id;
+
+    // Reassigned to the other client: it carries the mark with it, and Alpha is left with none.
+    const moved = executeCommand(made.db, w.admin, {
+      type: "update_user",
+      id,
+      input: { fullName: "Efua", email: "ops@alpha.test", role: "client_contact", active: true, driverId: null, clientId: w.db.clients[1].id, primaryContact: true },
+    }, NOW);
+    expect(moved.ok).toBe(true);
+    if (!moved.ok) return;
+    expect(primaryOf(moved.db, w.clientOneId)).toBeUndefined();
+    expect(primaryOf(moved.db, w.db.clients[1].id)!.id).toBe(id);
+
+    // Promoted to internal staff: the client link and the mark both go.
+    const promoted = executeCommand(moved.db, w.admin, {
+      type: "update_user",
+      id,
+      input: { fullName: "Efua", email: "ops@alpha.test", role: "operations", active: true },
+    }, NOW);
+    expect(promoted.ok).toBe(true);
+    if (!promoted.ok) return;
+    const after = promoted.db.users.find((u) => u.id === id)!;
+    expect(after.clientId).toBeNull();
+    expect(after.primaryContact).toBe(false);
   });
 });
 

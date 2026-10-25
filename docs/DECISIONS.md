@@ -989,3 +989,23 @@ decision the office makes, not one the system invents.
 - **Consequence.** Nothing changes for a company that ticks no switches. Ticking one turns a silent
   gap into a refusal that quotes the paper and the date, and the same sentence appears on the
   dispatch board and on the rental form.
+
+### D-77: a client may have several contact accounts, one marked primary (Q-38)
+
+- **Question.** Q-38 asked whether one corporate client may have more than one contact account.
+  The build allowed exactly one, refused the second, and told the administrator that several were
+  not supported yet.
+- **Decision.** A client may have as many contact accounts as it has people who need to see that
+  client's bookings, and each is its own login confined to that client. One of them is marked
+  **primary** — the person the office rings first — and marking another moves the mark rather than
+  creating a second. A client with no primary shows as "none marked primary" rather than implying
+  that nobody is reachable.
+- **Rejected.** One shared login per client (two people writing under one name defeats the audit
+  log, and changing a password to remove one person locks out the other). Leaving the primary mark
+  off entirely (the office then guesses, and guesses differently). A primary flag that can be set
+  on a driver or internal account (it means nothing there, and the register would show a client
+  contact that is not one). Deleting the mark silently when the primary account is deactivated: the
+  register shows "Primary (inactive - ring someone else)" instead, so the gap is visible.
+- **Consequence.** The unique index on `app_user.client_id` had to go (migration 005); the driver
+  rule stays in the database as well as in the service. Nothing about scope changes for the people
+  involved: each account sees exactly the one client it is linked to.

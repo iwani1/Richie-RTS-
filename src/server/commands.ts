@@ -142,8 +142,10 @@ export function describeDatabaseError(error: unknown): ServerFailure {
           return conflict("A user with this email already exists.");
         case "app_user_driver_uq":
           return conflict("That driver record is already linked to another account.");
+        // Only reachable on a database that has not yet applied migration 005: since Q-38 a
+        // client may have several contact accounts, one per person.
         case "app_user_client_uq":
-          return conflict("That client already has a contact account.");
+          return conflict("That client already has a contact account, and this database has not been migrated to allow several. Run npm run db:migrate.");
         case "trip_route_date_uq":
           return conflict("A trip already exists for this route on that date.");
         case "rental_reference_key":

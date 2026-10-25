@@ -52,6 +52,28 @@ export function UsersPage() {
           { key: "name", header: "Name", render: (u) => <span className="font-semibold text-stone-900">{u.fullName}{u.id === actor?.id && <span className="ml-1 text-[10px] font-normal text-stone-500">(you)</span>}</span> },
           { key: "email", header: "Email", render: (u) => u.email },
           { key: "role", header: "Role", render: (u) => ROLE_LABELS[u.role] },
+          {
+            key: "record",
+            header: "Acts for",
+            render: (u) => {
+              if (u.role === "driver") {
+                const driver = db.drivers.find((d) => d.id === u.driverId);
+                return driver ? driver.fullName : <span className="text-stone-400">-</span>;
+              }
+              if (u.role === "client_contact") {
+                const client = db.clients.find((c) => c.id === u.clientId);
+                if (!client) return <span className="text-stone-400">-</span>;
+                return (
+                  <span className="flex flex-wrap items-center gap-1">
+                    {client.name}
+                    {u.primaryContact && <Badge tone="info">Primary</Badge>}
+                    {u.primaryContact && !u.active && <span className="text-[11px] text-stone-600">(inactive - ring someone else)</span>}
+                  </span>
+                );
+              }
+              return <span className="text-stone-400">Whole company</span>;
+            },
+          },
           { key: "status", header: "Status", render: (u) => <Badge tone={u.active ? "success" : "neutral"}>{u.active ? "Active" : "Inactive"}</Badge> },
           { key: "created", header: "Created", render: (u) => <span className="text-xs text-stone-500">{formatDateTime(u.createdAt)}</span> },
           {
@@ -108,7 +130,7 @@ export function UsersPage() {
       {panel?.mode === "create" && (
         <UserForm
           title="Add user"
-          initial={{ fullName: "", email: "", role: "operations", active: true }}
+          initial={{ fullName: "", email: "", role: "operations", active: true, primaryContact: false }}
           withPassword
           onClose={() => setPanel(null)}
           onSubmit={async (input, password) => {
@@ -124,8 +146,9 @@ export function UsersPage() {
       {panel?.mode === "edit" && (
         <UserForm
           key={panel.user.id}
+          currentUserId={panel.user.id}
           title={`Edit ${panel.user.fullName}`}
-          initial={{ fullName: panel.user.fullName, email: panel.user.email, role: panel.user.role, active: panel.user.active, driverId: panel.user.driverId, clientId: panel.user.clientId }}
+          initial={{ fullName: panel.user.fullName, email: panel.user.email, role: panel.user.role, active: panel.user.active, driverId: panel.user.driverId, clientId: panel.user.clientId, primaryContact: panel.user.primaryContact }}
           onClose={() => setPanel(null)}
           onSubmit={async (input) => {
             const result = await dispatch({ type: "update_user", id: panel.user.id, input });
@@ -151,7 +174,7 @@ export function UsersPage() {
   );
 }
 
-function UserForm({ title, initial, withPassword, onClose, onSubmit }: { title: string; initial: UserInput; withPassword?: boolean; onClose: () => void; onSubmit: (input: UserInput, password: string) => Promise<Errors> }) {
+function UserForm({ title, initial, currentUserId, withPassword, onClose, onSubmit }: { title: string; initial: UserInput; currentUserId?: string; withPassword?: boolean; onClose: () => void; onSubmit: (input: UserInput, password: string) => Promise<Errors> }) {
   const { db } = useTms();
   const [values, setValues] = useState<UserInput>({ driverId: null, clientId: null, ...initial });
   const [password, setPassword] = useState("");
@@ -172,7 +195,7 @@ function UserForm({ title, initial, withPassword, onClose, onSubmit }: { title: 
         <Field label="Role" error={errors.role}>
           <Select
             value={values.role}
-            onChange={(e) => set({ role: e.target.value as UserInput["role"], driverId: null, clientId: null })}
+            onChange={(e) => set({ role: e.target.value as UserInput["role"], driverId: null, clientId: null, primaryContact: false })}
             invalid={!!errors.role}
           >
             {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
@@ -189,14 +212,43 @@ function UserForm({ title, initial, withPassword, onClose, onSubmit }: { title: 
           </Field>
         )}
         {values.role === "client_contact" && (
-          <Field label="Linked client" hint="Own-record scope: this account sees only this client's routes, roster and rental requests." error={errors.clientId}>
-            <Select value={values.clientId ?? ""} onChange={(e) => set({ clientId: e.target.value })} invalid={!!errors.clientId}>
-              <option value="">Select a client</option>
-              {db.clients
-                .filter((c) => c.id === values.clientId || !db.users.some((u) => u.clientId === c.id))
-                .map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </Field>
+          <>
+            <Field label="Linked client" hint="Own-record scope: this account sees only this client's routes, roster and rental requests." error={errors.clientId}>
+              <Select value={values.clientId ?? ""} onChange={(e) => set({ clientId: e.target.value })} invalid={!!errors.clientId}>
+                <option value="">Select a client</option>
+                {db.clients
+                  .map((c) => {
+                    // A client often has an operations contact and an accounts contact; each gets
+                    // its own login rather than sharing one password (Q-38, D-77).
+                    const others = db.users.filter((u) => u.clientId === c.id && u.role === "client_contact" && u.id !== currentUserId);
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{others.length ? ` (${others.length} contact account${others.length === 1 ? "" : "s"})` : ""}
+                      </option>
+                    );
+                  })}
+              </Select>
+            </Field>
+            {/* Not wrapped in Field: Field renders a <label>, and a label inside a label gives the
+                checkbox a name nobody can predict. */}
+            <div className="rts-field">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={values.primaryContact === true}
+                  disabled={!values.clientId}
+                  onChange={(e) => set({ primaryContact: e.target.checked })}
+                />
+                <span>Primary contact for the linked client</span>
+              </label>
+              <span className="rts-hint">
+                {values.clientId
+                  ? "The person we ring first about this client's bookings. Marking this account primary takes the mark off any other contact account for the same client."
+                  : "Pick a client first."}
+              </span>
+              {errors.primaryContact && <span className="rts-error" role="alert">{errors.primaryContact}</span>}
+            </div>
+          </>
         )}
         <Field label="Account status" error={errors.active}>
           <Select value={values.active ? "active" : "inactive"} onChange={(e) => set({ active: e.target.value === "active" })} invalid={!!errors.active}>

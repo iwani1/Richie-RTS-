@@ -40,7 +40,7 @@ limited, `503` the database could not be read.
 {
   "ok": true,
   "setupRequired": false,
-  "user": { "id": "…", "fullName": "Ama Mensah", "email": "ama@example.test", "role": "administrator", "active": true, "driverId": null, "clientId": null },
+  "user": { "id": "…", "fullName": "Ama Mensah", "email": "ama@example.test", "role": "administrator", "active": true, "driverId": null, "clientId": null, "primaryContact": false },
   "database": { "schemaVersion": 11, "users": [], "vehicles": [], "…": [] },
   "auditTotal": 412
 }

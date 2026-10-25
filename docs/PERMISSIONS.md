@@ -7,6 +7,11 @@ Record-bound roles (`driver`, `client_contact`) are **own-record scoped**: their
 linked to exactly one driver record or one corporate client, and every read and write is
 confined to it. The links are `User.driverId` and `User.clientId` (schema version 5).
 
+A driver record may be linked to one account only. A corporate client may have **several**
+contact accounts — an operations contact and an accounts contact, say — each with its own login
+and its own audit trail, and one of them marked `primaryContact` as the person the office rings
+first (Q-38, D-77). The mark is held by one account per client; marking another takes it away.
+
 | Permission | driver | client_contact | Scope for these roles |
 |---|:-:|:-:|---|
 | trips:read | x | | only trips assigned to its linked driver record |

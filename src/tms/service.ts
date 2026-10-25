@@ -82,6 +82,8 @@ export interface UserInput {
   // client_contact roles; see PERMISSIONS.md "Own-record scope".
   driverId?: string | null;
   clientId?: string | null;
+  // The one contact account we ring first for a client (Q-38). Ignored for other roles.
+  primaryContact?: boolean;
 }
 
 export interface RentalRequestInput {
@@ -371,13 +373,50 @@ export function validateUser(db: Database, input: UserInput, excludeId?: string)
     if (driverId) errors.driverId = "A client contact account is not linked to a driver.";
     if (!clientId) errors.clientId = "Link this account to a client so it can see its own records.";
     else if (!db.clients.some((c) => c.id === clientId)) errors.clientId = "Client not found.";
-    else if (db.users.some((u) => u.id !== excludeId && u.clientId === clientId))
-      errors.clientId = "That client already has a contact account. Multiple contacts per client are not supported yet (OPEN_QUESTIONS Q-38).";
+    // A company usually has an operations contact and an accounts contact. Both get their own
+    // login, each sees only that client, and one is marked primary (Q-38, D-77).
   } else if (driverId || clientId) {
     errors.driverId = "Only driver and client contact accounts can be linked to a record.";
   }
 
-  return { errors, value: { fullName, email, role: input.role, active: input.active, driverId, clientId } };
+  const primaryContact = input.primaryContact === true;
+  if (primaryContact && input.role !== "client_contact")
+    errors.primaryContact = "Only a client contact account can be the primary contact.";
+
+  return {
+    errors,
+    value: {
+      fullName,
+      email,
+      role: input.role,
+      active: input.active,
+      driverId,
+      clientId,
+      primaryContact: primaryContact && input.role === "client_contact",
+    },
+  };
+}
+
+/**
+ * Puts a saved account back into the list and keeps "one primary contact per client" true: marking
+ * an account primary takes the mark off whichever account of that client held it (Q-38).
+ */
+function withAccount(users: User[], account: User): User[] {
+  return users.map((u) => {
+    if (u.id === account.id) return account;
+    if (account.primaryContact && u.primaryContact && u.clientId === account.clientId) return { ...u, primaryContact: false };
+    return u;
+  });
+}
+
+/** The audit clause for a saved account that carries the primary mark, and who lost it. */
+function primaryNote(db: Database, account: User, wasPrimary: boolean): string {
+  if (!account.primaryContact) return "";
+  const client = db.clients.find((c) => c.id === account.clientId);
+  const demoted = wasPrimary
+    ? []
+    : db.users.filter((u) => u.id !== account.id && u.primaryContact && u.clientId === account.clientId).map((u) => u.fullName);
+  return `, primary contact${client ? ` for ${client.name}` : ""}${demoted.length ? ` (mark taken from ${demoted.join(", ")})` : ""}`;
 }
 
 export function validateSettings(db: Database, input: Settings) {
@@ -736,11 +775,11 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (Object.keys(errors).length || Object.keys(credentialErrors).length)
         return fail("Please correct the highlighted fields.", { ...errors, ...credentialErrors });
       const user: User = { id: makeId(), ...value, ...command.credential, createdAt: now, updatedAt: now };
-      const next = audit({ ...db, users: [...db.users, user] }, actor, {
+      const next = audit({ ...db, users: withAccount([...db.users, user], user) }, actor, {
         action: "users:create",
         entity: "user",
         entityId: user.id,
-        summary: `Created user ${user.email} (${user.role}).`,
+        summary: `Created user ${user.email} (${user.role})${primaryNote(db, user, false)}.`,
       }, now);
       return { ok: true, db: next, message: `User ${user.fullName} created.` };
     }
@@ -758,11 +797,11 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         errors.role = "At least one active administrator must remain.";
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
       const updated: User = { ...existing, ...value, updatedAt: now };
-      const next = audit({ ...db, users: db.users.map((u) => (u.id === updated.id ? updated : u)) }, actor, {
+      const next = audit({ ...db, users: withAccount(db.users, updated) }, actor, {
         action: "users:update",
         entity: "user",
         entityId: updated.id,
-        summary: `Updated user ${updated.email}: role ${updated.role}, ${updated.active ? "active" : "inactive"}.`,
+        summary: `Updated user ${updated.email}: role ${updated.role}, ${updated.active ? "active" : "inactive"}${primaryNote(db, updated, existing.primaryContact)}.`,
       }, now);
       return { ok: true, db: next, message: `User ${updated.fullName} updated.` };
     }

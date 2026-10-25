@@ -196,7 +196,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | Client portal: own routes with stops/times, roster (name + stop only), rental requests | Done (verified) | `Portals.test.tsx` |
 | Users screen links accounts to driver/client records | Done (verified) | Covered by the link-validation tests |
 | Record-bound roles are walled off from every internal screen | Done (verified) | `Portals.test.tsx` |
-| Multiple contact accounts per client | Blocked | Not supported; one per client (Q-38) |
+| Multiple contact accounts per client | Done (verified) | Several accounts per client, one marked primary (Phase 27, D-77). 5 domain and 7 screen tests |
 | Boarding codes and roster self-service for riders | Blocked | Policy not supplied (Q-19) |
 | Driver trip updates (start/stop, boarding) | Not started | Portal is read + incident reporting only in this slice |
 
@@ -639,7 +639,7 @@ in this phase: the answers are accepted-or-not first, and the code follows in th
 | Answered by confirming today's behaviour (no code) | Done | Q-19 no boarding codes, Q-33 drivers already report breakdowns, Q-45 hand-recorded odometer, Q-46 renewal uses current settings |
 | Answered by statement (no code) | Done | Q-01/Q-50 one office machine on the LAN, Caddy or nginx in front; Q-49 proprietary and private, `LICENSE` added and `README.md` updated |
 | Decisions recorded | Done | D-73 (the set), D-74 (a wrong trip entry is corrected, never edited), D-75 (safety defects block; an overdue routine service warns) |
-| **Code queued, in this order** | Not started | 1. Q-42 correction entries + `trips:correct`; 2. Q-47 cancel an in-progress run with a reason and optional incident; 3. Q-16 mandatory insurance and roadworthiness before assignment; 4. Q-38 several client contacts; 5. Q-34 work-type list and Q-29 report definitions (with RPT-03); 6. Q-48 roster-change marker; 7. Q-43 the stricter dispatch switch |
+| **Code queued, in this order** | In progress | 1. Q-42 correction entries + `trips:correct` (Phase 24); 2. Q-47 cancel an in-progress run with a reason and optional incident (Phase 25); 3. Q-16 mandatory insurance and roadworthiness before assignment (Phase 26); 4. Q-38 several client contacts (Phase 27); 5. Q-34 work-type list and Q-29 report definitions (with RPT-03); 6. Q-48 roster-change marker; 7. Q-43 the stricter dispatch switch |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **328 passed, 14 skipped**, `build`
 succeeds. Documentation and one licence file only; no behaviour changed.
@@ -719,3 +719,28 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **365 passed, 14
 succeeds.
 
 Next on the queued list: Q-38, several contacts per client.
+
+## Phase 27 - Several contacts at one client (item 4, Q-38)
+
+D-77 answers Q-38. Until this phase a client could have exactly one contact account, enforced in
+the service layer *and* by a unique index on `app_user.client_id`; the second person was refused,
+which pushes a company to share one password and lose the trail of who asked for what. Now a client
+may have several contact accounts, each its own login and each confined to that client, with one
+marked primary.
+
+| Item | Status | Evidence |
+|---|---|---|
+| A second contact account is accepted | Done (verified) | `validateUser` no longer refuses a client that already has a contact; migration `005_client_contact_accounts.sql` drops the unique index (driver records keep theirs) |
+| Each contact is its own login | Done (verified) | Each account has its own email, password and audit rows; both answer the same client's records through `scopedView` |
+| One primary, and only one | Done (verified) | `User.primaryContact`; saving an account as primary takes the mark off whichever account of that client held it, and the audit entry names whose mark moved |
+| Primary means a contact account | Done (verified) | A driver or internal account cannot carry the mark - refused with a field error, and choosing another role clears it |
+| Reassignments behave | Done (verified) | Moving a primary account to another client carries the mark and leaves the first client with none; promoting a contact to internal staff clears both the link and the mark |
+| The office can see who to ring | Done (verified) | Users register gained an "Acts for" column (client or driver, with a "Primary" badge, and a warning when the primary account is inactive); the client register says "2 contact accounts · Yaw Mensah is primary" or "none marked primary" |
+| Picking a client is honest | Done (verified) | The link picker lists every client and says how many contact accounts it already has, instead of hiding clients that have one |
+| A database that predates this | Done (verified) | Migration 005 drops the index; if an unmigrated database refuses the row, the message says to run `npm run db:migrate` instead of a 500 |
+| Tests | Done (verified) | 5 domain (`scope.test.ts` "several contacts per client, one marked primary"), 4 screen (`Users.test.tsx`), 3 screen (`Registers.test.tsx`), 2 integration (`repository.integration.test.ts`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **377 passed, 16 skipped** (the two new
+integration tests are among the skipped ones and run against PostgreSQL in CI), `build` succeeds.
+
+Next on the queued list: Q-34 work-type list with Q-29 report definitions (RPT-03).
