@@ -1,0 +1,22 @@
+Copyright (c) 2026 Richie Transport Services. All rights reserved.
+
+This software, its source code, its database schema, its screens, its written
+documentation and the business rules expressed in any of them are the
+proprietary property of Richie Transport Services.
+
+No permission is granted to copy, modify, publish, distribute, sublicense or
+sell any part of this work, in source or compiled form, without the prior
+written consent of the copyright holder.
+
+The repository is private for the same reason. Access granted to a member of
+staff, a contractor or an adviser is for the purpose of that engagement only,
+and does not carry any right to reuse the code elsewhere.
+
+No warranty is given. The software is provided as it is, and the copyright
+holder is not liable for any loss arising from its use.
+
+Third-party components remain under their own licences, listed in
+package.json and installed under node_modules/ at build time. Nothing in this
+notice alters those terms.
+
+For permission, contact the business directly.

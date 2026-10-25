@@ -888,3 +888,68 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
   rule is a business statement, not a universal one: an accounting package that rounds line tax
   *after* summing lines would disagree with this one at a tie, by one pesewa, and that difference is
   the point of stating the rule in one place.
+
+## D-73 The fourteen open questions, answered by recommendation
+
+- **Context.** Fourteen questions in `docs/OPEN_QUESTIONS.md` were blocking real behaviour, and each
+  one was written as "nothing is assumed" — so the build stops and asks rather than inventing a rule.
+  The owner has delegated the answers, with the standing right to change any of them.
+- **Decision.** The answers are recorded in `docs/OPEN_QUESTIONS.md` under "Recommended answers",
+  one row each, with the reason and the cost of undoing it. The shape of them:
+  - **Answer by doing nothing, where the build is already right.** Boarding codes (Q-19), the odometer
+    source (Q-45), renewed-quote terms (Q-46) and driver breakdown reports (Q-33) are settled by
+    confirming today's behaviour, because the alternative adds a step or a provider without removing
+    a loss.
+  - **Answer by naming a definition, not a rate.** Fleet utilisation and cost per trip (Q-29) are
+    defined from records the system already keeps, so a report can be built without a business fact
+    being invented.
+  - **Answer by adding a small, reversible rule.** Several client contacts (Q-38), a warning rather
+    than a block for an overdue routine service (Q-43), mandatory insurance and roadworthiness before
+    a vehicle may be assigned (Q-16), and a roster-change marker for the driver (Q-48).
+  - **Answer by protecting the record.** Corrections to trip data are appended, never edited (D-74),
+    and an in-progress run can be cancelled with a reason and, where relevant, an incident (D-75).
+  - **Answer by statement outside the code.** The repository is proprietary and private (Q-49), and
+    the deployment target is one office machine on the LAN (Q-01/Q-50).
+- **Rejected.** Assuming an answer and building on it, which is what the question table exists to
+  prevent. Also rejected: a permissive licence (it invites reuse of the owner's rules and prices),
+  and blocking dispatch on a routine service before the intervals have been used for a season (it
+  stops work over a mistyped odometer).
+- **Consequence.** Each recommendation is a line in a document, not a fact baked into code. Behaviour
+  that changes is marked **code queued** in that table and waits for acceptance; the questions closed
+  by confirmation change nothing today.
+
+## D-74 A wrong trip entry is corrected, never edited
+
+- **Context.** Q-42. Stop times and boarding outcomes are recorded during a run, and the brief
+  requires trip records to be trustworthy. Today the entries are immutable and there is no correction
+  route at all, so a fat-fingered time on a completed run stays wrong, and the office's only remedy
+  is a narrative note somewhere else.
+- **Decision.** A correction is a new record: who, when, why, the field, the previous value and the
+  new one. The original stays. Reports show the corrected value with a marker and a count, so a
+  reader can see that the record was corrected and how often. Recording a correction needs
+  `trips:correct`, held by operations and the administrator.
+- **Rejected.** Editing in place (it destroys the answer to "who said this, and when" — the whole
+  value of an operational log). Deleting and re-entering the stop (the same problem, with less
+  evidence). Making corrections administrator-only from the start (the dispatcher is the person who
+  notices).
+- **Known limit.** Corrections are additive, so a run corrected ten times carries ten records. That
+  is the intended cost: the count is shown precisely so that a repeatedly corrected run is visible
+  rather than silently clean.
+
+## D-75 Safety defects block; an overdue routine service warns
+
+- **Context.** Q-43. Readiness reports an overdue service per vehicle, and dispatch ignores it. The
+  question was whether that should be a block. Both answers are wrong alone: blocking every overdue
+  service stops a bus over a mistyped odometer, and blocking nothing lets a vehicle with a known
+  safety defect go out.
+- **Decision.** The two cases are separated. A **safety-related defect** — an open incident of type
+  `safety_concern`, or a work order carrying that flag — blocks assignment and dispatch, as it
+  already does. An **overdue routine service** is shown on readiness and on the dispatch screen with
+  the interval it exceeded, and does not block. A single setting, off by default, turns the second
+  into a block once the intervals have been in use for a season.
+- **Rejected.** Blocking on both (work stops for a data-entry slip during the period the intervals
+  are being calibrated). Blocking on neither (a vehicle with a failing brake is dispatched because
+  its service is merely "due"). A blanket "vehicle not ready" refusal without naming the reason: the
+  dispatcher has to know which rule stopped him to fix it.
+- **Consequence.** Dispatch can refuse a vehicle for two different reasons, and the message says
+  which. The stricter rule is one switch, so the owner can tighten it without a code change.

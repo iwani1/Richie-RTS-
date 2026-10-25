@@ -2,6 +2,44 @@
 
 Nothing below has been assumed. Where a question maps to a setting, the setting exists with **no default** and dependent features stay blocked until it is filled in.
 
+## Recommended answers (25 October 2026)
+
+The owner delegated the answering of these fourteen questions. Each row is a **recommendation, not a
+fact**: it is the answer this build would defend, the reason behind it, and what it costs to undo. A
+recommendation that changes behaviour is marked **code queued** and is not implemented until it is
+accepted; one marked **no code** describes behaviour the build already has, so accepting it only
+settles the question.
+
+| # | Recommended answer | Why | Changes | Undo |
+|---|---|---|---|---|
+| **Q-19** Boarding codes | **No codes.** The driver records boarding at the door, as today. | No fare is collected per boarding and riders are known employees on a fixed roster, so a code prevents no loss — it only adds a step at the door and a second failure (a lost or flat phone). | Nothing | Add codes later without touching the roster if fare collection or fare-sharing appears |
+| **Q-29** RPT-02 / RPT-03 definitions | **Utilisation = committed vehicle-days ÷ available vehicle-days** in the period (available = non-retired fleet × days). **Cost per trip = recorded costs ÷ completed trips** in the period. Cost categories come from a configured list, not free text. | Both are computable from records the system already keeps, and neither needs a rate or a guess. The rental report already computes vehicle-days the same way, so the two cannot disagree. | Report definitions; cost-category list | Definition lives in one function and the KPI document |
+| **Q-34** Fault taxonomy | **Keep the five incident types as shipped** (breakdown, accident, damage, safety concern, other — the brief's own list) and **add a configured work-type list for work orders**: service, repair, tyres, bodywork, inspection, other. | The incident list is the brief's, not an invention. Work type is free text today, which makes "how much did tyres cost" unanswerable; a short editable list fixes that without inventing causes. | Work-order input becomes a list | List is edited in Settings; free text can be restored |
+| **Q-33** Driver breakdown reports | **Yes — already built.** Drivers hold `incidents:create`; a driver's report blocks the vehicle and raises a work order. | The question was written before the driver portal gained own-record scope (Phase 10). | Nothing | Permissions change |
+| **Q-38** Client contacts | **Several contact accounts per client**, each its own login, each scoped to that one client, with one marked primary. | A company usually has an operations contact and an accounts contact. Refusing the second contact today pushes staff to share one password — the worst of the options. | One validation rule and the client link | Revert to one per client; existing accounts unaffected |
+| **Q-42** Correcting a saved stop or boarding | **Never edit. Append a correction**: who, when, why and the previous value are recorded; the original stays; the report shows the corrected value with a count of corrections. | Trip records are evidence of what happened on the road. Editing destroys the answer to "who said this, and when". A correction keeps both. Needs a `trips:correct` permission (operations and administrator). | New correction entry, permission, report marker | Permission can be narrowed to administrator only |
+| **Q-47** A run that cannot be completed | **Operations may cancel an in-progress trip with a reason.** If the cause is a breakdown, an incident must be linked (which already blocks the vehicle and raises a work order). Riders not yet boarded are released; boarded riders keep their recorded outcome. | Today the board refuses and the dispatcher has no legal move, which is worse than a recorded cancellation. Linking the incident keeps the safety trail intact. | `cancel_trip` allowed from in-progress, with reason and optional incident | Restrict the transition again in one table |
+| **Q-43** Overdue service and dispatch | **Safety blocks; routine service warns.** A safety-related defect already blocks the vehicle. An overdue routine service appears on readiness and on the dispatch screen but does not block until intervals have been trusted for a season — then one setting flips it to blocking. | Blocking dispatch on a routine service the office has not yet tuned would stop work for a data-entry slip. Blocking on safety is already correct and must stay. | A warning line on dispatch; a setting for the stricter rule | Setting, default off |
+| **Q-45** Odometer source | **Hand entry at fuelling and service**, checked by the workshop at service. No telematics. | There is no provider, and a mistyped odometer is visible on the next reading and correctable. A feed is a hardware project, not a decision. | Nothing | Add a feed later; the reading model already takes a source |
+| **Q-46** Renewed-quote terms | **Today's settings apply to a new revision**; the expired revision keeps its own values in history. | A renewal is a new offer made today. Quoting last month's deposit rate would contradict the policy in force. This is what ships (D-35); accepting it closes the question. | Nothing | Revert to "keep the old terms" if the owner prefers |
+| **Q-48** Telling the driver the roster changed | **No push.** The driver's next stop form shows a marker: what changed and when, since the run started. | No notification channel exists. A marker costs nothing, cannot be missed inside the app, and does not pretend an SMS was sent. | A banner and a change log on the run | Replace with SMS when a provider is added |
+| **Q-49** Licence and visibility | **Proprietary, all rights reserved; repository private.** A `LICENSE` file states it. | This is the owner's commercial system, with his rules, prices and screens. A permissive licence would invite reuse he has not agreed to, and the code contains his business logic. | `LICENSE` file added; repository visibility is the owner's one command | Publish under a chosen licence at any time |
+| **Q-16** Mandatory documents | **Insurance and roadworthiness are mandatory for a vehicle**; the driver's licence expiry is already checked. A missing or expired mandatory document blocks **assignment and dispatch** — not registration — and the message names the document. | A vehicle can be registered while a paper is pending, but it must not carry passengers without insurance. Blocking at registration would only encourage fake dates. | Required flag per document type; assignment check | Flag per type in Settings |
+| **Q-01 / Q-50** Hosting | **One office machine on the LAN**: Node 22 + PostgreSQL 16 or 18 in a container, Caddy or nginx in front terminating HTTPS with an internal certificate, nightly `pg_dump` to an external drive plus a weekly `npm run db:backup`. No background workers and no WebSockets are needed. | Nothing in the build queues work: enquiries, reports and reminders are all computed on request. A single machine with a nightly dump is honest for one office and needs no cloud account. | A deployment section, no code | Move to a managed host; nothing assumes the LAN |
+
+### Three more I would answer at the same time
+
+| # | Recommended answer | Why |
+|---|---|---|
+| **Q-35** Finance and incident descriptions | Finance sees the cost, category, vehicle and reference — **not the description text**, which can name a driver or describe an injury. | Recording a breakdown cost does not require reading the narrative. It is the same data-minimisation rule already applied to finance's view of rosters (D-60). |
+| **Q-10** Cancellation windows and refunds | **No automatic refund calculation.** A cancellation records a reason; any money movement is a credit note against the invoice, entered by finance. | A refund rule that guesses would put money on documents without a person deciding. Credit notes are the missing piece and are already first on the build list. |
+| **Q-12** Who approves quotations and extra charges | **The administrator approves a discount above zero and any extra charge at completion**, and the approval is recorded in the audit log with the amount. | Both already require a reason; adding the approval makes "who gave away this money" answerable. It is the same separation already used for releasing a vehicle. |
+
+If any of these is wrong, say which number and what it should be — the recommendation is a line in a
+document, not a decision baked into code.
+
+---
+
 | # | Question | Blocks | Modelled as |
 |---|----------|--------|-------------|
 | Q-01 | Hosting target: does it support Node.js, PostgreSQL (with `btree_gist`), background workers, WebSockets? | Production persistence (see DECISIONS D-01) | Not modelled; build environment is static-only |

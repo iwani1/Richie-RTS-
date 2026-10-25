@@ -129,5 +129,7 @@ retention periods, access review, a DPIA and encryption at rest are still open
 
 ## Licence
 
-No licence has been chosen yet — that is an owner decision, tracked as Q-49 in
-`docs/OPEN_QUESTIONS.md`. Until then, treat the code as all rights reserved.
+**Proprietary — all rights reserved.** See `LICENSE`. This is the recommendation recorded under Q-49
+in `docs/OPEN_QUESTIONS.md` on 25 October 2026, made because the code carries the owner's own rules,
+prices and screens; the owner can publish it under another licence at any time. The repository is
+private for the same reason.

@@ -625,3 +625,24 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **328 passed, 14
 
 Still open: the Playwright requirement (D-68), credit-note and adjustment records, EMP-02 passenger
 import, RPT-03 financial reports, and the trial on real data (`docs/REAL_DATA_TRIAL.md`).
+
+## Phase 23 - The open questions, answered; the code they unblock queued (D-73)
+
+Fourteen questions were stopping real behaviour. The owner delegated the answers, keeping the right to
+change any of them, so each one is now a recommendation with a reason and a stated cost of undoing it
+(`docs/OPEN_QUESTIONS.md` -> "Recommended answers"). Nothing that changes behaviour was implemented
+in this phase: the answers are accepted-or-not first, and the code follows in the order below.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Fourteen answers recorded | Done | `docs/OPEN_QUESTIONS.md` "Recommended answers": Q-01/Q-50, Q-16, Q-19, Q-29, Q-33, Q-34, Q-38, Q-42, Q-43, Q-45, Q-46, Q-47, Q-48, Q-49, plus Q-35, Q-10 and Q-12 as three further answers offered at the same time |
+| Answered by confirming today's behaviour (no code) | Done | Q-19 no boarding codes, Q-33 drivers already report breakdowns, Q-45 hand-recorded odometer, Q-46 renewal uses current settings |
+| Answered by statement (no code) | Done | Q-01/Q-50 one office machine on the LAN, Caddy or nginx in front; Q-49 proprietary and private, `LICENSE` added and `README.md` updated |
+| Decisions recorded | Done | D-73 (the set), D-74 (a wrong trip entry is corrected, never edited), D-75 (safety defects block; an overdue routine service warns) |
+| **Code queued, in this order** | Not started | 1. Q-42 correction entries + `trips:correct`; 2. Q-47 cancel an in-progress run with a reason and optional incident; 3. Q-16 mandatory insurance and roadworthiness before assignment; 4. Q-38 several client contacts; 5. Q-34 work-type list and Q-29 report definitions (with RPT-03); 6. Q-48 roster-change marker; 7. Q-43 the stricter dispatch switch |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **328 passed, 14 skipped**, `build`
+succeeds. Documentation and one licence file only; no behaviour changed.
+
+Still open: the live-database repeat of the trial (§5-§8), which needs the owner's machine, and the
+brief's later stages (bookings, contracts, notifications, GPS).
