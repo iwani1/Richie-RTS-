@@ -953,3 +953,20 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
   dispatcher has to know which rule stopped him to fix it.
 - **Consequence.** Dispatch can refuse a vehicle for two different reasons, and the message says
   which. The stricter rule is one switch, so the owner can tighten it without a code change.
+
+### Applied in Phase 25: a run stopped mid-way
+
+Q-47 put the same question in the middle of a journey: what does operations do when a run has started
+and cannot finish? The board used to refuse, leaving a run that could never be closed.
+
+`cancel_trip` now accepts an in-progress run, and the two records are tied rather than described
+twice: where an unresolved breakdown, accident or safety incident is recorded against the run or its
+vehicle, the cancellation must name it, and the command refuses with that reference until it does. A
+run with no such incident cancels with a reason alone.
+
+**Rejected.** Letting the two records stand independently (the trip says "breakdown" in free text and
+the incident says something else, and nobody can tell whether they are the same event). Forcing an
+incident to be raised *before* cancelling (the dispatcher's priority is to close the run and release
+the crew; making him file the incident first means the run stays open while he does paperwork).
+Reassigning the remaining stops to another vehicle automatically: that needs spare capacity and a
+decision the office makes, not one the system invents.

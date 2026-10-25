@@ -72,6 +72,9 @@ const trip: Trip = {
   startedAt: at,
   completedAt: at,
   cancelReason: null,
+  cancelledAt: null,
+  cancelledBy: null,
+  incidentId: null,
   stopLogs: [
     { stopId: "s1", actualTime: "06:05" },
     { stopId: "s2", actualTime: "06:35" },
@@ -83,13 +86,14 @@ const trip: Trip = {
   updatedAt: at,
 };
 
-function world(tripOverride: Partial<Trip> = {}): { db: Database; dispatch: Tms["dispatch"] } {
+function world(tripOverride: Partial<Trip> = {}, incidents: Database["incidents"] = []): { db: Database; dispatch: Tms["dispatch"] } {
   const db: Database = {
     ...emptyDatabase(),
     settings: { ...emptyDatabase().settings, currencyCode: "GHS", rental: emptyRentalSettings() },
     users: [admin],
     routes: [route],
     passengers: [passenger],
+    incidents,
     trips: [{ ...trip, ...tripOverride }],
   };
   const dispatch = vi.fn(async () => ({ ok: true, message: "corrected" }) as CommandResult);
@@ -190,5 +194,62 @@ describe("correcting a recorded run", () => {
     const { db, dispatch } = world({ status: "dispatched", stopLogs: [], boardings: [] });
     openTrips(db, dispatch);
     expect(screen.queryByRole("button", { name: /Correct a record/i })).toBeNull();
+  });
+});
+
+describe("stopping a run that has started", () => {
+  it("offers Stop run on a running trip and sends the reason", async () => {
+    const { db, dispatch } = world({ status: "in_progress", completedAt: null });
+    openTrips(db, dispatch);
+
+    fireEvent.click(screen.getByRole("button", { name: /Stop run/i }));
+    expect(screen.getByText(/Stop TR-0001/i)).toBeTruthy();
+    // The panel says what will be kept rather than warning that the record disappears.
+    expect(screen.getByText(/2 stop\(s\) already recorded stay on the run/i)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(/Reason/i), { target: { value: "Driver taken ill" } });
+    fireEvent.click(screen.getByRole("button", { name: /Stop this run/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: "cancel_trip", id: "t1", reason: "Driver taken ill", incidentId: undefined });
+  });
+
+  it("asks for the incident when one is already recorded against the vehicle", async () => {
+    const incident = {
+      id: "i1",
+      reference: "IN-0001",
+      type: "breakdown" as const,
+      severity: "high" as const,
+      vehicleId: "v1",
+      tripId: "t1",
+      reportedDate: today,
+      description: "Gearbox",
+      assignedTo: null,
+      takeVehicleOutOfService: true,
+      status: "reported" as const,
+      resolutionNote: null,
+      vehicleRestoredTo: null,
+      costEntries: [],
+      log: [],
+      createdAt: at,
+      updatedAt: at,
+    };
+    const { db, dispatch } = world({ status: "in_progress", completedAt: null }, [incident]);
+    openTrips(db, dispatch);
+    fireEvent.click(screen.getByRole("button", { name: /Stop run/i }));
+
+    expect(screen.getByLabelText(/Incident that stopped the run/i)).toBeTruthy();
+    expect(screen.getByRole("option", { name: /IN-0001/ })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Reason/i), { target: { value: "Gearbox failed" } });
+    fireEvent.change(screen.getByLabelText(/Incident that stopped the run/i), { target: { value: "i1" } });
+    fireEvent.click(screen.getByRole("button", { name: /Stop this run/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: "cancel_trip", id: "t1", reason: "Gearbox failed", incidentId: "i1" });
+  });
+
+  it("keeps a planned run's cancel panel simple", () => {
+    const { db, dispatch } = world({ status: "planned", stopLogs: [], boardings: [], vehicleId: null, driverId: null });
+    openTrips(db, dispatch);
+    fireEvent.click(screen.getByRole("button", { name: /^Cancel$/ }));
+    expect(screen.getByText(/Cancel TR-0001/i)).toBeTruthy();
+    expect(screen.queryByLabelText(/Incident that stopped the run/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /Cancel this trip/i })).toBeTruthy();
   });
 });

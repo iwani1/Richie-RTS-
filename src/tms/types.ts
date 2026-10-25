@@ -366,6 +366,11 @@ export interface Trip {
   startedAt: string | null;
   completedAt: string | null;
   cancelReason: string | null;
+  /** Set when the run was cancelled, including a run stopped after it had started (Q-47). */
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  /** The incident that caused a mid-run cancellation, when one was recorded (D-75). */
+  incidentId: string | null;
   stopLogs: StopLog[];
   boardings: BoardingRecord[];
   onTimeThresholdMinutes: number | null; // snapshot of the setting taken at completion
@@ -726,6 +731,10 @@ export function migrate(value: unknown): Database | null {
           startedAt: trip.startedAt ?? null,
           // Records written before corrections existed simply have none.
           corrections: Array.isArray(trip.corrections) ? trip.corrections : [],
+          // Likewise for a run stopped mid-way: older records only carry the reason.
+          cancelledAt: trip.cancelledAt ?? null,
+          cancelledBy: trip.cancelledBy ?? null,
+          incidentId: trip.incidentId ?? null,
         }))
       : [],
     incidents: Array.isArray(v.incidents) ? (v.incidents as Incident[]) : [],

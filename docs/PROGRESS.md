@@ -670,3 +670,25 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **339 passed, 14
 succeeds.
 
 Next on the queued list: Q-47, cancelling a run that has started.
+
+## Phase 25 - Stopping a run that has started (item 2 of the queued list)
+
+Q-47 answered by D-75: a run that cannot be completed gets a recorded way out. Until this phase the
+dispatch board offered no legal move once a trip was in progress, so a breakdown left the dispatcher
+with a run that could never be closed.
+
+| Item | Status | Evidence |
+|---|---|---|
+| `cancel_trip` accepts an in-progress run | Done (verified) | `src/tms/busing.ts`; still refused for a completed or already-cancelled run |
+| What happened is kept | Done (verified) | Stop logs and boarding outcomes already recorded are untouched; the message and the audit entry state how many stops and how many rider outcomes were kept, and how many riders had no outcome |
+| Who and when | Done (verified) | `cancelledAt`, `cancelledBy` on the trip (null for runs cancelled before this phase, normalised on load) |
+| The cause is linked, not described | Done (verified) | Optional `incidentId` on the command. If an unresolved breakdown, accident or safety incident exists against the run or its vehicle, the cancellation **must** name it — refused with the reference until it does, so the two records cannot describe the same morning differently. An incident about another vehicle, or one already resolved, is refused |
+| The simple case stays simple | Done (verified) | A planned or dispatched run still cancels with a reason alone |
+| Screen | Done (verified) | "Stop run" on an in-progress trip opens a panel that says what will be kept and offers the relevant incidents; the submit button reads "Stop this run" so it cannot be confused with the row action |
+| Audit | Done (verified) | `trips:cancel` entry carries the trip reference, the incident reference in brackets, the stop count, the rider counts and the reason |
+| Tests | Done (verified) | 7 domain (`busing.test.ts` "stopping a run that has already started") and 3 screen (`Busing.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **349 passed, 14 skipped**, `build`
+succeeds.
+
+Next on the queued list: Q-16, insurance and roadworthiness required before a vehicle is assigned.

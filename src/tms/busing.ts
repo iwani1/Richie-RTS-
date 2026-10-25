@@ -109,7 +109,7 @@ export type BusingCommand =
   | { type: "start_trip"; id: string }
   | { type: "record_trip_stop"; id: string; input: ProgressiveStopInput }
   | { type: "complete_trip"; id: string; input?: CompleteTripInput }
-  | { type: "cancel_trip"; id: string; reason: string }
+  | { type: "cancel_trip"; id: string; reason: string; incidentId?: string }
   | { type: "correct_trip_record"; id: string; input: TripCorrectionInput };
 
 export const MAX_GENERATE_DAYS = 62;
@@ -504,6 +504,9 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
           startedAt: null,
           completedAt: null,
           cancelReason: null,
+          cancelledAt: null,
+          cancelledBy: null,
+          incidentId: null,
           stopLogs: [],
           boardings: [],
           onTimeThresholdMinutes: null,
@@ -854,17 +857,74 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       if (denied) return denied;
       const existing = db.trips.find((t) => t.id === command.id);
       if (!existing) return fail("Trip not found.");
-      if (existing.status !== "planned" && existing.status !== "dispatched")
+      if (existing.status !== "planned" && existing.status !== "dispatched" && existing.status !== "in_progress")
         return fail(`A ${existing.status} trip cannot be cancelled.`);
-      if (!command.reason.trim()) return fail("A reason is required.", { reason: "Give a short reason for cancelling this trip." });
-      const updated: Trip = { ...existing, status: "cancelled", cancelReason: command.reason.trim(), updatedAt: now };
+      const reason = command.reason.trim();
+      if (!reason) return fail("A reason is required.", { reason: "Give a short reason for cancelling this trip." });
+
+      // A run that has started is stopped by something: a breakdown, a safety event, a driver who
+      // cannot continue. Q-47 said operations must be able to record that instead of being stuck with
+      // a run it cannot close. Where the cause is already recorded as an incident, the cancellation
+      // has to name it, so the two records cannot describe different events (D-75).
+      const midRun = existing.status === "in_progress";
+      const live = (incident: { status: string; type: string }) =>
+        incident.status !== "resolved" && incident.status !== "closed";
+      const causes = db.incidents.filter(
+        (incident) =>
+          live(incident) &&
+          (incident.type === "breakdown" || incident.type === "accident" || incident.type === "safety_concern") &&
+          (incident.tripId === existing.id || (!!existing.vehicleId && incident.vehicleId === existing.vehicleId)),
+      );
+
+      let incidentId: string | null = null;
+      if (midRun && command.incidentId) {
+        const incident = db.incidents.find((candidate) => candidate.id === command.incidentId);
+        if (!incident) return fail("That incident was not found.", { incidentId: "Choose the incident that stopped this run." });
+        if (incident.tripId !== existing.id && (!existing.vehicleId || incident.vehicleId !== existing.vehicleId))
+          return fail("That incident is not about this run or its vehicle.", { incidentId: "Choose an incident recorded for this run." });
+        if (!live(incident)) return fail(`${incident.reference} is ${incident.status}, so it is not what stopped this run.`);
+        incidentId = incident.id;
+      } else if (midRun && causes.length > 0) {
+        // Do not let a run be stopped "for a reason" while an unresolved breakdown sits on the same
+        // vehicle unmentioned: that is how two records end up disagreeing about the same morning.
+        const first = causes[0];
+        return fail(
+          `${first.reference} is recorded against this run's vehicle. Link it when cancelling so the two records agree.`,
+          { incidentId: `Select ${first.reference}.` },
+        );
+      }
+
+      const boarded = existing.boardings.filter((record) => record.outcome === "boarded").length;
+      const withoutOutcome = midRun ? Math.max(
+        db.passengers.filter((p) => p.routeId === existing.routeId && p.status === "active").length - existing.boardings.length,
+        0,
+      ) : 0;
+
+      const updated: Trip = {
+        ...existing,
+        status: "cancelled",
+        cancelReason: reason,
+        cancelledAt: now,
+        cancelledBy: actor?.fullName ?? "System",
+        incidentId,
+        updatedAt: now,
+      };
+      const incidentRef = incidentId ? db.incidents.find((candidate) => candidate.id === incidentId)?.reference : null;
+      const stopped = midRun ? ` Stopped after ${existing.stopLogs.length} stop(s) were recorded.` : "";
+      const riders = midRun
+        ? ` ${boarded} rider outcome(s) kept; ${withoutOutcome} without an outcome.`
+        : "";
       const next = audit({ ...db, trips: db.trips.map((t) => (t.id === updated.id ? updated : t)) }, actor, {
         action: "trips:cancel",
         entity: "trip",
         entityId: updated.id,
-        summary: `${updated.reference} cancelled. Reason: ${updated.cancelReason}`,
+        summary: `${updated.reference} cancelled${incidentRef ? ` (${incidentRef})` : ""}.${stopped}${riders} Reason: ${reason}`,
       }, now);
-      return { ok: true, db: next, message: `${updated.reference} cancelled.` };
+      return {
+        ok: true,
+        db: next,
+        message: `${updated.reference} cancelled${incidentRef ? ` and linked to ${incidentRef}` : ""}.${stopped}${riders}`,
+      };
     }
   }
 }

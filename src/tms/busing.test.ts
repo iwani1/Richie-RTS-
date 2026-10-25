@@ -892,3 +892,140 @@ describe("staff busing - corrections to a recorded run (D-74, Q-42)", () => {
     expect(w.db.audit.filter((row) => row.action === "trips:correct")).toHaveLength(3);
   });
 });
+
+describe("stopping a run that has already started (Q-47, D-75)", () => {
+  /** A run on today's service date, started, with its first stop recorded and one rider aboard. */
+  function runningRun(w: World) {
+    const routeId = createRoute(w);
+    const stops = w.db.routes.find((r) => r.id === routeId)!.stops.map((s) => s.id);
+    step(w, "ops", { type: "create_passenger", input: passengerInput(w, { routeId, stopId: stops[0] }) });
+    step(w, "ops", { type: "create_passenger", input: passengerInput(w, { routeId, stopId: stops[1], fullName: "Efua Mensah", employeeRef: "E-002" }) });
+    const tripId = generate(w, routeId, "2026-06-01");
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "dispatch_trip", id: tripId });
+    step(w, "ops", { type: "start_trip", id: tripId });
+    step(w, "ops", {
+      type: "record_trip_stop",
+      id: tripId,
+      input: { stopId: stops[0], actualTime: "06:04", boardings: [{ passengerId: w.db.passengers[0].id, outcome: "boarded" }] },
+    });
+    return { tripId, stops, vehicleId: w.db.vehicles[0].id };
+  }
+
+  it("lets operations stop a run mid-way, keeping the stops and the outcomes already recorded", () => {
+    const w = build();
+    const { tripId } = runningRun(w);
+    const result = step(w, "ops", { type: "cancel_trip", id: tripId, reason: "Driver taken ill at the second pick-up" });
+
+    const trip = w.db.trips.find((t) => t.id === tripId)!;
+    expect(trip.status).toBe("cancelled");
+    expect(trip.cancelReason).toBe("Driver taken ill at the second pick-up");
+    expect(trip.cancelledBy).toBe("Ops");
+    expect(trip.cancelledAt).toBe(NOW);
+    // The evidence of the part of the run that happened is untouched.
+    expect(trip.stopLogs).toHaveLength(1);
+    expect(trip.boardings[0].outcome).toBe("boarded");
+    expect(result.ok && result.message).toMatch(/Stopped after 1 stop\(s\) were recorded/);
+    expect(result.ok && result.message).toMatch(/1 rider outcome\(s\) kept; 1 without an outcome/);
+  });
+
+  it("insists the finished run is completed, not cancelled", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    const tripId = runTrip(w, routeId, "2026-06-02", ["06:05", "06:20", "06:35"]);
+    const result = attempt(w, "ops", { type: "cancel_trip", id: tripId, reason: "Tidy up" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toMatch(/completed trip cannot be cancelled/);
+  });
+
+  it("refuses to stop a run while an unresolved breakdown sits on its vehicle, until it is linked", () => {
+    const w = build();
+    const { tripId, vehicleId } = runningRun(w);
+    step(w, "ops", {
+      type: "create_incident",
+      input: {
+        type: "breakdown",
+        severity: "high",
+        vehicleId,
+        tripId,
+        reportedDate: "2026-06-01",
+        description: "Gearbox failed on the hill",
+        assignedTo: "",
+        takeVehicleOutOfService: true,
+      },
+    });
+    const incidentId = w.db.incidents[0].id;
+
+    const unlinked = attempt(w, "ops", { type: "cancel_trip", id: tripId, reason: "Breakdown" });
+    expect(unlinked.ok).toBe(false);
+    if (!unlinked.ok) {
+      expect(unlinked.message).toMatch(/IN-0001 is recorded against this run/);
+      expect(unlinked.errors.incidentId).toMatch(/IN-0001/);
+    }
+    // Nothing was written while the records disagreed.
+    expect(w.db.trips.find((t) => t.id === tripId)!.status).toBe("in_progress");
+
+    const linked = step(w, "ops", { type: "cancel_trip", id: tripId, reason: "Breakdown", incidentId });
+    const trip = w.db.trips.find((t) => t.id === tripId)!;
+    expect(trip.status).toBe("cancelled");
+    expect(trip.incidentId).toBe(incidentId);
+    expect(linked.ok && linked.message).toMatch(/linked to IN-0001/);
+    // The audit entry ties the two references together.
+    const entry = w.db.audit.filter((row) => row.action === "trips:cancel").pop()!;
+    expect(entry.summary).toMatch(/TR-0001 cancelled \(IN-0001\)/);
+  });
+
+  it("refuses an incident that is about something else, or already resolved", () => {
+    const w = build();
+    const { tripId } = runningRun(w);
+    step(w, "ops", {
+      type: "create_incident",
+      input: {
+        type: "breakdown",
+        severity: "high",
+        vehicleId: w.db.vehicles[1].id,
+        tripId: "",
+        reportedDate: "2026-06-01",
+        description: "Other bus",
+        assignedTo: "",
+        takeVehicleOutOfService: false,
+      },
+    });
+    const otherIncident = w.db.incidents[0].id;
+    const wrong = attempt(w, "ops", { type: "cancel_trip", id: tripId, reason: "Breakdown", incidentId: otherIncident });
+    expect(wrong.ok).toBe(false);
+    if (!wrong.ok) expect(wrong.message).toMatch(/not about this run or its vehicle/);
+
+    const missing = attempt(w, "ops", { type: "cancel_trip", id: tripId, reason: "Breakdown", incidentId: "nope" });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.message).toMatch(/not found/);
+  });
+
+  it("keeps the simple case simple: a planned run still cancels with just a reason", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    const tripId = generate(w, routeId, "2026-06-03");
+    step(w, "ops", { type: "cancel_trip", id: tripId, reason: "Public holiday" });
+    const trip = w.db.trips.find((t) => t.id === tripId)!;
+    expect(trip.status).toBe("cancelled");
+    expect(trip.cancelledAt).toBe(NOW);
+    expect(trip.incidentId).toBeNull();
+  });
+
+  it("is closed to the driver whose run it is", () => {
+    const w = build();
+    const { tripId } = runningRun(w);
+    const asDriver = attempt(w, "driver", { type: "cancel_trip", id: tripId, reason: "I could not finish" });
+    expect(asDriver.ok).toBe(false);
+    if (!asDriver.ok) expect(asDriver.message).toMatch(/trips:cancel/);
+  });
+
+  it("cannot be cancelled twice", () => {
+    const w = build();
+    const { tripId } = runningRun(w);
+    step(w, "ops", { type: "cancel_trip", id: tripId, reason: "Breakdown" });
+    const again = attempt(w, "ops", { type: "cancel_trip", id: tripId, reason: "Once more" });
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.message).toMatch(/cancelled/);
+  });
+});

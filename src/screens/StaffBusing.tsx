@@ -563,8 +563,14 @@ function TripsTab() {
       out.push(<Button key="stop" variant="ghost" onClick={() => setPanel({ mode: "stop", trip: t })}>Record next stop</Button>);
     if (t.status === "in_progress" && route && t.stopLogs.length === route.stops.length && allowed("trips:complete"))
       out.push(<Button key="complete" variant="primary" onClick={() => void report(dispatch({ type: "complete_trip", id: t.id }))}>Complete run</Button>);
-    if ((t.status === "planned" || t.status === "dispatched") && allowed("trips:cancel"))
-      out.push(<Button key="cancel" variant="danger" onClick={() => setPanel({ mode: "cancel", trip: t })}>Cancel</Button>);
+    // A run that has started can still be stopped (Q-47): a breakdown or an ill driver must have a
+    // recorded way out, or the dispatcher is left with a run that can never be closed.
+    if ((t.status === "planned" || t.status === "dispatched" || t.status === "in_progress") && allowed("trips:cancel"))
+      out.push(
+        <Button key="cancel" variant="danger" onClick={() => setPanel({ mode: "cancel", trip: t })}>
+          {t.status === "in_progress" ? "Stop run" : "Cancel"}
+        </Button>,
+      );
     // A correction is for something already recorded, so it appears once there is a record to fix —
     // on a running or finished run, never on one that has not started (D-74).
     if ((t.status === "in_progress" || t.status === "completed") && t.stopLogs.length > 0 && allowed("trips:correct"))
@@ -752,8 +758,8 @@ function TripsTab() {
         <CancelForm
           trip={panel.trip}
           onClose={() => setPanel(null)}
-          onSubmit={async (reason) => {
-            const result = await dispatch({ type: "cancel_trip", id: panel.trip.id, reason });
+          onSubmit={async (reason, incidentId) => {
+            const result = await dispatch({ type: "cancel_trip", id: panel.trip.id, reason, incidentId });
             report(result);
             if (result.ok) setPanel(null);
             return result.ok ? {} : result.errors;
@@ -882,18 +888,74 @@ function CompleteForm({
   );
 }
 
-function CancelForm({ trip, onClose, onSubmit }: { trip: Trip; onClose: () => void; onSubmit: (reason: string) => Errors | Promise<Errors> }) {
+/**
+ * Cancel a run, or stop one that has already started (Q-47).
+ *
+ * When the run is on the road the screen offers the incidents recorded against it or its vehicle:
+ * the command will not accept a mid-run cancellation while an unresolved breakdown sits on the same
+ * vehicle unacknowledged, because two records describing the same morning differently is how an
+ * operator loses the thread (D-75).
+ */
+function CancelForm({
+  trip,
+  onClose,
+  onSubmit,
+}: {
+  trip: Trip;
+  onClose: () => void;
+  onSubmit: (reason: string, incidentId?: string) => Errors | Promise<Errors>;
+}) {
+  const { db } = useTms();
   const [reason, setReason] = useState("");
+  const [incidentId, setIncidentId] = useState("");
   const [errors, setErrors] = useState<Errors>({});
+  const running = trip.status === "in_progress";
+  const causes = db.incidents.filter(
+    (incident) =>
+      incident.status !== "resolved" &&
+      incident.status !== "closed" &&
+      (incident.tripId === trip.id || (!!trip.vehicleId && incident.vehicleId === trip.vehicleId)),
+  );
+
   return (
-    <Panel title={`Cancel ${trip.reference}`} onClose={onClose}>
-      <form onSubmit={async (e) => { e.preventDefault(); setErrors((await onSubmit(reason)) ?? {}); }} className="space-y-4">
-        <Field label="Reason" hint="Recorded in the audit log." error={errors.reason}>
+    <Panel
+      title={running ? `Stop ${trip.reference}` : `Cancel ${trip.reference}`}
+      description={
+        running
+          ? `${trip.stopLogs.length} stop(s) already recorded stay on the run, and each rider's outcome is kept.`
+          : undefined
+      }
+      onClose={onClose}
+    >
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setErrors((await onSubmit(reason, incidentId || undefined)) ?? {});
+        }}
+        className="space-y-4"
+      >
+        <Field label="Reason" hint="Recorded in the audit log with your name." error={errors.reason}>
           <TextArea value={reason} onChange={(e) => setReason(e.target.value)} invalid={!!errors.reason} autoFocus />
         </Field>
+        {running && causes.length > 0 && (
+          <Field
+            label="Incident that stopped the run"
+            hint="An unresolved incident is recorded against this run or its vehicle. Link it so the two records agree."
+            error={errors.incidentId}
+          >
+            <Select value={incidentId} onChange={(e) => setIncidentId(e.target.value)} invalid={!!errors.incidentId}>
+              <option value="">Select the incident</option>
+              {causes.map((incident) => (
+                <option key={incident.id} value={incident.id}>
+                  {incident.reference} — {incident.type}, {incident.status}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <div className="flex justify-end gap-2 pt-2">
           <Button onClick={onClose}>Close</Button>
-          <Button type="submit" variant="danger">Cancel trip</Button>
+          <Button type="submit" variant="danger">{running ? "Stop this run" : "Cancel this trip"}</Button>
         </div>
       </form>
     </Panel>
