@@ -17,6 +17,7 @@ const admin: User = {
   passwordSalt: "",
   driverId: null,
   clientId: null,
+  passengerId: null,
   primaryContact: false,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",

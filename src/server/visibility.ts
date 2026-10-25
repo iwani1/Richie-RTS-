@@ -11,6 +11,7 @@
 //   - a driver reads their own driver record, the trips assigned to them and the vehicles those
 //     trips used;
 //   - a client contact reads their own client, its routes, roster and rental requests;
+//   - a passenger reads its own rider record, its own journeys and the seats it holds (PAX-01, D-97);
 //   - a record-bound account with no linked record reads nothing. It does not fall back to
 //     company-wide access.
 //
@@ -77,6 +78,41 @@ const SECTION_PERMISSIONS: { [K in keyof Database]?: Permission } = {
   workOrders: "maintenance:read",
 };
 
+/**
+ * The company's settings, as far as a rider needs them (PAX-01, D-97).
+ *
+ * Every other record-bound role is an outside party that already trades with the company, so it
+ * receives the settings table whole. A passenger is an employee reading its own bus times, and the
+ * same table carries rental prices, the deposit percentage, payment terms and the tax position —
+ * commercial terms with no bearing on catching a bus. None of it travels to a passenger.
+ */
+function journeySettings(settings: Database["settings"]): Database["settings"] {
+  return {
+    companyName: settings.companyName,
+    currencyCode: settings.currencyCode,
+    onTimeThresholdMinutes: null,
+    vehicleCategories: [],
+    shifts: [],
+    rental: {
+      pricingBasis: null,
+      depositPercent: null,
+      quotationValidityDays: null,
+      driversAlwaysIncluded: null,
+      paymentMethods: [],
+      requotePolicy: null,
+    },
+    documentTypes: [],
+    taxPosition: null,
+    taxLines: [],
+    invoiceDueDays: null,
+    documentReminderLeadDays: null,
+    workTypes: [],
+    costCategories: [],
+    maintenance: settings.maintenance,
+    booking: settings.booking,
+  };
+}
+
 function byPermission(database: Database, actor: Actor): Database {
   const visible: Database = { ...database };
   for (const [section, permission] of Object.entries(SECTION_PERMISSIONS) as [keyof Database, Permission][]) {
@@ -136,6 +172,8 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       referenceCounters: [],
       // Record-bound roles have no audit: the summaries name records that are not theirs.
       audit: [],
+      // A rider reads the company's name and the two booking cut-offs, nothing of its prices.
+      settings: link.passenger ? journeySettings(database.settings) : database.settings,
     };
   }
 

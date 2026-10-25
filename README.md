@@ -81,7 +81,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Staff busing: routes, rosters, trip generation, dispatch, progressive stop/boarding capture, seat bookings, on-time report | Works; a freed seat is offered to the waiting list, never auto-confirmed, and a booked seat is on the run's manifest |
 | Staff logistics: incidents, work orders, cost report | Works |
 | Fleet readiness: service intervals, odometer, readiness | Works |
-| Driver and client portals (own-record scope) | Works |
+| Driver, client and passenger portals (own-record scope) | Works — a rider sees its own journeys, seats and references, and no live position, because none is recorded |
 | Invoices and manual payments: numbered, voided, part-paid, settled | Works; numbers are per year and per kind |
 | Credit notes: money taken off an issued invoice, with a refund stated when it goes below what was paid | Works; one balance rule behind the screen, both money reports and the finance home |
 | Cancelling a payment recorded in error, with a reason, one way, leaving the invoice owed again | Works; the money reports, the finance home and the printed sheet all ignore a cancelled payment |
@@ -95,7 +95,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | CSV import for vehicles, drivers, clients and staff rosters | Works; rejects a row with its line number, never merges an existing person |
 | Corporate agreements: term, service, routes, pricing and payment terms transcribed from the signed paper, with approval, suspension, termination and a renewal watch | Works; an approved agreement's terms are frozen by the database, a booking is refused under an agreement that is not active, and expiry is read from the end date rather than recorded |
 | Planning aid for dispatch: who can take each run, ranked, with the reason each pair works or cannot | Works; it reads the same rule the save enforces, so a suggestion is never refused, and it assigns nothing — the dispatcher still presses save |
-| Notifications, driver app, GPS, passenger portal | **Not built** — see `docs/PROGRESS.md` |
+| Notifications, offline driver app, GPS tracking, payment gateway, PDF reports | **Not built** — see `docs/PROGRESS.md` |
 
 680 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP

@@ -12,6 +12,7 @@
 import { can } from "./permissions";
 import { bookingContractProblem } from "./contracts";
 import { allocateReference } from "./references";
+import { confinedPassengerId } from "./scope";
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
 import {
   BOOKING_TYPES,
@@ -143,7 +144,7 @@ export function capacityOf(db: Database, trip: Trip): CapacityView {
 }
 
 /** Minutes from now until the run's first stop departs. Negative once it has gone. */
-function minutesToDeparture(db: Database, trip: Trip, now: string): number | null {
+export function minutesToDeparture(db: Database, trip: Trip, now: string): number | null {
   const route = db.routes.find((candidate) => candidate.id === trip.routeId);
   const first = route?.stops[0];
   if (!first) return null;
@@ -173,7 +174,7 @@ function bookableTrip(db: Database, routeId: string, date: string): Trip | undef
  * company owns, a run that exists and has not left, a vehicle whose seats can be counted, and room
  * for one more. Each message says why, because the person reading it usually has to fix it.
  */
-function seatErrors(db: Database, trip: Trip, passengerId: string, now: string, ignoreBookingId?: string): Errors {
+export function seatErrors(db: Database, trip: Trip, passengerId: string, now: string, ignoreBookingId?: string): Errors {
   const errors: Errors = {};
   const passenger = db.passengers.find((candidate) => candidate.id === passengerId);
   const route = db.routes.find((candidate) => candidate.id === trip.routeId);
@@ -203,6 +204,17 @@ function seatErrors(db: Database, trip: Trip, passengerId: string, now: string, 
   }
 
   return errors;
+}
+
+/**
+ * A passenger requesting a seat may only request one for itself (PAX-01, D-97).
+ *
+ * The portal hides the rider field entirely, so this is not what makes the screen work — it is what
+ * stops a hand-made request (or a future screen) from booking a seat in someone else's name.
+ */
+function notMyOwnRider(db: Database, actor: Actor | null, passengerId: string): boolean {
+  const mine = confinedPassengerId(db, actor);
+  return mine !== null && mine !== passengerId;
 }
 
 /** A client's own contact may only touch its own company's riders (D-60, BKG-02). */
@@ -240,6 +252,7 @@ export function executeBookings(db: Database, actor: Actor | null, command: Book
         else if (daysBetween(serviceDate, toDate) > 62) errors.toDate = "Book at most 62 days of a series in one go.";
       }
       if (passenger && outsideOwnClient(db, actor, passenger.clientId)) errors.passengerId = "Your account is confined to your own company's staff.";
+      if (passengerId && notMyOwnRider(db, actor, passengerId)) errors.passengerId = "Your account can request a seat for yourself only.";
       if (Object.keys(errors).length) return fail("This booking cannot be made yet.", errors);
 
       const dates: string[] = [];
@@ -442,9 +455,11 @@ export function executeBookings(db: Database, actor: Actor | null, command: Book
       const existing = db.bookings.find((booking) => booking.id === command.id);
       if (!existing) return fail("Booking not found.");
 
-      // The office may cancel anything; a client's own contact may cancel its own people's seats.
+      // The office may cancel anything; a client's own contact may cancel its own people's seats; a
+      // passenger may cancel the seat it holds and nobody else's (PAX-01, D-97).
       const ownClientCancel = actor?.role === "client_contact" && can(actor.role, "bookings:create");
-      if (!ownClientCancel) {
+      const ownSeatCancel = actor?.role === "passenger" && can(actor.role, "bookings:create") && existing.passengerId === confinedPassengerId(db, actor);
+      if (!ownClientCancel && !ownSeatCancel) {
         const denied = authorise(actor, "bookings:manage");
         if (denied) return denied;
       }

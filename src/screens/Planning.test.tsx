@@ -24,6 +24,7 @@ const admin: User = {
   active: true,
   driverId: null,
   clientId: null,
+  passengerId: null,
   primaryContact: false,
   passwordHash: "",
   passwordSalt: "",

@@ -206,7 +206,7 @@ an audit entry.
 | `waitlisted` | `offered` | automatic, on a cancellation | The oldest waiter on that run, and only when the freed seat actually makes room. **Never `confirmed`**: the offer waits for a person |
 | `offered` / `requested` / `waitlisted` | `confirmed` | `bookings:manage` | A seat is free (`offered` already holds one) |
 | `requested` / `offered` / `waitlisted` / `confirmed` | `rejected` | `bookings:manage` | A reason is required; kept with the booking |
-| `requested` / `offered` / `waitlisted` / `confirmed` | `cancelled` | `bookings:manage`, or the client's own contact (`bookings:create`) for its own company | A reason is required; refused inside the cancellation cut-off when one is set; a held seat is offered to the oldest waiter |
+| `requested` / `offered` / `waitlisted` / `confirmed` | `cancelled` | `bookings:manage`; the client's own contact (`bookings:create`) for its own company; or **the rider whose seat it is** (`bookings:create`, PAX-01, D-97) | A reason is required; refused inside the cancellation cut-off when one is set; a held seat is offered to the oldest waiter. A passenger may cancel only its own seat, never a colleague's |
 | `rejected` / `cancelled` | (none) | - | terminal — the record is kept, the seat is released |
 
 Both cut-offs are minutes before the run's first stop departs and both are **blank by default**: an
@@ -216,6 +216,25 @@ A booking that holds a seat (`confirmed` or `offered`) is a person on the run's 
 stop record expects an outcome for them at their pickup stop, and the completion expects one for the
 run. The manifest is fixed once the run is `in_progress`, so no seat can be added to a bus that has
 left.
+
+## What a rider is shown (`JourneyPhase`, PAX-01, D-97)
+
+There is no new record here: the page derives one state per journey from three existing ones, in this
+order, and never in the other direction.
+
+| Rider's state | Read from | What it means |
+|---|---|---|
+| Seat requested / on the waiting list / seat offered / not accepted / cancelled | `Booking.status` | the seat's own history, before the run is considered at all |
+| Seat held (no bus) | run `planned`/`dispatched` with **no** `vehicleId` | the seat is real, the bus is not assigned yet |
+| Bus assigned / ready to leave | run `planned` / `dispatched` with a vehicle | a bus and driver are on the run; "ready to leave" means dispatched, not moving |
+| Under way | run `in_progress`, no boarding recorded | the driver started the run. **No position and no ETA**: neither is recorded |
+| Picked up | run `in_progress`, boarding `boarded` | the door recorded the rider aboard |
+| Travelled / not recorded aboard | run `completed`, boarding `boarded` / `no_show` | what the driver recorded at the stop |
+| Run cancelled | run `cancelled` | with the reason the office typed when it cancelled |
+
+**Delayed is not in this list, and that is a decision rather than an omission** (D-97): a delay is not
+recorded anywhere in this build, so inferring one from the timetable would state a fact nobody entered.
+The portal says a delay cannot be told from these records.
 
 ## Contract (`Contract.status`, CLI-02, D-95)
 

@@ -11,13 +11,18 @@
   `010_refunds.sql`, D-92, `expense` in `011_expenses.sql`, D-93, and `contract` in
   `015_contracts.sql`, D-95; `013` and `014` replace the two ceiling functions so a cancellation is
   not counted against itself (D-94); `012_reference_counter_scopes.sql`
-  widens the numbering-series constraint to match `REFERENCE_SERIES`; `btree_gist` +
+  widens the numbering-series constraint to match `REFERENCE_SERIES`; `016_passenger_accounts.sql`
+  adds `app_user.passenger_id`, widens the role check to accept `passenger` and creates
+  `app_user_passenger_uq` (D-97); `btree_gist` +
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
 - Session: `iron-session` sealed cookie; passwords Argon2id (`@node-rs/argon2`) — D-51.
 - The browser receives a **redacted, role-scoped snapshot** and holds no credentials; it posts
   commands to `POST /api/commands` (D-52, D-56). A driver's payload contains their own record, their
-  trips and the vehicles those trips used — not the fleet, the client book or the audit log.
+  trips and the vehicles those trips used — not the fleet, the client book or the audit log. A
+  passenger's payload is narrower again: its own rider record, its own seats, the runs that carry it,
+  the buses on them and its own reports. It receives neither the employee roster nor the settings
+  table beyond the company name and the two booking cut-offs.
 - Quality gates: `npm run check` runs typecheck, lint, tests with coverage thresholds, and build,
   in that order. `npm run test:integration` runs the PostgreSQL suite (skipped without
   `TEST_DATABASE_URL`). `.github/workflows/ci.yml` runs both on a runner; the integration job has
@@ -52,10 +57,10 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 18`, `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–18) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 20` (the migration number and the snapshot version are counted separately: three phases shipped without a new migration), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–20) |
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
-| `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `confinedClientId`. Confines `driver` and `client_contact` to their one linked record. Fails closed |
+| `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `mayReportOnRun`, `confinedClientId`, `confinedPassengerId`. Confines `driver`, `client_contact` and `passenger` to their one linked record. Fails closed |
 | `src/tms/service.ts` | Core commands: setup, users, settings, vehicles, drivers, clients, rentals, backup import |
 | `src/tms/logistics.ts` | Staff logistics commands: incidents, work orders, cost entries, response and maintenance state machines |
 | `src/tms/busing.ts` | Staff busing commands: routes, passengers, trip generation, assignment, dispatch, progressive start/stop/boarding, completion, cancellation, conflict checks and on-time judgement |
@@ -68,6 +73,8 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 | `src/tms/costs.ts` | Recorded-cost report with period, total, entries and data coverage. Counts incident and work-order costs and standalone expenses in one figure (D-93) |
 | `src/tms/contracts.ts` | Corporate agreements (D-95): the transcribed term and commercial terms, `contractStateOf` (expiry derived from the end date, never stored), `isContractEditable`, the status moves, the overlap rule, `bookingContractProblem` (the booking gate) and `contractsDueForRenewal` |
 | `src/screens/Contracts.tsx` | The contract register: term, client, service and derived state; draft and correct while unapproved; approve, suspend and terminate with a reason; the renewal watch |
+| `src/tms/passenger.ts` | The passenger portal's reading of the records (PAX-01, D-97): `journeyStateOf` (the brief's statuses derived from a booking, a run or a boarding outcome), `journeysOf`, `eligibleRunsFor` (the runs a rider may ask for **and why not**, from the same rules the command runs), `cancellationProblem`, `travelPolicy` and `PASSENGER_LIMITS` |
+| `src/screens/PassengerPortal.tsx` | A rider's one page: next journey, upcoming and past runs with their state, request a seat, cancel a seat, report a problem with a journey |
 | `src/tms/planning.ts` | The planning aid (RTE-04, D-96): every vehicle-and-driver pair for a run, judged by the same rule the save enforces, ranked with a sentence each, plus `PLANNING_LIMITS` — the facts the records do not hold. Reads only; assigns nothing |
 | `src/tms/expenses.ts` | Spending that is not a repair: `record_expense` / `void_expense`, numbered `EXP-YYYY-NNNN`, with the receipt number and whether the paper is held (D-93) |
 | `src/tms/commands.ts` | `executeCommand()`: the single router for every write (`AnyCommand`) |

@@ -8,7 +8,7 @@ information in the language of the business.
 
 ---
 
-## The five roles
+## The six roles
 
 | Role | Who it is for | What they do |
 |---|---|---|
@@ -17,6 +17,7 @@ information in the language of the business.
 | **Finance** | the person who bills and reconciles | quotations' confirmation step, invoices, payments, costs, the rental report |
 | **Driver** | a driver, on their own phone | their own runs only: open a trip, board passengers, record a no-show, complete, report a defect |
 | **Client contact** | a corporate client's office | their own client's routes, roster, agreement and rental requests; can raise a request, not confirm one |
+| **Passenger** | a member of staff who travels on the bus | their own journeys only: the next run and its pickup time and stop, every seat they hold with its reference, ask for a seat on another run, cancel their own seat, report a problem with a journey |
 
 There is one installation per company. Nobody signs in and sees another company's data, because there
 is no other company in the database.
@@ -226,6 +227,26 @@ seat (the office confirms it once the seats are counted) and cannot book a seat 
 
 ---
 
+## Passenger
+
+**Can:** see its own rider record, its own route and stop, the next run with its pickup time and the
+bus's registration, every seat it holds with its booking reference, and the runs it has already
+travelled on with what was recorded at the door. It can ask for a seat on another of its company's runs
+— the page lists the runs it may ask for **and the reason for each it may not** (its own route needs no
+booking; the run is full; it already holds a seat; requests have closed) — and it can cancel a seat it
+holds, until the office's cut-off or until the run starts. It can report a problem with a journey, which
+reaches operations as an incident against that run.
+
+**Cannot:** see a colleague's name, phone or seat; see another company; see any billing, the roster, the
+fleet, the audit log or the office's settings beyond the company name and the two booking cut-offs;
+book a seat in anybody else's name; cancel somebody else's seat; or take a bus off the road.
+
+**What the page will not do:** show where the bus is. Nothing records a position or a delay, so there is
+no map and no arrival countdown — the page says the run has started instead, and prints that limit on
+the screen so nobody has to guess whether it is broken.
+
+---
+
 ## When a screen says it is blocked
 
 The application refuses rather than guesses. The message names what is missing, and it is almost
@@ -251,7 +272,7 @@ always a setting:
 
 ## What is not built yet
 
-Contracts, notifications (SMS or email), offline driver mode, boarding codes,
-GPS tracking, credit notes and PDF documents. The screens do not offer them, and `docs/PROGRESS.md`
-records each one with its status. If a supervisor asks for one of these, the answer is that it is on
-the roadmap, not that it is hidden somewhere.
+Notifications (SMS or email), offline driver mode, boarding codes, GPS tracking, a payment gateway,
+payroll, scanned receipts and PDF report exports. The screens do not offer them, and
+`docs/PROGRESS.md` records each one with its status. If a supervisor asks for one of these, the answer
+is that it is on the roadmap, not that it is hidden somewhere.

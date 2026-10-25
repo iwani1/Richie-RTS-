@@ -29,6 +29,8 @@ export interface AppUserRow {
   active: boolean;
   driver_id: string | null;
   client_id: string | null;
+  /** The rider a passenger account reads its own journeys through (PAX-01, D-97). */
+  passenger_id: string | null;
   password_hash: string;
   password_salt: string;
   created_at: Timestamp;

@@ -181,6 +181,7 @@ suite("PostgreSQL constraints, through the repository", () => {
       active: true,
       driverId: null,
       clientId: "client-1",
+      passengerId: null,
       primaryContact,
       passwordHash: "argon2id-hash",
       passwordSalt: "salt",

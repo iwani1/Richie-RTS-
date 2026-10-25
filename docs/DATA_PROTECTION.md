@@ -6,13 +6,14 @@ Status: **draft proposal**. This is not legal advice. Ghana's Data Protection Ac
 
 | Subject | Data held | Why | Entered by | Who can see it |
 |---|---|---|---|---|
-| System users (staff) | Name, email, role, active flag, password hash and salt, audit actions | Account access and accountability | Administrator | Administrator (all); audit viewers see actor names |
+| System users (staff) | Name, email, role, active flag, the driver, client or rider record the account is bound to, password hash and salt, audit actions | Account access and accountability | Administrator | Administrator (all); audit viewers see actor names |
 | Drivers | Name, phone, licence number, licence expiry, status | Dispatch, licence validity checks | Operations | Operations (read/write); finance (read); administrator |
 | Corporate client contacts | Contact name, phone, email | Account communication | Finance, administrator | Finance (read/write); operations (read); administrator |
 | Passengers (employees of corporate clients) | Full name, employee reference, optional phone, route, pickup stop, status | Running staff busing routes | Operations (from the client's roster; source to be confirmed) | Operations (read/write); finance (read); administrator |
 | Boarding and stop-time records | Per trip: boarded or no-show per passenger; actual time at each stop | Attendance, on-time measurement | Operations at trip completion | Operations; administrator; KPI views show aggregates only |
 | Rental customers | Name, phone, email, purpose, pickup and drop-off locations | Quotation, booking, billing | Operations, finance | Finance; operations; administrator |
-| Seat bookings | Rider name (by reference to their passenger record), the run's date, a short note and the reason for a refusal or cancellation, plus a history of who changed what | Named single seats for visitors and newcomers, and an account of who decided what | Operations; the client's own contact for its own company's riders | Operations (read/write); the client's own contact (own company only); administrator. Finance and drivers cannot read bookings |
+| Seat bookings | Rider name (by reference to their passenger record), the run's date, a short note and the reason for a refusal or cancellation, plus a history of who changed what | Named single seats for visitors and newcomers, and an account of who decided what | Operations; the client's own contact for its own company's riders; **the rider itself** (PAX-01, D-97) | Operations (read/write); the client's own contact (own company only); the rider, for its own seats only; administrator. Finance and drivers cannot read bookings |
+| Passenger portal accounts | The rider's own name, employee reference, phone, route, pickup stop, seats and booking references, and any problem it reported about a journey | Letting a member of staff see its own bus, stop and seat instead of ringing the office | The rider (seat requests and reports); operations (the rider record) | The rider, for its own record and seats only; operations and the administrator. **No other rider's name, phone or seat is in its payload**, and it receives none of the company's prices or payment terms |
 
 Sensitivity notes:
 - A pickup stop reveals where an employee waits and, often, where they live. Treat it as sensitive location data.
@@ -72,6 +73,15 @@ These are not acceptable for live personal data. They must be closed before prod
   portal shows roster **name and pickup stop only** — not phone, employee reference or any
   other passenger detail (OPEN_QUESTIONS Q-39). The driver portal shows only the runs and
   incidents belonging to that driver's record.
+- **Phase 48 addition (PAX-01, D-97).** The passenger portal narrows that further: its payload holds
+  **one rider** — the person signed in — and no colleague's name, phone, employee reference or seat
+  appears anywhere in it, which the server test asserts over the serialised payload rather than array
+  by array. The rider keeps its own phone number (it is its own record); its pickup stop is the same
+  sensitive location data as above, disclosed to the person who waits there and to nobody else. The
+  settings table is narrowed for this role to the company name and the two booking cut-offs, so the
+  rental prices, deposit percentage, payment terms and tax position do not travel to an employee.
+  Feedback is stored as an incident against a run, attributed to the account that raised it, and the
+  rider can read back only the reports it raised.
 
 ## 6. Act 843 considerations to verify with counsel
 

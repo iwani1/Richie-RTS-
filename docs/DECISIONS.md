@@ -1725,3 +1725,76 @@ decision the office makes, not one the system invents.
   exports from `busing.ts` (`assessResources`, `rosterCount`), the aid in the assign panel and the
   dispatch desk, a `.rts-plan` block in `src/index.css`, and 19 new tests (13 domain, 6 screen). No
   new command, no new permission, no new table: the aid adds no way to change anything.
+
+## D-97 Passenger accounts: one rider, one page, and no map it cannot draw (PAX-01)
+
+- **Context.** Six of the seven brief requirements in Phase 1C were built; the last one was the
+  passenger portal, and the honest state was that the person who actually travels had no account.
+  "Is my seat confirmed?" and "did the bus come?" were answered by ringing the office, and the office
+  answered from a screen the rider could not see. The brief asks for profile, approved options,
+  eligible journeys, references and status, pickup time and location, history, cancelling, feedback
+  and the company's policy — and it asks for the statuses to be **clearly distinguished**: requested,
+  confirmed, assigned to trip, driver en route, picked up, completed, cancelled, delayed.
+- **Decision.** A third record-bound role, `passenger`, bound to exactly one rider record through
+  `User.passengerId` — the same shape as `driver` and `client_contact`, because the alternative (a
+  permission flag on the roster row) would have put a second notion of "who may sign in" beside the
+  one that already exists.
+  - **One account per rider** is a unique partial index (`app_user_passenger_uq`, migration 016), and
+    the role check constraint on `app_user` was widened in the same migration. Adding the role to the
+    application without widening the constraint would have failed at insert time on the one database
+    the tests actually exercise.
+  - **The payload is one person.** The server's bound branch is a whitelist, and a collection left out
+    of it hands over the whole table (D-85, D-86). A passenger receives its own rider record, its own
+    seats, the runs that carry it, the buses on them and the reports it raised — and nothing else. The
+    test asserts over the serialised payload: no colleague's phone number appears anywhere in it.
+  - **Settings are narrowed for this role, and only this role.** The settings table also holds rental
+    prices, the deposit percentage, payment terms and the tax position. A driver and a client contact
+    already trade with the company; an employee reading bus times does not need its employer's
+    commercial terms. A passenger receives the company name and the two booking cut-offs, and the
+    screen shows an unset cut-off as unset.
+  - **Every status is derived from a record, and the ones the data cannot support say so.**
+    `journeyStateOf` reads the booking status first (requested, waitlisted, offered, rejected,
+    cancelled), then the run (seat held with no bus, bus assigned, ready to leave, under way, run
+    cancelled with its reason), then the boarding outcome recorded at the door (picked up, travelled,
+    recorded as not boarding). **Two of the brief's words are deliberately not used:**
+    - *driver en route* — a dispatched run has not left, and a started run is on the road, but nothing
+      here records position or traffic, so calling either "en route" would be a guess dressed as a
+      fact. The page says "ready to leave" and "under way" instead.
+    - *delayed* — a delay is not recorded anywhere in this system. The portal says a delay cannot be
+      told from these records and to ring the office; it does not infer lateness from a timetable.
+    Each state is a short label **and** a sentence, because one word cannot separate a held seat with
+    no bus from a bus that has not left, and colour never carries state on its own (design rule).
+  - **The refusals are shown, not hidden.** `eligibleRunsFor` runs the same `seatErrors`,
+    `bookingContractProblem` and request cut-off the command runs, so a run offered on the page cannot
+    then be refused by `create_booking`, and a run that is not offered comes with the office's reason:
+    its own route needs no booking (the roster *is* the seat), the run is full, a seat is already held,
+    requests have closed, or the agreement is not active. A list that silently omitted them would
+    leave the rider ringing to ask why.
+  - **A rider acts only on itself.** `create_booking` refuses a seat requested in a colleague's name
+    (and the portal does not show a rider field at all); `cancel_booking` allows a passenger its own
+    seat and refuses anybody else's, mirroring the existing own-client path. Both go through the
+    command layer, so a hand-made request is refused for the same reason.
+  - **Feedback is an incident, not a new table.** The brief asks for feedback; this build already has
+    a record for "something went wrong" with a triage workflow, a responder, costs and an audit trail.
+    A rider's report becomes an incident against **a run it is on**, with that run's vehicle
+    substituted for anything the browser sends and `takeVehicleOutOfService` forced off — a rider does
+    not take a bus off the road (D-17). The rider sees only the reports it raised.
+  - **No live map and no ETA.** PAX-02 stays deferred, and the reason is a fact about the data, not a
+    scheduling choice: no provider is configured and no position is stored. `PASSENGER_LIMITS` is
+    printed on the screen in four sentences, so the silence reads as a stated limit rather than a
+    broken page.
+- **Rejected.** (a) *A read-only snapshot of the roster.* It would have shown a rider its colleagues'
+  names and seats — personal data with no purpose on the page. (b) *Reusing the client-contact role
+  with a narrower link.* A client contact sees a company; a rider is one person, and one role that
+  means two different things fails closed in neither direction. (c) *A new feedback table.* A second
+  place where "a problem was reported" lives would need its own triage, its own permissions and its
+  own migration, to duplicate what the incident log already does. (d) *Deriving "delayed" from the
+  timetable.* That would be inventing a fact the office never recorded, and it would put a red badge
+  on a bus nobody had complained about.
+- **Consequence.** New role (`ROLES`, `ROLE_LABELS`, `User.passengerId`), migration
+  `016_passenger_accounts.sql`, `passenger_id` in the repository row projection,
+  `SCHEMA_VERSION = 20`, the passenger branch of `scopedView` and of `mayReportOnVehicle` plus
+  `mayReportOnRun`, `journeySettings` in the server whitelist, `confinedPassengerId` and
+  `notMyOwnRider` in `bookings.ts`, `src/tms/passenger.ts`, `src/screens/PassengerPortal.tsx`, the
+  "My journeys" destination, the linked-rider field on the Users screen, and 26 new tests (20 domain,
+  4 payload, 2 screen).

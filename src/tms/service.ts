@@ -79,10 +79,13 @@ export interface UserInput {
   email: string;
   role: Role;
   active: boolean;
-  // Which record this account acts for. Only meaningful for the driver and
-  // client_contact roles; see PERMISSIONS.md "Own-record scope".
+  // Which record this account acts for. Only meaningful for the driver, client_contact and
+  // passenger roles; see PERMISSIONS.md "Own-record scope".
   driverId?: string | null;
   clientId?: string | null;
+  // The rider this account is (PAX-01, D-97). A passenger sees its own journeys and nothing else,
+  // so the link is required for that role and refused for every other one.
+  passengerId?: string | null;
   // The one contact account we ring first for a client (Q-38). Ignored for other roles.
   primaryContact?: boolean;
 }
@@ -363,21 +366,33 @@ export function validateUser(db: Database, input: UserInput, excludeId?: string)
 
   const driverId = input.driverId || null;
   const clientId = input.clientId || null;
+  const passengerId = input.passengerId || null;
 
   if (input.role === "driver") {
     if (clientId) errors.clientId = "A driver account is not linked to a client.";
+    if (passengerId) errors.passengerId = "A driver account is not linked to a rider.";
     if (!driverId) errors.driverId = "Link this account to a driver record so it can see its own trips.";
     else if (!db.drivers.some((d) => d.id === driverId)) errors.driverId = "Driver record not found.";
     else if (db.users.some((u) => u.id !== excludeId && u.driverId === driverId))
       errors.driverId = "That driver record is already linked to another account.";
   } else if (input.role === "client_contact") {
     if (driverId) errors.driverId = "A client contact account is not linked to a driver.";
+    if (passengerId) errors.passengerId = "A client contact account is not linked to a rider.";
     if (!clientId) errors.clientId = "Link this account to a client so it can see its own records.";
     else if (!db.clients.some((c) => c.id === clientId)) errors.clientId = "Client not found.";
     // A company usually has an operations contact and an accounts contact. Both get their own
     // login, each sees only that client, and one is marked primary (Q-38, D-77).
-  } else if (driverId || clientId) {
-    errors.driverId = "Only driver and client contact accounts can be linked to a record.";
+  } else if (input.role === "passenger") {
+    // PAX-01 (D-97). A passenger is one person, not a company: the link is what confines the
+    // account to its own journeys, so it is required rather than optional.
+    if (driverId) errors.driverId = "A passenger account is not linked to a driver.";
+    if (clientId) errors.clientId = "A passenger account is not linked to a client; link the rider record instead.";
+    if (!passengerId) errors.passengerId = "Link this account to a rider so it can see its own journeys.";
+    else if (!db.passengers.some((p) => p.id === passengerId)) errors.passengerId = "Rider record not found.";
+    else if (db.users.some((u) => u.id !== excludeId && u.passengerId === passengerId))
+      errors.passengerId = "That rider is already linked to another account.";
+  } else if (driverId || clientId || passengerId) {
+    errors.driverId = "Only driver, client contact and passenger accounts can be linked to a record.";
   }
 
   const primaryContact = input.primaryContact === true;
@@ -393,6 +408,7 @@ export function validateUser(db: Database, input: UserInput, excludeId?: string)
       active: input.active,
       driverId,
       clientId,
+      passengerId,
       primaryContact: primaryContact && input.role === "client_contact",
     },
   };

@@ -71,7 +71,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | DRV-03 | 2 | Boarding verification: trip-specific code or OTP from a secure random source, expiry, single use where policy requires, results recorded, minimal… | Deferred | Phase 2. |
 | DRV-04 | 1B | Vehicle defect report and breakdown/incident report (basic record; full handling in INC). | Met | Driver can raise an incident which blocks the vehicle and creates a work order. |
 | DRV-05 | 2 | Offline operation (progressive web app): queue status and boarding events locally with event IDs, sync when connectivity returns, show "pending sync"… | Deferred | Phase 2. |
-| PAX-01 | 1C | Passenger portal: profile, approved options, request eligible journeys, booking references and status, pickup time and location, history, cancel… | Not built | No passenger role or screen. |
+| PAX-01 | 1C | Passenger portal: profile, approved options, request eligible journeys, booking references and status, pickup time and location, history, cancel… | Met | `src/tms/passenger.ts` + `src/screens/PassengerPortal.tsx` (Phase 48, D-97): a third record-bound role (`passenger`, one account per rider, migration 016) whose payload is **one person** — its own record, its own seats, the runs that carry it and the bus on them. The page states each journey in the brief's own terms: **seat requested, waiting list, seat offered, seat held (no bus assigned), bus assigned, ready to leave, under way, picked up, travelled, not recorded aboard, run cancelled, cancelled, not accepted** — every one derived from a booking status, a run status or a boarding outcome recorded at the door, never invented. Pickup time and stop come from the route's timetable and the rider's own stop; the booking reference is on the row. It lists **the runs a rider may ask for and the office's reason for the ones it may not** (own route = the roster is the seat; full; already held; inside the request cut-off; contract not active) using the same rules the command enforces, and lets the rider cancel a seat it holds, inside the cancellation cut-off. **Feedback**: a report about a journey the rider is on becomes an incident on the ordinary operations log, with the run's own vehicle and no power to withdraw it. **Deliberately absent:** no map, no arrival countdown, no delay state — nothing records a position, so the page says the run has started and prints four stated limits instead (PAX-02). Tests: 20 domain (`passenger.test.ts`), 4 payload (`visibility.test.ts`), 2 screen (`PassengerPortal.test.tsx`). |
 | PAX-02 | 2 | Trip updates. Do not show a live map or live ETA when only manually entered statuses exist. | Deferred | Phase 2. |
 | INC-01 | 2 | Incident records: reference, trip, vehicle, driver, time, type (breakdown, accident, driver unavailable, traffic delay, missed pickup, complaint,… | Partial | Reference, vehicle, trip, type, severity, description, assignee, status, costs, log. **No driver, time, location, people affected, attachments.** |
 | INC-02 | 2 | Breakdown workflow: driver reports, incident created, dispatcher alerted, affected trips and passengers identified, eligible replacement vehicles and… | Partial | Vehicle blocked, work order created, incident stays open. **No affected-passenger identification, no replacement listing, no notification.** |
@@ -93,7 +93,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RPT-05 | 3 | PDF reports. | Deferred | Phase 3. |
 | GPS-01 | 2 | Provider interface; last reported location with timestamp; clear distinction between live, stale and simulated locations; never fabricate… | Deferred | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
 
-**78 IDs: 23 met, 38 partial, 1 not built, 14 deferred.** Phase 1A: 29 IDs - 9 met, 20 partial, 0 not built.
+**78 IDs: 24 met, 37 partial, 0 not built, 14 deferred.** Phase 1A: 29 IDs - 9 met, 20 partial, 0 not built. Phase 1C is now complete in this build: 6 IDs - 2 met, 4 partial, 0 not built.
 
 ## Phase 0 - Inspect and plan (approved)
 
@@ -1152,4 +1152,29 @@ workshop. This phase puts that reading of the records on the screen — ranked, 
 | Tests | Done (verified) | 13 domain (`planning.test.ts`), 6 screen (`Planning.test.tsx`), and the existing busing and dispatch suites unchanged and green |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **680 passed, 26 skipped**, `build`
+succeeds.
+
+## Phase 48 - The bus in the morning, on the rider's own page (PAX-01, D-97)
+
+Every other portal in this build belonged to somebody who already deals with the office. The person who
+actually stands at the stop had nothing: "is my seat confirmed?" and "did the bus come?" were answered
+by ringing in. This phase gives that person an account, a page and a short list of things it may do —
+and the same page is careful about the one thing it cannot say, which is where the bus is.
+`docs/DECISIONS.md` D-97 records the reasoning.
+
+| Item | Status | Evidence |
+|---|---|---|
+| A rider can sign in to its own record, and one rider has one account | Done (verified) | `passenger` role, `User.passengerId`, migration `016_passenger_accounts.sql` (the role's check constraint widened, `app_user_passenger_uq`); validateUser refuses a missing rider, an unknown rider, a second account on the same rider, and a rider link on any other role ("refuses a passenger account with no rider, and a second account on the same rider") |
+| The payload is one person | Done (verified) | `scopedView`'s passenger branch and the server whitelist: own record, own seats, the runs that carry it, the buses on them, its own feedback. A colleague's name, another client, the register, the money and the audit log are absent — asserted over the serialised payload, not just the arrays ("never sends a colleague, another company, the office's money or the audit log") |
+| It fails closed | Done (verified) | An account whose rider record is gone sees nothing, never the company ("fails closed when the linked rider record is gone"; "sends an unlinked passenger nothing") |
+| The brief's statuses, each from a record | Done (verified) | `journeyStateOf`: requested, waitlisted, offered, rejected, cancelled (from the booking); seat held, bus assigned, ready to leave, under way, picked up, travelled, not recorded aboard, run cancelled (from the run and its boardings). One test per family, including a cancelled run that keeps its recorded reason |
+| Pickup time and location, history, references | Done (verified) | The rider's own stop and the timetable's time on the next-journey card and every row; past runs kept newest first; the booking reference shown where there is one, "on roster" where there is not |
+| Asking for a seat, with the reasons for refusal | Done (verified) | `eligibleRunsFor` reads `seatErrors`, `bookingContractProblem` and the request cut-off — the same functions the command runs — and prints each refusal; "tells the rider why a run cannot be asked for, rather than hiding it" |
+| A rider may act only on itself | Done (verified) | `create_booking` refuses a seat in a colleague's name; `cancel_booking` refuses somebody else's seat and allows its own, with the rider named in the history ("lets the rider cancel its own seat and refuses a colleague's") |
+| Cancelling, inside the office's rules | Done (verified) | `cancellationProblem` refuses a finished or already-running run and honours `cancellationCutoffMinutes`; the button is not offered where the rule would refuse it |
+| Feedback goes somewhere a person acts on it | Done (verified) | A report about a journey becomes an incident (`incidents:create`, own runs only), with the run's vehicle substituted for anything the browser sends and `takeVehicleOutOfService` forced off; the rider sees only the reports it raised |
+| It does not pretend to track the bus | Done (verified) | `PASSENGER_LIMITS` printed on the screen: no position, no delay record, times are the timetable's, seats are confirmed by a person. PAX-02 stays deferred |
+| Tests | Done (verified) | 20 domain (`passenger.test.ts`), 4 payload (`visibility.test.ts`), 2 screen (`PassengerPortal.test.tsx`); the 680 earlier tests unchanged, and 26 added |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **706 passed, 26 skipped**, `build`
 succeeds.

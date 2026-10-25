@@ -71,6 +71,18 @@ export function UsersPage() {
                   </span>
                 );
               }
+              if (u.role === "passenger") {
+                // A rider account is one employee, not a company: the name alone is the answer.
+                const rider = db.passengers.find((p) => p.id === u.passengerId);
+                if (!rider) return <span className="text-stone-400">-</span>;
+                const client = db.clients.find((c) => c.id === rider.clientId);
+                return (
+                  <span>
+                    {rider.fullName}
+                    <span className="block text-[11px] text-stone-500">{client ? `${client.name} · ${rider.employeeRef}` : rider.employeeRef}</span>
+                  </span>
+                );
+              }
               return <span className="text-stone-400">Whole company</span>;
             },
           },
@@ -148,7 +160,7 @@ export function UsersPage() {
           key={panel.user.id}
           currentUserId={panel.user.id}
           title={`Edit ${panel.user.fullName}`}
-          initial={{ fullName: panel.user.fullName, email: panel.user.email, role: panel.user.role, active: panel.user.active, driverId: panel.user.driverId, clientId: panel.user.clientId, primaryContact: panel.user.primaryContact }}
+          initial={{ fullName: panel.user.fullName, email: panel.user.email, role: panel.user.role, active: panel.user.active, driverId: panel.user.driverId, clientId: panel.user.clientId, passengerId: panel.user.passengerId, primaryContact: panel.user.primaryContact }}
           onClose={() => setPanel(null)}
           onSubmit={async (input) => {
             const result = await dispatch({ type: "update_user", id: panel.user.id, input });
@@ -176,7 +188,7 @@ export function UsersPage() {
 
 function UserForm({ title, initial, currentUserId, withPassword, onClose, onSubmit }: { title: string; initial: UserInput; currentUserId?: string; withPassword?: boolean; onClose: () => void; onSubmit: (input: UserInput, password: string) => Promise<Errors> }) {
   const { db } = useTms();
-  const [values, setValues] = useState<UserInput>({ driverId: null, clientId: null, ...initial });
+  const [values, setValues] = useState<UserInput>({ driverId: null, clientId: null, passengerId: null, ...initial });
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
@@ -195,7 +207,7 @@ function UserForm({ title, initial, currentUserId, withPassword, onClose, onSubm
         <Field label="Role" error={errors.role}>
           <Select
             value={values.role}
-            onChange={(e) => set({ role: e.target.value as UserInput["role"], driverId: null, clientId: null, primaryContact: false })}
+            onChange={(e) => set({ role: e.target.value as UserInput["role"], driverId: null, clientId: null, passengerId: null, primaryContact: false })}
             invalid={!!errors.role}
           >
             {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
@@ -249,6 +261,27 @@ function UserForm({ title, initial, currentUserId, withPassword, onClose, onSubm
               {errors.primaryContact && <span className="rts-error" role="alert">{errors.primaryContact}</span>}
             </div>
           </>
+        )}
+        {values.role === "passenger" && (
+          <Field
+            label="Linked rider record"
+            hint="Own-record scope: this account sees only this rider's own journeys, seats and booking references."
+            error={errors.passengerId}
+          >
+            <Select value={values.passengerId ?? ""} onChange={(e) => set({ passengerId: e.target.value })} invalid={!!errors.passengerId}>
+              <option value="">Select a rider</option>
+              {db.passengers
+                .filter((p) => p.id === values.passengerId || !db.users.some((u) => u.passengerId === p.id))
+                .map((p) => {
+                  const client = db.clients.find((c) => c.id === p.clientId);
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.fullName} · {p.employeeRef}{client ? ` · ${client.name}` : ""}
+                    </option>
+                  );
+                })}
+            </Select>
+          </Field>
         )}
         <Field label="Account status" error={errors.active}>
           <Select value={values.active ? "active" : "inactive"} onChange={(e) => set({ active: e.target.value === "active" })} invalid={!!errors.active}>

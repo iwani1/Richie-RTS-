@@ -25,6 +25,7 @@ function createUser(id: string, fullName: string, role: User["role"]): User {
     active: true,
     driverId: null,
     clientId: null,
+    passengerId: null,
     primaryContact: false,
     passwordHash: cred.passwordHash,
     passwordSalt: cred.passwordSalt,

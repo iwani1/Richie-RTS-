@@ -228,11 +228,19 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // contracts:read is own-record: a client's own contact sees the agreement the office runs for them,
   // which is what makes the portal answer "what did we agree?" without a phone call (CLI-03, D-95).
   client_contact: ["routes:read", "passengers:read", "rentals:read", "rentals:create", "bookings:read", "bookings:create", "contracts:read"],
+  // Own-record scope: a passenger sees its own rider record, its route and the runs that carry it,
+  // and the seats it holds (PAX-01, D-97). It may ask for a seat for **itself** and cancel one it
+  // holds; it can never book for somebody else, confirm its own seat, or read another rider.
+  // trips:read is own-record here for the same reason as a driver's: the journeys, not the timetable.
+  // A rider reads its own journeys and may ask for a seat on a run that is not its own route. It may
+  // also report a problem with a journey it is on — the feedback the brief asks for (PAX-01), kept as
+  // an incident so operations triages it where it triages everything else.
+  passenger: ["trips:read", "routes:read", "bookings:read", "bookings:create", "incidents:create"],
 };
 
 // Record-bound roles hold their permissions against their own records only. The same
 // permissions are company-scoped when held by internal staff.
-const BOUND_ROLES: readonly Role[] = ["driver", "client_contact"];
+const BOUND_ROLES: readonly Role[] = ["driver", "client_contact", "passenger"];
 const OWN_SCOPED_FOR_BOUND_ROLES: readonly Permission[] = [
   "trips:read",
   "trips:start",

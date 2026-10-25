@@ -426,6 +426,7 @@ describe("bookings - who may book and cancel (D-60)", () => {
       active: true,
       driverId: null,
       clientId: w.clientId,
+      passengerId: null,
       primaryContact: true,
       passwordHash: "",
       passwordSalt: "",

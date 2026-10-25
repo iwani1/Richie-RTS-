@@ -107,6 +107,7 @@ function createUser(id: string, fullName: string, email: string, role: User["rol
     active: true,
     driverId: null,
     clientId: null,
+    passengerId: null,
     primaryContact: false,
     passwordHash: cred.passwordHash,
     passwordSalt: cred.passwordSalt,

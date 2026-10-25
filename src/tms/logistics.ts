@@ -16,7 +16,7 @@ import {
 } from "./service";
 import { parsePositiveAmount } from "./money";
 import { allocateReference } from "./references";
-import { actorLink, mayReportOnVehicle } from "./scope";
+import { actorLink, mayReportOnRun, mayReportOnVehicle } from "./scope";
 import {
   INCIDENT_SEVERITIES,
   INCIDENT_TYPES,
@@ -338,10 +338,28 @@ export function executeLogistics(
       // and cannot change fleet availability — withdrawing a vehicle is an operations
       // decision (D-17), so the flag is ignored for record-bound roles.
       const link = actorLink(db, actor);
-      if (link.bound && !mayReportOnVehicle(db, actor, command.input.vehicleId)) {
-        return fail("You can only report an incident for a vehicle assigned to you.");
+      // PAX-01 (D-97): a rider's feedback is about a journey it is on. The run decides the vehicle, so
+      // the browser cannot point the report at another bus, and a rider never withdraws a vehicle from
+      // service — that is operations' decision (D-17), which the bound branch already enforces below.
+      if (link.passenger) {
+        if (!command.input.tripId) return fail("Choose the journey this is about.", { tripId: "Pick the run you were on." });
+        if (!mayReportOnRun(db, actor, command.input.tripId))
+          return fail("You can report a problem only with a journey you are on.");
       }
-      const incidentInput = link.bound ? { ...command.input, takeVehicleOutOfService: false } : command.input;
+      // The vehicle a rider reports on is the one on its run, so it is resolved before the vehicle
+      // check rather than taken from the browser.
+      const runVehicle = link.passenger ? db.trips.find((trip) => trip.id === command.input.tripId)?.vehicleId ?? "" : null;
+      const reportedVehicle = runVehicle !== null && runVehicle !== "" ? runVehicle : command.input.vehicleId;
+      if (link.bound && !mayReportOnVehicle(db, actor, reportedVehicle)) {
+        return fail(
+          link.passenger
+            ? "This journey has no bus assigned, so there is no bus to report. Tell the office instead."
+            : "You can only report an incident for a vehicle assigned to you.",
+        );
+      }
+      const incidentInput = link.bound
+        ? { ...command.input, vehicleId: reportedVehicle, takeVehicleOutOfService: false }
+        : command.input;
       const { errors, value } = validateIncident(db, incidentInput);
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
       const { reference, counters } = allocateReference(db, "incident", now.slice(0, 4));

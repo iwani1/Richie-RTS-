@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–47** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 48 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–48** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 49 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -27,11 +27,11 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 |---|---|---|
 | **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 9 fully met, 20 met but narrower than the brief, **0 unbuilt** |
 | **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting, corporate agreements, a planning aid | **Built, with narrower registers than the brief.** 25 IDs: 12 met, 13 partial, **0 not built**. Contracts arrived in Phase 46 (a transcribed term, the lifecycle, renewals, a booking gate) and the planning aid in Phase 47 — ranked pairs that explain themselves, with no geometry because no stop has a position |
-| **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Mostly built.** 6 IDs: 1 met (finance dashboard), 4 partial, 1 not built (passenger portal) |
+| **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Built, with narrower reports.** 6 IDs: 2 met (finance dashboard, passenger portal), 4 partial, **0 not built**. The passenger portal arrived in Phase 48 — a rider's own journeys, seats and references, with the bus's position honestly absent because nothing records one |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
 | **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs, 6 deferred, 1 met (expenses with a receipt number and whether the paper is held — no scanned copy yet) |
 
-Totals across all 78 brief requirements: **23 met · 38 partial · 1 not built · 14 deferred.**
+Totals across all 78 brief requirements: **24 met · 37 partial · 0 not built · 14 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -106,15 +106,19 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   days, which completed hires have no invoice yet, and which payments still need verifying. The
   period figures are the same ones the Reports screen produces, and a margin is shown only when both
   sides of the account are complete for that period — otherwise the screen says what is missing.
-- Driver and client portals showing only their own records.
+- Driver, client and **rider** portals showing only their own records. A rider signs in to one page:
+  the next run with its pickup stop and time, the bus to look for, every seat it holds with its
+  booking reference, whether the seat is only requested, waiting, held, assigned to a bus, under way,
+  or already travelled — and its own history. It can ask for a seat on another of its company's runs
+  (with the office's reason printed on the ones it may not), cancel a seat inside the cut-off, and
+  report a problem with a journey, which reaches operations as an incident against that run. **Where
+  the bus is, the page does not pretend to know**: no map and no arrival countdown, because nothing in
+  this build records a position (PAX-02).
 
 ## What is not built
 
-**Whole features absent** (1 brief ID):
-
-| Missing | What it means in practice | Why |
-|---|---|---|
-| Passenger portal (PAX-01) | Passengers cannot sign in to see their own journeys | Phase 1C |
+**Whole features absent** (none in Phase 1A–1C). Every brief requirement in the three delivered phases
+is now built at least in part; what remains is the deferred Phase 2/3 work below.
 
 **Deferred to Phase 2/3** (14 IDs): SMS and email, in-app notifications, GPS tracking, two-factor
 sign-in, offline driver mode, boarding codes/OTP, payment gateway, payroll and driver allowances,

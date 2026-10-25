@@ -16,6 +16,7 @@ import { StaffLogisticsPage } from "./screens/StaffLogistics";
 import { CompliancePage } from "./screens/Compliance";
 import { FleetReadinessPage } from "./screens/FleetReadiness";
 import { ClientPortalPage } from "./screens/ClientPortal";
+import { PassengerPortalPage } from "./screens/PassengerPortal";
 import { DriverPortalPage } from "./screens/DriverPortal";
 import { isRecordBound } from "./tms/permissions";
 import { SettingsPage } from "./screens/Settings";
@@ -34,7 +35,7 @@ import { Icon, type IconName } from "./ui/icons";
 import { cn } from "./utils/cn";
 
 const NAV_GROUPS: { label: string; routes: Route[] }[] = [
-  { label: "My desk", routes: ["driver_portal", "client_portal"] },
+  { label: "My desk", routes: ["driver_portal", "client_portal", "passenger_portal"] },
   { label: "Service desk", routes: ["dashboard", "finance", "rentals", "invoices", "statements", "expenses", "busing", "logistics", "fleetReadiness"] },
   { label: "Fleet & clients", routes: ["compliance", "vehicles", "drivers", "clients", "contracts"] },
   { label: "Analysis", routes: ["reports"] },
@@ -63,6 +64,7 @@ const ROUTE_ICONS: Record<Route, IconName> = {
   profile: "user",
   driver_portal: "busing",
   client_portal: "client",
+  passenger_portal: "busing",
 };
 
 
@@ -142,7 +144,13 @@ function Shell() {
   // Record-bound roles (driver, client_contact) are confined to their own portal.
   // The internal screens read company-wide records, so those roles must not reach them.
   const portalRoute: Route | null =
-    actor?.role === "driver" ? "driver_portal" : actor?.role === "client_contact" ? "client_portal" : null;
+    actor?.role === "driver"
+      ? "driver_portal"
+      : actor?.role === "client_contact"
+        ? "client_portal"
+        : actor?.role === "passenger"
+          ? "passenger_portal"
+          : null;
   // A finance account opens on the money home (FIN-07); everybody else opens on the operations board.
   const homeRoute: Route = actor?.role === "finance" ? "finance" : (portalRoute ?? "dashboard");
   const bound = actor ? isRecordBound(actor.role) : false;
@@ -205,6 +213,7 @@ function Shell() {
       case "compliance": return <CompliancePage />;
       case "driver_portal": return <DriverPortalPage />;
       case "client_portal": return <ClientPortalPage />;
+      case "passenger_portal": return <PassengerPortalPage />;
       case "vehicles": return <VehiclesPage navigate={navigate} />;
       case "drivers": return <DriversPage />;
       case "clients": return <ClientsPage />;

@@ -5,6 +5,8 @@
 //   driver        -> its driver record, and therefore the trips/vehicles assigned to it
 //   client_contact -> its corporate client, and therefore that client's routes, roster
 //                     and rental requests
+//   passenger     -> its own rider record, the route it travels on and the runs that carry
+//                     it, and the seats it holds (PAX-01, D-97)
 //
 // This module is the single definition of that scope, and it is applied twice: on the
 // server in `src/server/visibility.ts`, so the payload an account receives already
@@ -35,6 +37,7 @@ export interface ActorLink {
   user: User | null;
   driver: Driver | null;
   client: Client | null;
+  passenger: Passenger | null;
   bound: boolean;
 }
 
@@ -49,6 +52,7 @@ export function actorLink(db: Database, actor: Actor | null): ActorLink {
     user,
     driver: user?.driverId ? db.drivers.find((d) => d.id === user.driverId) ?? null : null,
     client: user?.clientId ? db.clients.find((c) => c.id === user.clientId) ?? null : null,
+    passenger: user?.passengerId ? db.passengers.find((p) => p.id === user.passengerId) ?? null : null,
     bound,
   };
 }
@@ -124,6 +128,36 @@ export function scopedView(db: Database, actor: Actor | null) {
     };
   }
 
+  if (link.passenger) {
+    const me = link.passenger;
+    // The seats this rider holds, on its own route or on another run of the same client.
+    const myBookings = db.bookings.filter((booking) => booking.passengerId === me.id);
+    const routeIds = new Set<string>(myBookings.map((booking) => booking.routeId));
+    if (me.routeId) routeIds.add(me.routeId);
+    const trips = db.trips.filter((trip) => routeIds.has(trip.routeId) && (trip.routeId === me.routeId || myBookings.some((booking) => booking.tripId === trip.id)));
+    const vehicleIds = new Set(trips.map((trip) => trip.vehicleId).filter(Boolean) as string[]);
+    return {
+      link,
+      // The journeys: the runs on the rider's own route, plus any run a seat was booked on.
+      trips,
+      // The rider's own feedback, and nothing else in the incident log: an incident names a vehicle,
+      // a responder and sometimes another person's accident, so only the ones this account raised
+      // travel (D-85's lesson: a collection missing from a bound branch leaks the whole table).
+      incidents: db.incidents.filter((incident) => incident.log.some((entry) => entry.actorId === link.user?.id)),
+      routes: db.routes.filter((route) => routeIds.has(route.id)),
+      // One person in this payload: the rider reading it. No colleague's name, phone or stop.
+      passengers: [me],
+      rentals: [] as Rental[],
+      // Only the vehicles carrying this rider, so the portal can say which bus to look for —
+      // registration is on the side of a bus in a yard, not personal data.
+      vehicles: db.vehicles.filter((vehicle) => vehicleIds.has(vehicle.id)),
+      workOrders: [],
+      documents: [] as ComplianceDocument[],
+      bookings: myBookings,
+      contracts: [] as Contract[],
+    };
+  }
+
   if (link.client) {
     const routes = db.routes.filter((r) => r.clientId === link.client!.id);
     const routeIds = new Set(routes.map((r) => r.id));
@@ -169,7 +203,29 @@ export function mayReportOnVehicle(db: Database, actor: Actor | null, vehicleId:
   const link = actorLink(db, actor);
   if (!link.bound) return true;
   if (link.driver) return driverVehicleIds(db, link.driver.id).has(vehicleId);
+  // A rider does not choose a vehicle: the bus it travelled on is the subject of its report, so the
+  // command substitutes the run's vehicle rather than accepting one from the browser.
+  if (link.passenger) return db.trips.some((trip) => trip.vehicleId === vehicleId && mayReportOnRun(db, actor, trip.id));
   return false;
+}
+
+/**
+ * True when this run is one the rider is actually on (PAX-01, D-97): a run of its own route, or a run
+ * it holds a live seat on. Anything else is somebody else's journey.
+ */
+export function mayReportOnRun(db: Database, actor: Actor | null, tripId: string): boolean {
+  const link = actorLink(db, actor);
+  if (!link.bound) return true;
+  if (!link.passenger) return false;
+  const trip = db.trips.find((candidate) => candidate.id === tripId);
+  if (!trip) return false;
+  if (trip.routeId === link.passenger.routeId) return true;
+  return db.bookings.some(
+    (booking) =>
+      booking.tripId === trip.id &&
+      booking.passengerId === link.passenger!.id &&
+      (booking.status === "confirmed" || booking.status === "offered" || booking.status === "requested" || booking.status === "waitlisted"),
+  );
 }
 
 /**
@@ -181,6 +237,12 @@ export function mayActOnTrip(db: Database, actor: Actor | null, tripId: string):
   if (!link.bound) return true;
   if (!link.driver) return false;
   return db.trips.some((t) => t.id === tripId && t.driverId === link.driver!.id);
+}
+
+/** The rider a passenger account is confined to, or null for every other role (PAX-01, D-97). */
+export function confinedPassengerId(db: Database, actor: Actor | null): string | null {
+  const link = actorLink(db, actor);
+  return link.bound ? link.passenger?.id ?? null : null;
 }
 
 /** The client a client_contact account is confined to, or null for internal staff. */

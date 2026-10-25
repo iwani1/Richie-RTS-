@@ -17,6 +17,7 @@ const user = (id: string, role: User["role"], links: Partial<User> = {}): User =
   active: true,
   driverId: null,
   clientId: null,
+  passengerId: null,
   primaryContact: false,
   passwordHash: `argon2id-hash-${id}`,
   passwordSalt: "",
@@ -521,5 +522,99 @@ describe("contract scope", () => {
       const visible = scopeDatabase(withContracts(), who)!;
       expect(visible.contracts.map((contract) => contract.reference)).toEqual(["CT-0001", "CT-0002"]);
     }
+  });
+});
+
+describe("what a passenger account receives (PAX-01, D-97)", () => {
+  /** Ama on route r1's roster holding a booked seat on t1; a colleague holding one on another client's run. */
+  function withRiders(): Database {
+    const w = world();
+    w.users = [...w.users, user("rider-user", "passenger", { passengerId: "p1" })];
+    w.passengers = [
+      { id: "p1", clientId: "c1", fullName: "Ama Boateng", employeeRef: "E-1", phone: "+233200000001", routeId: "r1", stopId: null, status: "active", createdAt: at, updatedAt: at },
+      { id: "p2", clientId: "c1", fullName: "Kofi Mensah", employeeRef: "E-2", phone: "+233200000002", routeId: "r1", stopId: null, status: "active", createdAt: at, updatedAt: at },
+      { id: "p3", clientId: "c2", fullName: "Other Client Rider", employeeRef: "", phone: "+233200000003", routeId: "r2", stopId: null, status: "active", createdAt: at, updatedAt: at },
+    ];
+    // p1 holds a seat on the route its client runs; p2 holds a seat on another client's run.
+    w.bookings = [booking("b1", "t1", "p1", "c1", "BK-0001"), booking("b2", "t2", "p2", "c1", "BK-0002")];
+    return w;
+  }
+
+  it("sends one rider: itself, its own seats, the run it travels on and that bus", () => {
+    const visible = scopeDatabase(withRiders(), actor("rider-user", "passenger"))!;
+    expect(visible.users.map((u) => u.id)).toEqual(["rider-user"]);
+    expect(visible.passengers.map((p) => p.fullName)).toEqual(["Ama Boateng"]);
+    expect(visible.bookings.map((b) => b.reference)).toEqual(["BK-0001"]);
+    expect(visible.trips.map((t) => t.id)).toEqual(["t1"]);
+    expect(visible.routes.map((r) => r.id)).toEqual(["r1"]);
+    expect(visible.vehicles.map((v) => v.id)).toEqual(["v1"]);
+  });
+
+  it("never sends a colleague, another company, the office's money or the audit log", () => {
+    const w = withRiders();
+    w.incidents = [
+      {
+        id: "i1",
+        reference: "IN-0001",
+        type: "breakdown",
+        severity: "high",
+        vehicleId: "v1",
+        tripId: "t1",
+        reportedDate: "2026-01-01",
+        description: "Fleet-wide tyre check.",
+        assignedTo: null,
+        takeVehicleOutOfService: false,
+        status: "reported",
+        resolutionNote: null,
+        vehicleRestoredTo: null,
+        costEntries: [],
+        log: [{ id: "l1", at, actorId: "admin", actorName: "Admin", note: "Reported", fromStatus: null, toStatus: "reported" }],
+        createdAt: at,
+        updatedAt: at,
+      },
+    ];
+    const visible = scopeDatabase(w, actor("rider-user", "passenger"))!;
+    expect(visible.passengers.map((p) => p.id)).toEqual(["p1"]);
+    expect(visible.clients).toEqual([]);
+    expect(visible.drivers).toEqual([]);
+    expect(visible.invoices).toEqual([]);
+    expect(visible.payments).toEqual([]);
+    expect(visible.expenses).toEqual([]);
+    expect(visible.contracts).toEqual([]);
+    expect(visible.audit).toEqual([]);
+    // An incident somebody else raised is not the rider's to read, even on its own bus.
+    expect(visible.incidents).toEqual([]);
+    // The rider keeps its own name and phone; nobody else's number is in the payload.
+    expect(visible.passengers[0].phone).toBe("+233200000001");
+    expect(JSON.stringify(visible)).not.toContain("+233200000002");
+    expect(JSON.stringify(visible)).not.toContain("+233200000003");
+  });
+
+  it("sends a rider the company's name and booking rules, but none of its prices", () => {
+    const w = withRiders();
+    w.settings = {
+      ...w.settings,
+      companyName: "Richie Transport Services",
+      invoiceDueDays: 30,
+      booking: { requestCutoffMinutes: 60, cancellationCutoffMinutes: 30 },
+      rental: { ...w.settings.rental, depositPercent: 40 },
+    };
+    const visible = scopeDatabase(w, actor("rider-user", "passenger"))!;
+    expect(visible.settings.companyName).toBe("Richie Transport Services");
+    expect(visible.settings.booking).toEqual({ requestCutoffMinutes: 60, cancellationCutoffMinutes: 30 });
+    expect(visible.settings.invoiceDueDays).toBeNull();
+    expect(visible.settings.rental.depositPercent).toBeNull();
+    // The other roles still receive the settings table whole.
+    expect(scopeDatabase(w, actor("admin", "administrator"))!.settings.rental.depositPercent).toBe(40);
+  });
+
+  it("sends an unlinked passenger nothing, rather than falling back to the company", () => {
+    const w = withRiders();
+    w.users = [...w.users, user("stray", "passenger")];
+    const visible = scopeDatabase(w, actor("stray", "passenger"))!;
+    expect(visible.trips).toEqual([]);
+    expect(visible.passengers).toEqual([]);
+    expect(visible.bookings).toEqual([]);
+    expect(visible.routes).toEqual([]);
   });
 });

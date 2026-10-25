@@ -212,6 +212,7 @@ from its own button, the scrim and Escape.
 | Invoices | Settle what is owed on one invoice | The balance and every action on it | Detail: notice, seven figures (total, received, credited, outstanding, refunded), line items, payments, credit notes, **refunds paid back** with their own numbers and reasons, then the document itself. A refund is recorded from here, in a panel that fills in what is still owed back |
 | Expenses | Enter what the month actually cost | The period total, the biggest category, and what has no receipt | Period at the top, then four figures (recorded, biggest category, entries with no receipt number, receipts held), the register with receipts named per row, a category table beneath it, and a panel to record or void. A voided entry stays on the list, struck through, with its reason in words |
 | Statements | Chase what one customer owes | The balance and its age | Customer list ordered by what is owed beside the statement itself: five figures, the ageing bands in words, the entries in the period, the invoices still owing. Prints as the same A4 sheet as an invoice |
+| My journeys (passenger portal) | Catch the bus, and know whether the seat is real | The next run, then what state each seat is in | Page head, then **your next journey** as four facts in a row (time, stop, bus, status) with the status sentence underneath; a request button and a report button; then the upcoming runs as a table whose status cell carries the label *and* the sentence that qualifies it; then **where you have been**; then the company's policy beside the reports the rider has raised. Limits are printed, not hidden (D-97) |
 | Printed invoice / credit note | Hand the customer a document | The figures and what is owed | A4 sheet in a preview overlay: letterhead and reference at the top, the line table, the totals in the lower right with the sentence that explains them beneath, footer with reference and print date. Print removes the app entirely |
 
 **Paper is a different surface, and it has its own rules (D-87).** A sheet that becomes a physical
@@ -225,7 +226,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **680 passed, 26 skipped** across 67 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **706 passed, 26 skipped** across 69 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are
@@ -261,9 +262,14 @@ screen scale, so what is approved on screen is what goes on the paper.
    reads as a filter rather than a frame.
 6. **Charts are absent by design** beyond the seven-day runs series: RPT-02/RPT-03 need fleet-hours
    and cost inputs this installation does not collect.
-7. **The portals were re-skinned, not restructured.** Their tasks (one run, one account) are already
+7. **The passenger portal's status is a word plus a sentence.** A rider reads "Bus assigned" and then
+   "A bus and a driver are on this run. It has not been released to leave yet" — one word alone cannot
+   distinguish a held seat with no bus from a bus that has not left, and colour is never the carrier
+   (D-97). Its absent map is stated on the page rather than left blank, so silence is not read as a
+   fault.
+8. **The portals were re-skinned, not restructured.** Their tasks (one run, one account) are already
    single-purpose; they inherit the system and keep their body layout.
-8. **Settings is one card per rule**, so on the longest form the page is taller than a two-column
+9. **Settings is one card per rule**, so on the longest form the page is taller than a two-column
    form would be. That is a trade of vertical space for a readable measure.
-9. **The sidebar shows at most six counts.** Groups without an outstanding number stay silent; if
+10. **The sidebar shows at most six counts.** Groups without an outstanding number stay silent; if
    more destinations gain counts, the sidebar needs a "see all" treatment rather than a wall of pills.

@@ -1,7 +1,7 @@
 // Domain types for Richie TMS - Phase 1A (foundation and master data).
 // Business rules that are unknown are modelled as nullable settings with no default.
 
-export const ROLES = ["administrator", "operations", "finance", "driver", "client_contact"] as const;
+export const ROLES = ["administrator", "operations", "finance", "driver", "client_contact", "passenger"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
@@ -10,6 +10,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   finance: "Finance",
   driver: "Driver",
   client_contact: "Client contact",
+  passenger: "Passenger",
 };
 
 export interface User {
@@ -21,10 +22,12 @@ export interface User {
   passwordHash: string;
   passwordSalt: string;
   // Own-record access depends on which record this account acts for. A driver account
-  // points at its driver record, a client_contact account at its corporate client. Both
-  // are null for internal staff, whose access is company-scoped.
+  // points at its driver record, a client_contact account at its corporate client, and a
+  // passenger account at the rider it is (PAX-01, D-97). All three are null for internal
+  // staff, whose access is company-scoped.
   driverId: string | null;
   clientId: string | null;
+  passengerId: string | null;
   // Which of a client's contact accounts is the one we ring first (Q-38, D-77). Only a
   // client_contact account can hold it, and only one per client; everything else is false.
   primaryContact: boolean;
@@ -1025,7 +1028,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 /**
  * Every schema version this build can still read.
@@ -1035,7 +1038,7 @@ export const SCHEMA_VERSION = 19;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1128,7 +1131,15 @@ export function migrate(value: unknown): Database | null {
   };
   return {
     schemaVersion: SCHEMA_VERSION,
-    users: (v.users as User[]).map((u) => ({ ...u, driverId: u.driverId ?? null, clientId: u.clientId ?? null, primaryContact: u.primaryContact === true })),
+    users: (v.users as User[]).map((u) => ({
+      ...u,
+      driverId: u.driverId ?? null,
+      clientId: u.clientId ?? null,
+      // A passenger account arrived in Phase 48; an older backup has none, and inventing a link
+      // would hand somebody else's journeys to the wrong person.
+      passengerId: u.passengerId ?? null,
+      primaryContact: u.primaryContact === true,
+    })),
     vehicles: v.vehicles as Database["vehicles"],
     drivers: v.drivers as Database["drivers"],
     clients: v.clients as Database["clients"],

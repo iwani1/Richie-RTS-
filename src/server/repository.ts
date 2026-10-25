@@ -58,6 +58,7 @@ const userRow = (u: User): Row => ({
   active: u.active,
   driver_id: u.driverId ?? null,
   client_id: u.clientId ?? null,
+  passenger_id: u.passengerId ?? null,
   password_hash: u.passwordHash,
   password_salt: u.passwordSalt,
   created_at: u.createdAt,

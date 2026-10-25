@@ -158,7 +158,7 @@ describe("account-to-record links (validateUser)", () => {
       credential: cred,
     });
     expect(linkedStaff.ok).toBe(false);
-    if (!linkedStaff.ok) expect(linkedStaff.errors.driverId).toMatch(/Only driver and client contact/);
+    if (!linkedStaff.ok) expect(linkedStaff.errors.driverId).toMatch(/Only driver, client contact and passenger/);
   });
 });
 

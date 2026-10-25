@@ -22,7 +22,8 @@ export type Route =
   | "profile"
   | "compliance"
   | "driver_portal"
-  | "client_portal";
+  | "client_portal"
+  | "passenger_portal";
 
 export interface NavItem {
   route: Route;
@@ -43,6 +44,9 @@ export const NAV_ITEMS: NavItem[] = [
   { route: "finance", label: "Finance", caption: "Money in, out and owed", permission: "invoices:read" },
   { route: "driver_portal", label: "My runs", caption: "Assigned work and problems", permission: null, roles: ["driver"] },
   { route: "client_portal", label: "My account", caption: "Routes, staff and rentals", permission: null, roles: ["client_contact"] },
+  // A rider's own desk (PAX-01, D-97). No permission gate: the server has already narrowed the
+  // payload to this rider's record, so there is nothing here an unlinked account could read.
+  { route: "passenger_portal", label: "My journeys", caption: "Bus, stop and seat", permission: null, roles: ["passenger"] },
   { route: "rentals", label: "Bus rentals", caption: "Requests to billing", permission: "rentals:read" },
   { route: "invoices", label: "Invoices", caption: "Billing and payments", permission: "invoices:read" },
   // One customer's whole account, aged: the paper the office chases money with (FIN-02, D-90). Gated by

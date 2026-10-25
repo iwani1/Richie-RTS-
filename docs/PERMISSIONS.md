@@ -3,14 +3,36 @@
 Source of truth: `src/tms/permissions.ts`. Enforced in `src/tms/service.ts` before any mutation; the UI additionally hides controls the actor cannot use.
 
 Scope: internal roles (`administrator`, `operations`, `finance`) are **company-scoped**.
-Record-bound roles (`driver`, `client_contact`) are **own-record scoped**: their account is
-linked to exactly one driver record or one corporate client, and every read and write is
-confined to it. The links are `User.driverId` and `User.clientId` (schema version 5).
+Record-bound roles (`driver`, `client_contact`, `passenger`) are **own-record scoped**: their account
+is linked to exactly one driver record, one corporate client or one rider record, and every read and
+write is confined to it. The links are `User.driverId`, `User.clientId` and `User.passengerId`
+(schema version 5 for the first two; passenger accounts arrived with migration 016, D-97).
 
 A driver record may be linked to one account only. A corporate client may have **several**
 contact accounts — an operations contact and an accounts contact, say — each with its own login
 and its own audit trail, and one of them marked `primaryContact` as the person the office rings
 first (Q-38, D-77). The mark is held by one account per client; marking another takes it away.
+
+### Passenger accounts (PAX-01, D-97)
+
+A `passenger` account is the third record-bound role: one account per **rider** (`User.passengerId`),
+and the rider is the person who stands at the stop. It holds exactly five permissions, and every one
+of them is confined to that rider:
+
+| Permission | Scope for a passenger |
+|---|---|
+| trips:read | the runs of its own route, and any run it holds a seat on |
+| routes:read | its own route, plus the routes of runs it holds a seat on |
+| bookings:read | its own seats only — never a colleague's |
+| bookings:create | a seat **for itself**; the command refuses a seat requested in another rider's name |
+| incidents:create | feedback about a journey it is on; the run decides the vehicle, and the vehicle is never withdrawn from service |
+
+The unique index `app_user_passenger_uq` (migration 016) is what makes it one account per rider, and
+`app_user.role` was widened in the same migration to accept the role. A passenger is **not** a client
+contact: it sees one person, not a company roster, and it receives none of the settings table beyond
+the company name and the two booking cut-offs (the table also carries rental prices and payment
+terms). The per-permission tables below list the office roles and the two original bound roles;
+where a row has no `passenger` column, the role does not hold that permission at all.
 
 | Permission | driver | client_contact | Scope for these roles |
 |---|:-:|:-:|---|
