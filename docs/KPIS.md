@@ -92,7 +92,7 @@ was issued in the period; at least one cost line was recorded in it; and **no hi
 period is left unbilled**. The last condition is the important one — an unbilled hire is revenue that
 exists and has not been written down, so a margin computed over it overstates the business. When the
 rule fails the screen prints the reason instead of the number. Margin is `(invoiced − credited) − expenses`, shown
-with its percentage of revenue; it is **not** profit (tax owed, deposits held and fuel are not in it).
+with its percentage of revenue; it is **not** profit (tax owed, deposits held and driver pay are not in it).
 Cash movement (payments received minus recorded spend minus refunds paid back) is shown beside it, because the two answer
 different questions.
 

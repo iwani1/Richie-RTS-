@@ -64,8 +64,12 @@ them, dispatch and complete them; create routes and stops; generate trips; assig
 drivers; create and manage passengers; report incidents, advance them, record costs; create work
 orders, advance them, record costs; record compliance documents; read the audit log.
 
-**Cannot:** confirm a rental or take a deposit; issue an invoice or record a payment; change settings;
-create accounts.
+**Also sees, but cannot change:** the **Expenses** screen. Fuel, tolls and permits are part of what a run
+costs, so operations reads them; entering or voiding that spending is the finance officer's job, and
+the button is simply not offered.
+
+**Cannot:** confirm a rental or take a deposit; issue an invoice or record a payment; record or void an
+expense; change settings; create accounts.
 
 **The dispatch day:**
 
