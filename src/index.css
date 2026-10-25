@@ -2175,6 +2175,46 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   background: var(--card-2);
 }
 
+/* How old the money is, on the statement screen (FIN-02, D-90). Four bands, each with its own
+   sentence, because "31–60 days late" means nothing to a new member of staff and "worth a call" does.
+   The amount is set in the monospaced face so the column can be read downwards, and an empty band
+   says so with a dash rather than a zero — a zero invites the reader to add it up. */
+.rts-ageing {
+  display: grid;
+  margin: 0;
+}
+
+.rts-ageing-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rts-ageing-row:first-child { padding-top: 0; }
+.rts-ageing-row:last-child { border-bottom: 0; padding-bottom: 0; }
+
+.rts-ageing-label {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+
+.rts-ageing-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted-2);
+}
+
+.rts-ageing-row dd {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
 /* ---------------------------------------------------------------- printed documents (FIN-02, D-87)
    A sheet of paper, previewed on screen and printed by the browser. The rules that matter:
    - the sheet is white with dark ink whatever the theme, because it is the one surface here that

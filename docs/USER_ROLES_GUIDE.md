@@ -86,7 +86,8 @@ the person who reported the defect be the only sign-off.
 
 **Can:** see rentals, clients, vehicles, trips, incidents and maintenance costs; prepare quotations;
 confirm rentals and record the deposit; issue and void invoices; record payments and advance them to
-verified and reconciled; issue and void credit notes; read the rental report. **Lands on the Finance screen**, which is where the
+verified and reconciled; cancel a payment recorded in error; issue and void credit notes; print
+invoices, credit notes and statements; read the rental report. **Lands on the Finance screen**, which is where the
 money work starts: money in and out for a period, who is late paying and by how many days, completed
 hires nobody has invoiced yet, and payments still to verify or reconcile. The "Margin" figure appears
 only when both sides of the period are complete (an invoice and a cost line in the period, and no
@@ -128,6 +129,25 @@ that statement will now be short by before you agree.
 Cancelling is not a refund. Cancelling says the money was never received; giving real money back is a
 **credit note** with a refund stated on it (below), and the refund itself is paid the way you pay any
 other outgoing.
+
+**Chasing what a customer owes.** **Statements** in the menu shows one customer's account for a period
+of your choosing: what was charged, what came in, what was credited, the balance brought forward from
+before the period, and the balance as at the end of it, with the debt aged into bands (not yet due,
+1–30, 31–60, over 60 days) and a line saying what each band is worth doing. Pick the customer on the
+left, set the period above, then **Print statement** — the sheet is the paper you send, and it says in
+print that it is a statement of account rather than a demand for payment.
+
+Three things worth knowing before you send one:
+
+- the **balance brought forward** is taken from the day before the period starts, so a short period
+  still carries the arrears in rather than showing a clean account;
+- a **cancelled payment** does not appear at all — that money never arrived, so it is not the
+  customer's figure to be reminded of;
+- an account that has been **paid more than it was invoiced** says it is in credit, and how much is
+  owed back, instead of showing a demand for nothing.
+
+Statements cover one customer at a time on purpose: a page listing what every customer owes is a
+different document with a different risk attached to it.
 
 **Sending a copy.** Open the invoice and choose **Print invoice**, or **Print** beside a credit note.
 The preview shows exactly what will be printed; the **Print or save as PDF** button opens your

@@ -99,7 +99,8 @@ company-wide report cannot be assembled from it.
 is not always the person who may take it back, and the cancellation carries that person's name.
 
 Read scope: `invoices:read` also opens the invoice's payments and credit notes, because both are part
-of the invoice. Record-bound roles receive none of the three collections, so a driver or client
+of the invoice — and it is the permission the **Statements** destination needs (D-90), because a
+statement is those same three collections read for one customer over a period. Record-bound roles receive none of the three collections, so a driver or client
 contact never sees a customer's billing (`visibility.ts`, `SECTION_PERMISSIONS`).
 
 Separation of duties: operations completes a rental and therefore produces the line items that will

@@ -1,5 +1,5 @@
-// The paper the office hands to a customer: an invoice, and the credit note that corrects it
-// (FIN-02, D-86, D-87).
+// The paper the office hands to a customer: an invoice, the credit note that corrects it, and the
+// statement of their whole account (FIN-02, D-86, D-87, D-90).
 //
 // This is a printable sheet, not a PDF service. The browser already has a print engine that knows the
 // page size, the margins and how to write a file, so the document needs no dependency, works with no
@@ -18,6 +18,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { invoiceBalance } from "../tms/creditNotes";
+import type { CustomerStatement, StatementRowKind } from "../tms/customerStatement";
 import { formatAmount, lineAmount } from "../tms/money";
 import type { CreditNote, Invoice } from "../tms/types";
 import { CREDIT_NOTE_STATUS_LABELS, INVOICE_STATUS_LABELS } from "../tms/types";
@@ -79,11 +80,14 @@ function SheetTop({
   reference,
   state,
   companyName,
+  referenceLabel = "Reference",
 }: {
   docType: string;
   reference: string;
   state: string;
   companyName: string | null;
+  /** What the second block is: a document number, or the period a statement covers. */
+  referenceLabel?: string;
 }) {
   return (
     <header className="rts-sheet-top">
@@ -94,7 +98,7 @@ function SheetTop({
         <p className="rts-sheet-doctype">{docType}</p>
       </div>
       <div className="rts-sheet-id">
-        <p className="rts-sheet-label">Reference</p>
+        <p className="rts-sheet-label">{referenceLabel}</p>
         <p className="rts-sheet-reference">{reference}</p>
         <p className="rts-sheet-state">{state}</p>
       </div>
@@ -352,6 +356,200 @@ export function CreditNoteSheet({ note }: { note: CreditNote }) {
       </p>
 
       <SheetFoot reference={note.reference} />
+    </article>
+  );
+}
+
+/**
+ * A customer's statement of account for a period (FIN-02, D-90).
+ *
+ * This is the sheet an office sends when it chases money, so it has to survive being read by the
+ * customer's bookkeeper: every row carries a date, a document number and what it did to the balance,
+ * the balance carried in comes from the day before the period, and the balance carried out is stated
+ * once at the bottom with its age in bands. The figures are the ones `customerStatement()` produced —
+ * this component formats, it does not add up — so the paper, the screen and the reports cannot
+ * diverge.
+ */
+export function StatementSheet({ statement }: { statement: CustomerStatement }) {
+  const { db } = useTms();
+  // A statement has no document number of its own; the period is what identifies it.
+  const period = `${formatDate(statement.from)} – ${formatDate(statement.to)}`;
+  const currency = statement.currencyCode ?? "";
+  const kindLabel: Record<StatementRowKind, string> = {
+    invoice: "Invoice",
+    creditNote: "Credit note",
+    payment: "Payment",
+  };
+
+  return (
+    <article className="rts-sheet" aria-label={`Statement for ${statement.customerName}`}>
+      <SheetTop
+        docType="Statement of account"
+        reference={period}
+        referenceLabel="Period"
+        state={`As at ${formatDate(statement.to)}`}
+        companyName={db.settings.companyName}
+      />
+
+      <div className="rts-sheet-meta">
+        <div>
+          <p className="rts-sheet-label">Account of</p>
+          <p className="rts-sheet-value">{statement.customerName}</p>
+        </div>
+        <div>
+          <p className="rts-sheet-label">Period</p>
+          <p className="rts-sheet-value">{period}</p>
+        </div>
+        <div>
+          <p className="rts-sheet-label">Currency</p>
+          <p className="rts-sheet-value">{currency || "not set"}</p>
+        </div>
+      </div>
+
+      <table className="rts-sheet-table" aria-label="Account activity">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">What</th>
+            <th scope="col">Reference</th>
+            <th scope="col" className="rts-sheet-num">
+              Charged
+            </th>
+            <th scope="col" className="rts-sheet-num">
+              Paid or credited
+            </th>
+            <th scope="col" className="rts-sheet-num">
+              Balance
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{formatDate(statement.from)}</td>
+            <td colSpan={3}>Balance brought forward</td>
+            <td className="rts-sheet-num" />
+            <td className="rts-sheet-num">{money(currency, statement.openingBalance)}</td>
+          </tr>
+          {statement.rows.map((row) => (
+            <tr key={`${row.kind}-${row.id}`}>
+              <td>{formatDate(row.date)}</td>
+              <td>
+                {kindLabel[row.kind]}
+                {row.kind === "creditNote" && row.description ? ` — ${row.description}` : ""}
+                {row.kind === "payment" && row.description ? ` — ${row.description.replace("Payment received — ", "")}` : ""}
+              </td>
+              <td className="rts-mono">{row.reference}</td>
+              <td className="rts-sheet-num">{row.debit > 0 ? money(currency, row.debit) : ""}</td>
+              <td className="rts-sheet-num">{row.credit > 0 ? money(currency, row.credit) : ""}</td>
+              <td className="rts-sheet-num">{money(currency, row.balance)}</td>
+            </tr>
+          ))}
+          {statement.rows.length === 0 && (
+            <tr>
+              <td colSpan={6}>Nothing moved on this account in the period.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      <div className="rts-sheet-closing">
+        {/* The opening balance is stated once, in the table's own "brought forward" row above: a
+            totals block that repeated it would ask the reader to decide which one was authoritative. */}
+        <dl className="rts-sheet-totals">
+          <div className="rts-sheet-row">
+            <dt>Invoiced in the period</dt>
+            <dd>{money(currency, statement.invoiced)}</dd>
+          </div>
+          <div className="rts-sheet-row">
+            <dt>Payments received</dt>
+            <dd>{money(currency, statement.received)}</dd>
+          </div>
+          <div className="rts-sheet-row">
+            <dt>Credit notes issued</dt>
+            <dd>{money(currency, statement.credited)}</dd>
+          </div>
+          <div className="rts-sheet-row rts-sheet-row--due">
+            <dt>{statement.closingBalance < 0 ? "In credit — owed to the customer" : "Balance due"}</dt>
+            <dd>{money(currency, Math.abs(statement.closingBalance))}</dd>
+          </div>
+        </dl>
+
+        <p className="rts-sheet-words">
+          {statement.closingBalance > 0
+            ? `This is a statement of account, not a demand for payment. It lists every invoice, payment and credit note on this account in the period. ${money(currency, statement.closingBalance)} was owed as at ${formatDate(statement.to)}.`
+            : statement.closingBalance < 0
+              ? `This account is in credit by ${money(currency, -statement.closingBalance)} as at ${formatDate(statement.to)}: more has been paid or credited than invoiced.`
+              : `Nothing is owed on this account as at ${formatDate(statement.to)}.`}
+        </p>
+      </div>
+
+      {statement.ageing.total > 0 && (
+        <section aria-label="How old the money is">
+          <p className="rts-sheet-label">Money still owed, by age at {formatDate(statement.to)}</p>
+          <table className="rts-sheet-table">
+            <thead>
+              <tr>
+                <th scope="col">Not yet due</th>
+                <th scope="col" className="rts-sheet-num">
+                  1–30 days late
+                </th>
+                <th scope="col" className="rts-sheet-num">
+                  31–60 days late
+                </th>
+                <th scope="col" className="rts-sheet-num">
+                  Over 60 days late
+                </th>
+                <th scope="col" className="rts-sheet-num">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{money(currency, statement.ageing.notYetDue)}</td>
+                <td className="rts-sheet-num">{money(currency, statement.ageing.days1to30)}</td>
+                <td className="rts-sheet-num">{money(currency, statement.ageing.days31to60)}</td>
+                <td className="rts-sheet-num">{money(currency, statement.ageing.days61plus)}</td>
+                <td className="rts-sheet-num">{money(currency, statement.ageing.total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {statement.openInvoices.length > 0 && (
+        <section aria-label="Invoices still owing">
+          <p className="rts-sheet-label">Invoices still owing</p>
+          <table className="rts-sheet-table">
+            <thead>
+              <tr>
+                <th scope="col">Invoice</th>
+                <th scope="col">Issued</th>
+                <th scope="col">Payment due</th>
+                <th scope="col" className="rts-sheet-num">
+                  Days late
+                </th>
+                <th scope="col" className="rts-sheet-num">
+                  Outstanding
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {statement.openInvoices.map((row) => (
+                <tr key={row.invoiceId}>
+                  <td className="rts-mono">{row.reference}</td>
+                  <td>{formatDate(row.issuedOn)}</td>
+                  <td>{formatDate(row.dueOn)}</td>
+                  <td className="rts-sheet-num">{row.daysOverdue > 0 ? row.daysOverdue : "—"}</td>
+                  <td className="rts-sheet-num">{money(currency, row.outstanding)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      <SheetFoot reference={`Statement — ${statement.customerName}`} />
     </article>
   );
 }

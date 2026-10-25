@@ -89,7 +89,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RPT-01 | 1A | Rental reports: enquiries, quotations issued, acceptance rate, confirmed and completed rentals, revenue, outstanding balances, vehicle utilisation,… | Met | `src/tms/rentalReport.ts` + `src/screens/Reports.tsx` (Phase 17). All eight figures are computed from records, with coverage stated, a currency guard and a CSV of the same numbers; 7 domain tests and 3 screen tests. Formulas in `docs/KPIS.md`. |
 | RPT-02 | 1C | Staff transport and fleet reports: bookings received/confirmed/completed/cancelled, no-shows, on-time pickup rate, average delay, passengers… | Partial | On-time pickup rate with data coverage (`src/tms/kpis.ts`). Utilisation **definition** agreed in Q-29 and written down in `KPIS.md`; the fleet-wide screen is still to build. **No bookings, no-shows, passengers transported, route utilisation, contract performance, downtime, fuel, mileage.** |
 | RPT-03 | 1C | Financial reports: revenue by service and customer, payments received, outstanding invoices, expenses by category, cost per trip, cost per passenger… | Partial | `src/tms/financialReport.ts` + a section on the Reports screen (Phase 28): all six figures computed from records, with the period, coverage, cost-per-trip and cost-per-passenger definitions from Q-29, and a CSV. **Revenue by service has one line** because only vehicle hire is invoiced in this build; contract billing is FIN-02. No profit or margin (costs captured are maintenance only). |
-| RPT-04 | 1C | Filters (date range, service, client, customer, route, driver, vehicle, status) and CSV export, always permission-scoped. Every KPI formula is… | Partial | The rental report has a date range, a coverage panel and a CSV of the same figures (Phase 17); other screens have search and status filters. Formulas documented in `docs/KPIS.md`. **The other reports have no date range or CSV, and there is no cross-report filter bar** (service, client, route, driver, vehicle). |
+| RPT-04 | 1C | Filters (date range, service, client, customer, route, driver, vehicle, status) and CSV export, always permission-scoped. Every KPI formula is… | Partial | The rental report has a date range, a coverage panel and a CSV of the same figures (Phase 17); other screens have search and status filters. Formulas documented in `docs/KPIS.md`. The **customer statement** (Phase 39, D-90) is the per-customer view: one account for a chosen period, with the balance carried in, the ageing bands and a printable sheet. **The other reports have no date range or CSV, and there is no cross-report filter bar** (service, client, route, driver, vehicle); the statement has no CSV because it is a document, not a data export. |
 | RPT-05 | 3 | PDF reports. | Deferred | Phase 3. |
 | GPS-01 | 2 | Provider interface; last reported location with timestamp; clear distinction between live, stale and simulated locations; never fabricate… | Deferred | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
 
@@ -1005,4 +1005,28 @@ the application's own backup after the schema bump.
 | Tests | Done (verified) | 26 new unit and UI tests plus 1 database integration test (541 → 568): 10 domain (`finance.test.ts`), 4 screen (`Invoices.test.tsx`), 10 command-list (`commandTypes.test.ts`), 1 backup guard (`hardening.test.ts`), 1 each in the two money reports and the finance home |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **550 passed, 18 skipped**, `build`
+succeeds.
+
+## Phase 39 - What one customer owes, and how old it is (FIN-02, RPT-04, D-90)
+
+The money screens each answered "what is this document?". Nothing answered the question the office asks
+every time it chases a debt — what does this customer owe, what has moved on their account, and since
+when — so statements were being written out by hand from the invoice screen. This phase adds the
+statement of account: one customer, one period, the balance carried in and out, the debt aged in bands,
+and the sheet to send.
+
+| Item | Status | Evidence |
+|---|---|---|
+| One customer's whole account, for a period the operator chooses | Done (verified) | `src/tms/customerStatement.ts`; the **Statements** destination (gated by `invoices:read`), a customer list ordered by what is owed, and a search box |
+| The opening balance is real, and the period is bounded on both ends | Done (verified) | Opening is the account as at the day before the period; payments and credit notes are filed by their own dates. "carries arrears in and out of a month that contains none of the activity" (2,450 in and out), "dates a credit note by its own date, not by the invoice it corrects" |
+| The arithmetic is the one balance rule, checked a second way | Done (verified) | `customerStatement()` calls `invoiceBalance` (D-86) and `livePayments` (D-88); the screen and the sheet only format. "agrees with the invoices one by one, which is the check that catches a misfiled row" computes the closing balance a second route and requires equality |
+| The debt is aged, in days and in named bands | Done (verified) | Bands: not yet due, 1–30, 31–60, over 60, each with a sentence ("worth a reminder", "worth a call"). "puts each open invoice in the bucket its due date earns" (1,000 / 2,000 / 3,000 / 4,000 across the four bands as at 30 June); printed on the sheet as its own table |
+| A partly paid invoice is aged at what is left | Done (verified) | "counts a partly paid invoice at what is left, not at its total" (1,000 invoice, 250 paid, aged at 750) |
+| Nothing retracted is stated | Done (verified) | Void invoices and void credit notes are absent; a **cancelled payment** is absent and moves no balance (D-88): "leaves a cancelled payment off, because that money never arrived", and the screen test of the same name |
+| An account in credit says so, in words | Done (verified) | "says a customer is in credit rather than netting the difference to zero" (−400); the sheet prints **In credit — owed to the customer** and never "Balance due" |
+| It refuses to state what cannot be stated | Done (verified) | Mixed currencies are not added ("GHS, USD"); a customer with no invoice on or before the date is told in a sentence; a period that runs backwards is refused; an impossible date such as 2026-02-30 is refused |
+| The statement prints as a document | Done (verified) | `StatementSheet` uses the same preview, portal, print stylesheet and page title as the invoice (D-87); 3 sheet tests, including that the opening balance is stated **once** rather than twice in two different blocks |
+| Tests | Done (verified) | 12 domain (`customerStatement.test.ts`), 9 screen (`Statements.test.tsx`), 3 sheet (`Documents.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **574 passed, 18 skipped**, `build`
 succeeds.

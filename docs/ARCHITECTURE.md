@@ -65,6 +65,8 @@ The interface is a purpose-built "operations ledger", not a component-kit defaul
 | `src/tms/commands.ts` | `executeCommand()`: the single router for every write (`AnyCommand`) |
 | `src/tms/crypto.ts` | PBKDF2-SHA256 password hashing via Web Crypto |
 | `src/tms/useTms.ts` | React state, session, persistence, `dispatch()` |
+| `src/tms/customerStatement.ts` | A customer's account for a period (D-90): the entries, the balance carried in and out, and the ageing bands. Calls the shared balance rule rather than subtracting again |
+| `src/screens/Statements.tsx` | The statement screen: choose a customer and a period, read the account, print it |
 | `src/screens/Documents.tsx` | The paper a customer keeps (D-87): `InvoiceSheet` and `CreditNoteSheet`, plus `PrintPreview`, which portals a sheet to `document.body`, sets the page title (the suggested file name) and hands printing to the browser |
 | `src/ui/useDialogFocus.ts` | The keyboard contract every overlay shares: focus in, Tab trapped, Escape closes, focus restored. Used by `Panel` and the print preview |
 | `src/pages/*` | Screens. `StaffBusing.tsx` holds Routes, Passengers, Trips, Bookings and Performance tabs |

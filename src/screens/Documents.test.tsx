@@ -8,7 +8,8 @@
 // payable. Third, nothing is invented: a company name that was never set is named as missing.
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CreditNoteSheet, InvoiceSheet, PrintPreview } from "./Documents";
+import { CreditNoteSheet, InvoiceSheet, PrintPreview, StatementSheet } from "./Documents";
+import { customerStatement } from "../tms/customerStatement";
 import { TmsContext, type Tms } from "../tms/useTms";
 import type { CommandResult } from "../tms/service";
 import {
@@ -314,5 +315,68 @@ describe("the preview around the sheet (D-87)", () => {
     // The sheet itself carries the gap as a plain statement, not as advice.
     expect(screen.getByRole("article", { name: /Invoice/i }).textContent).toContain("Company name not set in Settings");
     expect(screen.getByRole("article", { name: /Invoice/i }).textContent).not.toContain("is not set in Settings, so this document");
+  });
+});
+
+describe("the statement a customer's bookkeeper reads (FIN-02, D-90)", () => {
+  const statementWorld = (): Database => {
+    const db = world();
+    return {
+      ...db,
+      invoices: [invoice, { ...invoice, id: "i2", reference: "INV-2026-0002", issuedOn: "2026-05-20", dueOn: "2026-06-03", total: 1000, subtotal: 1000, taxLines: [] }],
+      payments: [{ ...payment, paidOn: "2026-06-02" }],
+      creditNotes: [],
+    };
+  };
+
+  it("states the period, what came in and what is still owed", () => {
+    const db = statementWorld();
+    renderSheet(<StatementSheet statement={customerStatement(db, "Acme Ltd", "2026-06-01", "2026-06-30")} />, db);
+
+    const sheet = screen.getByRole("article", { name: /Statement for Acme Ltd/i });
+    expect(within(sheet).getByText("Statement of account")).toBeTruthy();
+    expect(within(sheet).getByText("Acme Ltd")).toBeTruthy();
+    expect(within(sheet).getByText("Balance brought forward")).toBeTruthy();
+    // The opening balance is stated once on the paper, not once in the table and again below it.
+    expect(within(sheet).getAllByText("Balance brought forward")).toHaveLength(1);
+    // The May invoice is carried in at what was owed on it, not restated as a June row; the figure
+    // also appears in the ageing and in the invoices table, which is the point of the sheet.
+    expect(within(sheet).getAllByText("GHS 1000.00").length).toBeGreaterThan(0);
+    expect(within(sheet).getByText("Invoiced in the period")).toBeTruthy();
+    expect(within(sheet).getByText("Payments received")).toBeTruthy();
+    expect(within(sheet).getByText("Balance due")).toBeTruthy();
+    // 4,025 + 1,000 brought forward − 1,000 paid = 4,025.
+    expect(within(sheet).getByText(/This is a statement of account, not a demand for payment/)).toBeTruthy();
+    expect(within(sheet).getByText(/GHS 4025\.00 was owed as at/i)).toBeTruthy();
+  });
+
+  it("shows how old the money is, and names the invoices still owing", () => {
+    const db = statementWorld();
+    renderSheet(<StatementSheet statement={customerStatement(db, "Acme Ltd", "2026-06-01", "2026-06-30")} />, db);
+
+    const ageing = screen.getByRole("region", { name: /How old the money is/i });
+    expect(within(ageing).getByText("Over 60 days late")).toBeTruthy();
+    const owing = screen.getByRole("region", { name: /Invoices still owing/i });
+    expect(within(owing).getByText("INV-2026-0002")).toBeTruthy();
+    // The unpaid invoice is 27 days late as at 30 June, and the table says so in days.
+    expect(within(owing).getByText("27")).toBeTruthy();
+  });
+
+  it("says an account is in credit rather than printing a demand", () => {
+    const db = world();
+    const over = {
+      ...db,
+      invoices: [{ ...invoice, total: 1000, subtotal: 1000, taxLines: [] }],
+      payments: [{ ...payment, amount: 1000 }],
+      creditNotes: [{ ...creditNote, total: 400, subtotal: 400, taxLines: [] }],
+    };
+    renderSheet(<StatementSheet statement={customerStatement(over, "Acme Ltd", "2026-06-01", "2026-06-30")} />, over);
+
+    const sheet = screen.getByRole("article", { name: /Statement for Acme Ltd/i });
+    expect(within(sheet).getByText(/In credit — owed to the customer/)).toBeTruthy();
+    expect(within(sheet).getByText(/in credit by GHS 400\.00 as at/i)).toBeTruthy();
+    expect(within(sheet).queryByText("Balance due")).toBeNull();
+    // Nothing is owed on an invoice, so there is no ageing section to read.
+    expect(screen.queryByRole("region", { name: /How old the money is/i })).toBeNull();
   });
 });

@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–38** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 39 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–39** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 40 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -53,6 +53,10 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   itself refuses, and six simultaneous attempts give one winner and five refusals.
 - Invoices numbered per year, with your tax lines, discounts, due dates, voiding, part payments and
   exact settlement. Money is computed in whole pesewas with one rounding rule.
+- **A customer statement**: one customer's whole account for a period — what was charged, paid and
+  credited, the balance carried in and out, and how old the money still owed is (not yet due, 1–30,
+  31–60, over 60 days). It prints as the sheet you send when you chase a debt, and it refuses to add
+  two currencies together or to state an account with nothing to state.
 - **Correcting a payment**: a figure keyed against the wrong invoice, or for money that never arrived,
   can be cancelled with a reason. The record keeps its number and stays in the list, the amount stops
   counting as received, and the invoice goes back to what it actually owed — in the reports and on the
@@ -132,7 +136,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**550 passed, 18 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**574 passed, 18 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - 18 integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, and the database refusing to

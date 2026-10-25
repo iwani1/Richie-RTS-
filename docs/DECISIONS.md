@@ -1433,3 +1433,46 @@ decision the office makes, not one the system invents.
   at 15. The round-trip test caught it within the same run. That list is now exported as
   `READABLE_SCHEMA_VERSIONS`, the rejection message is generated from it rather than written out, and a
   test pins it to `SCHEMA_VERSION`, so the next bump cannot pass unnoticed.
+
+## D-90 A statement of account is a document, and its arithmetic is the balance rule
+
+- **Context.** Every money screen answered "what is this document?" — one invoice, its payments, its
+  credit notes. Nothing answered the question the office asks whenever it chases a debt: *what does
+  this customer owe us, what has moved on their account, and how old is the money?* The finance report
+  totals a **period across all customers**, which is a different question: it cannot tell an operator
+  that one customer is 90 days late on an invoice the report has already summed into a healthy month.
+  The consequence was practical — statements were being written out by hand from the invoice screen.
+- **Decision.** A **statement of account** per customer: one screen, one printable sheet, for a period
+  the operator chooses.
+  - **One customer, all their documents.** The statement is keyed by the name that appears on the
+    invoice (`customerName`), because that is the only key invoices, payments and credit notes share.
+    The invoice's customer name, not the client register, is what the customer recognises.
+  - **The opening balance is real.** It is the account as at the day before the period starts, so a
+    statement for one month still carries the arrears it inherited. Payments and credit notes are
+    filed by **their own dates**, never by the invoice they belong to.
+  - **The arithmetic is the shared balance rule.** `customerStatement()` calls `invoiceBalance` (D-86)
+    and `livePayments` (D-88); the screen and the sheet only format what it returns. The test that
+    guards this computes the closing balance a second way — invoice by invoice — and requires the two
+    to agree.
+  - **Age is stated in days and in bands** (not yet due, 1–30, 31–60, over 60), each with a sentence
+    saying what it is worth doing. Colour is never the only carrier: the band is written out.
+  - **An account in credit says so** rather than showing a minus sign or netting to zero.
+  - **Retracted documents are absent.** A void invoice never asked for money, a void credit note took
+    nothing off, and a cancelled payment never arrived (D-88) — none of them appear, and none of them
+    move a balance. Stating a cancelled payment would put money on the customer's page they never sent.
+  - **Refusals are explicit.** Mixed currencies are not added together; a customer with no invoice on
+    or before the date is told so in a sentence; a period that runs backwards is refused.
+- **Rejected.** Adding a report filter instead (a filter answers "show me June", not "tell this customer
+  what they owe and since when" — and it would print across customers, which is a data-protection
+  problem as well as a useless document). Sending a copy of every invoice in the period (the customer
+  already has them; a statement summarises). Allocating payments across invoices first-in-first-out
+  (this build records each payment **against an invoice**, so allocation is already known — inventing a
+  second, positional rule would make the statement disagree with the invoice it describes). Making the
+  statement a fourth money balance helper (that is the mistake D-86 exists to prevent). Sending it by
+  email (no mail provider).
+- **Consequence.** `src/tms/customerStatement.ts` (`customerStatement`, `statementCustomers`, the
+  ageing bands); `src/screens/Statements.tsx` behind a new **Statements** destination gated by
+  `invoices:read`; `StatementSheet` in `src/screens/Documents.tsx`, so the statement prints through the
+  same preview, portal and print stylesheet as the invoice (D-87); the ageing block in
+  `src/index.css`. 12 domain tests, 9 screen tests and 3 sheet tests. Delivery is still manual: the
+  statement prints or saves as a PDF, and nothing is emailed.

@@ -209,6 +209,7 @@ from its own button, the scrim and Escape.
 | Settings | Supply the company's real rules | Nothing prefilled; what is still missing | "Rules to supply" read from the saved record, then one card per rule |
 | Audit | Prove who changed what | Chronology and the actor | Dense table: mono timestamps, action as a chip, record named, "showing 17 of 412" |
 | Command palette | Jump without the mouse | Destinations and their captions | Overlay, keyboard-first, permission-filtered, focus-trapped |
+| Statements | Chase what one customer owes | The balance and its age | Customer list ordered by what is owed beside the statement itself: five figures, the ageing bands in words, the entries in the period, the invoices still owing. Prints as the same A4 sheet as an invoice |
 | Printed invoice / credit note | Hand the customer a document | The figures and what is owed | A4 sheet in a preview overlay: letterhead and reference at the top, the line table, the totals in the lower right with the sentence that explains them beneath, footer with reference and print date. Print removes the app entirely |
 
 **Paper is a different surface, and it has its own rules (D-87).** A sheet that becomes a physical
@@ -222,7 +223,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **550 passed, 18 skipped** across 57 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **574 passed, 18 skipped** across 59 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are
