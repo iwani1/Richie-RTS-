@@ -108,7 +108,8 @@ the session/password decision (D-51).
 
 | Document | Contents |
 |---|---|
-| `docs/SETUP_AND_DEPLOYMENT.md` | install, migrate, seed, build, run, limits — start here |
+| `docs/STATUS.md` | one page: what is built, what is not, and what is left — start here if you want the short answer |
+| `docs/SETUP_AND_DEPLOYMENT.md` | install, migrate, seed, build, run, limits |
 | `richie-tms-standing-brief.md` | the standing brief: how this project is built (authoritative) |
 | `docs/ARCHITECTURE.md` | modules, request flow, known limits |
 | `docs/PROGRESS.md` | what is done, what is blocked, and the evidence for each claim |
