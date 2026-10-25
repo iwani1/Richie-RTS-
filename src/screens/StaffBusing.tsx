@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { MAX_GENERATE_DAYS, type CompleteTripInput, type PassengerInput, type RouteInput, type TripAssignInput } from "../tms/busing";
+import { MAX_GENERATE_DAYS, type CompleteTripInput, type PassengerInput, type RouteInput, type TripAssignInput, type TripCorrectionInput } from "../tms/busing";
 import { TripStopForm } from "./TripStopForm";
 import { onTimeReport } from "../tms/kpis";
 import type { Permission } from "../tms/permissions";
@@ -10,6 +10,7 @@ import {
   DIRECTION_LABELS,
   PASSENGER_STATUSES,
   ROUTE_STATUSES,
+  TRIP_CORRECTION_FIELD_LABELS,
   TRIP_STATUS_LABELS,
   VEHICLE_STATUS_LABELS,
   type BoardingOutcome,
@@ -533,7 +534,7 @@ function PassengerForm({ passenger, onClose }: { passenger: Passenger | null; on
 function TripsTab() {
   const { db, allowed, dispatch, setFlash } = useTms();
   const [date, setDate] = useState(todayYmd());
-  const [panel, setPanel] = useState<{ mode: "assign" | "complete" | "stop" | "cancel"; trip: Trip } | null>(null);
+  const [panel, setPanel] = useState<{ mode: "assign" | "complete" | "stop" | "cancel" | "correct"; trip: Trip } | null>(null);
 
   const trips = db.trips.filter((t) => t.serviceDate === date).sort((a, b) => a.reference.localeCompare(b.reference));
   const routeOf = (routeId: string) => db.routes.find((r) => r.id === routeId);
@@ -564,6 +565,10 @@ function TripsTab() {
       out.push(<Button key="complete" variant="primary" onClick={() => void report(dispatch({ type: "complete_trip", id: t.id }))}>Complete run</Button>);
     if ((t.status === "planned" || t.status === "dispatched") && allowed("trips:cancel"))
       out.push(<Button key="cancel" variant="danger" onClick={() => setPanel({ mode: "cancel", trip: t })}>Cancel</Button>);
+    // A correction is for something already recorded, so it appears once there is a record to fix —
+    // on a running or finished run, never on one that has not started (D-74).
+    if ((t.status === "in_progress" || t.status === "completed") && t.stopLogs.length > 0 && allowed("trips:correct"))
+      out.push(<Button key="correct" variant="ghost" onClick={() => setPanel({ mode: "correct", trip: t })}>Correct a record</Button>);
     return <div className="flex justify-end gap-1">{out}</div>;
   };
 
@@ -619,6 +624,9 @@ function TripsTab() {
                       </p>
                       <p className="rts-run-meta">
                         {route?.reference ?? "—"} · {route ? `${t.stopLogs.length}/${route.stops.length} stops recorded` : "route missing"}
+                        {t.corrections.length > 0 && (
+                          <span className="rts-run-ref"> · {t.corrections.length} correction{t.corrections.length === 1 ? "" : "s"}</span>
+                        )}
                       </p>
                       <p className="rts-run-crew">
                         <span>{t.vehicleId ? vehicleReg(t.vehicleId) : <em className="rts-unset">no vehicle</em>}</span>
@@ -720,6 +728,20 @@ function TripsTab() {
           onClose={() => setPanel(null)}
           onSubmit={async (input) => {
             const result = await dispatch({ type: "record_trip_stop", id: panel.trip.id, input });
+            report(result);
+            if (result.ok) setPanel(null);
+            return result.ok ? {} : result.errors;
+          }}
+        />
+      )}
+      {panel && panelRoute && panel.mode === "correct" && (
+        <CorrectForm
+          trip={panel.trip}
+          route={panelRoute}
+          roster={db.passengers.filter((p) => p.routeId === panel.trip.routeId)}
+          onClose={() => setPanel(null)}
+          onSubmit={async (input) => {
+            const result = await dispatch({ type: "correct_trip_record", id: panel.trip.id, input });
             report(result);
             if (result.ok) setPanel(null);
             return result.ok ? {} : result.errors;
@@ -872,6 +894,142 @@ function CancelForm({ trip, onClose, onSubmit }: { trip: Trip; onClose: () => vo
         <div className="flex justify-end gap-2 pt-2">
           <Button onClick={onClose}>Close</Button>
           <Button type="submit" variant="danger">Cancel trip</Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+/**
+ * Correct something already recorded on a run (D-74).
+ *
+ * The panel offers only the stops that have a recorded time, and only the riders with an outcome
+ * already recorded, because a correction is not a way to add a record that was missed — that is what
+ * the run itself is for. The reason field is required and lands in the audit log.
+ */
+function CorrectForm({
+  trip,
+  route,
+  roster,
+  onClose,
+  onSubmit,
+}: {
+  trip: Trip;
+  route: BusRoute;
+  roster: Passenger[];
+  onClose: () => void;
+  onSubmit: (input: TripCorrectionInput) => Errors | Promise<Errors>;
+}) {
+  const [field, setField] = useState<"stop_time" | "boarding_outcome">("stop_time");
+  const [stopId, setStopId] = useState(trip.stopLogs[0]?.stopId ?? "");
+  const [passengerId, setPassengerId] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [reason, setReason] = useState("");
+  const [errors, setErrors] = useState<Errors>({});
+
+  const recordedStops = trip.stopLogs
+    .map((log) => ({ log, stop: route.stops.find((candidate) => candidate.id === log.stopId) }))
+    .filter((entry) => entry.stop);
+  const stopBoardings = trip.boardings.filter((record) => record.stopId === stopId);
+  const nameOf = (id: string) => roster.find((p) => p.id === id)?.fullName ?? "Former rider";
+  const currentTime = trip.stopLogs.find((log) => log.stopId === stopId)?.actualTime ?? "";
+  const currentOutcome = trip.boardings.find((record) => record.passengerId === passengerId && record.stopId === stopId)?.outcome ?? "";
+
+  return (
+    <Panel
+      title={`Correct a record on ${trip.reference}`}
+      description="Nothing is overwritten silently: the change, the reason and your name are kept, and the run shows how many corrections it has."
+      onClose={onClose}
+    >
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setErrors(
+            (await onSubmit({
+              field,
+              stopId,
+              passengerId: field === "boarding_outcome" ? passengerId : undefined,
+              newValue,
+              reason,
+            })) ?? {},
+          );
+        }}
+        className="space-y-4"
+      >
+        <Field label="What is wrong?" error={errors.field}>
+          <Select
+            value={field}
+            onChange={(e) => {
+              setField(e.target.value as "stop_time" | "boarding_outcome");
+              setNewValue("");
+              setPassengerId("");
+            }}
+          >
+            <option value="stop_time">{TRIP_CORRECTION_FIELD_LABELS.stop_time}</option>
+            <option value="boarding_outcome">{TRIP_CORRECTION_FIELD_LABELS.boarding_outcome}</option>
+          </Select>
+        </Field>
+
+        <Field label="Stop" error={errors.stopId}>
+          <Select value={stopId} onChange={(e) => { setStopId(e.target.value); setPassengerId(""); setNewValue(""); }} invalid={!!errors.stopId}>
+            {recordedStops.map(({ stop }) => (
+              <option key={stop!.id} value={stop!.id}>{stop!.name}</option>
+            ))}
+          </Select>
+        </Field>
+
+        {field === "stop_time" ? (
+          <Field label="Corrected arrival time" hint={currentTime ? `Recorded as ${currentTime}.` : undefined} error={errors.newValue}>
+            <TextInput type="time" value={newValue} onChange={(e) => setNewValue(e.target.value)} invalid={!!errors.newValue} autoFocus />
+          </Field>
+        ) : (
+          <>
+            <Field label="Rider" error={errors.passengerId}>
+              <Select value={passengerId} onChange={(e) => { setPassengerId(e.target.value); setNewValue(""); }} invalid={!!errors.passengerId}>
+                <option value="">Select the rider</option>
+                {stopBoardings.map((record) => (
+                  <option key={record.passengerId} value={record.passengerId}>
+                    {nameOf(record.passengerId)} ({record.outcome === "boarded" ? "boarded" : "did not board"})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field
+              label="Corrected outcome"
+              hint={currentOutcome ? `Recorded as ${currentOutcome === "boarded" ? "boarded" : "did not board"}.` : "Choose the rider first."}
+              error={errors.newValue}
+            >
+              <Select value={newValue} onChange={(e) => setNewValue(e.target.value)} invalid={!!errors.newValue}>
+                <option value="">Select an outcome</option>
+                <option value="boarded">Boarded</option>
+                <option value="no_show">Did not board</option>
+              </Select>
+            </Field>
+          </>
+        )}
+
+        <Field label="Why is it being corrected?" hint="Required. Kept in the audit log with your name." error={errors.reason}>
+          <TextArea value={reason} onChange={(e) => setReason(e.target.value)} invalid={!!errors.reason} />
+        </Field>
+
+        {trip.corrections.length > 0 && (
+          <div className="rounded-sm border border-stone-200 p-3">
+            <p className="rts-kicker">Already corrected on this run</p>
+            <ul className="mt-2 space-y-1 text-xs">
+              {trip.corrections.map((correction) => (
+                <li key={correction.id}>
+                  <b>{TRIP_CORRECTION_FIELD_LABELS[correction.field]}</b> at{" "}
+                  {route.stops.find((candidate) => candidate.id === correction.stopId)?.name ?? "a stop"}:{" "}
+                  {correction.previousValue ?? "nothing"} → {correction.newValue} · {correction.correctedBy} · {correction.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClose}>Close</Button>
+          <Button type="submit" variant="primary">Record correction</Button>
         </div>
       </form>
     </Panel>

@@ -13,6 +13,7 @@ confined to it. The links are `User.driverId` and `User.clientId` (schema versio
 | trips:start | x | | only its own dispatched run |
 | trips:record | x | | only the next unrecorded stop on its own in-progress run |
 | trips:complete | x | | only its own run; completion requires every stop and boarding outcome |
+| trips:correct | | | **not held by either bound role.** Recording a fact at the door and correcting it afterwards are different acts, and the correction is attributed (D-74). Operations and the administrator hold it |
 | incidents:read | x | | only incidents on its own runs or vehicles |
 | incidents:create | x | | only against a vehicle assigned to it; cannot withdraw a vehicle from service |
 | routes:read | | x | only routes for its linked client |

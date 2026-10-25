@@ -330,6 +330,30 @@ export interface BoardingRecord {
   outcome: BoardingOutcome;
 }
 
+// A correction to a recorded stop time or boarding outcome (D-74, Q-42).
+//
+// The record is never edited in place: a new entry says what changed, from what, by whom and why,
+// and the trip's own fields are updated to the corrected value. The chain of entries is the evidence
+// that the change was deliberate, so a report can show both the value and the fact that it moved.
+export type TripCorrectionField = "stop_time" | "boarding_outcome";
+export const TRIP_CORRECTION_FIELD_LABELS: Record<TripCorrectionField, string> = {
+  stop_time: "Stop arrival time",
+  boarding_outcome: "Boarding outcome",
+};
+
+export interface TripCorrection {
+  id: string;
+  field: TripCorrectionField;
+  stopId: string;
+  /** Set for a boarding-outcome correction, null for a stop time. */
+  passengerId: string | null;
+  previousValue: string | null;
+  newValue: string;
+  reason: string;
+  correctedAt: string;
+  correctedBy: string;
+}
+
 export interface Trip {
   id: string;
   reference: string; // TR-0001
@@ -345,6 +369,8 @@ export interface Trip {
   stopLogs: StopLog[];
   boardings: BoardingRecord[];
   onTimeThresholdMinutes: number | null; // snapshot of the setting taken at completion
+  /** Append-only: every entry is a correction that was applied, oldest first (D-74). */
+  corrections: TripCorrection[];
   createdAt: string;
   updatedAt: string;
 }
@@ -694,7 +720,14 @@ export function migrate(value: unknown): Database | null {
     rentals: Array.isArray(v.rentals) ? (v.rentals as Rental[]).map((rental) => ({ ...rental, quoteHistory: rental.quoteHistory ?? [] })) : [],
     routes: Array.isArray(v.routes) ? (v.routes as BusRoute[]) : [],
     passengers: Array.isArray(v.passengers) ? (v.passengers as Passenger[]) : [],
-    trips: Array.isArray(v.trips) ? (v.trips as Trip[]).map((trip) => ({ ...trip, startedAt: trip.startedAt ?? null })) : [],
+    trips: Array.isArray(v.trips)
+      ? (v.trips as Trip[]).map((trip) => ({
+          ...trip,
+          startedAt: trip.startedAt ?? null,
+          // Records written before corrections existed simply have none.
+          corrections: Array.isArray(trip.corrections) ? trip.corrections : [],
+        }))
+      : [],
     incidents: Array.isArray(v.incidents) ? (v.incidents as Incident[]) : [],
     workOrders: Array.isArray(v.workOrders)
       ? (v.workOrders as WorkOrder[]).map((order) => ({

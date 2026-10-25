@@ -725,3 +725,170 @@ describe("staff busing - migration", () => {
     }
   });
 });
+
+describe("staff busing - corrections to a recorded run (D-74, Q-42)", () => {
+  /** A completed run whose actual times are 06:05 / 06:20 / 06:35 against 06:00 / 06:15 / 06:30. */
+  function completedRun(w: World): { tripId: string; routeId: string; stops: string[] } {
+    const routeId = createRoute(w);
+    const tripId = runTrip(w, routeId, "2026-06-02", ["06:05", "06:20", "06:35"]);
+    const route = w.db.routes.find((r) => r.id === routeId)!;
+    return { tripId, routeId, stops: route.stops.map((s) => s.id) };
+  }
+
+  it("corrects a stop time on a completed run, and keeps what was there before", () => {
+    const w = build();
+    const { tripId, stops } = completedRun(w);
+
+    const result = step(w, "ops", {
+      type: "correct_trip_record",
+      id: tripId,
+      input: { field: "stop_time", stopId: stops[1], newValue: "06:18", reason: "Driver wrote the wrong minute" },
+    });
+
+    const trip = w.db.trips.find((t) => t.id === tripId)!;
+    // The run now reads the corrected value...
+    expect(trip.stopLogs.find((log) => log.stopId === stops[1])!.actualTime).toBe("06:18");
+    // ...and the change is its own record, with the value it replaced.
+    expect(trip.corrections).toHaveLength(1);
+    expect(trip.corrections[0]).toMatchObject({
+      field: "stop_time",
+      stopId: stops[1],
+      passengerId: null,
+      previousValue: "06:20",
+      newValue: "06:18",
+      reason: "Driver wrote the wrong minute",
+      correctedBy: "Ops",
+    });
+    expect(result.ok && result.message).toMatch(/corrected to 06:18/);
+    // The audit log says so too, and names no rider.
+    const entry = w.db.audit.find((row) => row.action === "trips:correct")!;
+    expect(entry.summary).toMatch(/corrected from 06:20 to 06:18/);
+  });
+
+  it("feeds the corrected time into the on-time judgement instead of leaving it stale", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    const tripId = runTrip(w, routeId, "2026-06-02", ["06:20", "06:20", "06:20"]);
+    const stops = w.db.routes.find((r) => r.id === routeId)!.stops.map((s) => s.id);
+    // 06:20 against a 06:00 stop is 20 minutes late with a 5-minute threshold: not on time.
+    const before = onTimeReport(w.db, "2026-06-02", "2026-06-02");
+    expect(before.onTime).toBe(0);
+    expect(before.timed).toBe(1);
+
+    step(w, "ops", {
+      type: "correct_trip_record",
+      id: tripId,
+      input: { field: "stop_time", stopId: stops[0], newValue: "06:02", reason: "Watch was wrong" },
+    });
+    const after = onTimeReport(w.db, "2026-06-02", "2026-06-02");
+    expect(after.onTime).toBe(1);
+    // The threshold that judged the run is still the one in force when it was completed.
+    expect(w.db.trips.find((t) => t.id === tripId)!.onTimeThresholdMinutes).toBe(5);
+  });
+
+  it("corrects a boarding outcome, changes the count, and never names the rider in the log", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    const stops = w.db.routes.find((r) => r.id === routeId)!.stops.map((s) => s.id);
+    step(w, "ops", { type: "create_passenger", input: passengerInput(w, { routeId, stopId: stops[0] }) });
+    const passengerId = w.db.passengers[0].id;
+    // The run has to be worked on the day the test is "now", or the start guard refuses it.
+    const tripId = generate(w, routeId, "2026-06-01");
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "dispatch_trip", id: tripId });
+    step(w, "ops", { type: "start_trip", id: tripId });
+    step(w, "ops", { type: "record_trip_stop", id: tripId, input: { stopId: stops[0], actualTime: "06:04", boardings: [{ passengerId, outcome: "no_show" }] } });
+
+    step(w, "ops", {
+      type: "correct_trip_record",
+      id: tripId,
+      input: { field: "boarding_outcome", stopId: stops[0], passengerId, newValue: "boarded", reason: "Rider produced his badge after the run was logged" },
+    });
+
+    const trip = w.db.trips.find((t) => t.id === tripId)!;
+    expect(trip.boardings.find((b) => b.passengerId === passengerId)!.outcome).toBe("boarded");
+    expect(trip.corrections[0]).toMatchObject({ field: "boarding_outcome", passengerId, previousValue: "no_show", newValue: "boarded" });
+    const entry = w.db.audit.find((row) => row.action === "trips:correct")!;
+    expect(entry.summary).toMatch(/boarding outcome at Estate gate corrected/);
+    expect(entry.summary).not.toMatch(/Ama/);
+  });
+
+  it("refuses a correction that would break the order of the run", () => {
+    const w = build();
+    const { tripId, stops } = completedRun(w);
+    // Stop 2 cannot move before stop 1 at 06:05.
+    const backwards = attempt(w, "ops", {
+      type: "correct_trip_record",
+      id: tripId,
+      input: { field: "stop_time", stopId: stops[1], newValue: "05:50", reason: "typo" },
+    });
+    expect(backwards.ok).toBe(false);
+    if (!backwards.ok) expect(backwards.errors.newValue).toMatch(/earlier than/);
+    // Nor after stop 3 at 06:35.
+    const forwards = attempt(w, "ops", {
+      type: "correct_trip_record",
+      id: tripId,
+      input: { field: "stop_time", stopId: stops[1], newValue: "06:40", reason: "typo" },
+    });
+    expect(forwards.ok).toBe(false);
+    if (!forwards.ok) expect(forwards.errors.newValue).toMatch(/later than/);
+    // Nothing was written by either refusal.
+    expect(w.db.trips.find((t) => t.id === tripId)!.corrections).toHaveLength(0);
+  });
+
+  it("needs a reason, a real change and a recorded value", () => {
+    const w = build();
+    const { tripId, stops } = completedRun(w);
+    const correct = (input: Record<string, unknown>) => attempt(w, "ops", { type: "correct_trip_record", id: tripId, input: input as never });
+
+    const noReason = correct({ field: "stop_time", stopId: stops[0], newValue: "06:01", reason: "" });
+    expect(errorsOf(noReason).reason).toMatch(/why/);
+
+    const unchanged = correct({ field: "stop_time", stopId: stops[0], newValue: "06:05", reason: "checked" });
+    expect(errorsOf(unchanged).newValue).toMatch(/already recorded/);
+
+    const badTime = correct({ field: "stop_time", stopId: stops[0], newValue: "6.05 am", reason: "checked" });
+    expect(errorsOf(badTime).newValue).toMatch(/HH:MM/);
+
+    const notRecorded = correct({ field: "stop_time", stopId: "nope", newValue: "06:01", reason: "checked" });
+    expect(errorsOf(notRecorded).stopId).toMatch(/not on this route/);
+
+    const noRecord = correct({ field: "boarding_outcome", stopId: stops[0], passengerId: "", newValue: "boarded", reason: "checked" });
+    expect(errorsOf(noRecord).passengerId).toMatch(/Choose the rider/);
+  });
+
+  it("is closed to the driver who recorded the run, and to finance", () => {
+    const w = build();
+    const { tripId, stops } = completedRun(w);
+    const asDriver = attempt(w, "driver", {
+      type: "correct_trip_record",
+      id: tripId,
+      input: { field: "stop_time", stopId: stops[0], newValue: "06:01", reason: "I was actually early" },
+    });
+    expect(asDriver.ok).toBe(false);
+    if (!asDriver.ok) expect(asDriver.message).toMatch(/trips:correct/);
+
+    const asFinance = attempt(w, "finance", {
+      type: "correct_trip_record",
+      id: tripId,
+      input: { field: "stop_time", stopId: stops[0], newValue: "06:01", reason: "tidy up" },
+    });
+    expect(asFinance.ok).toBe(false);
+  });
+
+  it("keeps every correction, so a repeatedly corrected run is visible", () => {
+    const w = build();
+    const { tripId, stops } = completedRun(w);
+    for (const time of ["06:06", "06:07", "06:08"]) {
+      step(w, "ops", {
+        type: "correct_trip_record",
+        id: tripId,
+        input: { field: "stop_time", stopId: stops[0], newValue: time, reason: "driver called in the real time" },
+      });
+    }
+    const trip = w.db.trips.find((t) => t.id === tripId)!;
+    expect(trip.corrections.map((c) => c.newValue)).toEqual(["06:06", "06:07", "06:08"]);
+    expect(trip.corrections.map((c) => c.previousValue)).toEqual(["06:05", "06:06", "06:07"]);
+    expect(w.db.audit.filter((row) => row.action === "trips:correct")).toHaveLength(3);
+  });
+});

@@ -20,6 +20,8 @@ import {
   type PassengerStatus,
   type RouteStatus,
   type Trip,
+  type TripCorrection,
+  type TripCorrectionField,
 } from "./types";
 
 export const BUSING_COMMAND_TYPES = [
@@ -34,6 +36,7 @@ export const BUSING_COMMAND_TYPES = [
   "record_trip_stop",
   "complete_trip",
   "cancel_trip",
+  "correct_trip_record",
 ] as const;
 
 export interface StopInput {
@@ -81,6 +84,20 @@ export interface ProgressiveStopInput {
   boardings: { passengerId: string; outcome: BoardingOutcome }[];
 }
 
+/**
+ * A correction to something already recorded (D-74).
+ *
+ * `field` says which value moved; `passengerId` is required only for a boarding outcome. `reason`
+ * is not optional: a correction without a stated reason is an edit with extra steps.
+ */
+export interface TripCorrectionInput {
+  field: TripCorrectionField;
+  stopId: string;
+  passengerId?: string;
+  newValue: string;
+  reason: string;
+}
+
 export type BusingCommand =
   | { type: "create_route"; input: RouteInput }
   | { type: "update_route"; id: string; input: RouteInput }
@@ -92,7 +109,8 @@ export type BusingCommand =
   | { type: "start_trip"; id: string }
   | { type: "record_trip_stop"; id: string; input: ProgressiveStopInput }
   | { type: "complete_trip"; id: string; input?: CompleteTripInput }
-  | { type: "cancel_trip"; id: string; reason: string };
+  | { type: "cancel_trip"; id: string; reason: string }
+  | { type: "correct_trip_record"; id: string; input: TripCorrectionInput };
 
 export const MAX_GENERATE_DAYS = 62;
 
@@ -489,6 +507,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
           stopLogs: [],
           boardings: [],
           onTimeThresholdMinutes: null,
+          corrections: [],
           createdAt: now,
           updatedAt: now,
         });
@@ -717,6 +736,117 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         summary: `${updated.reference} completed: ${boarded} boarded, ${boardings.length - boarded} no-show. ${timing}`,
       }, now);
       return { ok: true, db: next, message: `${updated.reference} completed. ${timing}` };
+    }
+
+    case "correct_trip_record": {
+      const denied = authorise(actor, "trips:correct");
+      if (denied) return denied;
+      const existing = db.trips.find((t) => t.id === command.id);
+      if (!existing) return fail("Trip not found.");
+      const route = db.routes.find((r) => r.id === existing.routeId);
+      if (!route) return fail("Route not found.");
+
+      const field = command.input.field;
+      const reason = command.input.reason.trim();
+      const errors: Errors = {};
+      if (field !== "stop_time" && field !== "boarding_outcome") errors.field = "Choose what is being corrected.";
+      if (!reason) errors.reason = "Say why this record is being corrected.";
+      else if (reason.length > 200) errors.reason = "Keep the reason to 200 characters.";
+
+      const logIndex = existing.stopLogs.findIndex((log) => log.stopId === command.input.stopId);
+      const stop = route.stops.find((candidate) => candidate.id === command.input.stopId);
+      if (!stop) errors.stopId = "That stop is not on this route.";
+      else if (logIndex < 0) errors.stopId = `${stop.name} has no recorded time on ${existing.reference}, so there is nothing to correct.`;
+
+      let previousValue: string | null = null;
+      let newStopLogs = existing.stopLogs;
+      let newBoardings = existing.boardings;
+
+      if (!Object.keys(errors).length && field === "stop_time") {
+        previousValue = existing.stopLogs[logIndex].actualTime;
+        const value = command.input.newValue.trim();
+        if (!TIME_RE.test(value)) errors.newValue = "Enter the corrected arrival time (HH:MM).";
+        else if (value === previousValue) errors.newValue = `${stop!.name} is already recorded at ${value}.`;
+        else {
+          // The run's own order has to survive the correction: a stop cannot be earlier than the one
+          // before it, nor later than the one after it, or the log stops describing a journey.
+          const before = existing.stopLogs[logIndex - 1]?.stopId;
+          const after = existing.stopLogs[logIndex + 1]?.stopId;
+          const beforeTime = before ? existing.stopLogs.find((log) => log.stopId === before)?.actualTime : undefined;
+          const afterTime = after ? existing.stopLogs.find((log) => log.stopId === after)?.actualTime : undefined;
+          if (beforeTime && value < beforeTime)
+            errors.newValue = `Cannot be earlier than ${route.stops.find((s2) => s2.id === before)?.name ?? "the previous stop"} at ${beforeTime}.`;
+          else if (afterTime && value > afterTime)
+            errors.newValue = `Cannot be later than ${route.stops.find((s2) => s2.id === after)?.name ?? "the next stop"} at ${afterTime}.`;
+          else newStopLogs = existing.stopLogs.map((log, index) => (index === logIndex ? { ...log, actualTime: value } : log));
+        }
+      }
+
+      if (!Object.keys(errors).length && field === "boarding_outcome") {
+        const passengerId = command.input.passengerId ?? "";
+        const recordIndex = existing.boardings.findIndex((record) => record.passengerId === passengerId && record.stopId === command.input.stopId);
+        if (!passengerId) errors.passengerId = "Choose the rider whose outcome is wrong.";
+        else if (recordIndex < 0) errors.passengerId = "That rider has no boarding outcome recorded at this stop.";
+        previousValue = recordIndex >= 0 ? existing.boardings[recordIndex].outcome : null;
+        const value = command.input.newValue.trim();
+        if (recordIndex >= 0) {
+          if (value !== "boarded" && value !== "no_show") errors.newValue = "Choose boarded or did not board.";
+          else if (value === previousValue) errors.newValue = `That outcome is already recorded as ${previousValue === "boarded" ? "boarded" : "did not board"}.`;
+          else newBoardings = existing.boardings.map((record, index) => (index === recordIndex ? { ...record, outcome: value as BoardingOutcome } : record));
+        }
+      }
+
+      if (Object.keys(errors).length) return fail("That correction cannot be applied. See the highlighted fields.", errors);
+
+      if (field === "stop_time") {
+        const ordered = route.stops.map((s2) => newStopLogs.find((log) => log.stopId === s2.id)).filter((log) => log !== undefined);
+        for (let index = 1; index < ordered.length; index += 1) {
+          if (ordered[index]!.actualTime < ordered[index - 1]!.actualTime)
+            return fail("That time would put this stop before the one recorded ahead of it. Correct that stop first.", {
+              newValue: "The recorded stops must stay in time order.",
+            });
+        }
+      }
+
+      const correction: TripCorrection = {
+        id: makeId(),
+        field,
+        stopId: command.input.stopId,
+        passengerId: field === "boarding_outcome" ? (command.input.passengerId ?? null) : null,
+        previousValue,
+        newValue: command.input.newValue.trim(),
+        reason,
+        correctedAt: now,
+        correctedBy: actor?.fullName ?? "System",
+      };
+
+      const updated: Trip = {
+        ...existing,
+        stopLogs: newStopLogs,
+        boardings: newBoardings,
+        corrections: [...existing.corrections, correction],
+        updatedAt: now,
+      };
+
+      // Nothing else is recomputed: the on-time judgement is derived from the stop log at read time
+      // against the threshold snapshotted at completion, so a corrected time flows into the report on
+      // its own and the historical threshold is not quietly replaced by today's setting.
+
+      // The audit entry names the stop and the field but never a rider's name (data minimisation).
+      const what = field === "stop_time" ? `${stop!.name} arrival time` : `boarding outcome at ${stop!.name}`;
+      const next = audit({ ...db, trips: db.trips.map((t) => (t.id === updated.id ? updated : t)) }, actor, {
+        action: "trips:correct",
+        entity: "trip",
+        entityId: updated.id,
+        summary: `${updated.reference}: ${what} corrected from ${previousValue ?? "nothing"} to ${correction.newValue}. Reason: ${reason}`,
+      }, now);
+
+      // The rider is not named in the message either: the screen already knows which row was opened.
+      return {
+        ok: true,
+        db: next,
+        message: `${updated.reference}: ${what} corrected to ${correction.newValue}. ${updated.corrections.length} correction(s) now recorded on this run.`,
+      };
     }
 
     case "cancel_trip": {

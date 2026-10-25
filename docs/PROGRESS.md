@@ -646,3 +646,27 @@ succeeds. Documentation and one licence file only; no behaviour changed.
 
 Still open: the live-database repeat of the trial (§5-§8), which needs the owner's machine, and the
 brief's later stages (bookings, contracts, notifications, GPS).
+
+## Phase 24 - Correcting a recorded run (item 1 of the queued list)
+
+Q-42 answered by D-74: a wrong stop time or boarding outcome is **corrected, never edited**. The run
+keeps its record, the correction keeps the value it replaced, and the change is attributed.
+
+| Item | Status | Evidence |
+|---|---|---|
+| A correction is its own record | Done (verified) | `TripCorrection` (`src/tms/types.ts`): field, stop, rider, previous value, new value, reason, `correctedAt`, `correctedBy`; stored append-only on the trip |
+| New command `correct_trip_record` | Done (verified) | `src/tms/busing.ts`; whitelisted in `src/app/api/commands/route.ts` |
+| Its own permission | Done (verified) | `trips:correct` held by operations and the administrator, **not** by a driver: recording a fact and correcting it are different acts (test "is closed to the driver who recorded the run, and to finance") |
+| The run's order survives a correction | Done (verified) | A time cannot move before the previous stop or after the next; refused with the neighbouring stop named, and a second check walks the whole log after the change |
+| Only something recorded can be corrected | Done (verified) | A stop with no recorded time, or a rider with no outcome at that stop, is refused; the form lists only the recorded ones |
+| A reason is required | Done (verified) | Empty reason refused; the reason is in the audit entry with the actor's name |
+| The on-time judgement follows the correction | Done (verified) | Recomputed from the stop log at read time against the threshold snapshotted at completion, so a corrected time flows into RPT-02 without re-judging old runs against today's setting |
+| A repeatedly corrected run is visible | Done (verified) | Every correction is kept; the run sheet shows "N corrections" and the panel lists each one with who, when and why |
+| Audit entry names no rider | Done (verified) | Summary carries reference, stop, field and values — never a passenger name (data minimisation, as for boarding records themselves) |
+| Schema | **No migration** | Corrections live in the trip's JSON `data`, which `loadDatabase` already reads; older records are normalised to `corrections: []` by `migrate()` |
+| Tests | Done (verified) | 7 domain (`busing.test.ts` "corrections to a recorded run") and 4 screen (`src/screens/Busing.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **339 passed, 14 skipped**, `build`
+succeeds.
+
+Next on the queued list: Q-47, cancelling a run that has started.

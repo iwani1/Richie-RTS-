@@ -39,6 +39,10 @@ export const PERMISSIONS = [
   "trips:record",
   "trips:complete",
   "trips:cancel",
+  // Correcting a recorded stop time or boarding outcome is deliberately not part of trips:record:
+  // the driver at the door records the fact, operations corrects it afterwards and the correction is
+  // attributed (D-74).
+  "trips:correct",
   "incidents:read",
   "incidents:create",
   "incidents:update",
@@ -108,6 +112,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "trips:record",
     "trips:complete",
     "trips:cancel",
+    "trips:correct",
     "incidents:read",
     "incidents:create",
     "incidents:update",
