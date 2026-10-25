@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { formatAmount, fromMinor, lineAmount, linesTotalFromText, percentOf, toMinor } from "../tms/money";
 import { rentalQuotingReady, type AssignmentInput, type DepositInput, type QuoteInput, type QuoteLineInput, type RentalRequestInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, type Rental, type RentalStatus } from "../tms/types";
@@ -18,11 +19,12 @@ const statusTone: Record<RentalStatus, "neutral" | "info" | "success" | "warning
 };
 
 function money(amount: number, currency: string | null) {
-  if (!currency) return amount.toFixed(2);
+  // The pesewa is settled by money.ts, so what is written here is what was stored (audit D-04).
+  if (!currency) return formatAmount(amount);
   try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(fromMinor(toMinor(amount)));
   } catch {
-    return `${currency} ${amount.toFixed(2)}`;
+    return `${currency} ${formatAmount(amount)}`;
   }
 }
 
@@ -265,7 +267,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
                 <thead className="text-[10px] uppercase tracking-wider text-stone-500"><tr><th className="pb-1">Description</th><th className="pb-1 text-right">Qty</th><th className="pb-1 text-right">Unit</th><th className="pb-1 text-right">Line</th></tr></thead>
                 <tbody className="divide-y divide-stone-100">
                   {rental.quote.lines.map((l) => (
-                    <tr key={l.id}><td className="py-1 pr-2">{l.description}</td><td className="py-1 text-right">{l.quantity}</td><td className="py-1 text-right">{money(l.unitAmount, rental.quote!.currencyCode)}</td><td className="py-1 text-right">{money(l.quantity * l.unitAmount, rental.quote!.currencyCode)}</td></tr>
+                    <tr key={l.id}><td className="py-1 pr-2">{l.description}</td><td className="py-1 text-right">{l.quantity}</td><td className="py-1 text-right">{money(l.unitAmount, rental.quote!.currencyCode)}</td><td className="py-1 text-right">{money(lineAmount(l.quantity, l.unitAmount), rental.quote!.currencyCode)}</td></tr>
                   ))}
                 </tbody>
               </table>
@@ -320,7 +322,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
               <thead className="text-[10px] uppercase tracking-wider text-stone-500"><tr><th className="pb-1">Description</th><th className="pb-1 text-right">Qty</th><th className="pb-1 text-right">Unit</th><th className="pb-1 text-right">Line</th></tr></thead>
               <tbody className="divide-y divide-stone-100">
                 {rental.finalInvoice.lines.map((l) => (
-                  <tr key={l.id}><td className="py-1 pr-2">{l.description}</td><td className="py-1 text-right">{l.quantity}</td><td className="py-1 text-right">{money(l.unitAmount, rental.finalInvoice!.currencyCode)}</td><td className="py-1 text-right">{money(l.quantity * l.unitAmount, rental.finalInvoice!.currencyCode)}</td></tr>
+                  <tr key={l.id}><td className="py-1 pr-2">{l.description}</td><td className="py-1 text-right">{l.quantity}</td><td className="py-1 text-right">{money(l.unitAmount, rental.finalInvoice!.currencyCode)}</td><td className="py-1 text-right">{money(lineAmount(l.quantity, l.unitAmount), rental.finalInvoice!.currencyCode)}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -397,7 +399,8 @@ function RequestForm({ initial, title, onClose, onSubmit }: { initial: RentalReq
 }
 
 function LineItemsEditor({ lines, setLines, errors, currency }: { lines: QuoteLineInput[]; setLines: (l: QuoteLineInput[]) => void; errors: Errors; currency: string | null }) {
-  const subtotal = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitAmount) || 0), 0);
+  // The same total the command will store, counting only the lines that are finished (money.ts).
+  const subtotal = linesTotalFromText(lines);
   return (
     <div>
       <div className="space-y-3">
@@ -424,13 +427,13 @@ function LineItemsEditor({ lines, setLines, errors, currency }: { lines: QuoteLi
 function QuoteForm({ title, depositPercent, currency, completeMode, requoteMode, initialLines, onClose, onSubmit }: { title: string; depositPercent?: number | null; currency: string | null; completeMode?: boolean; requoteMode?: boolean; initialLines?: QuoteLineInput[]; onClose: () => void; onSubmit: (input: QuoteInput) => Errors | Promise<Errors> }) {
   const [lines, setLines] = useState<QuoteLineInput[]>(initialLines && initialLines.length ? initialLines : [{ description: "", quantity: "1", unitAmount: "" }]);
   const [errors, setErrors] = useState<Errors>({});
-  const subtotal = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitAmount) || 0), 0);
+  const subtotal = linesTotalFromText(lines);
   return (
     <Panel title={title} description={completeMode ? "Final charges for this rental. Pre-filled from the quotation; adjust for actuals." : requoteMode ? "Update the line items for a new validity period. The prior quotation will be retained in history." : "Enter the quotation line items. Rates are entered here, not assumed by the system."} onClose={onClose}>
       <form onSubmit={async (e) => { e.preventDefault(); setErrors((await onSubmit({ lines })) ?? {}); }} className="space-y-4">
         {requoteMode && <Notice tone="warning">This creates a new quotation revision; the prior amounts, deposit requirement and expiry date remain in the history.</Notice>}
         <LineItemsEditor lines={lines} setLines={setLines} errors={errors} currency={currency} />
-        {!completeMode && depositPercent !== null && depositPercent !== undefined && <Notice tone="info">Deposit at {depositPercent}% will be {money((subtotal * depositPercent) / 100, currency)}.</Notice>}
+        {!completeMode && depositPercent !== null && depositPercent !== undefined && <Notice tone="info">Deposit at {depositPercent}% will be {money(percentOf(subtotal, depositPercent), currency)}.</Notice>}
         <div className="flex justify-end gap-2 pt-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary">{completeMode ? "Complete rental" : requoteMode ? "Issue revised quotation" : "Issue quotation"}</Button></div>
       </form>
     </Panel>

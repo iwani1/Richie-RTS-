@@ -31,6 +31,7 @@ import {
   type Vehicle,
   type WorkOrder,
 } from "../tms/types";
+import { formatAmount, sumAmounts } from "../tms/money";
 import { db, type AuditEntryRow, type Db, type KyselyDatabase, type Trx } from "./db";
 
 const now = () => new Date().toISOString();
@@ -116,10 +117,10 @@ const rentalRow = (r: Rental): Row => ({
   assigned_vehicle_id: r.assignedVehicleId ?? null,
   assigned_driver_id: r.assignedDriverId ?? null,
   // Money columns are real NUMERIC(14,2) so reports and reconciliation never read a float (§5.4).
-  quote_subtotal: r.quote ? r.quote.subtotal.toFixed(2) : null,
-  deposit_required: r.quote ? r.quote.depositRequired.toFixed(2) : null,
-  deposit_amount: r.deposit ? r.deposit.amount.toFixed(2) : null,
-  invoice_total: r.finalInvoice ? r.finalInvoice.total.toFixed(2) : null,
+  quote_subtotal: r.quote ? formatAmount(r.quote.subtotal) : null,
+  deposit_required: r.quote ? formatAmount(r.quote.depositRequired) : null,
+  deposit_amount: r.deposit ? formatAmount(r.deposit.amount) : null,
+  invoice_total: r.finalInvoice ? formatAmount(r.finalInvoice.total) : null,
   currency_code: r.finalInvoice?.currencyCode ?? r.quote?.currencyCode ?? null,
   created_at: r.createdAt,
   updated_at: r.updatedAt,
@@ -194,7 +195,9 @@ const workOrderRow = (w: WorkOrder): Row => ({
   incident_id: w.incidentId ?? null,
   title: w.title,
   status: w.status,
-  cost_total: w.costEntries.reduce((sum, c) => sum + c.amount, 0).toFixed(2),
+  // Summed in whole pesewas and formatted once: the column is numeric(14,2) and must agree with
+  // the domain total to the pesewa (audit D-04).
+  cost_total: formatAmount(sumAmounts(w.costEntries.map((c) => c.amount))),
   created_at: w.createdAt,
   updated_at: w.updatedAt,
   data: json(w),
@@ -235,9 +238,9 @@ const invoiceRow = (i: Invoice): Row => ({
   client_id: i.clientId,
   customer_name: i.customerName,
   currency_code: i.currencyCode,
-  subtotal: i.subtotal.toFixed(2),
-  total: i.total.toFixed(2),
-  amount_paid: i.amountPaid.toFixed(2),
+  subtotal: formatAmount(i.subtotal),
+  total: formatAmount(i.total),
+  amount_paid: formatAmount(i.amountPaid),
   status: i.status,
   billable_event: i.billableEvent,
   issued_on: i.issuedOn,
@@ -251,7 +254,7 @@ const paymentRow = (p: Payment): Row => ({
   id: p.id,
   reference: p.reference,
   invoice_id: p.invoiceId,
-  amount: p.amount.toFixed(2),
+  amount: formatAmount(p.amount),
   currency_code: p.currencyCode,
   method: p.method,
   paid_on: p.paidOn,

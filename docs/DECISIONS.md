@@ -859,3 +859,32 @@ tests prove the fixes did not regress behaviour, lint is what found the defects.
 - **Known limit.** `npm run db:restore` truncates and reloads, so it deliberately bypasses the
   no-rewind trigger: restoring an older backup *does* make numbers issued after it available again.
   That is the meaning of a restore, and it is stated in `docs/BACKUP_AND_RECOVERY.md` §4.
+
+## D-72 Money is whole pesewas, and rounding happens once
+
+- **Context.** Audit defect D-04. Amounts were JavaScript `number`s. `round2` corrected them in the
+  domain, then PostgreSQL `numeric(14,2)` rounded the stored value again, and the two disagreed at
+  half-pesewa ties: measured against exact integer half-up, GHS 15.90 at 15% produced 2.38 where a
+  person writes 2.39, and 3,707 of the first million 2-decimal subtotals were a pesewa wrong at 15%
+  (16,390 at a 25% deposit). The payment guard hid the error by allowing `paid + 0.001 >= total`, so
+  an invoice could read *paid* while one pesewa was still owed.
+- **Decision.** One module, `src/tms/money.ts`, and one rule: **work in integer minor units, round
+  half-up with ties away from zero, and round once per line or percentage - never inside a sum.**
+  - Amounts cross the boundary through `toMinor`/`fromMinor`; sums go through `sumAmounts`, so 100
+    additions cannot drift a cent.
+  - Percentages are converted to integer basis points first (`percentOfMinor`), lines are computed as
+    integer thousandths of a quantity times an integer amount (`lineAmount`, `linesTotal`).
+  - Text input is parsed, not coerced: `parseAmount` accepts digits and at most two decimals and
+    refuses `1,000`, `1e3`, `100.005`, `-5` and non-ASCII digits. A third decimal is a field error, so
+    the operator sees the refusal instead of a silent round.
+  - Display and preview use the same functions, so the figure on screen cannot differ from the figure
+    stored, and a KPI cannot disagree with the invoices beneath it.
+- **Rejected.** A decimal library (a dependency for two operations, and `number` is exact for the
+  integers this module works in up to GHS 10^9). Keeping `number` and rounding at the edges with a
+  documented epsilon: that is what the code did, and it is the defect. Letting PostgreSQL's `numeric`
+  be the only rounding: the comparisons that matter (`paid >= total`, deposit sufficiency) happen in
+  the domain before any write, so the database never gets the chance.
+- **Known limit.** Amounts above GHS 1,000,000,000 are refused rather than represented. The rounding
+  rule is a business statement, not a universal one: an accounting package that rounds line tax
+  *after* summing lines would disagree with this one at a tie, by one pesewa, and that difference is
+  the point of stating the rule in one place.

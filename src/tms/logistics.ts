@@ -14,6 +14,7 @@ import {
   type CommandResult,
   type Errors,
 } from "./service";
+import { parsePositiveAmount } from "./money";
 import { allocateReference } from "./references";
 import { actorLink, mayReportOnVehicle } from "./scope";
 import {
@@ -147,7 +148,8 @@ function makeCost(actor: Actor | null, input: CostInput): CostEntry {
     id: makeId(),
     description: input.description.trim(),
     category: input.category.trim(),
-    amount: Number(input.amount),
+    // Validated by `validateCost` before this runs; read exactly, never coerced (audit D-04).
+    amount: parsePositiveAmount(input.amount).amount,
     incurredDate: input.incurredDate,
     recordedAt: new Date().toISOString(),
     recordedBy: actor?.fullName ?? "System",
@@ -159,11 +161,13 @@ function validateCost(db: Database, input: CostInput): Errors {
   if (!input.description.trim()) errors.description = "Describe what the cost was for.";
   else if (input.description.trim().length > 120) errors.description = "Keep the description to 120 characters.";
   if (input.category.trim().length > 40) errors.category = "Keep the category to 40 characters.";
-  const amount = Number(input.amount);
-  if (!input.amount.trim() || !Number.isFinite(amount)) errors.amount = "Enter an amount, for example 450.00.";
-  else if (amount <= 0) errors.amount = "The amount must be greater than zero. Use a work order note to explain a refund.";
-  else if (amount > 1_000_000_000) errors.amount = "That amount looks wrong. Check the figure.";
-  else if (!/^\d+(\.\d{1,2})?$/.test(input.amount.trim())) errors.amount = "Use at most two decimal places.";
+  // One parser for every amount in the application (money.ts), so a cost cannot accept a value that
+  // an invoice would refuse — or round one the operator can see is wrong (audit D-04).
+  const parsed = parsePositiveAmount(input.amount);
+  if (parsed.problem === "too-many-decimals") errors.amount = "Use at most two decimal places: amounts are in pesewas.";
+  else if (parsed.problem === "too-large") errors.amount = "That amount looks wrong. Check the figure.";
+  else if (parsed.problem === "zero") errors.amount = "The amount must be greater than zero. Use a work order note to explain a refund.";
+  else if (parsed.problem) errors.amount = "Enter an amount, for example 450.00.";
   if (!isValidDate(input.incurredDate)) errors.incurredDate = "Enter the date the cost was incurred.";
   // Costs are facts recorded after the fact; the currency must be known first (no default).
   if (!db.settings.currencyCode) errors.amount = "Set the company currency in Settings before recording costs.";

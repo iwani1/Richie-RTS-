@@ -76,8 +76,8 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | INC-01 | 2 | Incident records: reference, trip, vehicle, driver, time, type (breakdown, accident, driver unavailable, traffic delay, missed pickup, complaint,… | Partial | Reference, vehicle, trip, type, severity, description, assignee, status, costs, log. **No driver, time, location, people affected, attachments.** |
 | INC-02 | 2 | Breakdown workflow: driver reports, incident created, dispatcher alerted, affected trips and passengers identified, eligible replacement vehicles and… | Partial | Vehicle blocked, work order created, incident stays open. **No affected-passenger identification, no replacement listing, no notification.** |
 | FIN-01 | 1A | Configurable pricing models: fixed monthly, per trip, per passenger, distance-based, time-based, fixed quotation, approved waiting/overtime, approved… | Partial | Rental pricing basis (`per_day`, `per_km`, `per_trip`) with line items and a deposit rule; quotations are gated on the basis, currency, deposit %, validity and payment methods. **Quotations carry no tax lines and no discount line** (invoices do); **no waiting/overtime, extra-stop or discount policy; no contract pricing.** |
-| FIN-02 | 1A | Invoices: number, customer or client, related contract or rental, dates, itemised lines, taxes from settings, discounts/adjustments, totals, amount… | Partial | Built in Phase 16: `invoice` table and `src/tms/finance.ts`, `InvoicesPage`. Number from `reference_counter`, lines copied from the completion record, tax lines snapshotted from settings, discount as its own line, amount paid and outstanding derived from payments, status `issued → part_paid → paid → void`, partial unique index on `billable_event` so a service is billed once, immutability triggers. **No credit notes/adjustment records, no PDF, no corporate invoice generation** (needs contracts). |
-| FIN-03 | 1A | Manual payments: reference, customer, invoice or rental, amount, currency, method (cash, bank transfer, mobile money), date, external reference,… | Partial | Built in Phase 16: `payment` table; reference from the counter; method must be a configured one; external reference is the idempotency key (partial unique index + replay returns the existing payment); status only advances recorded → verified → reconciled; financial fields immutable by trigger; overpayment refused with the balance. **No adjustment records**, so a wrong payment cannot yet be corrected in-app. The deposit at confirmation remains a rental field, separate from the payment ledger. |
+| FIN-02 | 1A | Invoices: number, customer or client, related contract or rental, dates, itemised lines, taxes from settings, discounts/adjustments, totals, amount… | Partial | Built in Phase 16: `invoice` table and `src/tms/finance.ts`, `InvoicesPage`. Number from `reference_counter`, lines copied from the completion record, tax lines snapshotted from settings, discount as its own line, amount paid and outstanding derived from payments, status `issued → part_paid → paid → void`, partial unique index on `billable_event` so a service is billed once, immutability triggers. Totals, tax lines and the balance are computed in whole pesewas with one rounding rule (Phase 22, D-72). **No credit notes/adjustment records, no PDF, no corporate invoice generation** (needs contracts). |
+| FIN-03 | 1A | Manual payments: reference, customer, invoice or rental, amount, currency, method (cash, bank transfer, mobile money), date, external reference,… | Partial | Built in Phase 16: `payment` table; reference from the counter; method must be a configured one; external reference is the idempotency key (partial unique index + replay returns the existing payment); status only advances recorded → verified → reconciled; financial fields immutable by trigger; overpayment refused with the balance, compared in whole pesewas so an exact balance is accepted and one pesewa more is not (Phase 22, D-72). **No adjustment records**, so a wrong payment cannot yet be corrected in-app. The deposit at confirmation remains a rental field, separate from the payment ledger. |
 | FIN-04 | 3 | Payment provider integration (for example Paystack or Flutterwave): verify webhook signatures, idempotent handling, never trust a browser redirect,… | Deferred | Phase 3. |
 | FIN-05 | 3 | Expenses: reference, date, category (fuel, maintenance, repairs, tyres, tolls, other), vehicle, trip, supplier, amount, method, receipt, recorded-by,… | Partial | Cost entries on incidents/work orders (category, amount, date, description). **No supplier, method, receipt or approval.** |
 | FIN-06 | 3 | Driver allowances, trip payments, overtime and payroll export, with configurable rules and approval. | Deferred | Phase 3. |
@@ -584,6 +584,39 @@ are the four integration suites, which only run with `TEST_DATABASE_URL`), `buil
 PostgreSQL (12 of 14 locally — the two concurrency cases need more than one live connection, which
 the local PGlite stand-in cannot give; they run in CI against `postgres:18-alpine`).
 
-Still open, and unchanged by this phase: D-04 (money is a JavaScript `number` in the domain layer;
-only the columns that reach PostgreSQL are `numeric(14,2)`), the Playwright requirement (D-68), and
-the trial on real data (`docs/REAL_DATA_TRIAL.md`).
+## Phase 22 - Money: whole pesewas, rounded once (D-04)
+
+The last open correctness defect from the conformance report. Every amount was a JavaScript `number`,
+so percentages were rounded twice - once by `round2`, once by PostgreSQL `numeric(14,2)` - and the two
+did not always agree. Measured before the change, against exact integer half-up over every 2-decimal
+subtotal below GHS 10,000:
+
+| Percentage | Amounts computed a pesewa wrong |
+|---|---|
+| VAT 15% | 3,707 per million |
+| NHIL 2.5% | 1,132 |
+| GETFund 3% | 611 |
+| 12.5% | 8,189 |
+| 25% deposit | 16,390 |
+
+GHS 15.90 at 15% showed 2.38 where a person writes 2.39; GHS 8.54 at a 25% deposit showed 2.13 where
+the quotation asks 2.14. Nothing crashed: the invoice was simply a pesewa off, and the payment guard
+that compared `paid + 0.001 >= total` hid the difference.
+
+| Item | Status | Evidence |
+|---|---|---|
+| One arithmetic module | Done (verified) | `src/tms/money.ts`: `toMinor`/`fromMinor`, `sumAmounts`, `divideHalfUp`, `percentOfMinor`, `lineAmount`/`linesTotal`, `formatAmount`, `parseAmount`/`parsePositiveAmount`/`parseQuantity`, `linesTotalFromText`, `isPercentWithTwoDecimals` |
+| One rounding rule, stated once | Done | Half-up, ties away from zero, applied once per line or percentage - never inside a sum. Rates become integer basis points, quantities integer thousandths, so a percentage of a percentage cannot drift |
+| Invoices | Done (verified) | `finance.ts` computes discount, subtotal, each tax line, total, paid and outstanding in minor units; `statusFor` takes minor units. `taxLinesFor` uses `percentOfMinor` |
+| Quotations, deposits, completions | Done (verified) | `service.ts`: `validateQuoteLines` parses each line, `linesTotal` sums them, `buildQuote` takes the deposit with `percentOf`, `confirm_rental` compares the deposit in minor units |
+| Payments | Done (verified) | Over-payment is now a comparison of whole pesewas, with no `+0.001` tolerance; the balance message uses `formatAmount` |
+| Input is read, not coerced | Done (verified) | `parseAmount` accepts decimal text only and refuses `1,000`, `1e3`, `100.005`, `-5`, non-ASCII digits and anything above GHS 1,000,000,000. A third decimal is a field error, not a silent round. Settings refuse a tax or deposit rate with more than two decimals |
+| Aggregates | Done (verified) | `costs.ts`, `rentalReport.ts`, `repository.ts` (`cost_total`), and the invoice, dashboard and reports screens add with `sumAmounts`/`linesTotal`, so a KPI cannot disagree with the invoices under it |
+| Screens | Done (verified) | Quote and completion editors and the invoice preview total with the same function the command uses (`linesTotalFromText`, `linesTotal`, `lineAmount`, `percentOf`), so the figure on screen is the figure stored |
+| Tests | Done (verified) | `src/tms/money.test.ts` (17): pinned regressions 15% of 15.90 → 2.39 and 25% of 8.54 → 2.14, a sweep of every 25th pesewa below GHS 10,000 at five rates against longhand integer half-up, float-drift cases, and the parser refusals; `service.test.ts` adds three gate cases (deposit rate, tax rate and a quoted third decimal refused, a half-pesewa quantity tie rounded up with its deposit); `finance.test.ts` adds six document-level cases: the tie rounded up on an issued invoice, the deposit tie in a quotation, three part payments settling to zero outstanding, one pesewa over the balance refused, a third decimal refused without writing anything, and a discount with a third decimal refused |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **328 passed, 14 skipped**,
+`build` succeeds, `npm run e2e` **39/39** against the built server.
+
+Still open: the Playwright requirement (D-68), credit-note and adjustment records, EMP-02 passenger
+import, RPT-03 financial reports, and the trial on real data (`docs/REAL_DATA_TRIAL.md`).

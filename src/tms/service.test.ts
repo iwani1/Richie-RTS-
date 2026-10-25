@@ -255,6 +255,54 @@ describe("rentals - settings gates", () => {
   });
 });
 
+describe("money precision at the settings and quotation gates (audit D-04)", () => {
+  it("refuses a deposit percentage the arithmetic cannot represent", () => {
+    const { db, admin } = rentalReady();
+    const settings = (depositPercent: number) =>
+      execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: { ...db.settings.rental, depositPercent } } }, NOW);
+    const tooPrecise = settings(33.333);
+    expect(tooPrecise.ok).toBe(false);
+    if (!tooPrecise.ok) expect(tooPrecise.errors["rental.depositPercent"]).toMatch(/two decimal places/);
+    // Two decimals is what a percentage field is for, and it is accepted.
+    expect(settings(12.5).ok).toBe(true);
+  });
+
+  it("refuses a tax rate with more than two decimals", () => {
+    const { db, admin } = rentalReady();
+    const before = db.settings.taxLines;
+    const save = (ratePercent: number) =>
+      execute(db, admin, { type: "update_settings", input: { ...db.settings, taxPosition: "registered", taxLines: [{ id: "", name: "VAT", ratePercent }] } }, NOW);
+    const tooPrecise = save(2.555);
+    expect(tooPrecise.ok).toBe(false);
+    if (!tooPrecise.ok) expect(tooPrecise.errors["taxLines.0"]).toMatch(/two decimal places/);
+    expect(save(2.5).ok).toBe(true);
+    expect(before).toEqual(db.settings.taxLines);
+  });
+
+  it("refuses a quoted amount with a third decimal, and keeps the running total exact", () => {
+    const base = rentalReady();
+    let db = base.db;
+    const created = execute(db, base.admin, requestInput(base.catId, "2026-03-01", "2026-03-03"), NOW);
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    db = created.db;
+    const id = db.rentals[0].id;
+
+    const thirdDecimal = execute(db, base.admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "100.005" }] } }, NOW);
+    expect(thirdDecimal.ok).toBe(false);
+    if (!thirdDecimal.ok) expect(thirdDecimal.errors["lines.0.unitAmount"]).toMatch(/two decimal places/);
+    expect(db.rentals[0].quote ?? null).toBeNull();
+
+    // A half-pesewa quantity tie rounds up, and the deposit follows the rounded subtotal exactly.
+    const quoted = execute(db, base.admin, { type: "quote_rental", id, input: { lines: [{ description: "Half day", quantity: "1.5", unitAmount: "0.01" }] } }, NOW);
+    expect(quoted.ok).toBe(true);
+    if (!quoted.ok) return;
+    expect(quoted.db.rentals[0].quote!.subtotal).toBe(0.02);
+    // 25% of 0.02 is 0.005, a true tie: half-up gives one pesewa, not zero.
+    expect(quoted.db.rentals[0].quote!.depositRequired).toBe(0.01);
+  });
+});
+
 describe("rentals - full lifecycle", () => {
   it("runs request -> quote -> confirm -> assign -> start -> complete with computed deposit and audit", () => {
     const base = rentalReady();

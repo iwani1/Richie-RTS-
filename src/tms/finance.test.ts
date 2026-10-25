@@ -309,3 +309,124 @@ describe("FIN-03 manual payments", () => {
     expect(denied.ok === false && denied.message).toMatch(/payments:record/);
   });
 });
+
+describe("money arithmetic on real documents (audit D-04)", () => {
+  /**
+   * A hire whose subtotal makes the tax a half-pesewa tie: GHS 15.90 at 15% is GHS 2.385, which a
+   * person writing the invoice puts down as 2.39. The old float helper produced 2.38, so this test
+   * fails against the code this pass replaced.
+   */
+  function tieRental(taxLines: { id: string; name: string; ratePercent: number }[], depositPercent = 20): World {
+    const setup = execute(emptyDatabase(), null, { type: "setup_administrator", input: { fullName: "Admin", email: EMAILS.admin }, credential: cred }, NOW);
+    if (!setup.ok) throw new Error(setup.message);
+    const w: World = { db: setup.db, rentalId: "" };
+    step(w, "admin", { type: "create_user", input: { fullName: "Ops", email: EMAILS.ops, role: "operations", active: true }, credential: cred });
+    step(w, "admin", { type: "create_user", input: { fullName: "Fin", email: EMAILS.finance, role: "finance", active: true }, credential: cred });
+    step(w, "admin", {
+      type: "update_settings",
+      input: settings({
+        taxPosition: "registered",
+        taxLines,
+        rental: { ...emptyRentalSettings(), pricingBasis: "per_day", depositPercent, quotationValidityDays: 14, paymentMethods: ["Cash", "Bank transfer"] },
+      }),
+    });
+    const categoryId = w.db.settings.vehicleCategories[0].id;
+    step(w, "ops", { type: "create_vehicle", input: { registration: "GT 501-26", categoryId, make: "Toyota", model: "Coaster", seatCapacity: "30", notes: "" } });
+    step(w, "ops", {
+      type: "create_rental",
+      input: {
+        clientId: null,
+        customerName: "Tie Ltd",
+        customerPhone: "0244000001",
+        customerEmail: "",
+        purpose: "",
+        pickupLocation: "Accra",
+        dropoffLocation: "Tema",
+        startDate: "2026-06-01",
+        endDate: "2026-06-01",
+        passengers: "10",
+        vehicleCategoryId: categoryId,
+        driverRequired: false,
+        notes: "",
+      },
+    });
+    w.rentalId = w.db.rentals[0].id;
+    const id = w.rentalId;
+    step(w, "ops", { type: "quote_rental", id, input: { lines: [{ description: "One day", quantity: "1", unitAmount: "15.90" }] } });
+    // Pay exactly the deposit the quotation asks for, whatever percentage the test configured.
+    const deposit = w.db.rentals[0].quote!.depositRequired;
+    step(w, "admin", { type: "confirm_rental", id, input: { amount: deposit.toFixed(2), method: "Cash", reference: "DEP-TIE" } });
+    step(w, "ops", { type: "assign_rental", id, input: { vehicleId: w.db.vehicles[0].id, driverId: "" } });
+    step(w, "ops", { type: "start_rental", id });
+    step(w, "ops", { type: "complete_rental", id, input: { lines: [{ description: "One day", quantity: "1", unitAmount: "15.90" }] } });
+    return w;
+  }
+
+  it("puts the tax on a half-pesewa tie up, not down, on the invoice it issues", () => {
+    const w = tieRental([{ id: "", name: "VAT", ratePercent: 15 }]);
+    step(w, "finance", { type: "issue_rental_invoice", input: { ...invoice(), rentalId: w.rentalId } });
+    const issued = w.db.invoices[0];
+    expect(issued.subtotal).toBe(15.9);
+    // 2.385 → 2.39, half-up. The float helper gave 2.38.
+    expect(issued.taxLines[0].amount).toBe(2.39);
+    expect(issued.total).toBe(18.29);
+  });
+
+  it("puts the deposit on a half-pesewa tie up in the quotation", () => {
+    const w = tieRental([{ id: "", name: "VAT", ratePercent: 15 }], 25);
+    // 25% of 15.90 is 3.975 → 3.98 (the float helper gave 3.97 for the 8.54-style cases).
+    expect(w.db.rentals[0].quote?.depositRequired).toBe(3.98);
+  });
+
+  it("settles an invoice exactly, with no residual pesewa claimed as outstanding", () => {
+    const w = tieRental([{ id: "", name: "VAT", ratePercent: 15 }]);
+    step(w, "finance", { type: "issue_rental_invoice", input: { ...invoice(), rentalId: w.rentalId } });
+    const id = w.db.invoices[0].id;
+    // Three payments of a third each: the classic float trap. 6.10 + 6.10 + 6.09 = 18.29 exactly.
+    step(w, "finance", { type: "record_payment", input: payment(id, { amount: "6.10", externalReference: "A" }) });
+    step(w, "finance", { type: "record_payment", input: payment(id, { amount: "6.10", externalReference: "B" }) });
+    const last = step(w, "finance", { type: "record_payment", input: payment(id, { amount: "6.09", externalReference: "C" }) });
+    expect(w.db.invoices[0].amountPaid).toBe(18.29);
+    expect(w.db.invoices[0].status).toBe("paid");
+    expect(last.message).toMatch(/outstanding: GHS 0\.00/);
+  });
+
+  it("refuses one pesewa more than the balance, and accepts the balance itself", () => {
+    const w = tieRental([{ id: "", name: "VAT", ratePercent: 15 }]);
+    step(w, "finance", { type: "issue_rental_invoice", input: { ...invoice(), rentalId: w.rentalId } });
+    const id = w.db.invoices[0].id;
+    step(w, "finance", { type: "record_payment", input: payment(id, { amount: "18.28", externalReference: "PART" }) });
+    const tooMuch = attempt(w, "finance", { type: "record_payment", input: payment(id, { amount: "0.02", externalReference: "OVER" }) });
+    expect(tooMuch.ok).toBe(false);
+    if (!tooMuch.ok) expect(tooMuch.errors.amount).toMatch(/0\.01 outstanding/);
+    // The exact balance is accepted — no 0.001 fudge factor needed.
+    step(w, "finance", { type: "record_payment", input: payment(id, { amount: "0.01", externalReference: "REST" }) });
+    expect(w.db.invoices[0].status).toBe("paid");
+  });
+
+  it("refuses an amount with a third decimal instead of rounding it", () => {
+    const w = tieRental([{ id: "", name: "VAT", ratePercent: 15 }]);
+    step(w, "finance", { type: "issue_rental_invoice", input: { ...invoice(), rentalId: w.rentalId } });
+    const id = w.db.invoices[0].id;
+    const result = attempt(w, "finance", { type: "record_payment", input: payment(id, { amount: "5.005" }) });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.amount).toMatch(/two decimal places/);
+    // Nothing was recorded, and the invoice is untouched.
+    expect(w.db.payments).toHaveLength(0);
+    expect(w.db.invoices[0].amountPaid).toBe(0);
+  });
+
+  it("refuses a discount with a third decimal, and adds an exact one", () => {
+    const w = tieRental([{ id: "", name: "VAT", ratePercent: 15 }]);
+    const bad = attempt(w, "finance", { type: "issue_rental_invoice", input: { ...invoice(), rentalId: w.rentalId, discountAmount: "1.005", discountReason: "Goodwill" } });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.discountAmount).toMatch(/two decimal places/);
+
+    step(w, "finance", { type: "issue_rental_invoice", input: { ...invoice(), rentalId: w.rentalId, discountAmount: "0.55", discountReason: "Goodwill" } });
+    const issued = w.db.invoices[0];
+    // 15.90 − 0.55 = 15.35, tax 15% = 2.3025 → 2.30, total 17.65.
+    expect(issued.subtotal).toBe(15.35);
+    expect(issued.taxLines[0].amount).toBe(2.3);
+    expect(issued.total).toBe(17.65);
+  });
+});

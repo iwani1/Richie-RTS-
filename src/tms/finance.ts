@@ -11,6 +11,7 @@
 // and totals are frozen here and by trigger in migration 003. Only its status, amount paid and void
 // note move, and the void path refuses once money has been recorded against it.
 
+import { formatAmount, fromMinor, linesTotal, parseAmount, parsePositiveAmount, percentOfMinor, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
 import type {
@@ -53,7 +54,6 @@ export function isFinanceCommand(command: { type: string }): command is FinanceC
   return (FINANCE_COMMAND_TYPES as readonly string[]).includes(command.type);
 }
 
-const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const PAYMENT_RANK: Record<PaymentStatus, number> = { recorded: 1, verified: 2, reconciled: 3 };
 
 
@@ -62,22 +62,40 @@ export function billableEventFor(rentalId: string): string {
   return `rental:${rentalId}:final`;
 }
 
+/** Everything recorded against an invoice, in whole pesewas, so the comparison is exact. */
+function paidMinor(db: Database, invoice: Invoice): number {
+  return db.payments.reduce((sum, payment) => (payment.invoiceId === invoice.id ? sum + toMinor(payment.amount) : sum), 0);
+}
+
+/**
+ * What is still owed on an invoice.
+ *
+ * Compared and subtracted in integer pesewas: `paid >= total` on floats is where an invoice that is
+ * paid to the cedi shows a pesewa of balance forever (audit D-04).
+ */
 export function outstanding(db: Database, invoice: Invoice): number {
-  const paid = db.payments.filter((payment) => payment.invoiceId === invoice.id).reduce((sum, payment) => sum + payment.amount, 0);
-  return round2(Math.max(invoice.total - paid, 0));
+  const remaining = toMinor(invoice.total) - paidMinor(db, invoice);
+  return fromMinor(remaining > 0 ? remaining : 0);
 }
 
-function statusFor(total: number, paid: number): InvoiceStatus {
-  if (paid <= 0) return "issued";
-  return paid >= total ? "paid" : "part_paid";
+function statusFor(totalMinor: number, paidMinorTotal: number): InvoiceStatus {
+  if (paidMinorTotal <= 0) return "issued";
+  return paidMinorTotal >= totalMinor ? "paid" : "part_paid";
 }
 
+/**
+ * Tax on the taxable subtotal, each line rounded once, half-up.
+ *
+ * 15% of GHS 15.90 is GHS 2.385, which a person writing the invoice by hand would put down as
+ * GHS 2.39. The old float helper produced 2.38 for that subtotal (audit D-04).
+ */
 function taxLinesFor(db: Database, subtotal: number): InvoiceTaxLine[] {
   if (db.settings.taxPosition !== "registered") return [];
+  const subtotalMinor = toMinor(subtotal);
   return db.settings.taxLines.map((line) => ({
     name: line.name,
     ratePercent: line.ratePercent,
-    amount: round2((subtotal * line.ratePercent) / 100),
+    amount: fromMinor(percentOfMinor(subtotalMinor, line.ratePercent)),
   }));
 }
 
@@ -104,8 +122,14 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
       if (!isValidDate(input.issuedOn)) errors.issuedOn = "Enter the invoice date.";
       else if (input.issuedOn > now.slice(0, 10)) errors.issuedOn = "An invoice cannot be dated in the future.";
 
-      const discount = input.discountAmount.trim() === "" ? 0 : Number(input.discountAmount);
-      if (input.discountAmount.trim() !== "" && (!Number.isFinite(discount) || discount < 0)) {
+      // Blank means "no discount"; anything else is decimal text, read exactly.
+      const discountParsed = input.discountAmount.trim() === "" ? { amount: 0, problem: null } : parseAmount(input.discountAmount);
+      const discount = discountParsed.amount;
+      if (discountParsed.problem === "too-many-decimals") {
+        errors.discountAmount = "Use at most two decimal places: amounts are in pesewas.";
+      } else if (discountParsed.problem === "too-large") {
+        errors.discountAmount = "That amount looks wrong. Check the figure.";
+      } else if (discountParsed.problem) {
         errors.discountAmount = "Enter the discount as an amount of 0 or more, or leave it blank.";
       }
       if (discount > 0 && !input.discountReason.trim()) errors.discountReason = "Give a reason for the discount.";
@@ -141,12 +165,16 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
       if (finalLines.length === 0) return fail("The final invoice on this rental has no line items, so there is nothing to bill.");
       const lines = [...finalLines];
       if (discount > 0) {
-        lines.push({ id: makeId(), description: `Discount: ${input.discountReason.trim()}`, quantity: 1, unitAmount: -round2(discount) });
+        lines.push({ id: makeId(), description: `Discount: ${input.discountReason.trim()}`, quantity: 1, unitAmount: -discount });
       }
-      const subtotal = round2(lines.reduce((sum, line) => sum + line.quantity * line.unitAmount, 0));
-      if (subtotal < 0) return fail("The discount is larger than the invoice, so the total would be negative.");
+      // Every total below is summed in whole pesewas (money.ts): line amounts, then tax on the
+      // rounded subtotal, then the total. One rounding at each step, none inside a sum.
+      const subtotalMinor = lines.reduce((sum, line) => sum + toMinor(linesTotal([line])), 0);
+      if (subtotalMinor < 0) return fail("The discount is larger than the invoice, so the total would be negative.");
+      const subtotal = fromMinor(subtotalMinor);
       const taxLines = taxLinesFor(db, subtotal);
-      const total = round2(subtotal + taxLines.reduce((sum, line) => sum + line.amount, 0));
+      const totalMinor = subtotalMinor + taxLines.reduce((sum, line) => sum + toMinor(line.amount), 0);
+      const total = fromMinor(totalMinor);
 
       const period = input.issuedOn.slice(0, 4);
       const { reference, counters } = allocateReference(db, "invoice", period);
@@ -180,11 +208,11 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
           action: "finance:invoice_issue",
           entity: "invoice",
           entityId: invoice.id,
-          summary: `${invoice.reference} issued to ${invoice.customerName} for ${rental!.reference}: ${currencyCode} ${total.toFixed(2)}, due ${invoice.dueOn}.`,
+          summary: `${invoice.reference} issued to ${invoice.customerName} for ${rental!.reference}: ${currencyCode} ${formatAmount(total)}, due ${invoice.dueOn}.`,
         },
         now,
       );
-      return { ok: true, db: next, message: `${invoice.reference} issued: ${currencyCode} ${total.toFixed(2)} due ${invoice.dueOn}.` };
+      return { ok: true, db: next, message: `${invoice.reference} issued: ${currencyCode} ${formatAmount(total)} due ${invoice.dueOn}.` };
     }
 
     case "void_invoice": {
@@ -225,11 +253,16 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
       else if (!invoice) errors.invoiceId = "Invoice not found.";
       else if (invoice.status === "void") errors.invoiceId = `${invoice.reference} is void and cannot take payments.`;
 
-      const amount = Number(input.amount);
+      const parsed = parsePositiveAmount(input.amount ?? "");
+      const amount = parsed.amount;
       const dueNow = invoice ? outstanding(db, invoice) : 0;
-      if (input.amount.trim() === "" || !Number.isFinite(amount) || amount <= 0) errors.amount = "Enter the amount received.";
-      else if (invoice && amount > dueNow + 0.001) {
-        errors.amount = `${invoice.reference} has ${invoice.currencyCode} ${dueNow.toFixed(2)} outstanding, so this payment is too large.`;
+      if (parsed.problem === "too-many-decimals") errors.amount = "Use at most two decimal places: amounts are in pesewas.";
+      else if (parsed.problem === "too-large") errors.amount = "That amount looks wrong. Check the figure.";
+      else if (parsed.problem) errors.amount = "Enter the amount received.";
+      // Compared in whole pesewas, so an invoice settled exactly is settled: no 0.001 fudge factor,
+      // and no way for the last pesewa to be both owed and paid (audit D-04).
+      else if (invoice && toMinor(amount) > toMinor(dueNow)) {
+        errors.amount = `${invoice.reference} has ${invoice.currencyCode} ${formatAmount(dueNow)} outstanding, so this payment is too large.`;
       }
 
       const method = input.method.trim();
@@ -261,7 +294,7 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
         id: makeId(),
         reference,
         invoiceId: invoice!.id,
-        amount: round2(amount),
+        amount,
         currencyCode: invoice!.currencyCode,
         method,
         paidOn: input.paidOn,
@@ -283,10 +316,17 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
         recordedAt: now,
       };
 
-      const paidTotal = round2(
-        db.payments.filter((existing) => existing.invoiceId === invoice!.id).reduce((sum, existing) => sum + existing.amount, 0) + payment.amount,
+      const paidMinorTotal = db.payments.reduce(
+        (sum, existing) => (existing.invoiceId === invoice!.id ? sum + toMinor(existing.amount) : sum),
+        toMinor(payment.amount),
       );
-      const updated: Invoice = { ...invoice!, amountPaid: paidTotal, status: statusFor(invoice!.total, paidTotal), updatedAt: now };
+      const paidTotal = fromMinor(paidMinorTotal);
+      const updated: Invoice = {
+        ...invoice!,
+        amountPaid: paidTotal,
+        status: statusFor(toMinor(invoice!.total), paidMinorTotal),
+        updatedAt: now,
+      };
       const next = audit(
         {
           ...db,
@@ -299,15 +339,16 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
           action: "finance:payment_record",
           entity: "payment",
           entityId: payment.id,
-          summary: `${payment.reference} ${payment.currencyCode} ${payment.amount.toFixed(2)} recorded against ${updated.reference} (${method}). Outstanding ${updated.currencyCode} ${outstanding({ ...db, payments: [...db.payments, payment] }, updated).toFixed(2)}.`,
+          summary: `${payment.reference} ${payment.currencyCode} ${formatAmount(payment.amount)} recorded against ${updated.reference} (${method}). Outstanding ${updated.currencyCode} ${formatAmount(outstanding({ ...db, payments: [...db.payments, payment] }, updated))}.`,
         },
         now,
       );
-      const balance = round2(Math.max(updated.total - paidTotal, 0));
+      const balanceMinor = toMinor(updated.total) - paidMinorTotal;
+      const balance = fromMinor(balanceMinor > 0 ? balanceMinor : 0);
       return {
         ok: true,
         db: next,
-        message: `${payment.reference} recorded. ${updated.reference} outstanding: ${updated.currencyCode} ${balance.toFixed(2)}.`,
+        message: `${payment.reference} recorded. ${updated.reference} outstanding: ${updated.currencyCode} ${formatAmount(balance)}.`,
       };
     }
 

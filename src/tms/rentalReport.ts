@@ -8,6 +8,7 @@
 //
 // Formulas are documented in docs/KPIS.md. Changing one here without changing it there is a defect.
 
+import { fromMinor, sumAmounts, toMinor } from "./money";
 import type { Database, Invoice, Payment, Rental } from "./types";
 
 export interface CancellationReason {
@@ -68,8 +69,15 @@ export function daysInRange(from: string, to: string): string[] {
   return Array.from({ length: end - start + 1 }, (_, offset) => new Date((start + offset) * dayMs).toISOString().slice(0, 10));
 }
 
-const paidOn = (payments: Payment[], invoice: Invoice) =>
-  payments.filter((payment) => payment.invoiceId === invoice.id).reduce((sum, payment) => sum + payment.amount, 0);
+/**
+ * Payments against one invoice, summed in whole pesewas (money.ts).
+ *
+ * These figures are compared with a printed total and subtracted from it, so a float sum that lands
+ * a hair under the total would report a settled invoice as outstanding forever (audit D-04).
+ */
+const paidOnMinor = (payments: Payment[], invoice: Invoice) =>
+  payments.reduce((sum, payment) => (payment.invoiceId === invoice.id ? sum + toMinor(payment.amount) : sum), 0);
+
 
 /** Vehicle-days a rental commits inside the range. Only a committed rental occupies a vehicle. */
 function rentalVehicleDays(rental: Rental, days: string[]): number {
@@ -91,15 +99,19 @@ export function rentalReport(db: Database, from: string, to: string): RentalRepo
 
   const invoices = db.invoices.filter((invoice) => invoice.status !== "void" && inRange(invoice.issuedOn));
   const payments = db.payments.filter((payment) => inRange(payment.paidOn));
-  const invoicedTotal = invoices.reduce((sum, invoice) => sum + invoice.total, 0);
-  const receivedTotal = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  // Totals are added in whole pesewas and converted back once, so the report reconciles exactly with
+  // the invoices it is made of (audit D-04).
+  const invoicedTotal = sumAmounts(invoices.map((invoice) => invoice.total));
+  const receivedTotal = sumAmounts(payments.map((payment) => payment.amount));
 
   const openInvoices = db.invoices.filter((invoice) => invoice.status !== "void" && invoice.issuedOn <= to);
-  const outstandingTotal = openInvoices.reduce(
-    (sum, invoice) => sum + Math.max(invoice.total - paidOn(db.payments, invoice), 0),
-    0,
+  const outstandingTotal = sumAmounts(
+    openInvoices.map((invoice) => {
+      const remaining = toMinor(invoice.total) - paidOnMinor(db.payments, invoice);
+      return fromMinor(remaining > 0 ? remaining : 0);
+    }),
   );
-  const outstandingCount = openInvoices.filter((invoice) => paidOn(db.payments, invoice) < invoice.total).length;
+  const outstandingCount = openInvoices.filter((invoice) => paidOnMinor(db.payments, invoice) < toMinor(invoice.total)).length;
 
   const fleet = db.vehicles.filter((vehicle) => vehicle.status !== "retired");
   const vehicleDays = db.rentals.reduce((sum, rental) => sum + rentalVehicleDays(rental, days), 0);

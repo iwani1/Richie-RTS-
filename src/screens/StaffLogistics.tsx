@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import type { IncidentAdvanceInput, WorkOrderAdvanceInput, CostInput, IncidentInput, WorkOrderInput } from "../tms/logistics";
 import { INCIDENT_TRANSITIONS, WORK_ORDER_TRANSITIONS } from "../tms/logistics";
 import { costReport } from "../tms/costs";
+import { formatAmount } from "../tms/money";
 import {
   INCIDENT_SEVERITIES,
   INCIDENT_SEVERITY_LABELS,
@@ -56,7 +57,7 @@ const WORK_ORDER_TONE: Record<WorkOrderStatus, "info" | "warning" | "success" | 
   closed: "neutral",
 };
 
-const money = (amount: number, currency: string | null) => `${currency ?? ""} ${amount.toFixed(2)}`.trim();
+const money = (amount: number, currency: string | null) => `${currency ?? ""} ${formatAmount(amount)}`.trim();
 
 export function StaffLogisticsPage() {
   const [tab, setTab] = useState<Tab>("incidents");

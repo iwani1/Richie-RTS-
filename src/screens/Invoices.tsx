@@ -6,6 +6,7 @@
 // issued invoice: it can be paid, verified or voided, and the void path is refused once money has
 // been recorded against it.
 import { useMemo, useState, type FormEvent } from "react";
+import { formatAmount, lineAmount, linesTotal, sumAmounts } from "../tms/money";
 import type { CommandResult } from "../tms/service";
 import type { Invoice, InvoiceStatus, Payment, PaymentStatus } from "../tms/types";
 import { INVOICE_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "../tms/types";
@@ -36,7 +37,9 @@ const STATUS_TONE: Record<InvoiceStatus, "success" | "warning" | "error" | "neut
   void: "neutral",
 };
 
-const money = (currency: string, amount: number) => `${currency} ${amount.toFixed(2)}`;
+// Displayed and previewed with the same arithmetic the server will use, so the figure on screen
+// is the figure on the document (audit D-04).
+const money = (currency: string, amount: number) => `${currency} ${formatAmount(amount)}`;
 
 type CommandNotify = ReturnType<typeof useTms>["setFlash"];
 
@@ -50,21 +53,28 @@ export function InvoicesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [issuing, setIssuing] = useState(false);
 
-  const paidOn = (invoice: Invoice) =>
-    db.payments.filter((payment) => payment.invoiceId === invoice.id).reduce((sum, payment) => sum + payment.amount, 0);
+  // Payments attached to an invoice, added in whole pesewas rather than as floats.
+  const paidOn = useMemo(() => {
+    const byInvoice = new Map<string, number[]>();
+    for (const payment of db.payments) byInvoice.set(payment.invoiceId, [...(byInvoice.get(payment.invoiceId) ?? []), payment.amount]);
+    return (invoice: Invoice) => sumAmounts(byInvoice.get(invoice.id) ?? []);
+  }, [db.payments]);
   const live = db.invoices.filter((invoice) => invoice.status !== "void");
 
+  // KPI totals are added in whole pesewas (money.ts). Summed as floats, "billed less received" can
+  // sit a pesewa away from the invoices it is made of, and the operator sees a balance that is not
+  // owed (audit D-04).
   const totals = useMemo(() => {
-    const sumPaid = (invoice: Invoice) =>
-      db.payments.filter((payment) => payment.invoiceId === invoice.id).reduce((sum, payment) => sum + payment.amount, 0);
     const open = db.invoices.filter((invoice) => invoice.status !== "void");
-    const billed = open.reduce((sum, invoice) => sum + invoice.total, 0);
-    const received = open.reduce((sum, invoice) => sum + sumPaid(invoice), 0);
-    const overdue = open
-      .filter((invoice) => invoice.status !== "paid" && invoice.dueOn < today)
-      .reduce((sum, invoice) => sum + (invoice.total - sumPaid(invoice)), 0);
+    const billed = sumAmounts(open.map((invoice) => invoice.total));
+    const received = sumAmounts(open.map((invoice) => paidOn(invoice)));
+    const overdue = sumAmounts(
+      open
+        .filter((invoice) => invoice.status !== "paid" && invoice.dueOn < today)
+        .map((invoice) => Math.max(invoice.total - paidOn(invoice), 0)),
+    );
     return { billed, received, outstanding: Math.max(billed - received, 0), overdue };
-  }, [db.invoices, db.payments, today]);
+  }, [db.invoices, paidOn, today]);
 
   const currency = db.settings.currencyCode ?? live[0]?.currencyCode ?? "";
 
@@ -219,7 +229,8 @@ function IssueInvoiceForm({
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const rental = billable.find((candidate) => candidate.id === values.rentalId);
-  const subtotal = rental?.finalInvoice?.lines.reduce((sum, line) => sum + line.quantity * line.unitAmount, 0) ?? 0;
+  // The preview the operator reads before pressing Issue: the same rounding the invoice will apply.
+  const subtotal = rental?.finalInvoice ? linesTotal(rental.finalInvoice.lines) : 0;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -255,7 +266,7 @@ function IssueInvoiceForm({
                   <span>
                     {line.description} × {line.quantity}
                   </span>
-                  <span className="rts-mono">{money(rental.finalInvoice!.currencyCode, line.quantity * line.unitAmount)}</span>
+                  <span className="rts-mono">{money(rental.finalInvoice!.currencyCode, lineAmount(line.quantity, line.unitAmount))}</span>
                 </li>
               ))}
             </ul>
@@ -296,7 +307,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
   const [paying, setPaying] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const payments = db.payments.filter((payment) => payment.invoiceId === invoice.id);
-  const received = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const received = sumAmounts(payments.map((payment) => payment.amount));
   const outstanding = Math.max(invoice.total - received, 0);
   const rental = db.rentals.find((candidate) => candidate.id === invoice.rentalId) ?? null;
 
@@ -356,7 +367,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
               { key: "description", header: "Description", render: (line) => line.description },
               { key: "quantity", header: "Qty", className: "text-right rts-mono", render: (line) => line.quantity },
               { key: "unit", header: "Unit", className: "text-right rts-mono", render: (line) => money(invoice.currencyCode, line.unitAmount) },
-              { key: "amount", header: "Amount", className: "text-right rts-mono", render: (line) => money(invoice.currencyCode, line.quantity * line.unitAmount) },
+              { key: "amount", header: "Amount", className: "text-right rts-mono", render: (line) => money(invoice.currencyCode, lineAmount(line.quantity, line.unitAmount)) },
             ]}
           />
           {invoice.taxLines.length > 0 && (

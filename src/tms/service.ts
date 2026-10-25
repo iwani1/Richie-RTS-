@@ -5,6 +5,7 @@
 import { can, type Permission } from "./permissions";
 import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
+import { formatAmount, isPercentWithTwoDecimals, linesTotal, percentOf, parseAmount, parseQuantity, toMinor, fromMinor } from "./money";
 import { allocateReference } from "./references";
 import { confinedClientId } from "./scope";
 import {
@@ -206,8 +207,14 @@ export const RENTAL_TRANSITIONS: Record<RentalStatus, readonly RentalStatus[]> =
 
 const ACTIVE_RENTAL_STATUSES: readonly RentalStatus[] = ["confirmed", "in_progress"];
 
-// Round to 2 dp without floating-point surprises.
-export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+/**
+ * Rounds an already-computed amount to two decimals, half-up.
+ *
+ * Kept because callers outside this file use it, but it is no longer where money is calculated;
+ * `money.ts` does the arithmetic in integer pesewas, so this only has to round a value that is
+ * already assumed to be a 2-decimal amount (audit D-04).
+ */
+export const round2 = (n: number) => fromMinor(toMinor(n));
 
 const datesOverlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart <= bEnd && bStart <= aEnd;
 
@@ -422,8 +429,13 @@ export function validateSettings(db: Database, input: Settings) {
     requotePolicy: rentalIn.requotePolicy,
   };
   if (rental.pricingBasis !== null && !PRICING_BASES.includes(rental.pricingBasis)) errors["rental.pricingBasis"] = "Invalid pricing basis.";
+  // A percentage is computed in integer basis points (money.ts), so it may not carry more precision
+  // than the arithmetic can represent: 33.333% would silently become 33.33% and the deposit would be
+  // a different number from the one on the screen.
   if (rental.depositPercent !== null && (!Number.isFinite(rental.depositPercent) || rental.depositPercent < 0 || rental.depositPercent > 100))
     errors["rental.depositPercent"] = "Deposit must be between 0 and 100 percent.";
+  else if (rental.depositPercent !== null && !isPercentWithTwoDecimals(rental.depositPercent))
+    errors["rental.depositPercent"] = "Give the deposit to at most two decimal places.";
   if (rental.quotationValidityDays !== null && (!Number.isInteger(rental.quotationValidityDays) || rental.quotationValidityDays < 1))
     errors["rental.quotationValidityDays"] = "Validity must be a whole number of days (1 or more).";
   const seenMethod = new Set<string>();
@@ -462,6 +474,7 @@ export function validateSettings(db: Database, input: Settings) {
     if (!line.name) errors[`taxLines.${i}`] = "Tax line name is required.";
     else if (seenTax.has(norm(line.name))) errors[`taxLines.${i}`] = "Duplicate tax line name.";
     else if (!Number.isFinite(line.ratePercent) || line.ratePercent < 0 || line.ratePercent > 100) errors[`taxLines.${i}`] = "Rate must be between 0 and 100 percent.";
+    else if (!isPercentWithTwoDecimals(line.ratePercent)) errors[`taxLines.${i}`] = "Give the rate to at most two decimal places.";
     seenTax.add(norm(line.name));
   });
   if (taxPosition === "registered" && taxLines.length === 0 && !errors.taxPosition) errors.taxLines = "A VAT-registered company needs at least one tax line.";
@@ -646,14 +659,21 @@ export function validateQuoteLines(input: QuoteInput) {
   if (input.lines.length === 0) errors.lines = "Add at least one line item.";
   input.lines.forEach((line, i) => {
     const description = line.description.trim();
-    const quantity = Number(line.quantity);
-    const unitAmount = Number(line.unitAmount);
+    // Amounts and quantities are read as decimal text and never coerced: `100.005` is a mistake to
+    // show the operator, not a number to round behind their back (audit D-04).
+    const quantity = parseQuantity(line.quantity ?? "");
+    const amount = parseAmount(line.unitAmount ?? "");
     if (!description) errors[`lines.${i}.description`] = "Description is required.";
-    if (line.quantity.trim() === "" || !Number.isFinite(quantity) || quantity <= 0) errors[`lines.${i}.quantity`] = "Quantity must be greater than 0.";
-    if (line.unitAmount.trim() === "" || !Number.isFinite(unitAmount) || unitAmount < 0) errors[`lines.${i}.unitAmount`] = "Amount must be 0 or more.";
-    lines.push({ id: line.id || makeId(), description, quantity: Number.isFinite(quantity) ? quantity : 0, unitAmount: Number.isFinite(unitAmount) ? unitAmount : 0 });
+    if (quantity.problem === "too-many-decimals") errors[`lines.${i}.quantity`] = "Use at most three decimal places.";
+    else if (quantity.problem) errors[`lines.${i}.quantity`] = "Quantity must be greater than 0.";
+    if (amount.problem === "too-many-decimals") errors[`lines.${i}.unitAmount`] = "Use at most two decimal places: amounts are in pesewas.";
+    else if (amount.problem === "too-large") errors[`lines.${i}.unitAmount`] = "That amount looks wrong. Check the figure.";
+    else if (amount.problem) errors[`lines.${i}.unitAmount`] = "Amount must be 0 or more.";
+    lines.push({ id: line.id || makeId(), description, quantity: quantity.quantity, unitAmount: amount.amount });
   });
-  const subtotal = round2(lines.reduce((sum, l) => sum + l.quantity * l.unitAmount, 0));
+  // Summed in whole pesewas, then rounded once per line — the same arithmetic the invoice repeats,
+  // so a quotation and the invoice raised from it cannot disagree by a cent.
+  const subtotal = Object.keys(errors).length ? 0 : linesTotal(lines);
   return { errors, lines, subtotal };
 }
 
@@ -674,7 +694,7 @@ function buildQuote(db: Database, actor: Actor, input: QuoteInput, now: string):
       lines,
       subtotal,
       depositPercent,
-      depositRequired: round2((subtotal * depositPercent) / 100),
+      depositRequired: percentOf(subtotal, depositPercent),
       validUntil,
       quotedAt: now,
       quotedBy: actor.fullName,
@@ -1090,20 +1110,24 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (!existing.quote) return fail("This rental has no quotation to confirm.");
       if (existing.quote.validUntil < now.slice(0, 10)) return fail("The quotation has expired. Issue a new quotation before confirming.");
       const errors: Errors = {};
-      const amount = Number(command.input.amount);
+      const parsed = parseAmount(command.input.amount ?? "");
       const method = command.input.method.trim();
-      if (command.input.amount.trim() === "" || !Number.isFinite(amount) || amount < 0) errors.amount = "Enter the deposit amount received.";
-      else if (round2(amount) < existing.quote.depositRequired) errors.amount = `Deposit must be at least ${existing.quote.currencyCode} ${existing.quote.depositRequired.toFixed(2)}.`;
+      if (parsed.problem === "too-many-decimals") errors.amount = "Use at most two decimal places: amounts are in pesewas.";
+      else if (parsed.problem === "too-large") errors.amount = "That amount looks wrong. Check the figure.";
+      else if (parsed.problem) errors.amount = "Enter the deposit amount received.";
+      else if (toMinor(parsed.amount) < toMinor(existing.quote.depositRequired)) {
+        errors.amount = `Deposit must be at least ${existing.quote.currencyCode} ${formatAmount(existing.quote.depositRequired)}.`;
+      }
       if (!method) errors.method = "Select the payment method.";
       else if (!db.settings.rental.paymentMethods.includes(method)) errors.method = "Unknown payment method.";
       if (Object.keys(errors).length) return fail("Please correct the deposit details.", errors);
-      const deposit = { amount: round2(amount), method, reference: command.input.reference.trim(), receivedAt: now };
+      const deposit = { amount: parsed.amount, method, reference: command.input.reference.trim(), receivedAt: now };
       const updated: Rental = { ...existing, status: "confirmed", deposit, updatedAt: now };
       const next = audit({ ...db, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
         action: "rentals:confirm",
         entity: "rental",
         entityId: updated.id,
-        summary: `${updated.reference} confirmed; deposit ${existing.quote.currencyCode} ${deposit.amount.toFixed(2)} via ${method}.`,
+        summary: `${updated.reference} confirmed; deposit ${existing.quote.currencyCode} ${formatAmount(deposit.amount)} via ${method}.`,
       }, now);
       return { ok: true, db: next, message: `${updated.reference} confirmed.` };
     }

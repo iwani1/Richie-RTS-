@@ -9,16 +9,19 @@ import {
   TRIP_STATUS_LABELS,
   type Trip,
 } from "../tms/types";
+import { formatAmount, fromMinor, sumAmounts, toMinor } from "../tms/money";
 import { Badge, Button, todayYmd } from "../ui/primitives";
 import { Icon } from "../ui/icons";
 import type { Route } from "../routes";
 
 function money(amount: number, currency: string | null) {
-  if (!currency) return amount.toFixed(2);
+  // formatAmount settles the pesewa with the same rule the server applies (money.ts); the formatter
+  // only decides how that settled value is written down.
+  if (!currency) return formatAmount(amount);
   try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(fromMinor(toMinor(amount)));
   } catch {
-    return `${currency} ${amount.toFixed(2)}`;
+    return `${currency} ${formatAmount(amount)}`;
   }
 }
 
@@ -80,10 +83,12 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
   const readiness = readinessReport(db, today);
   const awaitingConfirmation = db.rentals.filter((r) => r.status === "draft" || r.status === "quoted");
   const activeRentals = db.rentals.filter((r) => r.status === "confirmed" || r.status === "in_progress");
-  const depositsHeld = activeRentals.reduce((sum, r) => sum + (r.deposit?.amount ?? 0), 0);
-  const billed = db.rentals
-    .filter((r) => r.status === "completed" && r.finalInvoice)
-    .reduce((sum, r) => sum + (r.finalInvoice?.total ?? 0), 0);
+  // Added in whole pesewas: these two numbers sit side by side with the invoice figures, and float
+  // addition can leave them a pesewa apart (audit D-04).
+  const depositsHeld = sumAmounts(activeRentals.map((r) => r.deposit?.amount ?? 0));
+  const billed = sumAmounts(
+    db.rentals.filter((r) => r.status === "completed" && r.finalInvoice).map((r) => r.finalInvoice?.total ?? 0),
+  );
 
   // ---- today's work ----------------------------------------------------------------------------
   const startTimes = new Map<string, string>(

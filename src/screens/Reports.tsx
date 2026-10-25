@@ -6,6 +6,7 @@
 // browser alone — the payload the screen receives has already been narrowed on the server, so an
 // export can never contain a record the signed-in role cannot read.
 import { useMemo, useState } from "react";
+import { formatAmount } from "../tms/money";
 import { rentalReport, rentalReportCsv } from "../tms/rentalReport";
 import { useTms } from "../tms/useTms";
 import {
@@ -22,7 +23,7 @@ import {
   todayYmd,
 } from "../ui/primitives";
 
-const money = (currency: string | null, amount: number) => (currency ? `${currency} ${amount.toFixed(2)}` : "Not configured");
+const money = (currency: string | null, amount: number) => (currency ? `${currency} ${formatAmount(amount)}` : "Not configured");
 const percent = (value: number | null) => (value === null ? "Not available" : `${(value * 100).toFixed(1)}%`);
 
 const firstOfMonth = (today: string) => `${today.slice(0, 7)}-01`;

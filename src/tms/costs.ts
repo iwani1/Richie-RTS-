@@ -5,6 +5,7 @@
 // Every figure is returned together with its reporting period and data coverage, and a
 // total is only produced once the company currency has been set (no default).
 
+import { sumAmounts } from "./money";
 import type { CostEntry, Database } from "./types";
 
 export interface CostLine extends CostEntry {
@@ -59,7 +60,8 @@ export function costReport(db: Database, from: string, to: string): CostReport {
   const recordsInScope = incidents.length + workOrders.length;
   const recordsWithCosts = incidentsWithCosts + workOrdersWithCosts;
   const coverage = recordsInScope > 0 ? recordsWithCosts / recordsInScope : null;
-  const total = lines.reduce((sum, line) => sum + line.amount, 0);
+  // Added in whole pesewas: a hundred cost lines summed as floats can land a cent out (D-04).
+  const total = sumAmounts(lines.map((line) => line.amount));
 
   const base = {
     from,
