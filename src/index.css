@@ -2215,6 +2215,21 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   white-space: nowrap;
 }
 
+/* The last row of the same list can be a total rather than another band (the finance home, D-91). It is
+   separated by weight and a rule, not by a colour, so the figure still reads in greyscale. */
+.rts-ageing-label--total {
+  font-weight: 600;
+}
+
+.rts-ageing-row:last-child dt,
+.rts-ageing-row:last-child dd {
+  font-size: 0.9375rem;
+}
+
+.rts-ageing-row:last-child dd {
+  font-weight: 600;
+}
+
 /* ---------------------------------------------------------------- printed documents (FIN-02, D-87)
    A sheet of paper, previewed on screen and printed by the browser. The rules that matter:
    - the sheet is white with dark ink whatever the theme, because it is the one surface here that

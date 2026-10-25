@@ -26,6 +26,7 @@
 // company currency is not configured, because a total without a currency is a guess.
 
 import { isLivePayment } from "./creditNotes";
+import { debtAgeing, type DebtAgeing } from "./customerStatement";
 import { billableEventFor, outstanding } from "./finance";
 import { financialReport, type ExpensesByCategory, type FinancialReport, type RevenueByCustomer } from "./financialReport";
 import { fromMinor, toMinor } from "./money";
@@ -118,6 +119,8 @@ export interface FinanceHome {
   byCategory: ExpensesByCategory[];
   overdue: OverdueInvoice[];
   overdueTotal: number;
+  /** The same debt, in age bands and per customer: how bad it is, not just what it is (D-91). */
+  ageing: DebtAgeing;
   unbilled: UnbilledHire[];
   awaitingPayments: AwaitingPayment[];
   awaitingTotal: number;
@@ -259,6 +262,7 @@ export function financeHome(db: Database, from: string, to: string, asAt: string
     byCategory: report.expensesByCategory,
     overdue,
     overdueTotal: sum(overdue.map((invoice) => invoice.outstanding)),
+    ageing: debtAgeing(db, asAt),
     unbilled,
     awaitingPayments,
     awaitingTotal: sum(awaitingPayments.map((payment) => payment.amount)),

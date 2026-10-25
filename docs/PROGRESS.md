@@ -89,7 +89,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RPT-01 | 1A | Rental reports: enquiries, quotations issued, acceptance rate, confirmed and completed rentals, revenue, outstanding balances, vehicle utilisation,… | Met | `src/tms/rentalReport.ts` + `src/screens/Reports.tsx` (Phase 17). All eight figures are computed from records, with coverage stated, a currency guard and a CSV of the same numbers; 7 domain tests and 3 screen tests. Formulas in `docs/KPIS.md`. |
 | RPT-02 | 1C | Staff transport and fleet reports: bookings received/confirmed/completed/cancelled, no-shows, on-time pickup rate, average delay, passengers… | Partial | On-time pickup rate with data coverage (`src/tms/kpis.ts`). Utilisation **definition** agreed in Q-29 and written down in `KPIS.md`; the fleet-wide screen is still to build. **No bookings, no-shows, passengers transported, route utilisation, contract performance, downtime, fuel, mileage.** |
 | RPT-03 | 1C | Financial reports: revenue by service and customer, payments received, outstanding invoices, expenses by category, cost per trip, cost per passenger… | Partial | `src/tms/financialReport.ts` + a section on the Reports screen (Phase 28): all six figures computed from records, with the period, coverage, cost-per-trip and cost-per-passenger definitions from Q-29, and a CSV. **Revenue by service has one line** because only vehicle hire is invoiced in this build; contract billing is FIN-02. No profit or margin (costs captured are maintenance only). |
-| RPT-04 | 1C | Filters (date range, service, client, customer, route, driver, vehicle, status) and CSV export, always permission-scoped. Every KPI formula is… | Partial | The rental report has a date range, a coverage panel and a CSV of the same figures (Phase 17); other screens have search and status filters. Formulas documented in `docs/KPIS.md`. The **customer statement** (Phase 39, D-90) is the per-customer view: one account for a chosen period, with the balance carried in, the ageing bands and a printable sheet. **The other reports have no date range or CSV, and there is no cross-report filter bar** (service, client, route, driver, vehicle); the statement has no CSV because it is a document, not a data export. |
+| RPT-04 | 1C | Filters (date range, service, client, customer, route, driver, vehicle, status) and CSV export, always permission-scoped. Every KPI formula is… | Partial | The rental report has a date range, a coverage panel and a CSV of the same figures (Phase 17); other screens have search and status filters. Formulas documented in `docs/KPIS.md`. The **customer statement** (Phase 39, D-90) is the per-customer view: one account for a chosen period, with the balance carried in, the ageing bands and a printable sheet; the **finance home** states the same bands for the whole company (Phase 40, D-91), from one banding function. **The other reports have no date range or CSV, and there is no cross-report filter bar** (service, client, route, driver, vehicle); the statement has no CSV because it is a document, not a data export. |
 | RPT-05 | 3 | PDF reports. | Deferred | Phase 3. |
 | GPS-01 | 2 | Provider interface; last reported location with timestamp; clear distinction between live, stale and simulated locations; never fabricate… | Deferred | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
 
@@ -1029,4 +1029,27 @@ and the sheet to send.
 | Tests | Done (verified) | 12 domain (`customerStatement.test.ts`), 9 screen (`Statements.test.tsx`), 3 sheet (`Documents.test.tsx`) |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **574 passed, 18 skipped**, `build`
+succeeds.
+
+## Phase 40 - How bad the debt is, in one place (RPT-04, FIN-07, D-91)
+
+The finance home could list every late invoice, which answers "what do I chase today?". It could not
+answer "how bad is the debt overall?" without somebody adding a column up by hand — and the bands that
+would answer it already existed for a single customer's statement. This phase totals them across the
+company, from the same function, so a customer's statement and the finance home cannot disagree about
+how late the same invoice is.
+
+| Item | Status | Evidence |
+|---|---|---|
+| The debt is stated in the four bands, across all customers | Done (verified) | *Debt by age* card on the finance home: not yet due, 1–30, 31–60, over 60, each with the sentence saying what it is worth doing, then a total with the count of open invoices and customers; `debtAgeing()` in `src/tms/customerStatement.ts` |
+| One banding function, so the statement and the finance home agree | Done (verified) | `ageBucketFor` exported and used by both; "uses one definition of a band, so a statement and the company total agree" checks the boundaries (0, 1, 30, 31, 60, 61) and then compares the two totals on the same invoices |
+| A part-paid invoice is aged at what is left; retracted money counts for nothing | Done (verified) | `invoiceBalance` per invoice as at the date; "counts a part-paid invoice at what is left, and leaves void and cancelled money out" (650 of a 1,000 invoice after a 250 payment and a 100 credit) |
+| The customers behind the debt are named, largest first | Done (verified) | The per-customer band table with each customer's oldest debt in days: "2 customers owe GHS 3500.00 … GHS 2000.00 is over 60 days old" |
+| No total across two currencies | Done (verified) | "withholds the total when the invoices are in two currencies" — the figure is zero and the message names GHS and USD |
+| Nothing owed is said in words, not four zero rows | Done (verified) | "Nothing is owed as at 2026-06-30.", asserted exactly |
+| The card leads to the per-customer document | Done (verified) | **Open statements** on the card; "takes the officer from the debt straight to the statements" |
+| The finance home's own stale note is fixed | Done (verified) | The coverage line no longer says "PDF statements are not built yet"; it says where statements print |
+| Tests | Done (verified) | 5 domain (`customerStatement.test.ts`), 1 finance-home domain (`financeHome.test.ts`), 2 screen (`FinanceHome.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **582 passed, 18 skipped**, `build`
 succeeds.

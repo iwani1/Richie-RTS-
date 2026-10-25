@@ -147,13 +147,15 @@ describe("finance home", () => {
   it("shows the late invoice, the unbilled hire and the payment still to check, dated as at today", () => {
     open(world());
 
-    expect(screen.getByText("Overdue")).toBeTruthy();
-    // It appears twice on purpose: once in the overdue list, once against its payment.
-    expect(screen.getAllByText("INV-2026-0001").length).toBe(2);
+    expect(screen.getAllByText("Overdue").length).toBeGreaterThan(0);
+    // It appears more than once on purpose: in the overdue list and against its payment. The
+    // debt-by-age table is per customer, not per invoice, so it names the customer instead.
+    expect(screen.getAllByText("INV-2026-0001").length).toBeGreaterThanOrEqual(2);
     // 10 days late, and the money still owed (2,000 invoiced less 500 recorded).
     expect(screen.getByText("10 days")).toBeTruthy();
-    // Said in the notice at the top and on the table itself: the period filter does not move a deadline.
-    expect(screen.getAllByText(/measured as at/i).length).toBe(2);
+    // Said in the notice at the top, on the overdue table, and on the debt-by-age table: the period
+    // filter does not move a deadline.
+    expect(screen.getAllByText(/measured as at/i).length).toBe(3);
 
     expect(screen.getByText("RR-0002")).toBeTruthy();
     expect(screen.getByText("Completed but not billed")).toBeTruthy();
@@ -162,6 +164,42 @@ describe("finance home", () => {
     // A recorded payment is not settled money, and the screen names the step left to take.
     expect(screen.getByText("Recorded ·")).toBeTruthy();
     expect(screen.getByText("verify")).toBeTruthy();
+  });
+
+  it("shows how bad the debt is, in the same bands a customer statement prints (D-91)", () => {
+    const db = world();
+    open({
+      ...db,
+      invoices: [
+        invoice({ id: "inv1", reference: "INV-2026-0001", total: 1000, subtotal: 1000, dueOn: daysAgo(10) }),
+        invoice({ id: "inv2", reference: "INV-2026-0002", customerName: "Beta Foods", total: 2000, subtotal: 2000, dueOn: daysAgo(120) }),
+        invoice({ id: "inv3", reference: "INV-2026-0003", total: 500, subtotal: 500, issuedOn: today, dueOn: daysAgo(-14) }),
+      ],
+      payments: [],
+    });
+
+    expect(screen.getByText("Debt by age")).toBeTruthy();
+    // The four bands are named in words, each with the sentence saying what it is worth doing. The
+    // three late bands also head a column over the customers in them; "not yet due" is in the list only,
+    // because a column of money that is not late yet would be the one nobody chases.
+    expect(screen.getAllByText("Not yet due").length).toBe(1);
+    expect(screen.getAllByText("1–30 days late").length).toBe(2);
+    expect(screen.getByText("worth a reminder")).toBeTruthy();
+    expect(screen.getAllByText("Over 60 days late").length).toBe(2);
+    expect(screen.getByText("Total still owed")).toBeTruthy();
+    // 1,000 ten days late, 2,000 over 60 days late, 500 not due yet.
+    expect(screen.getByText(/2 customers owe GHS 3500/)).toBeTruthy();
+    expect(screen.getByText(/GHS 2000\.00 is over 60 days old/)).toBeTruthy();
+    // The customer behind the oldest money is named, with how late its oldest invoice is.
+    // The name also appears on the unbilled-hire table below, so it is not unique to this card.
+    expect(screen.getAllByText("Beta Foods").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/oldest 120 days late/).length).toBe(1);
+  });
+
+  it("takes the officer from the debt straight to the statements", () => {
+    const navigate = open(world());
+    fireEvent.click(screen.getByRole("button", { name: /Open statements/i }));
+    expect(navigate).toHaveBeenCalledWith("statements");
   });
 
   it("withholds the margin and says what is missing, instead of showing a made-up rate", () => {

@@ -1476,3 +1476,34 @@ decision the office makes, not one the system invents.
   same preview, portal and print stylesheet as the invoice (D-87); the ageing block in
   `src/index.css`. 12 domain tests, 9 screen tests and 3 sheet tests. Delivery is still manual: the
   statement prints or saves as a PDF, and nothing is emailed.
+
+## D-91 The debt is aged across the company, with one banding function and no cross-currency totals
+
+- **Context.** The finance home listed every late invoice one by one, which answers "what do I chase
+  today?". It could not answer "how bad is the debt overall?" without the reader adding a column up in
+  their head — and the ageing bands already existed for a single customer's statement (D-90), so the
+  figures the office would have to add by hand were figures the system already knew. Two ways of
+  banding the same invoice is exactly the class of drift D-86 exists to prevent.
+- **Decision.** The finance home states **debt by age**, across all customers, as at today:
+  - the same four bands a statement prints, from **one exported function** (`ageBucketFor`) and one
+    `invoiceBalance` call, so an invoice cannot be 60 days late here and 61 days late on a statement;
+  - each invoice contributes its **outstanding** amount on the day being read, so a part-paid invoice is
+    aged at what is left; a void invoice and a cancelled payment contribute nothing (D-88);
+  - the bands are shown with the same explanatory sentences as on the statement ("worth a reminder",
+    "worth a call"), and the customers behind them are listed with their own band totals and the age of
+    their oldest debt;
+  - **no total across currencies.** When the outstanding invoices are in more than one currency the
+    figure is withheld and the currencies are named, because a sum of cedis and dollars is true of
+    nothing;
+  - the card sits above the overdue list and links straight to **Statements**, so the reader can go from
+    "how bad is it" to "show this one customer" in one click.
+- **Rejected.** Adding the bands to `financialReport` (that report is about a period's activity; ageing is
+  about a balance at a moment, and mixing them would make "the June report" change every day as debts
+  age). A separate ageing screen (a second destination for four numbers, and the finance home is where
+  the money questions are asked). Colouring the oldest band red without saying its name (colour must
+  never be the only carrier: the band is written out and the amount is in words beside it).
+- **Consequence.** `debtAgeing()` and the exported band helpers in `src/tms/customerStatement.ts`;
+  `ageing` on `FinanceHome`; the *Debt by age* card and the per-customer band table on
+  `src/screens/FinanceHome.tsx`; the total row style in `src/index.css`. 5 domain tests, 1 finance-home
+  test, 1 navigation test, and a boundary test on the bands themselves. The stale line "PDF statements
+  are not built yet" under the coverage note is replaced: statements print from the Statements screen.

@@ -386,6 +386,29 @@ describe("finance home - work waiting on finance", () => {
     expect(home.awaitingTotal).toBe(750);
   });
 
+  it("states the debt in age bands, and agrees with the invoices it is made of (D-91)", () => {
+    // The finance home already lists late invoices one by one. The bands answer the other question —
+    // how bad it is overall — and they must add up to what is actually owed, not to a separate idea of it.
+    const db = build({
+      invoices: [
+        invoice({ id: "i1", reference: "INV-2026-0001", total: 1000, subtotal: 1000, taxLines: [], issuedOn: "2026-06-01", dueOn: "2026-06-30" }),
+        invoice({ id: "i2", reference: "INV-2026-0002", total: 2000, subtotal: 2000, taxLines: [], issuedOn: "2026-05-01", dueOn: "2026-06-10" }),
+        invoice({ id: "i3", reference: "INV-2026-0003", customerName: "Harbour Logistics", total: 3000, subtotal: 3000, taxLines: [], issuedOn: "2026-02-01", dueOn: "2026-03-01" }),
+      ],
+      payments: [],
+    });
+    const home = financeHome(db, JUNE.from, JUNE.to, "2026-06-25");
+    expect(home.ageing.status).toBe("ok");
+    expect(home.ageing.notYetDue).toBe(1000);
+    expect(home.ageing.days1to30).toBe(2000);
+    expect(home.ageing.days61plus).toBe(3000);
+    expect(home.ageing.total).toBe(6000);
+    expect(home.ageing.overdueTotal).toBe(5000);
+    // The bands are the same money as the overdue list, plus what is not late yet.
+    expect(home.ageing.total).toBeCloseTo(home.overdueTotal + home.ageing.notYetDue, 2);
+    expect(home.ageing.customers.map((row) => row.customerName)).toEqual(["Harbour Logistics", "Northstar Foods"]);
+  });
+
   it("does not ask anybody to verify a payment that was cancelled", () => {
     // A cancelled payment is not waiting on a next step, and it is not part of what is awaiting
     // checking in the period either (D-88).

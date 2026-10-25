@@ -6,7 +6,7 @@
 // counted twice, or a credit note left out shows up as a difference between them, which is exactly the
 // class of mistake a statement mailed to a customer makes public.
 import { describe, expect, it } from "vitest";
-import { customerStatement, statementCustomers } from "./customerStatement";
+import { ageBucketFor, customerStatement, debtAgeing, statementCustomers } from "./customerStatement";
 import { invoiceBalance } from "./creditNotes";
 import { emptyDatabase, type CreditNote, type Database, type Invoice, type Payment } from "./types";
 
@@ -270,5 +270,110 @@ describe("choosing a customer", () => {
     expect(statement.status).toBe("mixed_currency");
     expect(statement.message).toMatch(/GHS, USD/);
     expect(statement.rows).toEqual([]);
+  });
+});
+
+describe("how bad the debt is, across customers (RPT-04, D-91)", () => {
+  it("totals the same four bands a statement prints", () => {
+    const db = world({
+      invoices: [
+        // Acme: one invoice due 30 June (not yet late) and one 20 days late.
+        invoice({ id: "inv1", reference: "INV-2026-0001", issuedOn: "2026-06-01", dueOn: "2026-06-30", total: 1000, subtotal: 1000, taxLines: [] }),
+        invoice({ id: "inv2", reference: "INV-2026-0002", issuedOn: "2026-05-01", dueOn: "2026-06-10", total: 2000, subtotal: 2000, taxLines: [] }),
+        // Harbour: one invoice 121 days late.
+        invoice({ id: "inv3", reference: "INV-2026-0003", customerName: "Harbour Logistics", issuedOn: "2026-02-01", dueOn: "2026-03-01", total: 4000, subtotal: 4000, taxLines: [] }),
+      ],
+      payments: [],
+      creditNotes: [],
+    });
+    const ageing = debtAgeing(db, "2026-06-30");
+    expect(ageing.status).toBe("ok");
+    expect(ageing).toMatchObject({
+      currencyCode: "GHS",
+      notYetDue: 1000,
+      days1to30: 2000,
+      days31to60: 0,
+      days61plus: 4000,
+      total: 7000,
+      overdueTotal: 6000,
+      openInvoices: 3,
+    });
+    expect(ageing.customers.map((row) => [row.customerName, row.total, row.oldestDaysOverdue])).toEqual([
+      ["Harbour Logistics", 4000, 121],
+      ["Acme Ltd", 3000, 20],
+    ]);
+    expect(ageing.message).toMatch(/2 customers owe GHS 7000\.00 as at 2026-06-30/);
+    expect(ageing.message).toMatch(/GHS 6000\.00 of it is past its due date and GHS 4000\.00 is over 60 days old/);
+  });
+
+  it("counts a part-paid invoice at what is left, and leaves void and cancelled money out", () => {
+    const db = world({
+      invoices: [
+        invoice({ id: "inv1", reference: "INV-2026-0001", dueOn: "2026-06-20", total: 1000, subtotal: 1000, taxLines: [] }),
+        invoice({ id: "inv2", reference: "INV-2026-0002", dueOn: "2026-06-01", total: 5000, subtotal: 5000, taxLines: [], status: "void", voidReason: "Wrong", voidedAt: AT }),
+        invoice({ id: "inv3", reference: "INV-2026-0003", issuedOn: "2026-07-05", dueOn: "2026-07-19", total: 900, subtotal: 900, taxLines: [] }),
+      ],
+      payments: [
+        payment({ amount: 250 }),
+        payment({ id: "p2", reference: "PAY-2026-0002", amount: 900, voidReason: "Bounced", voidedAt: AT }),
+      ],
+      creditNotes: [credit({ total: 100, subtotal: 100, taxLines: [] })],
+    });
+    const ageing = debtAgeing(db, "2026-06-30");
+    // 1,000 − 250 paid − 100 credited = 650, ten days late. The void invoice, the July invoice and the
+    // cancelled payment all contribute nothing.
+    expect(ageing.days1to30).toBe(650);
+    expect(ageing.total).toBe(650);
+    expect(ageing.openInvoices).toBe(1);
+    expect(ageing.customers).toEqual([expect.objectContaining({ customerName: "Acme Ltd", total: 650, oldestDaysOverdue: 10, openInvoices: 1 })]);
+  });
+
+  it("says nothing is owed when nothing is, rather than showing four zero rows as a fact", () => {
+    const db = world({ invoices: [], payments: [], creditNotes: [] });
+    const ageing = debtAgeing(db, "2026-06-30");
+    expect(ageing).toMatchObject({ status: "ok", total: 0, overdueTotal: 0, openInvoices: 0, customers: [] });
+    expect(ageing.message).toBe("Nothing is owed as at 2026-06-30.");
+  });
+
+  it("withholds the total when the invoices are in two currencies", () => {
+    const db = world({
+      invoices: [
+        invoice({ id: "inv1", currencyCode: "GHS" }),
+        invoice({ id: "inv2", reference: "INV-2026-0002", customerName: "Harbour Logistics", currencyCode: "USD" }),
+      ],
+    });
+    const ageing = debtAgeing(db, "2026-06-30");
+    expect(ageing.status).toBe("mixed_currency");
+    expect(ageing.total).toBe(0);
+    expect(ageing.customers).toEqual([]);
+    expect(ageing.message).toMatch(/GHS, USD/);
+  });
+
+  it("uses one definition of a band, so a statement and the company total agree", () => {
+    // The boundary values are the whole point: 0 is not late, 30 and 60 are still the earlier band,
+    // and 61 starts the last one. A second implementation would drift on exactly these numbers.
+    expect([0, 1, 30, 31, 60, 61, 400].map(ageBucketFor)).toEqual([
+      "notYetDue",
+      "days1to30",
+      "days1to30",
+      "days31to60",
+      "days31to60",
+      "days61plus",
+      "days61plus",
+    ]);
+
+    const db = world({
+      invoices: [
+        invoice({ id: "inv1", reference: "INV-2026-0001", dueOn: "2026-05-01", total: 1000, subtotal: 1000, taxLines: [] }), // 60 days at 30 June
+        invoice({ id: "inv2", reference: "INV-2026-0002", dueOn: "2026-03-01", total: 2000, subtotal: 2000, taxLines: [] }), // 121 days
+      ],
+      payments: [],
+      creditNotes: [],
+    });
+    const statement = customerStatement(db, "Acme Ltd", "2026-06-01", "2026-06-30");
+    const ageing = debtAgeing(db, "2026-06-30");
+    expect(statement.ageing.days31to60).toBe(ageing.days31to60);
+    expect(statement.ageing.days61plus).toBe(ageing.days61plus);
+    expect(statement.ageing.total).toBe(ageing.total);
   });
 });

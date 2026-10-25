@@ -1,6 +1,10 @@
 // A customer's statement of account: everything that moved on their invoices in a period, with the
 // balance carried in, the balance carried out, and how old the money still owed is (FIN-02, D-90).
 //
+// The same bands answer the company-wide question — "how much of what we are owed is old?" — through
+// `debtAgeing()` (D-91). Both readers use `ageBucketFor()` and `invoiceBalance()`, so the finance home
+// and a printed statement can never put the same invoice in different bands.
+//
 // An invoice answers "what is this bill?". A statement answers the question the office asks every
 // month and could not answer before: "what does this customer owe us, and since when?" — the paper a
 // business sends when it chases money, and the only view in this system that reads *all* of one
@@ -186,11 +190,34 @@ export function statementCustomers(db: Database, asAt: string): StatementCustome
     .sort((a, b) => (a.outstanding === b.outstanding ? a.name.localeCompare(b.name) : b.outstanding - a.outstanding));
 }
 
-function bucketFor(daysOverdue: number): AgeBucket {
+/**
+ * The band a debt falls in, from the whole days it is past its due date.
+ *
+ * One function, because the bands are the vocabulary the office uses: a customer statement, the
+ * company-wide total on the finance home and the words on both have to agree about what "31–60 days"
+ * means. A debt not yet due is a band of its own rather than a zero, so an invoice due next week is
+ * never mistaken for one that is late by nothing.
+ */
+export function ageBucketFor(daysOverdue: number): AgeBucket {
   if (daysOverdue <= 0) return "notYetDue";
   if (daysOverdue <= 30) return "days1to30";
   if (daysOverdue <= 60) return "days31to60";
   return "days61plus";
+}
+
+/** The four bands, in the order they are read and printed. */
+export const AGE_BUCKETS: readonly AgeBucket[] = ["notYetDue", "days1to30", "days31to60", "days61plus"];
+
+export const AGE_BUCKET_LABELS: Record<AgeBucket, string> = {
+  notYetDue: "Not yet due",
+  days1to30: "1–30 days late",
+  days31to60: "31–60 days late",
+  days61plus: "Over 60 days late",
+};
+
+/** An empty set of bands, for a caller that is about to add to them. */
+export function emptyAgeing(): StatementAgeing {
+  return { notYetDue: 0, days1to30: 0, days31to60: 0, days61plus: 0, total: 0 };
 }
 
 /**
@@ -313,7 +340,7 @@ export function customerStatement(db: Database, customerName: string, from: stri
         dueOn: invoice.dueOn,
         outstanding: balance.outstanding,
         daysOverdue,
-        bucket: bucketFor(balance.outstanding > 0 ? daysOverdue : 0),
+        bucket: ageBucketFor(balance.outstanding > 0 ? daysOverdue : 0),
       };
     })
     .filter((row) => toMinor(row.outstanding) > 0)
@@ -324,7 +351,7 @@ export function customerStatement(db: Database, customerName: string, from: stri
       totals[row.bucket] += toMinor(row.outstanding);
       return totals;
     },
-    { notYetDue: 0, days1to30: 0, days31to60: 0, days61plus: 0, total: 0 },
+    emptyAgeing(),
   );
   const aged: StatementAgeing = {
     notYetDue: fromMinor(ageing.notYetDue),
@@ -361,6 +388,138 @@ export function customerStatement(db: Database, customerName: string, from: stri
     rows,
     openInvoices,
     ageing: aged,
+    status: "ok",
+    message,
+  };
+}
+
+/** One customer's share of the company's debt, split into the same bands a statement uses. */
+export interface CustomerAgeing {
+  customerName: string;
+  notYetDue: number;
+  days1to30: number;
+  days31to60: number;
+  days61plus: number;
+  total: number;
+  /** The oldest money this customer owes, in whole days past its due date. 0 when nothing is late. */
+  oldestDaysOverdue: number;
+  openInvoices: number;
+}
+
+export interface DebtAgeing {
+  asAt: string;
+  currencyCode: string | null;
+  notYetDue: number;
+  days1to30: number;
+  days31to60: number;
+  days61plus: number;
+  /** Everything still owed, in every band. */
+  total: number;
+  /** The part of `total` that is past its due date. */
+  overdueTotal: number;
+  openInvoices: number;
+  /** Only customers who owe something, largest debt first. */
+  customers: CustomerAgeing[];
+  status: "ok" | "currency_not_set" | "mixed_currency";
+  message: string;
+}
+
+/**
+ * How much of what the company is owed is old (RPT-04, D-91).
+ *
+ * The finance home already lists the invoices that are late, one by one, which answers "what do I chase
+ * today?". It could not answer "how bad is the debt overall?" without the reader adding up a column in
+ * their head. This is that answer, in the same four bands the customer statement uses, plus the
+ * customers behind the oldest band.
+ *
+ * A total is only stated when it is a total of one currency: adding cedis to dollars would produce a
+ * number that is true of nothing. When the invoices disagree, the figure is withheld and the message
+ * names the currencies — the same rule the statement follows, for the same reason.
+ */
+export function debtAgeing(db: Database, asAt: string): DebtAgeing {
+  const empty: DebtAgeing = {
+    asAt,
+    currencyCode: db.settings.currencyCode,
+    notYetDue: 0,
+    days1to30: 0,
+    days31to60: 0,
+    days61plus: 0,
+    total: 0,
+    overdueTotal: 0,
+    openInvoices: 0,
+    customers: [],
+    status: "ok",
+    message: `Nothing is owed as at ${asAt}.`,
+  };
+
+  // A void invoice never asked for money, so it cannot be owed. Everything else is measured at what is
+  // still outstanding on the day being read — a part-paid invoice counts at what is left, never at its
+  // total.
+  const owed = db.invoices
+    .filter((invoice) => invoice.status !== "void" && invoice.issuedOn <= asAt)
+    .map((invoice) => ({ invoice, outstanding: invoiceBalance(db, invoice, asAt).outstanding }))
+    .filter((entry) => toMinor(entry.outstanding) > 0);
+
+  if (owed.length === 0) return empty;
+
+  const currencies = [...new Set(owed.map((entry) => entry.invoice.currencyCode))].sort();
+  if (currencies.length > 1) {
+    return {
+      ...empty,
+      status: "mixed_currency",
+      message: `Invoices in ${currencies.join(", ")} are outstanding. A total across different currencies would not mean anything, so none is stated.`,
+    };
+  }
+  const currencyCode = currencies[0] ?? db.settings.currencyCode;
+
+  const byCustomer = new Map<string, CustomerAgeing>();
+  const totals = emptyAgeing();
+  for (const { invoice, outstanding } of owed) {
+    const name = statementNameOf(invoice);
+    const daysOverdue = Math.max(0, daysBetween(invoice.dueOn, asAt));
+    const bucket = ageBucketFor(daysOverdue);
+    const entry =
+      byCustomer.get(name) ??
+      { customerName: name, notYetDue: 0, days1to30: 0, days31to60: 0, days61plus: 0, total: 0, oldestDaysOverdue: 0, openInvoices: 0 };
+    entry[bucket] += toMinor(outstanding);
+    entry.total += toMinor(outstanding);
+    entry.openInvoices += 1;
+    entry.oldestDaysOverdue = Math.max(entry.oldestDaysOverdue, daysOverdue);
+    byCustomer.set(name, entry);
+    totals[bucket] += toMinor(outstanding);
+  }
+
+  const customers = [...byCustomer.values()]
+    .map((entry) => ({
+      ...entry,
+      notYetDue: fromMinor(entry.notYetDue),
+      days1to30: fromMinor(entry.days1to30),
+      days31to60: fromMinor(entry.days31to60),
+      days61plus: fromMinor(entry.days61plus),
+      total: fromMinor(entry.total),
+    }))
+    .sort((a, b) => (a.total === b.total ? a.customerName.localeCompare(b.customerName) : b.total - a.total));
+
+  const total = fromMinor(totals.notYetDue + totals.days1to30 + totals.days31to60 + totals.days61plus);
+  const overdueTotal = fromMinor(totals.days1to30 + totals.days31to60 + totals.days61plus);
+  const money = (minor: number) => `${currencyCode} ${formatAmount(fromMinor(minor))}`;
+  const customerWord = customers.length === 1 ? "customer owes" : "customers owe";
+  const message =
+    overdueTotal === 0
+      ? `${money(totals.notYetDue + totals.days1to30 + totals.days31to60 + totals.days61plus)} is owed as at ${asAt}, and nothing is past its due date.`
+      : `${customers.length} ${customerWord} ${money(totals.notYetDue + totals.days1to30 + totals.days31to60 + totals.days61plus)} as at ${asAt}: ${money(toMinor(overdueTotal))} of it is past its due date and ${money(totals.days61plus)} is over 60 days old.`;
+
+  return {
+    asAt,
+    currencyCode,
+    notYetDue: fromMinor(totals.notYetDue),
+    days1to30: fromMinor(totals.days1to30),
+    days31to60: fromMinor(totals.days31to60),
+    days61plus: fromMinor(totals.days61plus),
+    total,
+    overdueTotal,
+    openInvoices: owed.length,
+    customers,
     status: "ok",
     message,
   };

@@ -99,6 +99,20 @@ different questions.
 completed runs with no vehicle recorded; and the revenue-by-service line, which makes the
 single-service limitation visible.
 
+**Debt ageing (RPT-04, D-90, D-91).** A fourth way of cutting the same money: everything still owed on
+live invoices, **as at a stated date**, placed in the band its due date earns — not yet due, 1–30 days
+late, 31–60, over 60. An invoice is measured at `outstanding` (total less payments that still count less
+live credit notes), so a part-paid invoice is aged at what is left, never at its total; a void invoice
+and a cancelled payment contribute nothing. The denominator is the invoices themselves: the four bands
+must add up to the sum of `outstanding` over the same invoices, which is what the tests assert.
+
+- **Per customer** — the customer statement (D-90), for a period, with the balance carried in and out.
+- **Across the company** — the finance home's *Debt by age* card (D-91).
+- **One banding function** (`ageBucketFor`) serves both, so an invoice cannot be 60 days late on the
+  finance home and 61 on a statement sent to the customer.
+- **One currency only.** When the outstanding invoices are in more than one currency, no total is
+  stated and the currencies are named: adding them would produce a number true of nothing.
+
 ## Cost categories (Q-29, D-78)
 
 Every recorded cost carries a category chosen from the list in Settings, or none at all. Nothing is

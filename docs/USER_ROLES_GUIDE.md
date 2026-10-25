@@ -130,6 +130,12 @@ Cancelling is not a refund. Cancelling says the money was never received; giving
 **credit note** with a refund stated on it (below), and the refund itself is paid the way you pay any
 other outgoing.
 
+**How bad is the debt?** The Finance screen opens with **Debt by age**: everything still owed, in the
+same four bands a statement prints, with the customers behind them and how late each one's oldest
+invoice is. It is measured as at today, not inside the period you chose, because a debt does not stop
+being old when somebody changes a date filter. If the invoices are in more than one currency no total is
+shown, and it says so.
+
 **Chasing what a customer owes.** **Statements** in the menu shows one customer's account for a period
 of your choosing: what was charged, what came in, what was credited, the balance brought forward from
 before the period, and the balance as at the end of it, with the debt aged into bands (not yet due,

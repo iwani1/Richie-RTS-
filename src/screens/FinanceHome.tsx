@@ -9,6 +9,7 @@
 // The open work (late invoices, unbilled hires, payments to verify) is measured **as at today** and
 // says so, because changing the date filter must not make a deadline disappear.
 import { useMemo, useState } from "react";
+import { AGE_BUCKETS, AGE_BUCKET_LABELS } from "../tms/customerStatement";
 import { financeHome } from "../tms/financeHome";
 import { formatAmount } from "../tms/money";
 import { useTms } from "../tms/useTms";
@@ -114,6 +115,91 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
           </div>
 
           <div className="space-y-4">
+            {/* How bad the debt is, before the list of what to chase today (D-91). The bands are the
+                ones a customer statement prints, so a figure read here and the same figure on a
+                statement sent to the customer are the same band of the same money. */}
+            <TableCard
+              title="Debt by age"
+              summary={`Everything still owed, whatever its invoice date, measured as at ${formatDate(home.asAt)}. The bands are the ones a customer statement prints.`}
+              actions={
+                allowed("invoices:read") ? (
+                  <Button onClick={() => navigate("statements")}>Open statements</Button>
+                ) : undefined
+              }
+            >
+              <Notice tone={home.ageing.status === "ok" ? "info" : "warning"} className="mb-4">
+                {home.ageing.message}
+              </Notice>
+              {home.ageing.status === "ok" && (
+                <>
+                  <dl className="rts-ageing">
+                    {AGE_BUCKETS.map((bucket) => (
+                      <div key={bucket} className="rts-ageing-row">
+                        <dt>
+                          <span className="rts-ageing-label">{AGE_BUCKET_LABELS[bucket]}</span>
+                          <span className="rts-ageing-hint">
+                            {bucket === "notYetDue"
+                              ? "within the payment terms"
+                              : bucket === "days1to30"
+                                ? "worth a reminder"
+                                : bucket === "days31to60"
+                                  ? "worth a call"
+                                  : "decide what to do"}
+                          </span>
+                        </dt>
+                        <dd className="rts-mono">{home.ageing[bucket] > 0 ? money(currency, home.ageing[bucket]) : "—"}</dd>
+                      </div>
+                    ))}
+                    <div className="rts-ageing-row">
+                      <dt>
+                        <span className="rts-ageing-label rts-ageing-label--total">Total still owed</span>
+                        <span className="rts-ageing-hint">
+                          {home.ageing.openInvoices} open invoice{home.ageing.openInvoices === 1 ? "" : "s"} ·{" "}
+                          {home.ageing.customers.length} customer{home.ageing.customers.length === 1 ? "" : "s"}
+                        </span>
+                      </dt>
+                      <dd className="rts-mono">{money(currency, home.ageing.total)}</dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-5">
+                    <DataTable
+                      rows={home.ageing.customers}
+                      rowKey={(row) => row.customerName}
+                      emptyState={<EmptyState title="Nothing is owed" body="Every invoice issued so far is settled." />}
+                      columns={[
+                        {
+                          key: "customer",
+                          header: "Customer",
+                          render: (row) => (
+                            <span className="flex flex-col">
+                              <span>{row.customerName}</span>
+                              <span className="text-xs text-stone-600">
+                                {row.openInvoices} invoice{row.openInvoices === 1 ? "" : "s"}
+                                {row.oldestDaysOverdue > 0 ? ` · oldest ${row.oldestDaysOverdue} days late` : " · nothing late"}
+                              </span>
+                            </span>
+                          ),
+                        },
+                        ...AGE_BUCKETS.slice(1).map((bucket) => ({
+                          key: bucket,
+                          header: AGE_BUCKET_LABELS[bucket],
+                          className: "text-right rts-mono",
+                          render: (row: (typeof home.ageing.customers)[number]) => (row[bucket] > 0 ? money(currency, row[bucket]) : "—"),
+                        })),
+                        {
+                          key: "total",
+                          header: "Owed",
+                          className: "text-right rts-mono",
+                          render: (row: (typeof home.ageing.customers)[number]) => money(currency, row.total),
+                        },
+                      ]}
+                    />
+                  </div>
+                </>
+              )}
+            </TableCard>
+
             <TableCard
               title="Overdue"
               summary={`Measured as at ${formatDate(home.asAt)}, not inside the period. An invoice part paid is shown at what is still owed.`}
@@ -219,7 +305,8 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
               Coverage: {home.coverage.invoicesInPeriod} invoices in the period
               {home.coverage.invoicesWithoutCustomer > 0 && `, ${home.coverage.invoicesWithoutCustomer} with no customer name`}
               {home.coverage.uncategorisedExpenseLines > 0 && `, ${home.coverage.uncategorisedExpenseLines} cost lines with no category`}. A hire that was
-              completed but never invoiced is listed above rather than counted as revenue. PDF statements are not built yet.
+              completed but never invoiced is listed above rather than counted as revenue. A customer
+              statement prints from **Statements**, one customer at a time.
             </p>
           </div>
         </>
