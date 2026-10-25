@@ -9,7 +9,7 @@
 // Rejections are collected rather than thrown so the operator is told what is wrong with the
 // file instead of getting a white screen.
 
-import { migrate, ROLES, type Database } from "./types";
+import { migrate, READABLE_SCHEMA_VERSIONS, ROLES, type Database } from "./types";
 
 export interface BackupProblem {
   path: string;
@@ -38,7 +38,13 @@ export function inspectBackup(value: unknown): { database: Database | null; prob
   const problems: BackupProblem[] = [];
   const database = migrate(value);
   if (!database) {
-    return { database: null, problems: [{ path: "(root)", message: "Not a Richie TMS backup this build can read (schema version 1-14)." }] };
+    // The range comes from the list itself, so the sentence cannot drift away from what is accepted.
+    const oldest = READABLE_SCHEMA_VERSIONS[0];
+    const newest = READABLE_SCHEMA_VERSIONS[READABLE_SCHEMA_VERSIONS.length - 1];
+    return {
+      database: null,
+      problems: [{ path: "(root)", message: `Not a Richie TMS backup this build can read (schema version ${oldest}-${newest}).` }],
+    };
   }
 
   const fail = (path: string, message: string) => {

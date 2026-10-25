@@ -299,6 +299,8 @@ const paymentRow = (p: Payment): Row => ({
   status: p.status,
   recorded_by: p.recordedBy,
   recorded_at: p.recordedAt,
+  void_reason: p.voidReason ?? null,
+  voided_at: p.voidedAt ?? null,
   data: json(p),
 });
 

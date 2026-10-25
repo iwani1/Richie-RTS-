@@ -110,8 +110,11 @@ A successful command returns the **new scoped snapshot**, so the caller never ne
 | Roster | `create_passenger`, `update_passenger` |
 | Incidents and maintenance | `create_incident`, `update_incident`, `advance_incident`, `add_incident_cost`, `remove_incident_cost`, `create_work_order`, `update_work_order`, `advance_work_order`, `add_work_order_cost`, `remove_work_order_cost` |
 | Documents | `create_document`, `update_document` |
-| Money | `issue_rental_invoice`, `void_invoice`, `record_payment`, `advance_payment`, `issue_credit_note`, `void_credit_note` |
+| Money | `issue_rental_invoice`, `void_invoice`, `record_payment`, `advance_payment`, `void_payment`, `issue_credit_note`, `void_credit_note` |
 | Data | `import_records` (CSV, vehicles / drivers / clients), `record_backup_export` |
+
+The catalogue is `KNOWN_COMMAND_TYPES` in `src/tms/commandTypes.ts`; a test compares it against every
+module's command list, so a command a screen offers cannot be one this route refuses (D-89).
 
 Two commands exist in the domain but are **not** reachable over HTTP:
 
@@ -123,8 +126,8 @@ Two commands exist in the domain but are **not** reachable over HTTP:
 
 The route pre-checks the permission for the commands whose permission differs from the obvious one
 (`update_settings`, `create_user`, `update_user`, `reset_user_password`, `record_backup_export`,
-`issue_rental_invoice`, `void_invoice`, `record_payment`, `advance_payment`, `issue_credit_note`,
-`void_credit_note`), and every command checks
+`issue_rental_invoice`, `void_invoice`, `record_payment`, `advance_payment`, `void_payment`,
+`issue_credit_note`, `void_credit_note`), and every command checks
 again inside the service with the real actor. The full matrix is in `docs/PERMISSIONS.md`.
 
 ### Errors worth knowing

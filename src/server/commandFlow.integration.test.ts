@@ -253,6 +253,54 @@ suite("workflow C and concurrency, against PostgreSQL", () => {
     await expect(sql`update credit_note set total = 1 where id = ${note.id}`.execute(db())).rejects.toThrow(/immutable/);
   }, 60_000);
 
+  it("cancels a payment recorded in error, and the database refuses to un-cancel it (D-88)", async () => {
+    const { adminId, vehicleId } = await world();
+    const rentalId = await confirmedRental(adminId, "2026-06-01", "2026-06-03");
+    await step("assign_rental", { id: rentalId, input: { vehicleId, driverId: "" } } as never, adminId, TODAY);
+    await step("start_rental", { id: rentalId } as never, adminId, "2026-06-01T09:00:00.000Z");
+    await step("complete_rental", { id: rentalId, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } } as never, adminId, "2026-06-03T18:00:00.000Z");
+    const invoiced = await step("issue_rental_invoice", { input: { rentalId, issuedOn: "2026-06-03", discountAmount: "", discountReason: "", notes: "" } } as never, adminId, "2026-06-03T18:30:00.000Z");
+    const invoice = invoiced.invoices[0];
+    const paid = await step(
+      "record_payment",
+      { input: { invoiceId: invoice.id, amount: "1000", method: "Cash", paidOn: "2026-06-04", externalReference: "RCPT-1", note: "" } } as never,
+      adminId,
+      "2026-06-04T10:00:00.000Z",
+    );
+    expect(paid.invoices[0]).toMatchObject({ status: "part_paid", amountPaid: 1000 });
+
+    const cancelled = await step("void_payment", { id: paid.payments[0].id, reason: "Keyed against the wrong invoice" } as never, adminId, "2026-06-05T10:00:00.000Z");
+    // The invoice and the payment are written together: the amount received falls to nothing and the
+    // invoice is owed again, with no second command to remember.
+    expect(cancelled.invoices[0]).toMatchObject({ status: "issued", amountPaid: 0 });
+    expect(cancelled.payments[0]).toMatchObject({ status: "recorded", voidReason: "Keyed against the wrong invoice" });
+
+    // What a restart would see: the cancellation is in the database, not only in the returned snapshot.
+    const reloaded = await loadDatabase();
+    expect(reloaded.payments[0]).toMatchObject({ reference: "PAY-2026-0001", amount: 1000, voidReason: "Keyed against the wrong invoice" });
+    expect(reloaded.payments[0].voidedAt).toBe("2026-06-05T10:00:00.000Z");
+    expect(reloaded.invoices[0]).toMatchObject({ status: "issued", amountPaid: 0 });
+
+    // A cancellation is a one-way door, and it is settled in the database rather than only in the
+    // service: un-cancelling would silently restore money the office decided it never received.
+    await expect(sql`update payment set voided_at = null where id = ${reloaded.payments[0].id}`.execute(db())).rejects.toThrow(/stays cancelled/);
+    await expect(sql`update payment set void_reason = 'Changed my mind' where id = ${reloaded.payments[0].id}`.execute(db())).rejects.toThrow(/stays cancelled/);
+    // The financial fields are still frozen, cancellation or not.
+    await expect(sql`update payment set amount = 1 where id = ${reloaded.payments[0].id}`.execute(db())).rejects.toThrow(/immutable/);
+
+    // Cancelling without a reason is refused on the row itself: a year later the reason is the only
+    // explanation, so the column pair cannot be set by halves.
+    await expect(
+      sql`
+        insert into payment (id, reference, invoice_id, amount, currency_code, method, paid_on,
+          external_reference, status, recorded_by, recorded_at, voided_at, data)
+        values ('noreason', 'PAY-2026-0099', ${invoice.id}, 100, 'GHS', 'Cash', '2026-06-04'::date,
+          '', 'recorded', 'Admin', now(), now(), '{}'::jsonb)
+      `.execute(db()),
+    ).rejects.toThrow(/payment_void_has_reason|violates check constraint/);
+    await expect(sql`delete from payment where id = ${reloaded.payments[0].id}`.execute(db())).rejects.toThrow(/never deleted/);
+  }, 60_000);
+
   it("cannot double-book one vehicle from six parallel requests", async () => {
     const { adminId, vehicleId } = await world();
     const rentals: string[] = [];

@@ -66,6 +66,8 @@ const payment: Payment = {
   log: [],
   recordedBy: "Ama Mensah",
   recordedAt: at,
+  voidReason: null,
+  voidedAt: null,
 };
 
 const creditNote: CreditNote = {
@@ -153,7 +155,7 @@ describe("invoices and payments screen", () => {
     expect(screen.getByText(/Two days hire/)).toBeTruthy();
     expect(screen.getByText(/VAT at 15%/)).toBeTruthy();
     expect(screen.getAllByText("PAY-2026-0001").length).toBeGreaterThan(0);
-    expect(screen.getByText(/cannot be voided while payments stand/i)).toBeTruthy();
+    expect(screen.getByText(/cannot be voided while a payment still\s+counts against it/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Void invoice/i })).toBeNull();
     // Money can still come in for the balance.
     expect(screen.getByRole("button", { name: /Record a payment/i })).toBeTruthy();
@@ -291,5 +293,60 @@ describe("printing from the invoice screen (D-87)", () => {
     expect(within(sheet).getByText("INV-2026-0001")).toBeTruthy();
     expect(within(sheet).getByText("Airport transfer not operated")).toBeTruthy();
     expect(within(sheet).getByText("GHS 2300.00")).toBeTruthy();
+  });
+});
+
+describe("cancelling a payment recorded in error (D-88)", () => {
+  const cancelledPayment: Payment = { ...payment, voidReason: "Recorded against the wrong invoice", voidedAt: "2026-06-02T10:00:00.000Z" };
+  const withCancelled = (): Database => ({
+    ...base(),
+    payments: [payment, { ...cancelledPayment, id: "p2", reference: "PAY-2026-0002", amount: 500, externalReference: "" }],
+  });
+
+  it("offers a cancel action beside a payment that still counts", () => {
+    renderInvoices(base());
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    expect(screen.getByRole("button", { name: /Cancel PAY-2026-0001/i })).toBeTruthy();
+  });
+
+  it("cancels a payment through the panel, with the reason typed in", async () => {
+    const tms = renderInvoices(base());
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Cancel PAY-2026-0001/i }));
+
+    const dialog = screen.getByRole("dialog");
+    // The panel says what stopping the payment does to the invoice, in figures.
+    expect(within(dialog).getByText(/GHS 1000\.00 stops counting towards what was received on INV-2026-0001/i)).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText(/Reason/i), { target: { value: "Customer's transfer bounced" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Cancel payment$/i }));
+
+    expect(tms.dispatch).toHaveBeenCalledWith({ type: "void_payment", id: payment.id, reason: "Customer's transfer bounced" });
+  });
+
+  it("says what cancelling does to a payment already reconciled with the bank", () => {
+    const reconciled: Database = { ...base(), payments: [{ ...payment, status: "reconciled" }], invoices: [{ ...invoice, status: "part_paid" }] };
+    renderInvoices(reconciled);
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Cancel PAY-2026-0001/i }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/Already reconciled with the bank statement/i)).toBeTruthy();
+    expect(within(dialog).getByText(/leaves that statement\s+unmatched by GHS 1000\.00/i)).toBeTruthy();
+  });
+
+  it("shows a cancelled payment as cancelled, keeps its reason, and stops counting it as received", () => {
+    renderInvoices(withCancelled());
+    const row = screen.getByText("INV-2026-0001").closest("tr") as HTMLElement;
+    // Only the GHS 1,000 payment still counts; the cancelled GHS 500 is not money received.
+    expect(within(row).getByText("GHS 1000.00")).toBeTruthy();
+    expect(within(row).getByText("GHS 2450.00")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+    expect(screen.getByText("Cancelled")).toBeTruthy();
+    expect(screen.getByText(/Recorded against the wrong invoice — it no longer counts/)).toBeTruthy();
+    // A cancelled payment offers nothing further to do with it.
+    expect(screen.queryByRole("button", { name: /Cancel PAY-2026-0002/i })).toBeNull();
+    // The received figure is one of two payments, and the caption says so rather than lying.
+    expect(screen.getByText(/1 payment counting of 2 recorded/)).toBeTruthy();
   });
 });

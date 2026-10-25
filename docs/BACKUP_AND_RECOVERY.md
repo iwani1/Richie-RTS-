@@ -91,7 +91,7 @@ npm run db:restore -- /secure/richie-2026-10-24.json
 What the command does, in order:
 
 1. reads and parses the file;
-2. runs it through `migrate()`, which accepts schema versions 1–15 and fills in the fields added by
+2. runs it through `migrate()`, which accepts schema versions 1–16 (`READABLE_SCHEMA_VERSIONS`) and fills in the fields added by
    later versions — a backup taken before invoices existed restores into the current schema;
 3. refuses if the shape is not a Richie TMS database;
 4. in one transaction: truncates every business table, then writes the snapshot back (parents before

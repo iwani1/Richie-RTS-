@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { can } from "./permissions";
 import { hashPassword } from "./crypto";
 import { AUDIT_LIMIT, audit, execute, type Actor, type Credential } from "./service";
-import { emptyDatabase, type Database } from "./types";
+import { emptyDatabase, migrate, READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION, type Database } from "./types";
 
 const NOW = "2026-01-15T08:00:00.000Z";
 const VALID: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
@@ -90,6 +90,14 @@ describe("backup import validation", () => {
     const { db, admin } = adminDb();
     const res = execute(db, admin, { type: "import_backup", database: JSON.parse(JSON.stringify(db)) as Database }, NOW);
     expect(res.ok).toBe(true);
+  });
+
+  it("always reads a backup at the version this build writes", () => {
+    // Bumping SCHEMA_VERSION without adding it to READABLE_SCHEMA_VERSIONS makes the application
+    // refuse its own backup. That happened at 15 and was caught only by the round-trip test above;
+    // this states the rule directly, so the failure names the cause.
+    expect(READABLE_SCHEMA_VERSIONS).toContain(SCHEMA_VERSION);
+    expect(migrate(emptyDatabase())).not.toBeNull();
   });
 
   it("does not throw on a role the matrix does not know", () => {

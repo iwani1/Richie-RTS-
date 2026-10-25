@@ -8,7 +8,7 @@
 //
 // Formulas are documented in docs/KPIS.md. Changing one here without changing it there is a defect.
 
-import { invoiceBalance } from "./creditNotes";
+import { invoiceBalance, isLivePayment } from "./creditNotes";
 import { sumAmounts, toMinor } from "./money";
 import type { Database, Rental } from "./types";
 
@@ -93,7 +93,8 @@ export function rentalReport(db: Database, from: string, to: string): RentalRepo
   const cancelled = db.rentals.filter((rental) => rental.status === "cancelled" && inRange(ymd(rental.updatedAt))).length;
 
   const invoices = db.invoices.filter((invoice) => invoice.status !== "void" && inRange(invoice.issuedOn));
-  const payments = db.payments.filter((payment) => inRange(payment.paidOn));
+  // Cancelled payments are not money received (D-88).
+  const payments = db.payments.filter((payment) => isLivePayment(payment) && inRange(payment.paidOn));
   // Totals are added in whole pesewas and converted back once, so the report reconciles exactly with
   // the invoices it is made of (audit D-04).
   const invoicedTotal = sumAmounts(invoices.map((invoice) => invoice.total));

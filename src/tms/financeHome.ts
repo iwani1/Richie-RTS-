@@ -25,6 +25,7 @@
 // Money is added in whole pesewas (money.ts, audit D-04) and every amount is withheld when the
 // company currency is not configured, because a total without a currency is a guess.
 
+import { isLivePayment } from "./creditNotes";
 import { billableEventFor, outstanding } from "./finance";
 import { financialReport, type ExpensesByCategory, type FinancialReport, type RevenueByCustomer } from "./financialReport";
 import { fromMinor, toMinor } from "./money";
@@ -178,7 +179,8 @@ export function financeHome(db: Database, from: string, to: string, asAt: string
 
   // --- payments recorded but not yet taken all the way --------------------------------------
   const awaitingPayments: AwaitingPayment[] = db.payments
-    .filter((payment) => payment.status !== "reconciled")
+    // A cancelled payment needs no further verification, and an invoice is not waiting on it (D-88).
+    .filter((payment) => isLivePayment(payment) && payment.status !== "reconciled")
     .map((payment) => {
       const invoice = db.invoices.find((candidate) => candidate.id === payment.invoiceId);
       return {

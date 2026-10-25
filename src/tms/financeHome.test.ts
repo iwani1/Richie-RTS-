@@ -71,6 +71,8 @@ const payment = (overrides: Partial<Payment> = {}): Payment => ({
   log: [],
   recordedBy: "Fin",
   recordedAt: at,
+  voidReason: null,
+  voidedAt: null,
   ...overrides,
 });
 
@@ -382,5 +384,28 @@ describe("finance home - work waiting on finance", () => {
       ["PAY-2026-0002", "reconcile"],
     ]);
     expect(home.awaitingTotal).toBe(750);
+  });
+
+  it("does not ask anybody to verify a payment that was cancelled", () => {
+    // A cancelled payment is not waiting on a next step, and it is not part of what is awaiting
+    // checking in the period either (D-88).
+    const db = build({
+      payments: [
+        payment({ id: "p1", reference: "PAY-2026-0001", status: "recorded", amount: 500, paidOn: "2026-06-10" }),
+        payment({
+          id: "p2",
+          reference: "PAY-2026-0002",
+          status: "recorded",
+          amount: 400,
+          paidOn: "2026-06-11",
+          voidReason: "Wrong invoice",
+          voidedAt: "2026-06-12T09:00:00.000Z",
+        }),
+      ],
+    });
+    const home = financeHome(db, JUNE.from, JUNE.to, "2026-06-25");
+    expect(home.awaitingPayments.map((row) => row.reference)).toEqual(["PAY-2026-0001"]);
+    expect(home.awaitingTotal).toBe(500);
+    expect(home.figures.receivedTotal).toBe(500);
   });
 });

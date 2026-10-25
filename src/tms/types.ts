@@ -720,6 +720,13 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
 /**
  * A manual payment (FIN-03). The financial fields are written once; only the verification and
  * reconciliation status advances, and the database refuses any other change (migration 003).
+ *
+ * A payment can also be **cancelled** — the operator recorded it against the wrong invoice, or for
+ * money that never arrived — with a reason, once (D-88). Cancelling is deliberately not a fourth
+ * status on the verification ladder: the ladder answers "how far has this been checked?", and a
+ * cancelled payment has not stopped being verified, it has stopped being true. The two facts are
+ * kept apart so a cancelled payment cannot be un-cancelled by advancing it, and so a verification
+ * step can never be mistaken for a cancellation.
  */
 export interface Payment {
   id: string;
@@ -735,6 +742,10 @@ export interface Payment {
   log: LogEntry[];
   recordedBy: string;
   recordedAt: string;
+  /** Why the payment was cancelled. Null while the payment stands. */
+  voidReason: string | null;
+  /** When it was cancelled. Null while the payment stands. */
+  voidedAt: string | null;
 }
 
 export const TAX_POSITIONS = ["not_registered", "registered"] as const;
@@ -824,7 +835,17 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
+
+/**
+ * Every schema version this build can still read.
+ *
+ * A backup carries the version it was written at, and `migrate()` accepts anything in this list,
+ * filling in the fields that arrived later. Adding a version here is part of bumping
+ * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
+ * "clean round-trip of its own backup" test caught this list going stale at 15.
+ */
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -899,7 +920,7 @@ export function emptyDatabase(): Database {
 export function migrate(value: unknown): Database | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(v.schemaVersion as number)) return null;
+  if (!(READABLE_SCHEMA_VERSIONS as readonly number[]).includes(v.schemaVersion as number)) return null;
   if (!Array.isArray(v.users) || !Array.isArray(v.vehicles) || !Array.isArray(v.drivers) || !Array.isArray(v.clients) || !Array.isArray(v.audit)) return null;
   if (typeof v.settings !== "object" || v.settings === null) return null;
   const settings = v.settings as Record<string, unknown>;
@@ -953,7 +974,10 @@ export function migrate(value: unknown): Database | null {
       : [],
     // Credit notes arrived in schema 15; an older backup simply has none.
     creditNotes: Array.isArray(v.creditNotes) ? (v.creditNotes as CreditNote[]).map((note) => ({ ...note, taxLines: note.taxLines ?? [] })) : [],
-    payments: Array.isArray(v.payments) ? (v.payments as Payment[]) : [],
+    // Cancelling a payment arrived in schema 16; an older backup has no cancelled ones.
+    payments: Array.isArray(v.payments)
+      ? (v.payments as Payment[]).map((payment) => ({ ...payment, voidReason: payment.voidReason ?? null, voidedAt: payment.voidedAt ?? null }))
+      : [],
     // Bookings arrived in schema 14; an older backup simply has none.
     bookings: Array.isArray(v.bookings)
       ? (v.bookings as Booking[]).map((booking) => ({

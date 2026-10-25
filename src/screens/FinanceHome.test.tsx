@@ -55,6 +55,8 @@ const invoice = (overrides: Partial<Invoice> = {}): Invoice => ({
 });
 
 const payment = (overrides: Partial<Payment> = {}): Payment => ({
+  voidReason: null,
+  voidedAt: null,
   id: "pay1",
   reference: "PAY-2026-0001",
   invoiceId: "inv1",

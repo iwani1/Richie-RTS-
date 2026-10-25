@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 15). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
+The app stores these as arrays inside one JSON document (schema version 16). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
 erDiagram
@@ -339,7 +339,7 @@ Unique `(rental_id, revision_number)`; quote and line snapshots are immutable. T
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous
 snapshot, so the current quote count equals history length + 1.
 
-## Phase 16 invoices and payments (implemented in `db/migrations/003_invoices_and_payments.sql`)
+## Phase 16 invoices and payments (implemented in `db/migrations/003_invoices_and_payments.sql`, extended by `008_credit_notes.sql` and `009_payment_cancellations.sql`)
 
 ```mermaid
 erDiagram
@@ -381,6 +381,8 @@ erDiagram
     text status "recorded|verified|reconciled"
     text recorded_by
     timestamptz recorded_at
+    text void_reason "null while it stands (D-88)"
+    timestamptz voided_at "one-way; refuses being cleared"
     jsonb data
   }
 
@@ -418,8 +420,9 @@ Constraints and triggers:
 - `invoice_frozen_trg` — refuses any change to reference, kind, rental, client, customer, currency,
   subtotal, total, billable event, dates or the `lines`/`taxLines` JSON, and refuses to void an
   invoice with payments.
-- `payment_frozen_trg` — refuses any change to the financial fields, and refuses a status move
-  backwards.
+- `payment_frozen_trg` — refuses any change to the financial fields, refuses a status move backwards,
+  and allows the cancellation pair (`void_reason`, `voided_at`) to be set **once** and never cleared
+  (`009_payment_cancellations.sql`, D-88); `payment_void_has_reason` refuses one without the other.
 - `invoice_no_delete_trg`, `payment_no_delete_trg` — delete is never allowed (brief 5.9).
 - **`credit_note` (migration `008_credit_notes.sql`, D-86).** A credit note is the only way money comes
   off an issued invoice. `credit_note_within_invoice_trg` locks the invoice row and refuses an insert

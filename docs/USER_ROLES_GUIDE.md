@@ -117,6 +117,18 @@ that was charged. The credit note gets its own number (CN-2026-0001), leaves the
 they were recorded, and reduces what the invoice asks for. It cannot exceed the invoice total, it can
 be voided with a reason if you make a mistake, and it can never be edited or deleted.
 
+**If a payment itself is wrong** — keyed against the wrong invoice, or for money that never arrived —
+open the invoice and choose **Cancel** beside that payment, then say why. The payment keeps its number,
+stays in the list marked **Cancelled** with your reason, and stops counting towards what was received:
+the invoice goes back to what it actually owed, and the reports and the printed sheet follow. It is a
+one-way door — a cancelled payment is never un-cancelled, so if the money really did arrive, record it
+again as a new payment. If it had already been matched to the bank statement, the panel tells you what
+that statement will now be short by before you agree.
+
+Cancelling is not a refund. Cancelling says the money was never received; giving real money back is a
+**credit note** with a refund stated on it (below), and the refund itself is paid the way you pay any
+other outgoing.
+
 **Sending a copy.** Open the invoice and choose **Print invoice**, or **Print** beside a credit note.
 The preview shows exactly what will be printed; the **Print or save as PDF** button opens your
 browser's print dialog, where "Save as PDF" gives you a file to email. The sheet carries the company
@@ -180,7 +192,8 @@ always a setting:
 | `Invoicing is not configured` | tax position or payment terms are unset | administrator, in Settings → Invoicing |
 | `Not permitted: your role lacks …` | the role does not hold that permission | an administrator, if the role should have it |
 | `A rental cannot be … from status "…"` | the record is past or before that step | operations, by following the workflow in order |
-| `This invoice has payments recorded…` | a paid invoice cannot be voided | finance, by issuing a corrected invoice |
+| `This invoice has payments recorded…` | a paid invoice cannot be voided | finance: cancel the payment if it was recorded in error, or issue a credit note |
+| `PAY-… is already cancelled` | a cancelled payment is never un-cancelled | finance, by recording the money again as a new payment |
 | `Vehicle is … and cannot be assigned` | maintenance, out of service or retired | operations / maintenance, by releasing it |
 
 ## Passwords and accounts

@@ -155,6 +155,15 @@ customer, currency, amounts, date, reason, lines and tax lines are frozen by tri
 Backwards transitions are refused in the service and by trigger. The financial fields are immutable
 after insert; only the status may move.
 
+**Cancelling** is a separate one-way fact, not a fourth status (D-88):
+
+| From | To | Who | Preconditions |
+|---|---|---|---|
+| — | `voidedAt` + `voidReason` set | `payments:void` | Payment not already cancelled; a reason (300 characters); any verification status, with the reconciliation warning stated when it is `reconciled` |
+
+A cancelled payment never returns: the trigger refuses to clear either column, and the status stays
+exactly as it was. Cancelling is not a refund — that is a credit note whose refund is stated on it.
+
 ## Booking (`Booking.status`, BKG-03…05, D-83)
 
 A booking is one named rider's seat on one named run — never a second roster. Every transition is

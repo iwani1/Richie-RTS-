@@ -55,7 +55,7 @@ D-60). Hiding a control is a convenience, never the control.
 | rentals:cancel | x | x | | | |
 | invoices:read | x | | x | | |
 | invoices:issue / void | x | | x | | |
-| payments:record / advance | x | | x | | |
+| payments:record / advance / void | x | | x | | |
 | audit:read | x | x | | | |
 | backup:export / import | x | | | | |
 
@@ -91,8 +91,12 @@ company-wide report cannot be assembled from it.
 | invoices:void | x | | x | | |
 | payments:record | x | | x | | |
 | payments:advance | x | | x | | |
+| payments:void | x | | x | | |
 | credits:issue | x | | x | | |
 | credits:void | x | | x | | |
+
+`payments:void` is separate from `payments:record` on purpose (D-88): the person who took the money in
+is not always the person who may take it back, and the cancellation carries that person's name.
 
 Read scope: `invoices:read` also opens the invoice's payments and credit notes, because both are part
 of the invoice. Record-bound roles receive none of the three collections, so a driver or client

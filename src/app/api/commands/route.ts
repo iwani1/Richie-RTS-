@@ -4,6 +4,7 @@ import { runCommand } from "../../../server/commands";
 import { WeakPasswordError, hashPassword } from "../../../server/password";
 import { currentUserId } from "../../../server/session";
 import { visibleSnapshot } from "../../../server/visibility";
+import { KNOWN_COMMAND_TYPES } from "../../../tms/commandTypes";
 import { can } from "../../../tms/permissions";
 import { db } from "../../../server/db";
 import { findActor } from "../../../server/commands";
@@ -15,34 +16,16 @@ export const dynamic = "force-dynamic";
 // whether it is allowed, validates it, applies it in a transaction and returns the new redacted
 // snapshot. The client no longer holds a database it can mutate, which is the whole point of the
 // rebuild (brief §5.1, §5.3, §5.10).
-const KNOWN_TYPES = [
-  "record_sign_in",
-  "update_settings",
-  "create_vehicle", "update_vehicle", "transition_vehicle",
-  "create_driver", "update_driver",
-  "create_client", "update_client",
-  "create_rental", "update_rental", "quote_rental", "requote_rental", "confirm_rental",
-  "assign_rental", "start_rental", "complete_rental", "decline_rental", "cancel_rental",
-  "create_route", "update_route", "generate_trips", "dispatch_trip", "assign_trip",
-  "start_trip", "complete_trip", "cancel_trip", "record_trip_stop", "correct_trip_record",
-  "create_passenger", "update_passenger",
-  "create_booking", "confirm_booking", "reject_booking", "cancel_booking",
-  "create_incident", "update_incident", "advance_incident", "add_incident_cost", "remove_incident_cost",
-  "create_work_order", "update_work_order", "advance_work_order", "add_work_order_cost", "remove_work_order_cost",
-  "create_document", "update_document",
-  "record_odometer", "void_odometer",
-  "create_user", "update_user", "reset_user_password",
-  "issue_rental_invoice", "void_invoice", "record_payment", "advance_payment",
-  "record_backup_export",
-  "import_records",
-] as const;
+// The list of commands the browser may send lives in `src/tms/commandTypes.ts`, where a test can
+// compare it against every module's command types. It used to live here and had silently lost three
+// commands (D-89).
+const COMMAND_TYPES = new Set<string>(KNOWN_COMMAND_TYPES);
+const PASSWORD_TYPES = new Set(["create_user", "reset_user_password"]);
 
 // `setup_administrator` is deliberately absent: it is only reachable from /api/setup, which
 // refuses once an account exists. `import_backup` is absent too — a client-supplied database
 // would let any signed-in user overwrite every table and every credential, so restore is a
 // server-side operation (scripts/restore.ts) documented in docs/SETUP_AND_DEPLOYMENT.md.
-const COMMAND_TYPES = new Set<string>(KNOWN_TYPES);
-const PASSWORD_TYPES = new Set(["create_user", "reset_user_password"]);
 
 const envelope = z.object({
   type: z.string().min(1).max(64),
@@ -70,6 +53,7 @@ const PERMISSION_FOR: Record<string, Parameters<typeof can>[1]> = {
   void_credit_note: "credits:void",
   record_payment: "payments:record",
   advance_payment: "payments:advance",
+  void_payment: "payments:void",
   create_user: "users:create",
   update_user: "users:update",
   reset_user_password: "users:update",

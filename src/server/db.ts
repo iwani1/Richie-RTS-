@@ -250,6 +250,9 @@ export interface PaymentRow {
   status: string;
   recorded_by: string;
   recorded_at: Timestamp;
+  // Cancelling a payment (D-88): null while it stands, set once with a reason.
+  void_reason: string | null;
+  voided_at: Timestamp | null;
   data: Json;
 }
 

@@ -1358,3 +1358,78 @@ decision the office makes, not one the system invents.
   restored) instead of a second implementation of it; **Print invoice** on the invoice page and
   **Print** on each credit note; 10 component tests (`Documents.test.tsx`) and 2 screen tests. What is
   still absent is delivery: nothing is emailed and no copy is stored.
+
+## D-88 A payment recorded in error is cancelled, not deleted and not edited
+
+- **Context.** Money is recorded once. A payment's amount, date, method and external reference are
+  frozen by trigger (migration 003), and the invoice's `amount_paid` is derived from its payments.
+  That is right for a payment that happened. It left no lawful way out of the ordinary mistake: the
+  operator keyed the amount against the wrong invoice, or recorded a transfer that was later reversed.
+  The invoice then asked for money the office never received, the fee reports counted it as income, and
+  the only fix was a hand-written row in the database — invisible to the audit trail, and impossible
+  for the office to do at all.
+- **Decision.** A payment can be **cancelled** once, with a reason and a timestamp.
+  - Cancelling is **not a fourth value of the verification status**. The status answers "how far has
+    this been checked?"; a cancelled payment has not stopped being verified, it has stopped being true.
+    Keeping them apart means a verification step can never be mistaken for a cancellation, and a
+    cancelled payment cannot be un-cancelled by advancing it.
+  - It is a **one-way door**, enforced by the database trigger as well as the service: a cancelled
+    payment that could be un-cancelled would quietly restore money the office had decided it never
+    received, and the next report would show it with no trace of the reversal.
+  - The **reason is required and kept on the record**. A year later it is the only thing that explains
+    why a payment still on the page is not in the total.
+  - The invoice's `amount_paid` and status are **recomputed from the payments that still count**, by one
+    helper (`withPaymentsToDate` in `src/tms/finance.ts`) that the record path also uses — so recording
+    and cancelling cannot disagree about the same two fields.
+  - One exclusion rule, in one place (`isLivePayment` / `livePayments` in `src/tms/creditNotes.ts`),
+    feeds every reader: the invoice screen, the printed sheet, both money reports and the finance home.
+  - A **reconciled** payment may still be cancelled — otherwise one mis-click on "Reconcile" would lock
+    the figure for good — but the panel and the confirmation say what it does to the reconciliation
+    before it happens, rather than refusing and leaving the operator stuck.
+  - Cancelling is not a refund. A payment that was real and is being given back is a credit note
+    (D-86) with a refund stated; cancelling says the money was never received.
+- **Rejected.** Deleting the payment (the audit trail would lose the fact that money was ever recorded,
+  and the number would be reused). Editing the amount in place (there is then no record of what was
+  originally entered, which is exactly what a reconciliation needs). A `void` status value (it makes
+  "verify" and "cancel" the same axis, and lets a cancellation be produced without a reason by any code
+  path that advances a status). A negative "reversal" payment (it would corrupt every "received" total
+  and imply cash left the business, which is a refund, not a correction). Refusing cancellation of a
+  reconciled payment outright (no escape hatch after a mis-click).
+- **Consequence.** Migration `009_payment_cancellations.sql` (`void_reason`, `voided_at`, the paired
+  check constraint, and `payment_frozen()` rewritten so the two columns move once and the financial
+  fields stay frozen); `Payment.voidReason` / `voidedAt` (schema 16); `void_payment` in
+  `src/tms/finance.ts` behind a new `payments:void` permission (finance and administrator);
+  `isLivePayment` / `livePayments` in `src/tms/creditNotes.ts`; `void_invoice` now blocked only by
+  payments that still count; `financialReport`, `rentalReport` and `financeHome` ignore cancelled
+  payments; the invoice screen gains a **Cancel** action per payment, a "Cancelled" badge, a
+  struck-through amount, the reason listed under the table and a "1 payment counting of 2 recorded"
+  caption. The payment keeps its number and its place in the list.
+
+## D-89 The list of accepted commands is a module a test can compare against
+
+- **Context.** The API route decided which command names it would accept from a hand-maintained list
+  beside its permission table. Three commands were missing from it: `issue_credit_note` and
+  `void_credit_note` (Phase 36) and `create_adhoc_trip` (Phase 18). The service understood all three,
+  the screens offered buttons for all three, and the server answered **"Unknown command"** — so issuing
+  a credit note and adding an extra run could not be done in the deployed application at all, and no
+  test noticed, because the tests call the service directly rather than through the route.
+- **Decision.** The list moves to `src/tms/commandTypes.ts`, where it can be imported by a test, and is
+  held to the modules in two ways:
+  - the **compiler** checks it against the core `Command` union (`CoreCommandsAreAllListed`), with the
+    five commands that have their own routes named explicitly (`setup_administrator`, `import_backup`,
+    `update_profile`, `change_own_password`, `submit_enquiry`);
+  - a **test** compares it against every module's exported command array (bookings, busing, compliance,
+    finance, logistics, maintenance), refuses duplicates, and names the three commands that had been
+    lost so they cannot be lost again quietly.
+- **Rejected.** Testing the route handler end to end (it needs a session, a database and a running
+  Next server — the guard should fail in a second, in the ordinary unit run). Trusting a review
+  checklist (this is precisely what a checklist already missed three times). Accepting any command name
+  and letting the service refuse it (the route's list is what keeps `setup_administrator` and
+  `import_backup` off the browser-reachable endpoint).
+- **Consequence.** `src/tms/commandTypes.ts`; `src/tms/commandTypes.test.ts` (10 tests); the route
+  imports the list instead of declaring it; `void_payment` added to both the list and the permission
+  table. Also found on the way: bumping the schema to 16 for D-88 made the application refuse **its own
+  backup**, because the readable-versions list inside `migrate()` is maintained by hand and still ended
+  at 15. The round-trip test caught it within the same run. That list is now exported as
+  `READABLE_SCHEMA_VERSIONS`, the rejection message is generated from it rather than written out, and a
+  test pins it to `SCHEMA_VERSION`, so the next bump cannot pass unnoticed.

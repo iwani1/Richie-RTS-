@@ -83,6 +83,8 @@ function payment(overrides: Partial<Payment> = {}): Payment {
     log: [],
     recordedBy: "Fin",
     recordedAt: AT,
+    voidReason: null,
+    voidedAt: null,
     ...overrides,
   };
 }

@@ -18,9 +18,13 @@
 // invoice as recorded, untouched; a credit reduces what was asked for. Where the two cross, the
 // difference is a refund the office owes back, stated plainly rather than netted quietly into a zero.
 //
+// A payment can be cancelled — recorded against the wrong invoice, or for money that never arrived
+// (D-88). A cancelled payment is not money received: it is excluded here, once, so the invoice, the
+// two money reports, the finance home and the printed sheet cannot each decide for themselves.
+//
 // All comparison happens in whole pesewas (audit D-04): floats show a pesewa of balance forever.
 import { fromMinor, toMinor } from "./money";
-import type { CreditNote, Database, Invoice } from "./types";
+import type { CreditNote, Database, Invoice, Payment } from "./types";
 
 /**
  * The credit notes that still count: an issued one does, a voided one does not.
@@ -41,14 +45,21 @@ export function creditedTotal(db: Database, invoice: Invoice, upTo?: string): nu
   );
 }
 
-/** What the customer has actually paid, in the invoice's currency. */
+/** A payment that still counts: one that has not been cancelled (D-88). */
+export function isLivePayment(payment: Payment): boolean {
+  return !payment.voidedAt;
+}
+
+/** The payments that still count, optionally only those received by a given day. */
+export function livePayments(db: Database, upTo?: string): Payment[] {
+  return db.payments.filter((payment) => isLivePayment(payment) && (!upTo || payment.paidOn.slice(0, 10) <= upTo));
+}
+
+/** What the customer has actually paid, in the invoice's currency. Cancelled payments do not count. */
 export function paidTotal(db: Database, invoice: Invoice, upTo?: string): number {
   return fromMinor(
-    db.payments.reduce(
-      (sum, payment) =>
-        payment.invoiceId === invoice.id && (!upTo || payment.paidOn.slice(0, 10) <= upTo)
-          ? sum + toMinor(payment.amount)
-          : sum,
+    livePayments(db, upTo).reduce(
+      (sum, payment) => (payment.invoiceId === invoice.id ? sum + toMinor(payment.amount) : sum),
       0,
     ),
   );

@@ -11,7 +11,7 @@
 // and totals are frozen here and by trigger in migration 003. Only its status, amount paid and void
 // note move, and the void path refuses once money has been recorded against it.
 
-import { creditedTotal, invoiceBalance } from "./creditNotes";
+import { creditedTotal, invoiceBalance, livePayments } from "./creditNotes";
 import { formatAmount, fromMinor, linesTotal, parseAmount, parsePositiveAmount, percentOfMinor, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
@@ -32,6 +32,7 @@ export const FINANCE_COMMAND_TYPES = [
   "void_invoice",
   "record_payment",
   "advance_payment",
+  "void_payment",
   "issue_credit_note",
   "void_credit_note",
 ] as const;
@@ -74,6 +75,7 @@ export type FinanceCommand =
   | { type: "void_invoice"; id: string; reason: string }
   | { type: "record_payment"; input: PaymentInput }
   | { type: "advance_payment"; id: string; to: PaymentStatus }
+  | { type: "void_payment"; id: string; reason: string }
   | { type: "issue_credit_note"; input: CreditNoteInput }
   | { type: "void_credit_note"; id: string; reason: string };
 
@@ -98,6 +100,25 @@ export function billableEventFor(rentalId: string): string {
  */
 export function outstanding(db: Database, invoice: Invoice): number {
   return invoiceBalance(db, invoice).outstanding;
+}
+
+/**
+ * The invoice as it stands once its payments are what the database holds.
+ *
+ * `amountPaid` is the sum of the payments that still count, and the status follows from that sum.
+ * Both a recorded payment and a cancelled one move these same two fields, so they are worked out in
+ * one place: a cancelled payment that left `amountPaid` where it was would make the invoice claim
+ * money the office never received (D-88).
+ */
+function withPaymentsToDate(db: Database, invoice: Invoice, now: string): Invoice {
+  const balance = invoiceBalance(db, invoice);
+  return {
+    ...invoice,
+    amountPaid: balance.paid,
+    // A void invoice stays void: nothing about cancelling a payment brings one back to life.
+    status: invoice.status === "void" ? "void" : statusFor(toMinor(invoice.total), toMinor(balance.paid)),
+    updatedAt: now,
+  };
 }
 
 function statusFor(totalMinor: number, paidMinorTotal: number): InvoiceStatus {
@@ -261,10 +282,12 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
       if (!invoice) return fail("Invoice not found.");
       if (invoice.status === "void") return fail(`${invoice.reference} is already void.`);
       if (!command.reason.trim()) return fail("A reason is required.", { reason: "Give a short reason." });
-      const payments = db.payments.filter((payment) => payment.invoiceId === invoice.id);
+      // Only payments that still count block a void: a cancelled one never happened, so it cannot
+      // stand in the way of cancelling the invoice it was wrongly recorded against (D-88).
+      const payments = livePayments(db).filter((payment) => payment.invoiceId === invoice.id);
       if (payments.length) {
         return fail(
-          `${invoice.reference} has ${payments.length} payment${payments.length === 1 ? "" : "s"} recorded against it, so it cannot be voided. Payments are immutable; take the money off with a credit note instead.`,
+          `${invoice.reference} has ${payments.length} payment${payments.length === 1 ? "" : "s"} recorded against it, so it cannot be voided. Cancel the payment if it was recorded in error, or take the money off with a credit note.`,
         );
       }
       const credits = db.creditNotes.filter((note) => note.invoiceId === invoice.id && note.status === "issued");
@@ -359,24 +382,18 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
         ],
         recordedBy: actor?.fullName ?? "System",
         recordedAt: now,
+        voidReason: null,
+        voidedAt: null,
       };
 
-      const paidMinorTotal = db.payments.reduce(
-        (sum, existing) => (existing.invoiceId === invoice!.id ? sum + toMinor(existing.amount) : sum),
-        toMinor(payment.amount),
-      );
-      const paidTotal = fromMinor(paidMinorTotal);
-      const updated: Invoice = {
-        ...invoice!,
-        amountPaid: paidTotal,
-        status: statusFor(toMinor(invoice!.total), paidMinorTotal),
-        updatedAt: now,
-      };
+      // The invoice's paid figure and status are worked out from the payments that will exist, by
+      // the one helper both this command and a cancellation use (D-88).
+      const recorded = { ...db, referenceCounters: counters, payments: [...db.payments, payment] };
+      const updated = withPaymentsToDate(recorded, invoice!, now);
+      const balance = invoiceBalance(recorded, updated);
       const next = audit(
         {
-          ...db,
-          referenceCounters: counters,
-          payments: [...db.payments, payment],
+          ...recorded,
           invoices: db.invoices.map((record) => (record.id === updated.id ? updated : record)),
         },
         actor,
@@ -384,15 +401,72 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
           action: "finance:payment_record",
           entity: "payment",
           entityId: payment.id,
-          summary: `${payment.reference} ${payment.currencyCode} ${formatAmount(payment.amount)} recorded against ${updated.reference} (${method}). Outstanding ${updated.currencyCode} ${formatAmount(outstanding({ ...db, payments: [...db.payments, payment] }, updated))}.`,
+          summary: `${payment.reference} ${payment.currencyCode} ${formatAmount(payment.amount)} recorded against ${updated.reference} (${method}). Outstanding ${updated.currencyCode} ${formatAmount(balance.outstanding)}.`,
         },
         now,
       );
-      const balance = invoiceBalance({ ...db, payments: [...db.payments, payment] }, updated);
       return {
         ok: true,
         db: next,
         message: `${payment.reference} recorded. ${updated.reference} outstanding: ${updated.currencyCode} ${formatAmount(balance.outstanding)}.`,
+      };
+    }
+
+    case "void_payment": {
+      // A payment recorded against the wrong invoice, or for money that never arrived, has to be
+      // correctable: otherwise the invoice asks for money the office never received and the only way
+      // out is a hand-written row in the database (D-88). The record keeps its number, the reason is
+      // kept beside it, and the invoice goes back to what it actually owed.
+      const denied = authorise(actor, "payments:void");
+      if (denied) return denied;
+      const payment = db.payments.find((record) => record.id === command.id);
+      if (!payment) return fail("Payment not found.");
+      if (payment.voidedAt) return fail(`${payment.reference} is already cancelled.`);
+      const reason = command.reason.trim();
+      if (!reason) return fail("A reason is required.", { reason: "Say why this payment is being cancelled." });
+      if (reason.length > 300) return fail("Keep the reason to 300 characters.", { reason: "Keep the reason to 300 characters." });
+      const invoice = db.invoices.find((record) => record.id === payment.invoiceId);
+      if (!invoice) return fail("The invoice this payment was recorded against is missing, so its balance cannot be corrected.");
+
+      const cancelled: Payment = {
+        ...payment,
+        voidReason: reason,
+        voidedAt: now,
+        log: [
+          ...payment.log,
+          {
+            id: makeId(),
+            at: now,
+            actorId: actor?.id ?? null,
+            actorName: actor?.fullName ?? "System",
+            note: `Payment cancelled: ${reason}`,
+            fromStatus: payment.status,
+            toStatus: payment.status,
+          },
+        ],
+      };
+      const afterCancel = { ...db, payments: db.payments.map((record) => (record.id === cancelled.id ? cancelled : record)) };
+      const updated = withPaymentsToDate(afterCancel, invoice, now);
+      const balance = invoiceBalance(afterCancel, updated);
+      const reconciledNote =
+        payment.status === "reconciled"
+          ? " It had already been reconciled with the bank statement, so that reconciliation is now short by this amount."
+          : "";
+      const next = audit(
+        { ...afterCancel, invoices: db.invoices.map((record) => (record.id === updated.id ? updated : record)) },
+        actor,
+        {
+          action: "finance:payment_void",
+          entity: "payment",
+          entityId: cancelled.id,
+          summary: `${cancelled.reference} ${cancelled.currencyCode} ${formatAmount(cancelled.amount)} cancelled against ${updated.reference} (was ${payment.status}). Reason: ${reason}${reconciledNote} ${updated.reference} outstanding: ${updated.currencyCode} ${formatAmount(balance.outstanding)}.`,
+        },
+        now,
+      );
+      return {
+        ok: true,
+        db: next,
+        message: `${cancelled.reference} cancelled. ${updated.reference} outstanding: ${updated.currencyCode} ${formatAmount(balance.outstanding)}.${reconciledNote}`,
       };
     }
 

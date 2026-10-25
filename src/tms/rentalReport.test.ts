@@ -105,6 +105,8 @@ const payment = (overrides: Partial<Payment>): Payment => ({
   log: [],
   recordedBy: "Ama",
   recordedAt: "2026-06-08T09:00:00.000Z",
+  voidReason: null,
+  voidedAt: null,
   ...overrides,
 });
 
@@ -188,6 +190,21 @@ describe("rental report (RPT-01)", () => {
     // Outstanding is as at the end of the period: the July invoice falls outside it, so it does not count.
     expect(report.outstandingTotal).toBe(1500);
     expect(report.outstandingCount).toBe(1);
+  });
+
+  it("does not report a cancelled payment as money received", () => {
+    const db = world({
+      invoices: [invoice({ id: "i1", total: 2000, issuedOn: "2026-06-05" })],
+      payments: [
+        payment({ id: "p1", invoiceId: "i1", amount: 500, paidOn: "2026-06-08" }),
+        payment({ id: "p2", invoiceId: "i1", amount: 700, paidOn: "2026-06-09", voidReason: "Bounced", voidedAt: "2026-06-10T09:00:00.000Z" }),
+      ],
+    });
+    const report = rentalReport(db, JUNE.from, JUNE.to);
+    expect(report.receivedTotal).toBe(500);
+    expect(report.paymentCount).toBe(1);
+    // The cancelled money was never received, so the invoice still owes it.
+    expect(report.outstandingTotal).toBe(1500);
   });
 
   it("computes utilisation from committed rental vehicle-days and the acting fleet", () => {

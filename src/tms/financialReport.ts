@@ -19,7 +19,7 @@
 // the company currency is not set, because a total without a currency is a guess.
 
 import { costReport } from "./costs";
-import { creditedTotal, invoiceBalance } from "./creditNotes";
+import { creditedTotal, invoiceBalance, isLivePayment } from "./creditNotes";
 import { fromMinor, sumAmounts, toMinor } from "./money";
 import type { Database, Invoice, Payment } from "./types";
 
@@ -88,11 +88,18 @@ const ymd = (iso: string) => iso.slice(0, 10);
 /** What was sold. Only hire invoices exist in this build; a contract invoice would add a row. */
 const SERVICE_LABELS: Record<Invoice["kind"], string> = { rental: "Vehicle hire" };
 
-/** Money paid towards one invoice by a given day, in whole pesewas. */
+/**
+ * Money paid towards one invoice by a given day, in whole pesewas.
+ *
+ * A cancelled payment is skipped: it was recorded in error, so reporting it as money received would
+ * overstate the period and overstate what the customer has paid (D-88).
+ */
 const paidToward = (payments: Payment[], invoice: Invoice, upTo?: string) =>
   payments.reduce(
     (sum, payment) =>
-      payment.invoiceId === invoice.id && (!upTo || ymd(payment.paidOn) <= upTo) ? sum + toMinor(payment.amount) : sum,
+      payment.invoiceId === invoice.id && isLivePayment(payment) && (!upTo || ymd(payment.paidOn) <= upTo)
+        ? sum + toMinor(payment.amount)
+        : sum,
     0,
   );
 
@@ -101,7 +108,7 @@ export function financialReport(db: Database, from: string, to: string): Financi
   const inRange = (date: string) => date >= from && date <= to;
 
   const invoices = db.invoices.filter((invoice) => invoice.status !== "void" && inRange(invoice.issuedOn));
-  const payments = db.payments.filter((payment) => inRange(ymd(payment.paidOn)));
+  const payments = db.payments.filter((payment) => isLivePayment(payment) && inRange(ymd(payment.paidOn)));
 
   // Revenue by customer. A missing name is its own line: folding it into "other" would hide that
   // the invoice cannot be traced to anybody.

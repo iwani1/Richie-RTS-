@@ -71,6 +71,8 @@ function payment(overrides: Partial<Payment> = {}): Payment {
     log: [],
     recordedBy: "Fin",
     recordedAt: at,
+    voidReason: null,
+    voidedAt: null,
     ...overrides,
   };
 }
@@ -182,6 +184,23 @@ describe("financial report (RPT-03)", () => {
     expect(report.outstandingTotal).toBe(1500);
     expect(report.outstandingCount).toBe(1);
     expect(report.revenueByCustomer[0].paid).toBe(500);
+  });
+
+  it("leaves a cancelled payment out of what was received, and out of what the customer has paid", () => {
+    // A payment recorded in error and then cancelled never arrived, so the month's statement must not
+    // count it as income, and the customer's row must not say they paid it (D-88).
+    const db = world({
+      invoices: [invoice({})],
+      payments: [
+        payment({ id: "pay1", amount: 500, paidOn: "2026-06-10" }),
+        payment({ id: "pay2", amount: 400, paidOn: "2026-06-11", voidReason: "Wrong invoice", voidedAt: "2026-06-12T09:00:00.000Z" }),
+      ],
+    });
+    const report = financialReport(db, JUNE.from, JUNE.to);
+    expect(report.receivedTotal).toBe(500);
+    expect(report.paymentCount).toBe(1);
+    expect(report.revenueByCustomer[0].paid).toBe(500);
+    expect(report.revenueByCustomer[0].outstanding).toBe(1500);
   });
 
   it("groups expenses by the configured category, keeping uncategorised costs visible", () => {

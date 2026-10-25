@@ -297,8 +297,8 @@ describe("FIN-03 manual payments", () => {
     const w = invoiced();
     step(w, "finance", { type: "record_payment", input: payment(w.db.invoices[0].id, { amount: "750" }) });
     const snapshot = JSON.stringify(w.db.payments[0]);
-    // The only payment commands are record_payment and advance_payment; advancing must not touch
-    // the financial fields.
+    // The payment commands are record, advance and cancel; neither advancing nor cancelling may
+    // touch the financial fields.
     step(w, "finance", { type: "advance_payment", id: w.db.payments[0].id, to: "verified" });
     const after = w.db.payments[0];
     expect(after.amount).toBe(750);
@@ -312,6 +312,141 @@ describe("FIN-03 manual payments", () => {
     const denied = attempt(w, "ops", { type: "record_payment", input: payment(w.db.invoices[0].id) });
     expect(denied.ok).toBe(false);
     expect(denied.ok === false && denied.message).toMatch(/payments:record/);
+  });
+});
+
+describe("FIN-03 cancelling a payment recorded in error (D-88)", () => {
+  function invoiced(overrides: Record<string, unknown> = {}) {
+    const w = completedRental(overrides);
+    step(w, "finance", { type: "issue_rental_invoice", input: invoice({ rentalId: w.rentalId }) });
+    return w;
+  }
+
+  it("puts the invoice back to what it actually owed and keeps the record", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    step(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "2000" }) });
+    expect(w.db.invoices[0].amountPaid).toBe(2000);
+    expect(w.db.invoices[0].status).toBe("part_paid");
+
+    const cancelled = step(w, "finance", { type: "void_payment", id: w.db.payments[0].id, reason: "Recorded against the wrong invoice" });
+    expect(cancelled.ok && cancelled.message).toMatch(/PAY-2026-0001 cancelled\. INV-2026-0001 outstanding: GHS 4700\.00\./);
+
+    const subject = w.db.invoices[0];
+    expect(subject.amountPaid).toBe(0);
+    expect(subject.status).toBe("issued");
+    expect(outstanding(w.db, subject)).toBe(4700);
+    expect(invoiceBalance(w.db, subject).paid).toBe(0);
+
+    // The payment keeps its number, its amount and its date: only the cancellation was added.
+    const kept = w.db.payments[0];
+    expect(kept.reference).toBe("PAY-2026-0001");
+    expect(kept.amount).toBe(2000);
+    expect(kept.paidOn).toBe("2026-06-01");
+    expect(kept.voidReason).toBe("Recorded against the wrong invoice");
+    expect(kept.voidedAt).toBe(NOW);
+    expect(kept.status).toBe("recorded");
+    expect(kept.log.at(-1)).toMatchObject({ note: "Payment cancelled: Recorded against the wrong invoice", fromStatus: "recorded", toStatus: "recorded" });
+    expect(w.db.audit[0].action).toBe("finance:payment_void");
+    expect(w.db.audit[0].summary).toMatch(/Recorded against the wrong invoice/);
+  });
+
+  it("is a one-way door: a cancelled payment cannot be cancelled twice", () => {
+    const w = invoiced();
+    step(w, "finance", { type: "record_payment", input: payment(w.db.invoices[0].id, { amount: "500" }) });
+    step(w, "finance", { type: "void_payment", id: w.db.payments[0].id, reason: "Money never arrived" });
+    const again = attempt(w, "finance", { type: "void_payment", id: w.db.payments[0].id, reason: "Changed my mind" });
+    expect(again.ok).toBe(false);
+    expect(again.ok === false && again.message).toMatch(/already cancelled/);
+    expect(w.db.payments[0].voidReason).toBe("Money never arrived");
+  });
+
+  it("requires a reason, and refuses an unknown payment", () => {
+    const w = invoiced();
+    step(w, "finance", { type: "record_payment", input: payment(w.db.invoices[0].id, { amount: "500" }) });
+    const blank = attempt(w, "finance", { type: "void_payment", id: w.db.payments[0].id, reason: "   " });
+    expect(blank.ok).toBe(false);
+    expect(errorsOf(blank).reason).toMatch(/why this payment is being cancelled/i);
+    expect(w.db.payments[0].voidedAt).toBeNull();
+
+    const missing = attempt(w, "finance", { type: "void_payment", id: "nope", reason: "Typo" });
+    expect(missing.ok).toBe(false);
+    expect(missing.ok === false && missing.message).toMatch(/Payment not found/);
+  });
+
+  it("recomputes the invoice from the payments that still count, not from the cancelled one", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    step(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "1000", externalReference: "SLIP-A" }) });
+    step(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "1500", externalReference: "SLIP-B" }) });
+    expect(w.db.invoices[0].amountPaid).toBe(2500);
+    expect(w.db.invoices[0].status).toBe("part_paid");
+
+    step(w, "finance", { type: "void_payment", id: w.db.payments[0].id, reason: "Wrong amount keyed in" });
+    expect(w.db.invoices[0].amountPaid).toBe(1500);
+    expect(w.db.invoices[0].status).toBe("part_paid");
+
+    // A later payment is measured against the corrected balance, and the total stays consistent.
+    const tooMuch = attempt(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "3300", externalReference: "SLIP-C" }) });
+    expect(tooMuch.ok).toBe(false);
+    expect(errorsOf(tooMuch).amount).toMatch(/GHS 3200\.00 outstanding/);
+    step(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "3200", externalReference: "SLIP-C" }) });
+    expect(w.db.invoices[0].amountPaid).toBe(4700);
+    expect(w.db.invoices[0].status).toBe("paid");
+  });
+
+  it("lets a wrongly paid invoice be voided once its only payment is cancelled", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    step(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "4700" }) });
+    expect(attempt(w, "finance", { type: "void_invoice", id: invoiceId, reason: "Wrong customer" }).ok).toBe(false);
+
+    step(w, "finance", { type: "void_payment", id: w.db.payments[0].id, reason: "Paid by the other customer" });
+    step(w, "finance", { type: "void_invoice", id: invoiceId, reason: "Wrong customer" });
+    expect(w.db.invoices[0].status).toBe("void");
+    // A cancelled payment on a void invoice does not bring it back to life.
+    expect(w.db.invoices[0].amountPaid).toBe(0);
+  });
+
+  it("cancels a reconciled payment, and says what that does to the reconciliation", () => {
+    const w = invoiced();
+    step(w, "finance", { type: "record_payment", input: payment(w.db.invoices[0].id, { amount: "500" }) });
+    step(w, "finance", { type: "advance_payment", id: w.db.payments[0].id, to: "verified" });
+    step(w, "finance", { type: "advance_payment", id: w.db.payments[0].id, to: "reconciled" });
+
+    const cancelled = step(w, "finance", { type: "void_payment", id: w.db.payments[0].id, reason: "Matched to the wrong statement line" });
+    expect(cancelled.ok && cancelled.message).toMatch(/reconciled with the bank statement/);
+    // The verification status is not rewritten: the payment was reconciled, and it was cancelled.
+    expect(w.db.payments[0].status).toBe("reconciled");
+    expect(w.db.payments[0].voidedAt).toBe(NOW);
+    expect(w.db.invoices[0].amountPaid).toBe(0);
+  });
+
+  it("is closed to operations: cancelling money needs payments:void", () => {
+    const w = invoiced();
+    step(w, "finance", { type: "record_payment", input: payment(w.db.invoices[0].id, { amount: "500" }) });
+    const denied = attempt(w, "ops", { type: "void_payment", id: w.db.payments[0].id, reason: "Trying it on" });
+    expect(denied.ok).toBe(false);
+    expect(denied.ok === false && denied.message).toMatch(/payments:void/);
+    expect(w.db.payments[0].voidedAt).toBeNull();
+  });
+
+  it("leaves a credit note and a cancellation independent of one another", () => {
+    const w = invoiced();
+    const invoiceId = w.db.invoices[0].id;
+    step(w, "finance", { type: "record_payment", input: payment(invoiceId, { amount: "2000" }) });
+    step(w, "finance", {
+      type: "issue_credit_note",
+      input: { invoiceId, issuedOn: "2026-06-02", amount: "1000", description: "Airport transfer not operated", reason: "Service not delivered" },
+    });
+    // 4,700 − 2,000 paid − 1,175 credited = 1,525 still owed.
+    expect(invoiceBalance(w.db, w.db.invoices[0]).outstanding).toBe(1525);
+
+    step(w, "finance", { type: "void_payment", id: w.db.payments[0].id, reason: "Customer's transfer bounced" });
+    // Only the payment moved: the credit note still stands, so 4,700 − 1,175 = 3,525.
+    expect(w.db.creditNotes[0].status).toBe("issued");
+    expect(invoiceBalance(w.db, w.db.invoices[0]).outstanding).toBe(3525);
+    expect(invoiceBalance(w.db, w.db.invoices[0]).refundDue).toBe(0);
   });
 });
 

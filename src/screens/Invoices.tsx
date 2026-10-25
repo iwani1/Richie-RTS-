@@ -11,7 +11,7 @@
 // its own numbered document, it does not touch the payment rows, and every balance on this screen is
 // worked out by the one shared helper in creditNotes.ts so the tiles, the rows and the reports agree.
 import { useMemo, useState, type FormEvent } from "react";
-import { invoiceBalance, type InvoiceBalance } from "../tms/creditNotes";
+import { invoiceBalance, isLivePayment, type InvoiceBalance } from "../tms/creditNotes";
 import { formatAmount, fromMinor, lineAmount, linesTotal, parseAmount, percentOfMinor, toMinor } from "../tms/money";
 import type { CommandResult } from "../tms/service";
 import type { CreditNote, Invoice, InvoiceStatus, Payment, PaymentStatus } from "../tms/types";
@@ -47,6 +47,19 @@ const STATUS_TONE: Record<InvoiceStatus, "success" | "warning" | "error" | "neut
 // Displayed and previewed with the same arithmetic the server will use, so the figure on screen
 // is the figure on the document (audit D-04).
 const money = (currency: string, amount: number) => `${currency} ${formatAmount(amount)}`;
+
+/**
+ * How "received" is described when some payments have been cancelled (D-88).
+ *
+ * The figure beside this caption counts only the payments that still stand, so the caption has to
+ * say so: "2 payments recorded" next to a total from one payment is the kind of sentence that erodes
+ * trust in every other number on the page.
+ */
+function paymentsCaption(recorded: number, live: number): string {
+  const plural = (count: number) => `${count} payment${count === 1 ? "" : "s"}`;
+  if (recorded === live) return `${plural(recorded)} recorded`;
+  return `${plural(live)} counting of ${recorded} recorded · ${recorded - live} cancelled`;
+}
 
 type CommandNotify = ReturnType<typeof useTms>["setFlash"];
 
@@ -365,9 +378,15 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
   const [voiding, setVoiding] = useState(false);
   const [crediting, setCrediting] = useState(false);
   const [voidingCredit, setVoidingCredit] = useState<CreditNote | null>(null);
+  // The payment being cancelled, with the reason typed into the panel (D-88).
+  const [cancellingPayment, setCancellingPayment] = useState<Payment | null>(null);
   // Which document is open in the print preview: this invoice, or one of its credit notes (D-87).
   const [printing, setPrinting] = useState<{ kind: "invoice" } | { kind: "creditNote"; note: CreditNote } | null>(null);
   const payments = db.payments.filter((payment) => payment.invoiceId === invoice.id);
+  // A cancelled payment is shown, struck out of the figure, and still listed: the record is the
+  // reason the invoice is owed again, so hiding it would leave the operator with an unexplained
+  // balance (D-88).
+  const livePaymentsForInvoice = payments.filter(isLivePayment);
   const credits = db.creditNotes.filter((note) => note.invoiceId === invoice.id);
   const balance = invoiceBalance(db, invoice);
   const outstanding = balance.outstanding;
@@ -378,6 +397,13 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
   const advance = async (payment: Payment, to: PaymentStatus) => {
     const result = await dispatch({ type: "advance_payment", id: payment.id, to });
     setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+  };
+
+  const cancelPayment = async (payment: Payment, reason: string) => {
+    const result = await dispatch({ type: "void_payment", id: payment.id, reason });
+    setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) setCancellingPayment(null);
+    return result;
   };
 
   const voidCredit = async (note: CreditNote, reason: string) => {
@@ -405,7 +431,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             {allowed("credits:issue") && invoice.status !== "void" && toMinor(creditRoom) > 0 && (
               <Button onClick={() => setCrediting(true)}>Credit the invoice</Button>
             )}
-            {allowed("invoices:void") && invoice.status !== "void" && payments.length === 0 && credits.length === 0 && (
+            {allowed("invoices:void") && invoice.status !== "void" && livePaymentsForInvoice.length === 0 && credits.length === 0 && (
               <Button variant="danger" onClick={() => setVoiding(true)}>
                 Void invoice
               </Button>
@@ -423,8 +449,9 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
         <Notice tone="info" className="mb-4">
           {money(invoice.currencyCode, balance.paid)} received
           {balance.credited > 0 && <> and {money(invoice.currencyCode, balance.credited)} credited back</>};{" "}
-          {money(invoice.currencyCode, outstanding)} still outstanding. This invoice cannot be edited and cannot be voided while payments stand against it:
-          {" "}a correction is a credit note, which keeps its own number and leaves the payments untouched.
+          {money(invoice.currencyCode, outstanding)} still outstanding. This invoice cannot be edited, and cannot be voided while a payment still
+          counts against it: a payment recorded in error is cancelled with a reason, and a correction to the bill is a credit note. Both keep
+          their own number and leave the other record untouched.
         </Notice>
       )}
       {balance.refundDue > 0 && (
@@ -438,7 +465,11 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
         <Stat label="Subtotal" value={money(invoice.currencyCode, invoice.subtotal)} caption="before tax" />
         <Stat label="Tax" value={money(invoice.currencyCode, invoice.total - invoice.subtotal)} caption={invoice.taxLines.length ? invoice.taxLines.map((line) => `${line.name} ${line.ratePercent}%`).join(" · ") : "not registered"} />
         <Stat label="Total" value={money(invoice.currencyCode, invoice.total)} caption={INVOICE_STATUS_LABELS[invoice.status]} />
-        <Stat label="Received" value={money(invoice.currencyCode, balance.paid)} caption={`${payments.length} payment${payments.length === 1 ? "" : "s"} recorded`} />
+        <Stat
+          label="Received"
+          value={money(invoice.currencyCode, balance.paid)}
+          caption={paymentsCaption(payments.length, livePaymentsForInvoice.length)}
+        />
         <Stat
           label="Credited"
           value={money(invoice.currencyCode, balance.credited)}
@@ -483,21 +514,64 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
               { key: "ref", header: "Payment", render: (payment) => <span className="rts-mono text-xs">{payment.reference}</span> },
               { key: "date", header: "Received", render: (payment) => formatDate(payment.paidOn) },
               { key: "method", header: "Method", render: (payment) => payment.method },
-              { key: "amount", header: "Amount", className: "text-right rts-mono", render: (payment) => money(payment.currencyCode, payment.amount) },
-              { key: "status", header: "Status", render: (payment) => <Badge tone={payment.status === "reconciled" ? "success" : "info"}>{PAYMENT_STATUS_LABELS[payment.status]}</Badge> },
+              {
+                key: "amount",
+                header: "Amount",
+                className: "text-right rts-mono",
+                render: (payment) => (
+                  <span className={payment.voidedAt ? "text-stone-500 line-through" : undefined}>{money(payment.currencyCode, payment.amount)}</span>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                // A cancelled payment says so in words, not only in colour: the badge carries the
+                // meaning and the struck-through amount carries it a second time (D-88).
+                render: (payment) =>
+                  payment.voidedAt ? (
+                    <Badge tone="neutral">Cancelled</Badge>
+                  ) : (
+                    <Badge tone={payment.status === "reconciled" ? "success" : "info"}>{PAYMENT_STATUS_LABELS[payment.status]}</Badge>
+                  ),
+              },
               {
                 key: "actions",
                 header: "",
                 className: "text-right",
                 render: (payment) =>
-                  allowed("payments:advance") && payment.status !== "reconciled" ? (
-                    <Button variant="ghost" onClick={() => advance(payment, payment.status === "recorded" ? "verified" : "reconciled")}>
-                      {payment.status === "recorded" ? "Verify" : "Reconcile"}
-                    </Button>
-                  ) : null,
+                  payment.voidedAt ? null : (
+                    <span className="inline-flex gap-1">
+                      {allowed("payments:advance") && payment.status !== "reconciled" && (
+                        <Button variant="ghost" onClick={() => advance(payment, payment.status === "recorded" ? "verified" : "reconciled")}>
+                          {payment.status === "recorded" ? "Verify" : "Reconcile"}
+                        </Button>
+                      )}
+                      {allowed("payments:void") && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => setCancellingPayment(payment)}
+                          aria-label={`Cancel ${payment.reference}`}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </span>
+                  ),
               },
             ]}
           />
+          {payments.some((payment) => payment.voidedAt) && (
+            <ul className="mt-3 space-y-1 text-xs text-stone-600">
+              {payments
+                .filter((payment) => payment.voidedAt)
+                .map((payment) => (
+                  <li key={payment.id}>
+                    <span className="rts-mono">{payment.reference}</span> cancelled: {payment.voidReason ?? "no reason recorded"} — it no longer counts
+                    towards what was received.
+                  </li>
+                ))}
+            </ul>
+          )}
           {payments.some((payment) => payment.externalReference) && (
             <ul className="mt-3 space-y-1 text-xs text-stone-600">
               {payments
@@ -594,6 +668,15 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
           room={creditRoom}
           onClosed={() => setCrediting(false)}
           onSubmit={async (input) => dispatch({ type: "issue_credit_note", input })}
+          notify={setFlash}
+        />
+      )}
+      {cancellingPayment && (
+        <CancelPaymentForm
+          payment={cancellingPayment}
+          invoiceReference={invoice.reference}
+          onClosed={() => setCancellingPayment(null)}
+          onSubmit={(reason) => cancelPayment(cancellingPayment, reason)}
           notify={setFlash}
         />
       )}
@@ -733,6 +816,68 @@ function VoidInvoiceForm({
           <Button onClick={onClosed}>Cancel</Button>
           <Button type="submit" variant="danger">
             Void invoice
+          </Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+/**
+ * Cancelling a payment recorded in error (FIN-03, D-88).
+ *
+ * The record keeps its number, stays in the list and stops counting towards what was received; the
+ * invoice goes back to what it actually owed. A reason is required because a year later it is the
+ * only thing that explains why a payment that is still on the page is not in the total.
+ *
+ * A reconciled payment may still be cancelled — otherwise a mis-click on "Reconcile" would lock the
+ * figure for good — but the panel says out loud what it does to the reconciliation first.
+ */
+function CancelPaymentForm({
+  payment,
+  invoiceReference,
+  onSubmit,
+  notify,
+  onClosed,
+}: {
+  payment: Payment;
+  invoiceReference: string;
+  onClosed: () => void;
+  onSubmit: (reason: string) => Promise<CommandResult>;
+  notify: CommandNotify;
+}) {
+  const [reason, setReason] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const result = await onSubmit(reason);
+    notify({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) onClosed();
+    else setErrors(result.errors);
+  };
+
+  return (
+    <Panel
+      title={`Cancel ${payment.reference}`}
+      description={`${money(payment.currencyCode, payment.amount)} stops counting towards what was received on ${invoiceReference}, and the invoice goes back to what it actually owed. The payment keeps its number and stays on record with this reason.`}
+      onClose={onClosed}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {payment.status === "reconciled" && (
+          <Notice tone="warning" title="Already reconciled with the bank statement">
+            This payment was matched to the bank statement. Cancelling it leaves that statement
+            unmatched by {money(payment.currencyCode, payment.amount)}: check the bank before going
+            ahead.
+          </Notice>
+        )}
+        <Field label="Reason" hint="Kept on the record and in the audit trail" error={errors.reason}>
+          <TextInput value={reason} onChange={(e) => setReason(e.target.value)} invalid={!!errors.reason} />
+        </Field>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClosed}>Keep the payment</Button>
+          <Button type="submit" variant="danger">
+            Cancel payment
           </Button>
         </div>
       </form>

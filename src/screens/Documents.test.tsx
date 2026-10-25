@@ -85,6 +85,8 @@ const payment: Payment = {
   log: [],
   recordedBy: "Ama Mensah",
   recordedAt: at,
+  voidReason: null,
+  voidedAt: null,
 };
 
 const creditNote: CreditNote = {

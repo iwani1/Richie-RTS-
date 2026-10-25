@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–37** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 38 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–38** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 39 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -53,6 +53,11 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   itself refuses, and six simultaneous attempts give one winner and five refusals.
 - Invoices numbered per year, with your tax lines, discounts, due dates, voiding, part payments and
   exact settlement. Money is computed in whole pesewas with one rounding rule.
+- **Correcting a payment**: a figure keyed against the wrong invoice, or for money that never arrived,
+  can be cancelled with a reason. The record keeps its number and stays in the list, the amount stops
+  counting as received, and the invoice goes back to what it actually owed — in the reports and on the
+  printed sheet as well as on the screen. It is a one-way door, and a payment already matched to the
+  bank statement warns what the match will be short by before it is cancelled.
 - **Printable documents**: an invoice and each credit note print as a formatted A4 sheet, or save as a
   PDF from the browser's own print dialog. The printed amount due is the same figure the screen shows,
   a void document says so in words before any figure, and a refund is asked for on the paper.
@@ -121,13 +126,17 @@ These work, and the difference is worth knowing before relying on them:
 - **Credit notes** — one line each, typed before tax (the tax follows from the invoice). A note cannot
   carry several lines from the screen yet, and a refund that is actually paid out is recorded as an
   ordinary expense, because there is no cash book.
+- **Cancelling a payment** — it says the money was never received. Giving real money back is still a
+  credit note with a refund stated on it, and the refund itself is an expense; there is no refund
+  record and no cash book.
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**524 passed, 17 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**550 passed, 18 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
-- 17 integration tests against real PostgreSQL in CI, including six operators racing for one vehicle and
-  the database refusing to credit an invoice past its own total.
+- 18 integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
+  the database refusing to credit an invoice past its own total, and the database refusing to
+  un-cancel a payment or to cancel one without a reason.
 - `npm run e2e` — 39 checks against the built, started application over HTTP.
 - The trial on real data: §1–§10 passed on a copy of the database on 2026-10-25 (recorded in
   `docs/REAL_DATA_TRIAL.md` §10), including the invoice arithmetic checked to the pesewa.
