@@ -5,6 +5,7 @@ import { onTimeReport } from "../tms/kpis";
 import type { Permission } from "../tms/permissions";
 import type { CommandResult } from "../tms/service";
 import { readinessReport } from "../tms/maintenance";
+import { ImportPanel } from "../ui/ImportPanel";
 import { useTms } from "../tms/useTms";
 import {
   DIRECTIONS,
@@ -365,7 +366,7 @@ function GenerateForm({ route, onClose }: { route: BusRoute; onClose: () => void
 
 function PassengersTab() {
   const { db, allowed } = useTms();
-  const [panel, setPanel] = useState<{ mode: "create" } | { mode: "edit"; passenger: Passenger } | null>(null);
+  const [panel, setPanel] = useState<{ mode: "create" } | { mode: "edit"; passenger: Passenger } | { mode: "import" } | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
@@ -384,7 +385,15 @@ function PassengersTab() {
       <TableCard
         title="Passenger roster"
         summary={`${rows.length} of ${db.passengers.length} shown · ${db.passengers.filter((p) => !p.routeId).length} not yet on a route · personal data, capture only what the route needs`}
-        actions={allowed("passengers:create") ? <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add passenger</Button> : undefined}
+        actions={
+          allowed("passengers:create") ? (
+            <div className="flex flex-wrap gap-2">
+              {/* EMP-02: a new client's roster arrives as a spreadsheet, not as sixty typed rows. */}
+              <Button onClick={() => setPanel({ mode: "import" })}>Import CSV</Button>
+              <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Add passenger</Button>
+            </div>
+          ) : undefined
+        }
         toolbar={
           <>
             <SearchInput placeholder="Search name, employee ref, client" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search passengers" />
@@ -418,6 +427,7 @@ function PassengersTab() {
         />
       </TableCard>
 
+      {panel?.mode === "import" && <ImportPanel kind="passengers" onClose={() => setPanel(null)} />}
       {panel?.mode === "create" && <PassengerForm passenger={null} onClose={() => setPanel(null)} />}
       {panel?.mode === "edit" && <PassengerForm passenger={panel.passenger} onClose={() => setPanel(null)} />}
 

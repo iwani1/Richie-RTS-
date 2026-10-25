@@ -47,7 +47,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | CLI-02 | 1B | Contracts: reference, client, dates, status (Draft, Pending Approval, Active, Suspended, Expired, Terminated), attachment where supported, service… | Not built | No contract entity. |
 | CLI-03 | 1B | Corporate dashboard limited to the client's own records. | Partial | Client portal shows own routes, roster and rentals. **No contracts, invoices or payment status.** |
 | EMP-01 | 1B | Employee register: reference, name, contact, company, department, work location, shift, approved pickup and drop-off locations, account status,… | Partial | Passenger record: name, phone, employee reference, client, route, stop, status. **No department, work location, shift, eligibility, accessibility or drop-off.** |
-| EMP-02 | 1B | CSV import: documented template, required-field validation, duplicate detection by reference and likely duplicates, preview before saving, row-level… | Not built | Not present. |
+| EMP-02 | 1B | CSV import: documented template, required-field validation, duplicate detection by reference and likely duplicates, preview before saving, row-level… | Met | `src/tms/import.ts` with `kind="passengers"` from the Passengers tab (Phase 31, D-81): template documented in `docs/SETUP_AND_DEPLOYMENT.md` §8, names resolved to records, duplicates by employee reference rejected, likely duplicates flagged **Check**, preview before saving, every row either created or named by line. |
 | EMP-03 | 1B | Employee management: shifts, locations, eligibility toggle, permitted exports. Deactivated employees cannot create bookings unless policy allows. | Partial | Route/stop assignment and status changes; no shifts, locations, eligibility or export. |
 | RTE-01 | 1B | Locations and stops: coordinates, landmark description, optional Ghana digital address. | Partial | Stops have a name and a scheduled time only. |
 | RTE-02 | 1B | Routes: reference, name, service type, client, origin/destination, ordered pickup and drop-off stops, operating days, shifts, planned start, expected… | Partial | Reference, name, client, direction, shift, category, weekdays, date range, ordered stops, status. **No expected duration or capacity requirement.** |
@@ -818,3 +818,25 @@ succeeds.
 That closes the seven queued items from the recommended answers. What is left in the register is what
 needs the owner or a provider: the live-database repeat of the trial, bookings and contracts, SMS and
 GPS (no channel, no hardware), and VAT/GRA e-VAT (no rates supplied).
+
+## Phase 31 - Importing a roster, the last import the brief asks for (EMP-02, D-81)
+
+The office could import vehicles, drivers and clients, but every employee was typed by hand, one
+route and one pickup stop at a time. This closes that gap with the machinery that already exists,
+rather than with a second importer.
+
+| Item | Status | Evidence |
+|---|---|---|
+| A roster file is imported from the Passengers tab | Done (verified) | **Import CSV** beside **Add passenger** (`StaffBusing.tsx`); the same `ImportPanel` the registers use, with `kind="passengers"` (jsdom test "offers the roster template and checks the file before saving anything") |
+| Client, route and stop are matched by name | Done (verified) | `rowCommand` in `src/tms/import.ts`; case-insensitive, the route also by its reference. Tests "creates the roster, resolving the client, route and stop by name" |
+| An unknown name is a row error that lists what exists | Done (verified) | "names the clients that do exist when a row misspells one", "refuses a stop that is not on the route, listing the stops in order" |
+| A route needs a pickup stop; no route is allowed | Done (verified) | "requires a pickup stop once a route is named, rather than guessing one", "accepts a rider with no route, because a roster is often typed before the runs exist" |
+| Duplicates by employee reference are rejected | Done (verified) | Written through `create_passenger`, so the existing rule applies: "rejects a repeated employee reference, exactly as a typed row would" |
+| A likely duplicate person is flagged, not refused | Done (verified) | `likelyDuplicate` marks the row **Check** and names both references; the row still imports ("flags a likely duplicate person without refusing the row") |
+| Row-level preview, no silent discards, one audit entry per record | Done (verified) | Shared `previewImport`/`executeImport`; `passengers:create` and `import:passengers` entries |
+| Permission is checked before a file is even parsed | Done (verified) | "refuses a role that could not add a rider by hand" (finance) |
+| Template documented | Done (verified) | `docs/SETUP_AND_DEPLOYMENT.md` §8 now carries the passengers template, the name-matching rule and the duplicate-person flag |
+| Tests | Done (verified) | 8 domain (`import.test.ts` "importing a staff roster"), 1 jsdom (`Busing.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **420 passed, 16 skipped**, `build`
+succeeds.

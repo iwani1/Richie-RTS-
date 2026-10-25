@@ -29,6 +29,7 @@ export function ImportPanel({ kind, onClose }: { kind: ImportKind; onClose: () =
   const summary = useMemo(() => {
     if (!preview) return null;
     const parts = [`${preview.ready} ready`, `${preview.rejected} rejected`];
+    if (preview.warned) parts.push(`${preview.warned} to check for a duplicate person`);
     if (preview.truncated) parts.push(`only the first ${MAX_IMPORT_ROWS} rows were read`);
     if (preview.ignoredColumns.length) parts.push(`ignored columns: ${preview.ignoredColumns.join(", ")}`);
     return parts.join(" · ");
@@ -81,7 +82,7 @@ export function ImportPanel({ kind, onClose }: { kind: ImportKind; onClose: () =
         <Notice tone="info" title="Template">
           <p className="font-mono text-xs break-all">{spec.template}</p>
           <p className="mt-1 text-xs">Example row: <span className="font-mono break-all">{spec.example}</span></p>
-          <p className="mt-1 text-xs">Headers are matched case-insensitively and may be reordered. Category names must already exist in Settings.</p>
+          <p className="mt-1 text-xs">Headers are matched case-insensitively and may be reordered. {spec.note}</p>
         </Notice>
 
         <Field label="CSV file" hint="One file at a time. Nothing leaves this screen until you confirm.">
@@ -136,14 +137,23 @@ export function ImportPanel({ kind, onClose }: { kind: ImportKind; onClose: () =
                 {
                   key: "outcome",
                   header: "Outcome",
-                  render: (row) => <Badge tone={row.outcome === "create" ? "success" : "error"}>{row.outcome === "create" ? "Will import" : "Rejected"}</Badge>,
+                  render: (row) => (
+                    <div className="flex flex-col items-start gap-1">
+                      <Badge tone={row.outcome === "create" ? "success" : "error"}>{row.outcome === "create" ? "Will import" : "Rejected"}</Badge>
+                      {/* A likely duplicate is not a rejection: a namesake is real. It is flagged, not blocked. */}
+                      {row.warning && <Badge tone="warning">Check</Badge>}
+                    </div>
+                  ),
                 },
                 {
                   key: "why",
                   header: "Detail",
                   render: (row) =>
                     row.outcome === "create" ? (
-                      <span className="text-xs text-stone-500">{row.message}</span>
+                      <div className="text-xs text-stone-500">
+                        <span>{row.message}</span>
+                        {row.warning && <p className="mt-1 font-medium text-amber-800">{row.warning}</p>}
+                      </div>
                     ) : (
                       <span className="text-xs">{Object.values(row.errors)[0] ?? row.message}</span>
                     ),

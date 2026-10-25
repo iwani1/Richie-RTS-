@@ -26,12 +26,12 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 | Phase | What it covers | Verdict |
 |---|---|---|
 | **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 9 fully met, 20 met but narrower than the brief, **0 unbuilt** |
-| **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, on-time reporting | **Mostly built.** 25 IDs: 4 met, 11 partial, 10 not built — the 10 are seat-level bookings (BKG-01…06), contracts, the passenger import, the route planning aid and emergency trip creation |
-| **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Partly built.** 6 IDs: 3 partial, 3 not built (passenger portal, finance dashboard, financial reports) |
+| **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, on-time reporting | **Mostly built.** 25 IDs: 5 met, 11 partial, 9 not built — the 9 are seat-level bookings (BKG-01…06), contracts, the route planning aid and emergency trip creation |
+| **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Partly built.** 6 IDs: 4 partial, 2 not built (passenger portal, finance dashboard) |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
 | **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Not started.** 7 IDs, 6 deferred, 1 partial (cost entries without receipts) |
 
-Totals across all 78 brief requirements: **13 met · 38 partial · 13 not built · 14 deferred.**
+Totals across all 78 brief requirements: **14 met · 39 partial · 11 not built · 14 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -45,8 +45,9 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   intervals and a fleet-readiness view. A vehicle past its service interval is named to the
   dispatcher before it is chosen, and can be blocked outright with one setting; a safety defect
   always takes it off the road.
-- CSV import for vehicles, drivers and clients: preview first, every rejected row named by line
-  number, nothing merged or silently dropped.
+- CSV import for vehicles, drivers, clients and staff rosters: preview first, every rejected row
+  named by line number, nothing merged or silently dropped; a rider who looks like someone already
+  on the roster is flagged **Check** rather than refused.
 - Bus rentals: request → quotation (with revisions) → deposit → vehicle and driver assignment →
   start → completion → invoice → payments. **A vehicle cannot be booked twice** — the database
   itself refuses, and six simultaneous attempts give one winner and five refusals.
@@ -56,23 +57,23 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   reporting, mid-run passenger changes with a seat-capacity check.
 - Staff logistics: incidents, work orders with costs, and a vehicle release that needs its own
   permission and records who released it and when.
-- Reports: rental report with a date range, coverage and CSV; fleet readiness; cost report.
+- Reports: rental report with a date range, coverage and CSV; fleet readiness; cost report;
+  financial report (revenue by customer, payments received, outstanding at the period end, expenses
+  by category, cost per trip and per passenger) with CSV.
 - A public enquiry form that can be embedded on the company website — throttled, spam-trapped, and
   it creates a draft request without exposing any data.
 - Driver and client portals showing only their own records.
 
 ## What is not built
 
-**Whole features absent** (13 brief IDs):
+**Whole features absent** (11 brief IDs):
 
 | Missing | What it means in practice | Why |
 |---|---|---|
 | Bookings (BKG-01…06) | Passengers cannot book a single seat on a scheduled run with a booking reference; journeys are modelled as a route roster and a trip | Phase 1B; a booking entity is a project of its own |
 | Contracts (CLI-02) | No contract record, so corporate terms live in the quotation and the invoice rather than in an agreement with dates and a status | Phase 1B; needs the owner's contract wording |
-| Passenger import (EMP-02) | The roster is typed route by route; there is no CSV import for employees, although the template shape is documented | Phase 1B; the import machinery (MIG-01) exists to build on |
 | Route planning aid (RTE-04) | Dispatchers choose vehicles manually; nothing suggests a plan | Phase 1B |
 | Finance dashboard (FIN-07) | Finance sees the operations dashboard; there is no money-only home screen | Phase 1C |
-| Financial reports (RPT-03) | No revenue-by-customer or cost-per-trip report; the rental report covers revenue and outstanding | Phase 1C |
 | Passenger portal (PAX-01) | Passengers cannot sign in to see their own journeys | Phase 1C |
 | Emergency trip creation (DSP-03) | A trip exists only if a route generates it | Phase 1B |
 
@@ -95,7 +96,8 @@ These work, and the difference is worth knowing before relying on them:
 - **Rental request** — dates, not departure and return times; no intermediate stops or luggage notes.
 - **Quotations** — line items, deposit and validity, but no quotation number, tax line or discount
   line (those live on the invoice).
-- **Customer register** — name and contact details, not billing details or a customer type.
+- **Customer register** — several named contacts per client, one marked primary; still not billing
+  details, credit terms or a customer type.
 - **Work orders** — five statuses, no parts list or inspection record; the release step is complete.
 - **Rental report** — eight figures with CSV; other reports do not yet share its filters and export.
 

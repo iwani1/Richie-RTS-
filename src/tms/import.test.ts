@@ -4,6 +4,7 @@
 // validation, duplicate detection, a preview before saving, row-level errors, and no silent
 // discards — every row is either created or named with a reason.
 import { describe, expect, it } from "vitest";
+import { executeCommand, type AnyCommand } from "./commands";
 import { executeImport, parseCsv, previewImport, MAX_IMPORT_ROWS } from "./import";
 import { execute, type Actor, type Credential } from "./service";
 import { emptyDatabase, type Database } from "./types";
@@ -167,5 +168,142 @@ describe("import", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.db.vehicles).toHaveLength(MAX_IMPORT_ROWS);
+  });
+});
+
+describe("importing a staff roster (EMP-02, D-81)", () => {
+  /** A client with one route of two stops, so a row can name all three in words. */
+  function rosterWorld() {
+    const base = world();
+    let db = base.db;
+    const run = (actor: Actor, command: AnyCommand) => {
+      const result = executeCommand(db, actor, command, NOW);
+      if (!result.ok) throw new Error(`${command.type}: ${result.message} ${JSON.stringify(result.errors)}`);
+      db = result.db;
+    };
+    run(base.admin, { type: "create_client", input: { name: "Volta Foods Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
+    run(base.admin, {
+      type: "create_route",
+      input: {
+        name: "Northstar morning",
+        clientId: db.clients[0].id,
+        direction: "to_work",
+        shiftId: "",
+        vehicleCategoryId: db.settings.vehicleCategories[0].id,
+        weekdays: [0, 1, 2, 3, 4, 5, 6],
+        startDate: "2026-01-01",
+        endDate: "",
+        status: "active",
+        stops: [
+          { name: "Estate gate", scheduledTime: "06:00" },
+          { name: "Head office", scheduledTime: "06:30" },
+        ],
+      },
+    });
+    return { ...base, db };
+  }
+
+  const HEADER = "name,employee ref,phone,client,route,stop,status\n";
+
+  it("creates the roster, resolving the client, route and stop by name", () => {
+    const { db, ops } = rosterWorld();
+    const csv = `${HEADER}Ama Boateng,E-001,,Volta Foods Ltd,Northstar morning,Estate gate,\nKofi Mensah,E-002,+233201234567,volta foods ltd,Northstar morning,Head office,inactive\n`;
+    const result = executeImport(db, ops, { type: "import_records", kind: "passengers", csv }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const [ama, kofi] = result.db.passengers;
+    expect(ama.fullName).toBe("Ama Boateng");
+    expect(ama.clientId).toBe(result.db.clients[0].id);
+    expect(ama.routeId).toBe(result.db.routes[0].id);
+    // The stop is the route's own stop, not a name copied into the record.
+    expect(ama.stopId).toBe(result.db.routes[0].stops[0].id);
+    expect(ama.status).toBe("active");
+    // Names are matched case-insensitively; an explicit status is honoured.
+    expect(kofi.status).toBe("inactive");
+    expect(kofi.stopId).toBe(result.db.routes[0].stops[1].id);
+
+    expect(result.message).toMatch(/Imported 2 roster entries from 2 rows/);
+    expect(result.db.audit.filter((entry) => entry.action === "passengers:create")).toHaveLength(2);
+    expect(result.db.audit.some((entry) => entry.action === "import:passengers")).toBe(true);
+  });
+
+  it("accepts a rider with no route, because a roster is often typed before the runs exist", () => {
+    const { db, ops } = rosterWorld();
+    const csv = `${HEADER}Yaa Owusu,E-003,,Volta Foods Ltd,,,\n`;
+    const result = executeImport(db, ops, { type: "import_records", kind: "passengers", csv }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.db.passengers[0].routeId).toBeNull();
+    expect(result.db.passengers[0].stopId).toBeNull();
+  });
+
+  it("names the clients that do exist when a row misspells one", () => {
+    const { db, ops } = rosterWorld();
+    const csv = `${HEADER}Ama Boateng,E-001,,Volta Food Ltd,Northstar morning,Estate gate,\n`;
+    const result = previewImport(db, ops, "passengers", csv);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.preview.rows[0].outcome).toBe("reject");
+    expect(result.preview.rows[0].message).toMatch(/Client "Volta Food Ltd" was not found/);
+    expect(result.preview.rows[0].message).toMatch(/Known clients: Volta Foods Ltd/);
+  });
+
+  it("refuses a stop that is not on the route, listing the stops in order", () => {
+    const { db, ops } = rosterWorld();
+    const csv = `${HEADER}Ama Boateng,E-001,,Volta Foods Ltd,Northstar morning,Circle, \n`;
+    const result = previewImport(db, ops, "passengers", csv);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.preview.rows[0].outcome).toBe("reject");
+    expect(result.preview.rows[0].message).toMatch(/Stop "Circle" is not on Northstar morning/);
+    expect(result.preview.rows[0].message).toMatch(/Estate gate, Head office/);
+  });
+
+  it("requires a pickup stop once a route is named, rather than guessing one", () => {
+    const { db, ops } = rosterWorld();
+    const csv = `${HEADER}Ama Boateng,E-001,,Volta Foods Ltd,Northstar morning,,\n`;
+    const result = previewImport(db, ops, "passengers", csv);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.preview.rows[0].outcome).toBe("reject");
+    expect(result.preview.rows[0].message).toMatch(/Choose a pickup stop for Northstar morning/);
+  });
+
+  it("rejects a repeated employee reference, exactly as a typed row would", () => {
+    const { db, ops } = rosterWorld();
+    const csv = `${HEADER}Ama Boateng,E-001,,Volta Foods Ltd,Northstar morning,Estate gate,\nAma B.,e-001,,Volta Foods Ltd,Northstar morning,Head office,\n`;
+    const result = previewImport(db, ops, "passengers", csv);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.preview.rows.map((row) => row.outcome)).toEqual(["create", "reject"]);
+    expect(result.preview.rows[1].errors.employeeRef).toMatch(/already exists for this client/);
+  });
+
+  it("flags a likely duplicate person without refusing the row", () => {
+    const { db, ops } = rosterWorld();
+    const csv = `${HEADER}Ama Boateng,E-001,,Volta Foods Ltd,Northstar morning,Estate gate,\nAma Boateng,E-999,,Volta Foods Ltd,Northstar morning,Head office,\n`;
+    const preview = previewImport(db, ops, "passengers", csv);
+    expect(preview.ok).toBe(true);
+    if (!preview.ok) return;
+    // Both rows import: two people may genuinely share a name.
+    expect(preview.preview.rows.map((row) => row.outcome)).toEqual(["create", "create"]);
+    expect(preview.preview.warned).toBe(1);
+    expect(preview.preview.rows[1].warning).toMatch(/already called Ama Boateng \(E-001\)/);
+    expect(preview.preview.rows[0].warning).toBeUndefined();
+
+    const result = executeImport(db, ops, { type: "import_records", kind: "passengers", csv }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.db.passengers).toHaveLength(2);
+    expect(result.message).toMatch(/1 row may be someone already on the roster/);
+  });
+
+  it("refuses a role that could not add a rider by hand", () => {
+    const { db, finance } = rosterWorld();
+    const result = previewImport(db, finance, "passengers", `${HEADER}Ama Boateng,E-001,,Volta Foods Ltd,,,\n`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message).toMatch(/lacks passengers:create/);
   });
 });

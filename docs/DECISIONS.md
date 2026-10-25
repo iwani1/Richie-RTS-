@@ -1077,3 +1077,26 @@ decision the office makes, not one the system invents.
   trip, because two drivers are affected. The markers are append-only, so a shift supervisor reading a
   finished run can still see why the door count differs from the roster that was published the night
   before. `Trip.rosterChanges` is embedded on the trip (ERD), and no table was added.
+
+## D-81 A roster is imported by name, and a possible duplicate person is shown, not blocked
+
+- **Context.** EMP-02, the last import the brief asks for. Vehicles, drivers and clients already had a
+  CSV importer; a roster had none, and typing sixty employees one at a time is the slowest, most
+  error-prone job in the office. A roster row is different from a master-data row: it refers to three
+  other records (client, route, pickup stop) that no human should be typing as identifiers.
+- **Decision.** The roster importer reuses the existing preview-then-save machinery, and resolves the
+  **client, route and stop by name** (the route also by its reference, because route names repeat
+  across clients less than they repeat across a spreadsheet). Each row is then written through the
+  ordinary `create_passenger` command, so capacity, duplicate-reference and mid-run rules are the
+  same as the form. A row whose client, route or stop cannot be found is rejected with the names that
+  do exist listed, in the same way an unknown vehicle category behaves.
+- **Rejected.** Requiring ids or references in the file (an office manager would be transcribing
+  uuid-shaped strings from a screen — the error rate goes up, not down). Matching on employee
+  reference alone (many companies do not issue one to cleaners or contractors). Silently merging a
+  row that looks like an existing person (a name is not an identity: two Ama Boatengs are two
+  people). Refusing such a row outright (same reason, opposite error: the real namesake cannot be
+  hired).
+- **Consequence.** A likely duplicate — same name, different employee reference — imports and is
+  marked **Check**, with both references named in the preview and a count in the import message. The
+  operator decides. Route and stop must be given together: a rider may be imported with no route (a
+  roster is often typed before the runs exist) but not onto a route with nowhere to be picked up.

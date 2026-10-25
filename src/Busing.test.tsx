@@ -250,3 +250,28 @@ describe("an overdue routine service, seen by the dispatcher (Q-43, D-80)", () =
     expect(await screen.findByText(/dispatched\..*overdue for routine service/i)).toBeTruthy();
   });
 });
+
+describe("importing a roster from the passengers tab (EMP-02)", () => {
+  it("offers the roster template and checks the file before saving anything", async () => {
+    seed();
+    await renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: /Staff busing/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Passengers$/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Import CSV/i }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/Import roster entries from CSV/i)).toBeTruthy();
+    // The template names the columns a roster file must carry, and says what must already exist.
+    expect(within(dialog).getByText("name,employee ref,phone,client,route,stop,status")).toBeTruthy();
+    expect(within(dialog).getByText(/Client, route and stop are matched by name/i)).toBeTruthy();
+
+    // Previewing the existing rider is refused: the roster already holds that employee reference.
+    fireEvent.change(within(dialog).getByLabelText("CSV contents"), {
+      target: { value: "name,employee ref,phone,client,route,stop,status\nAma Boateng,E-001,,Acme Ltd,Estate run,Estate gate,\n" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Check file/i }));
+
+    expect(await within(dialog).findByText(/already exists for this client/i)).toBeTruthy();
+  });
+});

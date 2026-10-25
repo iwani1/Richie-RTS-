@@ -230,10 +230,11 @@ cookie then travels unencrypted. There is no third option that is safe.
 
 ## 8. Importing existing records from CSV (MIG-01)
 
-Vehicles, drivers and corporate clients can be imported instead of typed. Open the register
-(Vehicles, Drivers or Clients), press **Import CSV**, load the file, press **Check file**, and read
-the preview: every row is listed as *will import* or *rejected* with the line number and the reason.
-Only after that does **Import N rows** save anything.
+Vehicles, drivers, corporate clients and staff rosters can be imported instead of typed. Open the
+register (Vehicles, Drivers or Clients), or the **Passengers** tab of Staff busing, press
+**Import CSV**, load the file, press **Check file**, and read the preview: every row is listed as
+*will import* or *rejected* with the line number and the reason. Only after that does **Import N
+rows** save anything.
 
 The header row names the columns. Headers are matched case-insensitively, may appear in any order,
 and columns the importer does not use are reported, not silently ignored.
@@ -248,7 +249,8 @@ drivers    name,phone,licence number,licence expiry,status
 clients    name,contact name,contact phone,contact email,status
            Volta Foods Ltd,Efua Owusu,+233244000111,ops@example.test,active
 
-passengers name,employee ref,phone,route,stop,status        (template only - see the note)
+passengers name,employee ref,phone,client,route,stop,status
+           Ama Boateng,E-001,+233201234567,Volta Foods Ltd,Northstar morning,Estate gate,active
 ```
 
 Rules that hold for every import:
@@ -256,19 +258,29 @@ Rules that hold for every import:
 - **Required columns** are named in the error if they are missing (`category` and `seats` for
   vehicles, `licence number` and `licence expiry` for drivers). `status` defaults to `active`.
 - **Category names must already exist** in Settings; an unknown name is a row error that lists the
-  configured categories.
+  configured categories. A roster row works the same way: the client, route and stop are matched
+  **by name** (the route may also be given by its reference), and a misspelt name is a row error
+  that lists the names that do exist.
+- **A roster row needs a client and a name.** Route and pickup stop are optional together, so a
+  roster can be imported before the runs are planned; if a route is named, a stop on that route is
+  required, because the run has to know where to expect the person.
+- **A likely duplicate person is flagged, not refused.** If a row would create a rider whose name
+  matches someone already on that client's roster under a *different* employee reference, the row
+  still imports and is marked **Check** with both references named. Two people can share a name;
+  the same person entered twice is what the flag is for.
 - **Duplicates are rejected, never merged** — a registration or licence number that already exists,
   or that appears twice in the same file, fails on that row.
 - **Rows are saved through the ordinary commands**, so validation, permissions and the audit entry
   are identical to typing the record by hand. Each created record gets its own audit entry, plus one
-  summary entry (`import:vehicles`, `import:drivers`, `import:clients`).
+  summary entry (`import:vehicles`, `import:drivers`, `import:clients`, `import:passengers`).
 - **No silent discards:** if any row is rejected, the message names it by line; if every row is
   rejected nothing is written at all.
 - **Limits:** 200 kB and 500 rows per file. The tail beyond 500 rows is reported, not imported.
 
-Passengers/employees are **not** importable yet (EMP-02): the template is shown here so the shape is
-agreed, but the importer for it is still to be built, and the roster screen is the only way to add a
-passenger today.
+The roster import (EMP-02) uses the same code, the same preview and the same audit entries as the
+other three; nothing about it is a separate tool. A row is added through `create_passenger`, so the
+seat-capacity check, the duplicate-reference check and the "stop already recorded on a running trip"
+rule apply exactly as they do to a passenger typed into the form.
 
 ## 9. Backups
 
@@ -285,7 +297,7 @@ data. A PostgreSQL-native alternative is `pg_dump --format=custom`.
 ```bash
 npm run typecheck        # tsc --noEmit
 npm run lint             # eslint
-npm test                 # 328 unit and component tests
+npm test                 # 426 unit and component tests
 npm run test:integration # against a real database; needs TEST_DATABASE_URL (14 tests, 4 files)
 npm run build            # production build
 ```
