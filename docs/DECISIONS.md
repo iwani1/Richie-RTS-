@@ -1031,3 +1031,26 @@ decision the office makes, not one the system invents.
   wording they were given, and the form shows it as a record from before the list. A company that
   never configures cost categories keeps recording costs, and the report shows one "Uncategorised"
   line instead of hiding them.
+
+### D-79: telling the driver the roster changed, without a notification channel (Q-48)
+
+- **Question.** Q-48 asked whether the driver should be told when operations adds, removes or moves a
+  rider while the run is already under way. The build had no way to say so: the roster changed in the
+  office and the driver found out at the stop, if at all.
+- **Decision.** The run carries its own **roster-change marker**, written when the roster of an
+  **in-progress** run changes. It records what changed, when, and who changed it, and the driver sees
+  it at the top of the next stop form — the screen he is on when the roster matters — plus a line on
+  the run in both the staff run list and his own portal. Nothing is pushed: no SMS, no email, no
+  alert. Wording: "joined this roster at <stop>", "was taken off this roster", "moved to another
+  route", "moved from <stop> to <stop>", "name corrected".
+- **Rejected.** Adding an SMS provider (a monthly bill and a second system to keep alive, for a
+  message the driver reads seconds later in the app he must open to record the stop anyway). Marking
+  **planned** runs (their roster is the roster they start with — a marker would warn about a change
+  that never happened to anyone). Marking **completed** runs (nobody is left to warn; the record of
+  the change is still there, so history still explains itself). A marker that names the rider's phone
+  number or employee reference (the driver needs the name at the door, not personal data on a screen
+  the vehicle's passengers can see).
+- **Consequence.** A rider moved from one route to another leaves a marker on each route's running
+  trip, because two drivers are affected. The markers are append-only, so a shift supervisor reading a
+  finished run can still see why the door count differs from the roster that was published the night
+  before. `Trip.rosterChanges` is embedded on the trip (ERD), and no table was added.

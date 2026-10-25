@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { ProgressiveStopInput } from "../tms/busing";
 import type { BoardingOutcome, BusRoute, Passenger, Trip } from "../tms/types";
-import { Button, Field, Notice, Panel, Select, TextInput } from "../ui/primitives";
+import { Button, Field, Notice, Panel, Select, TextInput, formatDateTime } from "../ui/primitives";
 
 type Errors = Record<string, string>;
 
@@ -58,6 +58,23 @@ export function TripStopForm({
       description={`${stop.name} · stop ${trip.stopLogs.length + 1} of ${route.stops.length}. Scheduled ${stop.scheduledTime}. Stops are recorded in route order.`}
       onClose={onClose}
     >
+      {/* Q-48: nothing is pushed anywhere, so the run carries the marker. It sits above the stop
+          fields because it changes who is expected at the stop being recorded right now. */}
+      {trip.rosterChanges.length > 0 && (
+        <Notice tone="warning" title={`The roster changed since this run started (${trip.rosterChanges.length})`} className="mb-4">
+          <ul className="mt-1 space-y-1 text-sm">
+            {trip.rosterChanges.map((change) => (
+              <li key={change.id}>
+                <span className="rts-mono text-xs text-stone-600">{formatDateTime(change.at)}</span> · {change.summary}{" "}
+                <span className="text-xs text-stone-500">({change.by})</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-stone-600">
+            The list of riders below is the roster as it is now. Record an outcome for everyone still shown at this stop.
+          </p>
+        </Notice>
+      )}
       <form onSubmit={submit} className="space-y-4">
         <Field label={`Actual arrival at ${stop.name}`} error={errors.actualTime}>
           <TextInput type="time" value={actualTime} onChange={(event) => setActualTime(event.target.value)} invalid={!!errors.actualTime} autoFocus />

@@ -108,6 +108,7 @@ function trip(overrides: Partial<Trip> = {}): Trip {
     ],
     onTimeThresholdMinutes: 5,
     corrections: [],
+    rosterChanges: [],
     createdAt: at,
     updatedAt: at,
     ...overrides,

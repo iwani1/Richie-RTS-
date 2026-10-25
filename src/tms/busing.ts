@@ -19,6 +19,7 @@ import {
   type Direction,
   type Passenger,
   type PassengerStatus,
+  type RosterChange,
   type RouteStatus,
   type Trip,
   type TripCorrection,
@@ -263,6 +264,39 @@ function inProgressTripsForRoute(db: Database, routeId: string | null): Trip[] {
   return db.trips.filter((trip) => trip.routeId === routeId && trip.status === "in_progress");
 }
 
+/** The name of a stop, for a sentence a driver can read. */
+function stopNameOf(db: Database, routeId: string | null, stopId: string | null): string {
+  if (!routeId || !stopId) return "an unassigned stop";
+  return db.routes.find((route) => route.id === routeId)?.stops.find((stop) => stop.id === stopId)?.name ?? "an unknown stop";
+}
+
+/**
+ * Marks a roster change on every run of this route that is already under way (Q-48, D-79).
+ *
+ * Nothing is pushed anywhere: there is no notification channel, and pretending one exists would be
+ * worse than silence. The marker waits on the run, so the driver sees it on the next stop form.
+ * A run that has not started needs no marker — its roster is simply the roster it will start with.
+ */
+function markRosterChange(db: Database, routeId: string | null, entry: RosterChange, now: string): Database {
+  if (!routeId) return db;
+  if (!db.trips.some((trip) => trip.routeId === routeId && trip.status === "in_progress")) return db;
+  return {
+    ...db,
+    trips: db.trips.map((trip) =>
+      trip.routeId === routeId && trip.status === "in_progress"
+        ? { ...trip, rosterChanges: [...trip.rosterChanges, entry], updatedAt: now }
+        : trip,
+    ),
+  };
+}
+
+const rosterChangeEntry = (actor: Actor | null, now: string, summary: string): RosterChange => ({
+  id: makeId(),
+  at: now,
+  by: actor?.fullName ?? "System",
+  summary,
+});
+
 // In-progress trips on this route that already recorded the given stop.
 function tripsWithRecordedStop(trips: Trip[], stopId: string): Trip[] {
   return trips.filter((trip) => trip.stopLogs.some((log) => log.stopId === stopId));
@@ -448,8 +482,18 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       const created: Passenger = { id: makeId(), ...value, createdAt: now, updatedAt: now };
       const running = inProgressTripsForRoute(db, value.routeId);
       const midTrip = running.length > 0 ? ` Mid-trip addition during ${running.map((trip) => trip.reference).join(", ")}.` : "";
-      // Personal data is deliberately kept out of the audit summary.
-      const next = audit({ ...db, passengers: [...db.passengers, created] }, actor, {
+      // Personal data is deliberately kept out of the audit summary, but the driver's own roster
+      // marker names the rider: that is what he needs in order to pick the right person up (Q-48).
+      const withChange =
+        created.status === "active" && created.routeId
+          ? markRosterChange(
+              { ...db, passengers: [...db.passengers, created] },
+              created.routeId,
+              rosterChangeEntry(actor, now, `${created.fullName} joined this roster at ${stopNameOf(db, created.routeId, created.stopId)}.`),
+              now,
+            )
+          : { ...db, passengers: [...db.passengers, created] };
+      const next = audit(withChange, actor, {
         action: "passengers:create",
         entity: "passenger",
         entityId: created.id,
@@ -475,11 +519,38 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
       const updated: Passenger = { ...existing, ...value, updatedAt: now };
       const affectedRefs = [...new Set([...inProgressTripsForRoute(db, existing.routeId), ...inProgressTripsForRoute(db, value.routeId)].map((trip) => trip.reference))];
       const midTrip = affectedRefs.length > 0 ? ` Mid-trip change during ${affectedRefs.join(", ")}.` : "";
-      const next = audit({ ...db, passengers: db.passengers.map((p) => (p.id === updated.id ? updated : p)) }, actor, {
+
+      // What the driver has to be told, in the words he would use (Q-48). Each entry is marked on
+      // the run of the route it affects, so a rider moving between routes leaves one marker behind
+      // and one where he arrives.
+      const wasOn = existing.status === "active" && existing.routeId !== null;
+      const nowOn = updated.status === "active" && updated.routeId !== null;
+      const entries: { routeId: string | null; summary: string }[] = [];
+      if (wasOn && !nowOn) entries.push({ routeId: existing.routeId, summary: `${existing.fullName} was taken off this roster.` });
+      else if (!wasOn && nowOn)
+        entries.push({ routeId: updated.routeId, summary: `${updated.fullName} joined this roster at ${stopNameOf(db, updated.routeId, updated.stopId)}.` });
+      else if (wasOn && nowOn && existing.routeId !== updated.routeId) {
+        entries.push({ routeId: existing.routeId, summary: `${existing.fullName} moved to another route.` });
+        entries.push({ routeId: updated.routeId, summary: `${updated.fullName} joined this roster at ${stopNameOf(db, updated.routeId, updated.stopId)}.` });
+      } else if (wasOn && nowOn && existing.stopId !== updated.stopId)
+        entries.push({
+          routeId: updated.routeId,
+          summary: `${updated.fullName} moved from ${stopNameOf(db, existing.routeId, existing.stopId)} to ${stopNameOf(db, updated.routeId, updated.stopId)}.`,
+        });
+      if (existing.fullName !== updated.fullName)
+        entries.push({
+          routeId: updated.routeId ?? existing.routeId,
+          summary: `Name corrected: ${existing.fullName} is now recorded as ${updated.fullName}.`,
+        });
+
+      let afterUpdate: Database = { ...db, passengers: db.passengers.map((p) => (p.id === updated.id ? updated : p)) };
+      for (const entry of entries) afterUpdate = markRosterChange(afterUpdate, entry.routeId, rosterChangeEntry(actor, now, entry.summary), now);
+
+      const next = audit(afterUpdate, actor, {
         action: "passengers:update",
         entity: "passenger",
         entityId: updated.id,
-        summary: `Passenger record updated (${updated.status}).${midTrip}`,
+        summary: `Passenger record updated (${updated.status}).${midTrip}${entries.length ? ` ${entries.length} roster marker(s) left on the run.` : ""}`,
       }, now);
       return { ok: true, db: next, message: "Passenger record updated." };
     }
@@ -527,6 +598,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
           boardings: [],
           onTimeThresholdMinutes: null,
           corrections: [],
+          rosterChanges: [],
           createdAt: now,
           updatedAt: now,
         });

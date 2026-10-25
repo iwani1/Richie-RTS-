@@ -210,6 +210,7 @@ describe("money and cost section (RPT-03)", () => {
           boardings: [{ passengerId: "p1", stopId: "s1", outcome: "boarded" }],
           onTimeThresholdMinutes: 5,
           corrections: [],
+          rosterChanges: [],
           createdAt: at,
           updatedAt: at,
         },

@@ -771,3 +771,26 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **394 passed, 16
 succeeds.
 
 Next on the queued list: Q-48, the in-app roster-change marker.
+
+## Phase 29 - Telling the driver the roster changed (item 6, Q-48 / D-79)
+
+The office can change a roster at any moment; the driver only found out at the stop. There is no
+notification channel, so the answer lives where the driver already is: on the run he is recording.
+
+| Item | Status | Evidence |
+|---|---|---|
+| The run carries a roster-change marker | Done (verified) | `RosterChange` and `Trip.rosterChanges` (`src/tms/types.ts`); append-only, each entry with its own id, `at`, `by` and `summary`. Older stored trips load with an empty list |
+| A marker is written when a running roster changes | Done (verified) | `markRosterChange` in `src/tms/busing.ts`, called from `create_passenger` and `update_passenger`; covers a rider added, removed, moved between routes, moved between stops, and a corrected name |
+| Only runs under way are marked | Done (verified) | `markRosterChange` marks trips on that route whose status is `in_progress` and does nothing otherwise; tests "marks nothing on a run that has not started" and "keeps the marker after the run is finished" |
+| A cross-route move warns both drivers | Done (verified) | The move leaves one marker on each route's running trip (test "leaves a marker on each route when a rider moves between routes") |
+| The driver sees it before recording a stop | Done (verified) | Banner and change log at the top of `TripStopForm`; the form is rendered by both `StaffBusing` and `DriverPortal`, so both see the same markers |
+| Operations can see the run was affected | Done (verified) | "roster changed Nx" beside the correction count on the staff run card; "Roster changed while you were running" in the driver's run list |
+| No personal data in the marker | Done (verified) | `rosterChangeEntry` writes only the rider's name and the stop name — never the phone number or employee reference. The audit summary counts markers without repeating names |
+| Nothing is pushed | Done (verified) | No SMS, email or alert code exists; `OPEN_QUESTIONS.md` Q-48 records that replacing this with a provider is the undo |
+| Tests | Done (verified) | 5 domain (`busing.test.ts` "the driver is marked when the roster changes mid-run"), 3 screen (`TripStopForm.test.tsx`) |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **402 passed, 16 skipped**, `build`
+succeeds.
+
+Next on the queued list: Q-43, the stricter dispatch switch (safety blocks, overdue routine service
+warns).

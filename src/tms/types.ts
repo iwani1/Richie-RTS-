@@ -372,6 +372,20 @@ export interface TripCorrection {
   correctedBy: string;
 }
 
+/**
+ * A change to a route's roster that happened while a run was in progress (Q-48, D-79).
+ *
+ * The company has no notification channel, so nothing is pushed anywhere. The marker travels on
+ * the run itself: the driver's next stop form opens with "what changed since you started", which
+ * is a fact the system can show and cannot miss, unlike an SMS it never sent.
+ */
+export interface RosterChange {
+  id: string;
+  at: string;
+  by: string;
+  summary: string;
+}
+
 export interface Trip {
   id: string;
   reference: string; // TR-0001
@@ -394,6 +408,8 @@ export interface Trip {
   onTimeThresholdMinutes: number | null; // snapshot of the setting taken at completion
   /** Append-only: every entry is a correction that was applied, oldest first (D-74). */
   corrections: TripCorrection[];
+  /** Roster changes that happened while this run was in progress, oldest first (Q-48). */
+  rosterChanges: RosterChange[];
   createdAt: string;
   updatedAt: string;
 }
@@ -755,6 +771,7 @@ export function migrate(value: unknown): Database | null {
           startedAt: trip.startedAt ?? null,
           // Records written before corrections existed simply have none.
           corrections: Array.isArray(trip.corrections) ? trip.corrections : [],
+          rosterChanges: Array.isArray(trip.rosterChanges) ? trip.rosterChanges : [],
           // Likewise for a run stopped mid-way: older records only carry the reason.
           cancelledAt: trip.cancelledAt ?? null,
           cancelledBy: trip.cancelledBy ?? null,

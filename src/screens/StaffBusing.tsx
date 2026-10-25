@@ -633,6 +633,9 @@ function TripsTab() {
                         {t.corrections.length > 0 && (
                           <span className="rts-run-ref"> · {t.corrections.length} correction{t.corrections.length === 1 ? "" : "s"}</span>
                         )}
+                        {t.rosterChanges.length > 0 && (
+                          <span className="rts-run-ref"> · roster changed {t.rosterChanges.length}×</span>
+                        )}
                       </p>
                       <p className="rts-run-crew">
                         <span>{t.vehicleId ? vehicleReg(t.vehicleId) : <em className="rts-unset">no vehicle</em>}</span>

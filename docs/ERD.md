@@ -207,6 +207,11 @@ work order is for) and `settings.costCategories` (what a recorded cost was for).
 cost entry store the name they were given, so renaming a catalogue entry never rewrites history
 (D-78).
 
+`Trip.corrections` and `Trip.rosterChanges` are embedded on the trip rather than kept in tables of
+their own: both are append-only notes about one run (a corrected fact; a rider added, removed or
+moved while that run was under way), read with the run and never queried across runs. Each entry
+carries its own id, timestamp and author, so the record explains itself without a join (D-73, D-79).
+
 ## Exclusion constraints (no-double-booking)
 
 These need the `btree_gist` extension. They are the database form of the overlap rules that the service enforces in code today. Neither is enforced by the current browser build.

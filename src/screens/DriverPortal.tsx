@@ -117,7 +117,16 @@ export function DriverPortalPage() {
                   header: "Run progress",
                   render: (t: Trip) => {
                     const route = routeOf(t.routeId);
-                    return route ? `${t.stopLogs.length} / ${route.stops.length} stops` : "-";
+                    return (
+                      <>
+                        {route ? `${t.stopLogs.length} / ${route.stops.length} stops` : "-"}
+                        {/* The roster marker lives on the run, so it is visible before the stop form
+                            is even opened (Q-48). */}
+                        {t.rosterChanges.length > 0 && (
+                          <p className="mt-1 text-xs font-medium text-amber-800">Roster changed while you were running</p>
+                        )}
+                      </>
+                    );
                   },
                 },
                 {

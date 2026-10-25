@@ -1120,3 +1120,110 @@ describe("mandatory documents gate a run (Q-16, D-76)", () => {
     expect(w.db.trips.find((t) => t.id === tripId)!.status).toBe("dispatched");
   });
 });
+
+describe("the driver is marked when the roster changes mid-run (Q-48, D-79)", () => {
+  /** A route with two stops and one rider, with the run under way. */
+  function running(w: World) {
+    const routeId = createRoute(w, { stops: [{ name: "Estate gate", scheduledTime: "06:00" }, { name: "Head office", scheduledTime: "06:30" }] });
+    const route = w.db.routes.find((r) => r.id === routeId)!;
+    step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Ama", employeeRef: "P-A", routeId, stopId: route.stops[0].id }) });
+    const tripId = generate(w, routeId, "2026-06-01");
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "dispatch_trip", id: tripId });
+    step(w, "driver", { type: "start_trip", id: tripId });
+    return { routeId, route, tripId, amaId: w.db.passengers[0].id };
+  }
+  const tripIn = (w: World, id: string) => w.db.trips.find((t) => t.id === id)!;
+
+  it("marks a rider added while the run is under way, and says when and by whom", () => {
+    const w = build();
+    const { routeId, route, tripId } = running(w);
+    expect(tripIn(w, tripId).rosterChanges).toEqual([]);
+
+    step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Kofi Mensah", employeeRef: "P-K", routeId, stopId: route.stops[1].id }) });
+
+    const changes = tripIn(w, tripId).rosterChanges;
+    expect(changes).toHaveLength(1);
+    expect(changes[0].summary).toBe("Kofi Mensah joined this roster at Head office.");
+    expect(changes[0].by).toBe("Ops");
+    expect(changes[0].at).toBe(NOW);
+  });
+
+  it("names both stops when a rider is moved, and marks a removal", () => {
+    const w = build();
+    const { routeId, route, tripId, amaId } = running(w);
+
+    step(w, "ops", { type: "update_passenger", id: amaId, input: passengerInput(w, { fullName: "Ama", employeeRef: "P-A", routeId, stopId: route.stops[1].id }) });
+    expect(tripIn(w, tripId).rosterChanges.map((c) => c.summary)).toEqual(["Ama moved from Estate gate to Head office."]);
+
+    step(w, "ops", {
+      type: "update_passenger",
+      id: amaId,
+      input: passengerInput(w, { fullName: "Ama", employeeRef: "P-A", routeId, stopId: route.stops[1].id, status: "inactive" }),
+    });
+    expect(tripIn(w, tripId).rosterChanges.map((c) => c.summary)).toEqual([
+      "Ama moved from Estate gate to Head office.",
+      "Ama was taken off this roster.",
+    ]);
+  });
+
+  it("leaves a marker on each route when a rider moves between routes", () => {
+    const w = build();
+    const { tripId, amaId } = running(w);
+    const otherRouteId = createRoute(w, { name: "Second run" });
+    const otherRoute = w.db.routes.find((r) => r.id === otherRouteId)!;
+    // A second run on the other route, also under way, so both sides have somewhere to be marked.
+    const otherTripId = generate(w, otherRouteId, "2026-06-01");
+    step(w, "ops", { type: "assign_trip", id: otherTripId, input: { vehicleId: w.db.vehicles[1].id, driverId: w.db.drivers[1].id } });
+    step(w, "ops", { type: "dispatch_trip", id: otherTripId });
+    step(w, "ops", { type: "start_trip", id: otherTripId });
+
+    step(w, "ops", {
+      type: "update_passenger",
+      id: amaId,
+      input: passengerInput(w, { fullName: "Ama", employeeRef: "P-A", routeId: otherRouteId, stopId: otherRoute.stops[0].id }),
+    });
+
+    expect(tripIn(w, tripId).rosterChanges.map((c) => c.summary)).toEqual(["Ama moved to another route."]);
+    expect(tripIn(w, otherTripId).rosterChanges.map((c) => c.summary)).toEqual([
+      `Ama joined this roster at ${otherRoute.stops[0].name}.`,
+    ]);
+  });
+
+  it("marks nothing on a run that has not started, because its roster is the roster it starts with", () => {
+    const w = build();
+    const routeId = createRoute(w);
+    const route = w.db.routes.find((r) => r.id === routeId)!;
+    const tripId = generate(w, routeId, "2026-06-01");
+    step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Yaa", employeeRef: "P-Y", routeId, stopId: route.stops[0].id }) });
+    expect(tripIn(w, tripId).rosterChanges).toEqual([]);
+
+    // The marker appears only once the run is under way.
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "dispatch_trip", id: tripId });
+    step(w, "driver", { type: "start_trip", id: tripId });
+    step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Kojo", employeeRef: "P-K", routeId, stopId: route.stops[0].id }) });
+    expect(tripIn(w, tripId).rosterChanges.map((c) => c.summary)).toEqual([`Kojo joined this roster at ${route.stops[0].name}.`]);
+  });
+
+  it("keeps the marker after the run is finished, so the record still explains itself", () => {
+    const w = build();
+    const { routeId, route, tripId } = running(w);
+    step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Kofi", employeeRef: "P-K", routeId, stopId: route.stops[1].id }) });
+    step(w, "ops", {
+      type: "record_trip_stop",
+      id: tripId,
+      input: { stopId: route.stops[0].id, actualTime: "06:02", boardings: [{ passengerId: w.db.passengers[0].id, outcome: "boarded" }] },
+    });
+    step(w, "ops", {
+      type: "record_trip_stop",
+      id: tripId,
+      input: { stopId: route.stops[1].id, actualTime: "06:31", boardings: [{ passengerId: w.db.passengers[1].id, outcome: "boarded" }] },
+    });
+    step(w, "ops", { type: "complete_trip", id: tripId });
+
+    const finished = tripIn(w, tripId);
+    expect(finished.status).toBe("completed");
+    expect(finished.rosterChanges).toHaveLength(1);
+  });
+});
