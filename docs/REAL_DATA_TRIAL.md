@@ -254,6 +254,16 @@ on screen and (if it is a money or booking issue) the reference in question.
 The copy exists to make the first pass safe; the real pass is what tells you the system is ready for
 a working day.
 
+### Runs recorded
+
+| Date | Build | Where | Result | Notes |
+|---|---|---|---|---|
+| 2026-10-25 | `c7d6454` | Copy (`richie_tms_trial`), port 3001, §1–§10 | **Clean — reported by the owner, no step failed** | The arithmetic probe in §5 agreed to the pesewa: 1 × GHS 15.90 at a 25% deposit asking **3.98**, VAT at 15% on the invoice **2.39**, total **18.29**; a payment of 0.02 was refused naming 0.01 outstanding, and 0.01 settled it. §5–§8 on the live database is **still to run** |
+
+The row above is the owner's report of a completed pass, not a machine record: the trial is run by a
+person at a workstation, and this page is where the result is kept. A run that fails is recorded here
+too, with the step number and the reference in question, so the next person knows what was tried.
+
 ---
 
 ## What this trial deliberately does not cover

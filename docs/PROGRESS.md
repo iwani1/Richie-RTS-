@@ -556,7 +556,7 @@ been restored at least once.
 | Item | Status | Evidence |
 |---|---|---|
 | Trial checklist | Done (authored; the run itself is the owner's) | `docs/REAL_DATA_TRIAL.md`: copy the database first, restore a backup and compare counts, settings, CSV import, one real rental from request to a paid invoice (including the double-booking refusal and an over-payment refusal), the maintenance release control, reports reconciled by hand, the public enquiry form from a signed-out browser, and a restart. §10 is the sign-off table |
-| The trial itself | **Not started** — needs the owner's machine and real records | Run it against `richie_tms_trial`, then once against `richie_tms`. Findings come back as a step number, the message on screen, and the reference in question |
+| The trial itself | **Copy clean on 2026-10-25** (build `c7d6454`); the live-database repeat of §5–§8 is still to run | §1–§10 passed on `richie_tms_trial` at port 3001 with no step failing, including the §5 arithmetic probe to the pesewa (3.98 deposit, 2.39 VAT, 18.29 total, one pesewa over refused). Recorded in `docs/REAL_DATA_TRIAL.md` §10 "Runs recorded" |
 
 After the trial, the remaining open work is what the brief puts in Phase 1B/1C and what this build
 has recorded as deliberately absent: contracts, bookings, employee/passenger import (EMP-02), the
