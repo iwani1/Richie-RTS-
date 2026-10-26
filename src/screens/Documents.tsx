@@ -144,6 +144,9 @@ export function InvoiceSheet({ invoice }: { invoice: Invoice }) {
         <div>
           <p className="rts-sheet-label">Billed to</p>
           <p className="rts-sheet-value">{invoice.customerName}</p>
+          {/* The buyer's details as the invoice was issued (CUS-01): copied then, never re-read. */}
+          {invoice.buyerAddress && <p className="rts-sheet-detail">{invoice.buyerAddress}</p>}
+          {invoice.buyerTin && <p className="rts-sheet-detail">TIN {invoice.buyerTin}</p>}
         </div>
         <div>
           <p className="rts-sheet-label">Issued</p>

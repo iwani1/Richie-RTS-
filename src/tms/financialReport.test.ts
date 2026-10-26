@@ -37,6 +37,8 @@ function invoice(overrides: Partial<Invoice> = {}): Invoice {
     rentalId: "r1",
     clientId: null,
     customerName: "Northstar Foods",
+    buyerAddress: "",
+    buyerTin: "",
     currencyCode: "GHS",
     lines: [{ id: "l1", description: "Hire", quantity: 1, unitAmount: 2000 }],
     taxLines: [],

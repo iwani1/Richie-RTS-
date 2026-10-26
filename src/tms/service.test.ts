@@ -174,7 +174,7 @@ describe("drivers and clients", () => {
 
   it("lets finance manage clients but not operations", () => {
     const { db, ops, finance } = seeded();
-    const input = { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "bad-email", status: "active" as const };
+    const input = { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "bad-email", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" as const };
     const denied = execute(db, ops, { type: "create_client", input }, NOW);
     expect(denied.ok).toBe(false);
     const invalid = execute(db, finance, { type: "create_client", input }, NOW);

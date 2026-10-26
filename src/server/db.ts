@@ -66,10 +66,17 @@ export interface DriverRow {
 
 export interface ClientRow {
   id: string;
+  /** The office's own customer code; empty when it has none (migration 018, CUS-01). */
+  reference: string;
   name: string;
+  /** `organisation`, `individual`, or null where the office has not said (migration 018). */
+  client_type: string | null;
   contact_name: string;
   contact_phone: string;
   contact_email: string;
+  billing_address: string;
+  tin: string;
+  notes: string;
   status: string;
   created_at: Timestamp;
   updated_at: Timestamp;
@@ -240,6 +247,8 @@ export interface InvoiceRow {
   rental_id: string | null;
   client_id: string | null;
   customer_name: string;
+  buyer_address: string;
+  buyer_tin: string;
   currency_code: string;
   subtotal: string;
   total: string;

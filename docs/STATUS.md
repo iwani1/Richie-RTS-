@@ -156,8 +156,10 @@ These work, and the difference is worth knowing before relying on them:
 - **Rental request** — dates, not departure and return times; no intermediate stops or luggage notes.
 - **Quotations** — line items, deposit and validity, but no quotation number, tax line or discount
   line (those live on the invoice).
-- **Customer register** — several named contacts per client, one marked primary; still not billing
-  details, credit terms or a customer type.
+- **Customer register** — several named contacts per client, one marked primary, plus the office's own
+  customer code, organisation/individual, a billing address, a tax number and notes, with a history of
+  changes. Still not credit terms, a credit limit or a separate billing contact: the billing details are
+  the address and tax number printed on the invoice, nothing more.
 - **Work orders** — five statuses, no parts list or inspection record; the release step is complete.
 - **Rental report** — eight figures with CSV; other reports do not yet share its filters and export.
 - **Credit notes** — one line each, typed before tax (the tax follows from the invoice). A note cannot
@@ -169,7 +171,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**775 passed, 26 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**793 passed, 26 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

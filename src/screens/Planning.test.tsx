@@ -121,7 +121,7 @@ function world(overrides: Partial<Database> = {}): Database {
     ...db,
     settings: { ...db.settings, currencyCode: "GHS", documentReminderLeadDays: 30, rental: emptyRentalSettings() },
     users: [admin],
-    clients: [{ id: "c1", name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active", createdAt: at, updatedAt: at }],
+    clients: [{ id: "c1", name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active", createdAt: at, updatedAt: at }],
     routes: [route],
     passengers: [passenger("p1", "Kojo Owusu"), passenger("p2", "Adwoa Boakye")],
     vehicles: [vehicle("v-small", "GT-1111-24", 14), vehicle("v-big", "GT-9999-24", 45)],

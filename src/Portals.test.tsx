@@ -52,8 +52,8 @@ function seed(): { driverUserId: string; clientUserId: string; driverVehicleId: 
 
   run(ops, { type: "create_driver", input: { fullName: "Kojo Mensah", phone: "024", licenceNumber: "L-1", licenceExpiry: "2030-01-01", status: "active" } });
   run(ops, { type: "create_driver", input: { fullName: "Kwame", phone: "020", licenceNumber: "L-2", licenceExpiry: "2030-01-01", status: "active" } });
-  run(admin, { type: "create_client", input: { name: "Alpha Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
-  run(admin, { type: "create_client", input: { name: "Beta Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
+  run(admin, { type: "create_client", input: { name: "Alpha Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } });
+  run(admin, { type: "create_client", input: { name: "Beta Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } });
   const [alphaId, betaId] = [db.clients[0].id, db.clients[1].id];
 
   const route = (name: string, clientId: string, a: string, b: string) => ({

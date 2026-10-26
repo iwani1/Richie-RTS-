@@ -14,7 +14,10 @@
   widens the numbering-series constraint to match `REFERENCE_SERIES`; `016_passenger_accounts.sql`
   adds `app_user.passenger_id`, widens the role check to accept `passenger` and creates
   `app_user_passenger_uq` (D-97); `017_receipt_scans.sql` adds `receipt_file`, the index to a scanned
-  receipt kept in a folder outside the database (Q-51, D-100); `btree_gist` +
+  receipt kept in a folder outside the database (Q-51, D-100); `018_customer_details.sql` adds the
+  customer code, the organisation/individual classification, the billing address, the tax number and a
+  note to `client`, plus the buyer's address and tax number **copied onto** `invoice` at issue
+  (CUS-01, D-101); `btree_gist` +
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
 - Session: `iron-session` sealed cookie; passwords Argon2id (`@node-rs/argon2`) — D-51.
@@ -58,7 +61,7 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 21` (the migration number and the snapshot version are counted separately: three phases shipped without a new migration), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–21) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 22` (the migration number and the snapshot version are counted separately: one phase shipped without a new migration), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–22) |
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `mayReportOnRun`, `confinedClientId`, `confinedPassengerId`. Confines `driver`, `client_contact` and `passenger` to their one linked record. Fails closed |

@@ -39,7 +39,7 @@ async function world(): Promise<{ adminId: string; clientId: string }> {
   void configured;
   const withClient = await step(
     "create_client",
-    { input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } },
+    { input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } },
     adminId,
   );
   return { adminId, clientId: withClient.clients[0].id };

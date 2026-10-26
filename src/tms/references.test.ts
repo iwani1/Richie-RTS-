@@ -242,7 +242,7 @@ describe("commands that mint references", () => {
     const client = executeCommand(
       started,
       admin,
-      { type: "create_client", input: { name: "Volta Foods Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } },
+      { type: "create_client", input: { name: "Volta Foods Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } },
       NOW,
     );
     if (!client.ok) throw new Error(client.message);

@@ -58,7 +58,7 @@ function seed(options: { overdue?: boolean } = {}): { vehicleId: string; driverI
     },
   });
   const categoryId = db.settings.vehicleCategories[0].id;
-  run({ type: "create_client", input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
+  run({ type: "create_client", input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } });
   run({ type: "create_vehicle", input: { registration: "GT 900-26", categoryId, make: "", model: "", seatCapacity: "30", notes: "" } });
   run({ type: "create_driver", input: { fullName: "Kojo Driver", phone: "024", licenceNumber: "DRV-1", licenceExpiry: "2030-01-01", status: "active" } });
 

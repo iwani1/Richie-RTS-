@@ -2382,6 +2382,10 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   text-transform: uppercase;
 }
 .rts-sheet-value { margin: 0; color: #0f172a; font-size: 12.5px; font-weight: 550; }
+/* A qualifier under a sheet value: the buyer's address and tax number under "Billed to". Read on
+   paper, so it is darkened to stay above 4.5:1 on white (CUS-01). Not to be confused with
+   `.rts-sheet-note`, which is the block of notes at the foot of a sheet. */
+.rts-sheet-detail { margin: 2px 0 0; color: #3f3f46; font-size: 11.5px; line-height: 1.35; }
 
 .rts-sheet-void {
   margin: 14px 0 0;

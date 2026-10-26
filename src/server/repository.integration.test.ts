@@ -195,7 +195,7 @@ suite("PostgreSQL constraints, through the repository", () => {
       ...before,
       clients: [
         ...before.clients,
-        { id: "client-1", name: "Northstar Foods", contactName: "", contactPhone: "", contactEmail: "", status: "active", createdAt: NOW, updatedAt: NOW },
+        { id: "client-1", name: "Northstar Foods", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active", createdAt: NOW, updatedAt: NOW },
       ],
       users: [...before.users, account("user-1", "ops@northstar.test", false), account("user-2", "accounts@northstar.test", true)],
     };

@@ -85,8 +85,8 @@ function build(options: { seats?: string; rosterSize?: number } = {}): World {
 
   db = run(db, ops, { type: "create_vehicle", input: { registration: "GT 900-26", categoryId, make: "", model: "", seatCapacity: options.seats ?? "4", notes: "" } });
   db = run(db, ops, { type: "create_driver", input: { fullName: "Kojo", phone: "024", licenceNumber: "L-1", licenceExpiry: "2030-01-01", status: "active" } });
-  db = run(db, finance, { type: "create_client", input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
-  db = run(db, finance, { type: "create_client", input: { name: "Beta Foods", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
+  db = run(db, finance, { type: "create_client", input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } });
+  db = run(db, finance, { type: "create_client", input: { name: "Beta Foods", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } });
   const clientId = db.clients[0].id;
   const otherClientId = db.clients[1].id;
 

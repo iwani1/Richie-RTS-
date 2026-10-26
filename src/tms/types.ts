@@ -76,12 +76,38 @@ export interface Driver {
 export const CLIENT_STATUSES = ["active", "inactive"] as const;
 export type ClientStatus = (typeof CLIENT_STATUSES)[number];
 
+export const CLIENT_TYPES = ["organisation", "individual"] as const;
+/** Whether the customer is a company or a person. Null on a record nobody has classified yet. */
+export type ClientType = (typeof CLIENT_TYPES)[number];
+export const CLIENT_TYPE_LABELS: Record<ClientType, string> = {
+  organisation: "Organisation",
+  individual: "Individual",
+};
+
+/**
+ * A customer (CUS-01).
+ *
+ * The register used to be a name and a phone number, which is enough to ring somebody and not enough
+ * to bill them. `reference` is the code the office already uses in its own files; `billingAddress` and
+ * `tin` are what an invoice has to carry for a company to claim the tax, and what the office needs
+ * when a customer asks for a copy of an old invoice. Nothing here is invented: every field may be
+ * blank, and a blank is shown as "not recorded" rather than filled in with a guess.
+ */
 export interface Client {
   id: string;
+  /** The customer's own code, as the office knows them. Blank when they have none. */
+  reference: string;
   name: string;
+  /** A company or a person. Null until somebody says which. */
+  type: ClientType | null;
   contactName: string;
   contactPhone: string;
   contactEmail: string;
+  /** Where a bill is sent, as it should read on the document. */
+  billingAddress: string;
+  /** Tax identification number, printed on the invoice when a company has one. */
+  tin: string;
+  notes: string;
   status: ClientStatus;
   createdAt: string;
   updatedAt: string;
@@ -648,6 +674,13 @@ export interface Invoice {
   rentalId: string | null;
   clientId: string | null;
   customerName: string;
+  /**
+   * The buyer's billing details **as they were when the invoice was issued** (CUS-01). Copied, not
+   * looked up: a customer who moves premises in July must not change the address printed on a
+   * January invoice, exactly as a tax line is not recalculated later.
+   */
+  buyerAddress: string;
+  buyerTin: string;
   currencyCode: string;
   lines: InvoiceLine[];
   taxLines: InvoiceTaxLine[];
@@ -1070,7 +1103,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 22;
 
 /**
  * Every schema version this build can still read.
@@ -1080,7 +1113,7 @@ export const SCHEMA_VERSION = 21;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1186,7 +1219,16 @@ export function migrate(value: unknown): Database | null {
     })),
     vehicles: v.vehicles as Database["vehicles"],
     drivers: v.drivers as Database["drivers"],
-    clients: v.clients as Database["clients"],
+    clients: (v.clients as Client[]).map((client) => ({
+      ...client,
+      // CUS-01 arrived in schema 22. An older record has no code, no type and no billing details;
+      // inventing "organisation" for every existing customer would be a fact nobody stated.
+      reference: typeof client.reference === "string" ? client.reference : "",
+      type: client.type === "individual" || client.type === "organisation" ? client.type : null,
+      billingAddress: typeof client.billingAddress === "string" ? client.billingAddress : "",
+      tin: typeof client.tin === "string" ? client.tin : "",
+      notes: typeof client.notes === "string" ? client.notes : "",
+    })),
     rentals: Array.isArray(v.rentals) ? (v.rentals as Rental[]).map((rental) => ({ ...rental, quoteHistory: rental.quoteHistory ?? [] })) : [],
     routes: Array.isArray(v.routes) ? (v.routes as BusRoute[]) : [],
     passengers: Array.isArray(v.passengers) ? (v.passengers as Passenger[]) : [],
@@ -1221,7 +1263,14 @@ export function migrate(value: unknown): Database | null {
     documents: Array.isArray(v.documents) ? (v.documents as ComplianceDocument[]) : [],
     odometerReadings: Array.isArray(v.odometerReadings) ? (v.odometerReadings as OdometerReading[]) : [],
     invoices: Array.isArray(v.invoices)
-      ? (v.invoices as Invoice[]).map((invoice) => ({ ...invoice, taxLines: invoice.taxLines ?? [] }))
+      ? (v.invoices as Invoice[]).map((invoice) => ({
+          ...invoice,
+          taxLines: invoice.taxLines ?? [],
+          // Billing details on the document arrived in schema 22; an older invoice prints what it
+          // always printed — the customer's name.
+          buyerAddress: typeof invoice.buyerAddress === "string" ? invoice.buyerAddress : "",
+          buyerTin: typeof invoice.buyerTin === "string" ? invoice.buyerTin : "",
+        }))
       : [],
     // Credit notes arrived in schema 15; an older backup simply has none.
     creditNotes: Array.isArray(v.creditNotes) ? (v.creditNotes as CreditNote[]).map((note) => ({ ...note, taxLines: note.taxLines ?? [] })) : [],

@@ -12,6 +12,7 @@ import { allocateReference } from "./references";
 import { confinedClientId } from "./scope";
 import {
   CLIENT_STATUSES,
+  CLIENT_TYPES,
   DOCUMENT_OWNER_TYPES,
   DRIVER_STATUSES,
   PRICING_BASES,
@@ -21,6 +22,7 @@ import {
   type AuditEntry,
   type Client,
   type ClientStatus,
+  type ClientType,
   type Database,
   type Driver,
   type DriverStatus,
@@ -67,10 +69,19 @@ export interface DriverInput {
 }
 
 export interface ClientInput {
+  /** The code the office already uses for this customer. Optional: a walk-in has none. */
+  reference?: string;
   name: string;
+  /** Company or person. Null is allowed and shown as "not recorded" rather than guessed. */
+  type?: ClientType | null;
   contactName: string;
   contactPhone: string;
   contactEmail: string;
+  /** Where a bill is sent, printed on the invoice as typed. */
+  billingAddress?: string;
+  /** Tax identification number, printed on the invoice when the customer has one. */
+  tin?: string;
+  notes?: string;
   status: ClientStatus;
 }
 
@@ -338,18 +349,43 @@ export function validateClient(db: Database, input: ClientInput, excludeId?: str
   const errors: Errors = {};
   const name = input.name.trim();
   const contactEmail = input.contactEmail.trim().toLowerCase();
+  const reference = (input.reference ?? "").trim();
+  const billingAddress = (input.billingAddress ?? "").trim();
+  const tin = (input.tin ?? "").trim();
+  const notes = (input.notes ?? "").trim();
+
   if (!name) errors.name = "Client name is required.";
   else if (db.clients.some((c) => c.id !== excludeId && norm(c.name) === norm(name)))
     errors.name = "A client with this name already exists.";
+
+  // A customer code is the office's own, so it is not generated here — but two customers cannot
+  // share one, or the code stops identifying anybody.
+  if (reference.length > 40) errors.reference = "Keep the customer code to 40 characters.";
+  else if (reference && db.clients.some((c) => c.id !== excludeId && c.reference && norm(c.reference) === norm(reference)))
+    errors.reference = "Another client already uses this code.";
+
+  const type = input.type ?? null;
+  if (type !== null && !CLIENT_TYPES.includes(type)) errors.type = "Choose organisation or individual.";
+
   if (contactEmail && !EMAIL_RE.test(contactEmail)) errors.contactEmail = "Enter a valid email address.";
+  if (billingAddress.length > 300) errors.billingAddress = "Keep the billing address to 300 characters.";
+  // A TIN is whatever the customer's own document says; only its shape is checked, never its meaning.
+  if (tin && !/^[A-Za-z0-9][A-Za-z0-9 /-]{3,29}$/.test(tin)) errors.tin = "A tax number is 4–30 letters, digits, spaces or hyphens.";
+  if (notes.length > 500) errors.notes = "Keep the note to 500 characters.";
   if (!CLIENT_STATUSES.includes(input.status)) errors.status = "Invalid status.";
+
   return {
     errors,
     value: {
+      reference,
       name,
+      type,
       contactName: input.contactName.trim(),
       contactPhone: input.contactPhone.trim(),
       contactEmail,
+      billingAddress,
+      tin: tin.toUpperCase(),
+      notes,
       status: input.status,
     },
   };

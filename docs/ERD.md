@@ -530,5 +530,13 @@ Constraints and triggers:
   transaction. `receipt_file_frozen_trg` refuses any change to the file it indexes and makes a removal
   one-way; `receipt_file_no_delete_trg` refuses a delete, so the file stays in the folder for its three
   years and the register can still say a receipt was once filed.
+- **`client` billing details (migration `018_customer_details.sql`, CUS-01, D-101).** Five columns:
+  `reference` (the office's own customer code, nullable, `client_reference_uq` unique on
+  `lower(btrim(reference))` **where the trimmed value is not empty**, so any number of customers may
+  have no code and none may share one), `client_type` (`client_type_check`: `organisation`,
+  `individual` or NULL — a blank is a fact the office has not stated, not a default), `billing_address`,
+  `tin`, `notes`. `invoice` gains `buyer_address` and `buyer_tin`, **written once at issue** from the
+  customer record and never updated afterwards; a walk-in invoice leaves both empty. Every added column
+  defaults to empty, so an existing row migrates without an edit.
 - `reference_counter` is written by the same transaction that writes the document, so two writers
   cannot allocate the same number.

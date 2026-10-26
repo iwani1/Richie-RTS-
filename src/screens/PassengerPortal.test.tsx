@@ -63,7 +63,7 @@ function seed(): { userId: string; riderId: string; colleagueId: string; evening
   const category = db.settings.vehicleCategories[0].id;
   run(ops, { type: "create_vehicle", input: { registration: "GT 100-26", categoryId: category, make: "", model: "", seatCapacity: "30", notes: "" } });
   run(ops, { type: "create_driver", input: { fullName: "Kojo", phone: "024", licenceNumber: "L-1", licenceExpiry: "2030-01-01", status: "active" } });
-  run(admin, { type: "create_client", input: { name: "Alpha Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
+  run(admin, { type: "create_client", input: { name: "Alpha Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } });
   const clientId = db.clients[0].id;
 
   // Different times on purpose: one bus and one driver work both runs, so no assignment overlaps.

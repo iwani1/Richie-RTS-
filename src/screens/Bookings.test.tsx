@@ -129,7 +129,7 @@ function world(): { db: Database; dispatch: Tms["dispatch"] } {
   const db: Database = {
     ...base,
     users: [admin],
-    clients: [{ id: "c1", name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active", createdAt: at, updatedAt: at }],
+    clients: [{ id: "c1", name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active", createdAt: at, updatedAt: at }],
     routes: [route],
     vehicles: [
       {

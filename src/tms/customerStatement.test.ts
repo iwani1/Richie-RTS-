@@ -19,6 +19,8 @@ const invoice = (overrides: Partial<Invoice> = {}): Invoice => ({
   rentalId: null,
   clientId: null,
   customerName: "Acme Ltd",
+  buyerAddress: "",
+  buyerTin: "",
   currencyCode: "GHS",
   lines: [{ id: "l1", description: "Two days hire", quantity: 2, unitAmount: 2000 }],
   taxLines: [{ name: "VAT", ratePercent: 15, amount: 600 }],

@@ -18,7 +18,7 @@ import { executeBusing, type BusingCommand, type PassengerInput } from "./busing
 import type { Permission } from "./permissions";
 import { can } from "./permissions";
 import { audit, execute, type Actor, type ClientInput, type Command, type CommandResult, type DriverInput, type VehicleInput } from "./service";
-import type { ClientStatus, Database, DriverStatus, PassengerStatus } from "./types";
+import type { ClientStatus, ClientType, Database, DriverStatus, PassengerStatus } from "./types";
 
 export const IMPORT_KINDS = ["vehicles", "drivers", "clients", "passengers"] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
@@ -77,14 +77,18 @@ export const IMPORT_SPECS: Record<ImportKind, KindSpec> = {
   clients: {
     label: "clients",
     permission: "clients:create",
-    template: "name,contact name,contact phone,contact email,status",
-    example: "Volta Foods Ltd,Efua Owusu,+233244000111,ops@example.test,active",
-    note: "The contact columns describe the client's primary contact person; further contacts are added on the client record afterwards.",
+    template: "name,code,type,contact name,contact phone,contact email,billing address,tin,status",
+    example: "Volta Foods Ltd,VFL-01,organisation,Efua Owusu,+233244000111,ops@example.test,Industrial Area Accra,C0012345678,active",
+    note: "Every column after the name may be left out of the file or left blank, and a blank is kept as \"not recorded\" rather than guessed. The contact columns describe the client's primary contact person; further contacts are added on the client record afterwards.",
     columns: {
       name: { aliases: ["name", "client", "organisation", "organization", "company"], required: true },
+      reference: { aliases: ["code", "customer code", "client code", "reference", "account code"], required: false },
+      type: { aliases: ["type", "customer type", "client type"], required: false },
       contact: { aliases: ["contact", "contact name", "contact person"], required: false },
       phone: { aliases: ["phone", "contact phone", "telephone"], required: false },
       email: { aliases: ["email", "contact email", "e-mail"], required: false },
+      billingAddress: { aliases: ["billing address", "address", "postal address"], required: false },
+      tin: { aliases: ["tin", "tax number", "tax identification number", "tax id", "vat number"], required: false },
       status: { aliases: ["status"], required: false },
     },
   },
@@ -253,11 +257,25 @@ const matchesName = (value: string, record: { name: string; reference?: string }
 /** Turns one row into the ordinary command a person would have sent by hand. */
 function rowCommand(db: Database, kind: ImportKind, values: string[], index: Record<string, number>): RowPlan {
   if (kind === "clients") {
+    // A blank cell stays blank: "organisation" is a statement about the customer, and the file not
+    // saying so is not the same as the file saying it. `organisation` itself is also accepted in the
+    // type column, since that is the word the brief uses.
+    const typeCell = norm(cell(values, index, "type"));
+    let type: ClientType | null = null;
+    if (typeCell === "organisation" || typeCell === "organization" || typeCell === "company") type = "organisation";
+    else if (typeCell === "individual" || typeCell === "person") type = "individual";
+    else if (typeCell !== "")
+      return { error: `Found "${cell(values, index, "type")}" in the type column. Put organisation or individual, or leave the cell blank if it is not known.` };
     const input: ClientInput = {
+      reference: cell(values, index, "reference"),
       name: cell(values, index, "name"),
+      type,
       contactName: cell(values, index, "contact"),
       contactPhone: cell(values, index, "phone"),
       contactEmail: cell(values, index, "email"),
+      billingAddress: cell(values, index, "billingAddress"),
+      tin: cell(values, index, "tin"),
+      notes: "",
       status: (cell(values, index, "status") || "active") as ClientStatus,
     };
     return { module: "core", command: { type: "create_client", input } };

@@ -247,8 +247,8 @@ vehicles   registration,category,make,model,seats,notes
 drivers    name,phone,licence number,licence expiry,status
            Kofi Mensah,+233201234567,DL-001,2031-05-01,active
 
-clients    name,contact name,contact phone,contact email,status
-           Volta Foods Ltd,Efua Owusu,+233244000111,ops@example.test,active
+clients    name,code,type,contact name,contact phone,contact email,billing address,tin,status
+           Volta Foods Ltd,VFL-01,organisation,Efua Owusu,+233244000111,ops@example.test,Industrial Area Accra,C0012345678,active
 
 passengers name,employee ref,phone,client,route,stop,status
            Ama Boateng,E-001,+233201234567,Volta Foods Ltd,Northstar morning,Estate gate,active
@@ -257,7 +257,11 @@ passengers name,employee ref,phone,client,route,stop,status
 Rules that hold for every import:
 
 - **Required columns** are named in the error if they are missing (`category` and `seats` for
-  vehicles, `licence number` and `licence expiry` for drivers). `status` defaults to `active`.
+  vehicles, `licence number` and `licence expiry` for drivers). `status` defaults to `active`. For
+  clients only the name is required: a code, a type, a billing address and a tax number are optional,
+  and a blank cell is stored as *not recorded* rather than guessed. A `type` cell that says anything
+  other than `organisation` or `individual` is a row error naming the line, so a typo is fixed in the
+  file rather than imported as a blank.
 - **Category names must already exist** in Settings; an unknown name is a row error that lists the
   configured categories. A roster row works the same way: the client, route and stop are matched
   **by name** (the route may also be given by its reference), and a misspelt name is a row error

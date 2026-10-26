@@ -62,7 +62,7 @@ function world(currencyCode: string | null = "GHS"): Database {
   db = run(db, admin, { type: "create_vehicle", input: { registration: "GT 100-26", categoryId: category, make: "", model: "", seatCapacity: "30", notes: "" } });
   db = run(db, admin, {
     type: "create_client",
-    input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" },
+    input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" },
   });
   db = run(db, admin, {
     type: "create_rental",

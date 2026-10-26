@@ -1956,3 +1956,42 @@ decision the office makes, not one the system invents.
   schema version **21**, two permissions (`receipts:read`, `receipts:write`), a **File scan** action
   and panel on the Expenses screen, and `RECEIPT_DIR` in `.env.example`. 40 new tests (13 domain, 14
   store, 9 route, 4 screen).
+
+## D-101 - A customer record carries what a document needs, and the invoice keeps a copy (CUS-01)
+
+The register held a name, one free-text contact and a status. An invoice printed the name and nothing
+else. A customer entitled to claim the tax had no address or tax number on the paper they were given,
+and the office was re-typing both whenever the question came up.
+
+- **Decision 1: the office's own code, not one this program invents.** Customers are already known by
+  a short code in the office's own paperwork. The field is optional and unique when filled: the
+  uniqueness check compares the trimmed, lower-cased value, so "  NST-001 " and "NST-001" are the
+  same customer and the second one is refused by name. Generation was rejected — an invented code is
+  a second identifier to reconcile against the invoice, the file and the cash book.
+- **Decision 2: organisation or individual, and "not recorded" is a real answer.** The column is
+  nullable, with a migration default of blank. Every existing customer would otherwise be labelled
+  "organisation" on the strength of nothing. The register prints *type not recorded*, the same way it
+  prints *no code*, because the reader has to be able to tell a fact from a guess.
+- **Decision 3: billing details are address and tax number, not a second contact block.** The brief
+  said "billing details". These are the two facts a customer's bookkeeper asks for, and they are
+  what the sheet prints. Payment terms and a purchase-order field were **rejected** as a different
+  subject (they belong to the invoice, not the customer) — and the tax number is stored upper-case
+  after trimming, so the same number typed twice compares equal.
+- **Decision 4: the invoice copies the buyer's details at issue and never follows them afterwards.**
+  `issue_rental_invoice` looks the client up and writes `buyerAddress` and `buyerTin` onto the
+  invoice. A customer who moves in July does not alter the April document, which is the same rule
+  already applied to the invoice's own name and address lines. A walk-in (no client record) gets
+  blanks, and the sheet prints nothing at all rather than an empty label.
+- **Decision 5: the history is read from the audit log, and is read-only.** Changes to a customer are
+  already written to `audit` by the command layer. A **History** panel filters those entries to
+  `entity = "client"` and shows the person and the time. A separate history table was **rejected**:
+  a second record of the same change can disagree with the first, and this one is written by the same
+  transaction as the change itself.
+- **Decision 6: no new permission.** `clients:read`/`create`/`update` already gate the register, and a
+  billing address is part of a customer record rather than a new class of secret. The invoice sheet
+  prints what the person looking at the screen can already see.
+- **Consequence.** `Client` gains `reference`, `type`, `billingAddress`, `tin`, `notes`; `Invoice`
+  gains `buyerAddress`, `buyerTin`; migration **018** (`018_customer_details.sql`), schema version
+  **22**; validation in `validateClient`; the register gains a Billing column, a History panel and the
+  new form fields; the invoice sheet prints the buyer block; 16 new tests (9 domain, 2 import, 3
+  register screen, 2 sheet).

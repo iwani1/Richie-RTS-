@@ -54,6 +54,8 @@ const invoice: Invoice = {
   rentalId: "r1",
   clientId: null,
   customerName: "Acme Ltd",
+  buyerAddress: "",
+  buyerTin: "",
   currencyCode: "GHS",
   lines: [
     { id: "l1", description: "Two days hire", quantity: 2, unitAmount: 1500 },
@@ -206,6 +208,21 @@ describe("the invoice a customer receives (FIN-02, D-87)", () => {
     expect(within(sheet).getByText("GHS 3025.00")).toBeTruthy();
     expect(within(sheet).getByText(/Please pay GHS 3025\.00 by/i)).toBeTruthy();
     expect(within(sheet).getByText("Thank you for your business.")).toBeTruthy();
+  });
+
+  it("prints the buyer's address and tax number as they were issued", () => {
+    renderSheet(<InvoiceSheet invoice={{ ...invoice, buyerAddress: "Tema Harbour, Gate 3", buyerTin: "C0012345678" }} />, world({ invoices: [{ ...invoice, buyerAddress: "Tema Harbour, Gate 3", buyerTin: "C0012345678" }] }));
+
+    const sheet = screen.getByRole("article", { name: /Invoice INV-2026-0001/i });
+    expect(within(sheet).getByText("Tema Harbour, Gate 3")).toBeTruthy();
+    expect(within(sheet).getByText("TIN C0012345678")).toBeTruthy();
+  });
+
+  it("prints no buyer details at all when the invoice was issued to a walk-in customer", () => {
+    renderSheet(<InvoiceSheet invoice={invoice} />);
+    const sheet = screen.getByRole("article", { name: /Invoice INV-2026-0001/i });
+    // No empty label, no placeholder: the sheet reads exactly as it did before.
+    expect(within(sheet).queryByText(/^TIN /)).toBeNull();
   });
 
   it("shows what was credited as well as what was paid, and never a stale total", () => {

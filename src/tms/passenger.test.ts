@@ -82,7 +82,7 @@ function build(options: { cancellationCutoff?: number | null; requestCutoff?: nu
   const categoryId = db.settings.vehicleCategories[0].id;
   db = run(db, ops, { type: "create_vehicle", input: { registration: "GT 100-26", categoryId, make: "", model: "", seatCapacity: "3", notes: "" } });
   db = run(db, ops, { type: "create_driver", input: { fullName: "Kojo", phone: "024", licenceNumber: "L-1", licenceExpiry: "2030-01-01", status: "active" } });
-  db = run(db, admin, { type: "create_client", input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
+  db = run(db, admin, { type: "create_client", input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } });
   const clientId = db.clients[0].id;
 
   const routeInput = (name: string, starts: string) => ({

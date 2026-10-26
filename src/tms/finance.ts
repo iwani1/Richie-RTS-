@@ -259,13 +259,18 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
 
       const period = input.issuedOn.slice(0, 4);
       const { reference, counters } = allocateReference(db, "invoice", period);
+      // The buyer's billing details are copied onto the document, not looked up when it is printed
+      // (CUS-01). A customer who moves in July must not rewrite the address on a January invoice.
+      const buyer = rental!.clientId ? db.clients.find((client) => client.id === rental!.clientId) : undefined;
       const invoice: Invoice = {
         id: makeId(),
         reference,
         kind: "rental",
         rentalId: rental!.id,
         clientId: rental!.clientId,
-        customerName: rental!.customerName,
+        customerName: buyer?.name ?? rental!.customerName,
+        buyerAddress: buyer?.billingAddress ?? "",
+        buyerTin: buyer?.tin ?? "",
         currencyCode,
         lines,
         taxLines,

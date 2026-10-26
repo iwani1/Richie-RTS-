@@ -36,6 +36,8 @@ const invoice: Invoice = {
   rentalId: null,
   clientId: null,
   customerName: "Acme Ltd",
+  buyerAddress: "",
+  buyerTin: "",
   currencyCode: "GHS",
   lines: [{ id: "l1", description: "Two days hire", quantity: 2, unitAmount: 1500 }],
   taxLines: [{ name: "VAT", ratePercent: 15, amount: 450 }],

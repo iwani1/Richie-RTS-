@@ -137,6 +137,46 @@ describe("import", () => {
     expect(clients.message).toMatch(/Imported 1 of 2 clients/);
   });
 
+  it("carries a customer's code, classification and billing details from the file (CUS-01)", () => {
+    const { db, admin } = world();
+    const result = executeImport(db, admin, {
+      type: "import_records",
+      kind: "clients",
+      csv:
+        "name,code,type,contact name,contact phone,contact email,billing address,tin,status\n" +
+        "Volta Foods Ltd,VFL-01,Organisation,Efua Owusu,+233244000111,ops@example.test,\"Industrial Area, Accra\",c001234 5678,active\n" +
+        "Adjoa Mensah,,,,,,,,active\n",
+    }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const [volume, person] = result.db.clients;
+    expect(volume.reference).toBe("VFL-01");
+    expect(volume.type).toBe("organisation");
+    expect(volume.billingAddress).toBe("Industrial Area, Accra");
+    // Upper-cased on the way in, so the same number typed two ways compares equal.
+    expect(volume.tin).toBe("C001234 5678");
+    // The second row said nothing beyond a name, so nothing else is claimed about it.
+    expect(person.reference).toBe("");
+    expect(person.type).toBeNull();
+    expect(person.billingAddress).toBe("");
+    expect(person.tin).toBe("");
+  });
+
+  it("names the line whose type column is neither organisation nor individual", () => {
+    const { db, admin } = world();
+    const result = executeImport(db, admin, {
+      type: "import_records",
+      kind: "clients",
+      csv: "name,type\nVolta Foods Ltd,Sole trader\nHarbour Logistics,individual\n",
+    }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.db.clients.map((client) => client.name)).toEqual(["Harbour Logistics"]);
+    expect(result.message).toMatch(/line 2/);
+    expect(result.message).toMatch(/Sole trader/);
+  });
+
   it("fails as a whole when every row is rejected, so nothing half-imports", () => {
     const { db, ops } = world();
     const result = executeImport(db, ops, { type: "import_records", kind: "vehicles", csv: "registration,category,seats\n,Coaster,30\n,Minibus,14\n" }, NOW);

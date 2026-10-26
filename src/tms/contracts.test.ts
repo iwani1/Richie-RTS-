@@ -78,8 +78,8 @@ function build(): World {
   });
   const categoryId = db.settings.vehicleCategories[0].id;
   const shiftId = db.settings.shifts[0].id;
-  db = run(db, finance, { type: "create_client", input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
-  db = run(db, finance, { type: "create_client", input: { name: "Beta Foods", contactName: "", contactPhone: "", contactEmail: "", status: "active" } });
+  db = run(db, finance, { type: "create_client", input: { name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } });
+  db = run(db, finance, { type: "create_client", input: { name: "Beta Foods", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active" } });
   const clientId = db.clients[0].id;
   const otherClientId = db.clients[1].id;
   db = run(db, ops, {
