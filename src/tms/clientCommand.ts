@@ -19,7 +19,9 @@ type BrowserForbidden =
   | { type: "setup_administrator" }
   | { type: "import_backup" }
   | { type: "create_user" }
-  | { type: "reset_user_password" };
+  | { type: "reset_user_password" }
+  // A receipt scan arrives as a file through /api/receipts, never as a command (D-100).
+  | { type: "attach_receipt" };
 
 export type ClientCommand =
   | Exclude<AnyCommand, BrowserForbidden>

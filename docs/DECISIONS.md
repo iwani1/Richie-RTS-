@@ -1897,3 +1897,62 @@ decision the office makes, not one the system invents.
   a two-tab destination with the hire report as its own component; 15 new tests (12 domain, 3 screen).
   No new command, table, permission, migration or dependency. Definitions are written down in
   `docs/KPIS.md` under "Staff transport report".
+
+## D-100 - A receipt scan lives in a folder beside the database, and the index lives in it (Q-51)
+
+- **Context.** The expense register has held the number printed on a paper receipt and whether the
+  paper is in the file since Phase 42. Both are claims. An auditor asking "show me the receipt" could
+  be given a number and a tick. The owner was asked the four questions that decide whether a file can
+  be stored at all — where, for how long, backed up by whom, open to whom — and answered: **a folder
+  on the office machine beside the database; three years; a nightly copy the office runs itself;
+  finance and administrators only.**
+- **Decision 1: the bytes go on the disk, the index goes in the database.** A photograph in a
+  `bytea` column makes every nightly dump carry every receipt ever scanned, so a backup that used to
+  take seconds grows without bound and a restore drags the paper along with the figures. A folder is
+  also what an office can actually copy to a USB stick in the way it already backs up its files. So:
+  `data/receipts` (or `RECEIPT_DIR`), one file per scan, and a `receipt_file` row that says which
+  expense it belongs to, what it is called, what kind it is, how big, its SHA-256 and who filed it.
+- **Decision 2: the name on disk is generated, never the uploader's.** `rcpt_<36 hex>.<ext>`. The
+  name the phone gave it is stored to be *shown* and never used in a path. This is what makes
+  `../../.env` impossible rather than merely rejected, and the folder is read back through the same
+  pattern check, so a row edited by hand cannot become a file read from anywhere on the machine.
+- **Decision 3: the type is decided by the bytes.** A file declared `image/jpeg` whose first five
+  bytes are `%PDF-` is a PDF; something that starts with none of the four signatures is refused. The
+  browser's `Content-Type` is not consulted at all. Every byte that could ever be served back is
+  therefore a format a browser renders as an image or a document, never as a page that can run script.
+- **Decision 4: 2 MB, and it says so before the upload.** A phone photograph is routinely 4 MB, so
+  the panel says the ceiling in words and refuses an oversized file in the browser as well as on the
+  server. The database holds the same limit as a check constraint, because a rule that lives only in
+  the screen is a rule until somebody uses curl.
+- **Decision 5: one scan per expense, and nothing is deleted.** A partial unique index allows one
+  `attached` row per expense. Filing a new scan marks the old one `removed` — reason "Replaced by a
+  new scan" — and points it at its replacement; removing one records the reason and the person.
+  The file stays in the folder until its retention date. Deletion would answer "why is there no scan
+  on this expense?" with silence a year later.
+- **Decision 6: the file and the row are written together, or neither is.** The row is written by a
+  command the browser cannot send (`attach_receipt` is in neither `KNOWN_COMMAND_TYPES` nor the
+  client command union). `POST /api/receipts` writes the file, then runs the command, and deletes the
+  file again if the command is refused. A browser able to send that command itself could point a row
+  at a file that does not exist, or at somebody else's.
+- **Decision 7: reading is a server check, not a hidden button.** `GET /api/receipts/[id]` resolves
+  the account from the session, checks `receipts:read` against the role in the database, and only
+  then touches the disk. Responses carry `no-store`, `nosniff`, and a `content-disposition` filename
+  stripped of quotes and separators — a header built from what somebody typed is an injection.
+- **Decision 8: the register counts its own gaps.** The screen shows "No scan on file" for the period
+  beside the receipt-number count, because an office that can see the gap files the paper; one that
+  cannot, discovers it at the audit.
+- **Rejected.** (a) *Storing images in the database* — backup size, restore time, and a schema that
+  has to stream bytes through JSON on every command. (b) *A cloud bucket* — the owner chose the
+  office machine: opening a receipt must not depend on the internet, and a monthly bill for a folder
+  that already exists is not obviously worth it. (c) *Trusting the declared type* — the one thing an
+  upload must never do. (d) *Giving operations read access to the paper because it can already read
+  the expense* — a different fact with a different sensitivity. (e) *Deleting a scan* — see decision
+  5. (f) *Storing the printed management report as a PDF too* — D-98 still stands: the report is
+  produced on demand, and the owner's answer was about receipts, not about keeping a copy of every
+  report ever printed.
+- **Consequence.** New module `src/tms/receipts.ts` (`RECEIPT_LIMITS`, `receiptProblems`,
+  `attach_receipt`, `remove_receipt`), `src/server/receiptStore.ts` (the only code that touches the
+  folder), `POST /api/receipts`, `GET /api/receipts/[id]`, migration **017** (`receipt_file`),
+  schema version **21**, two permissions (`receipts:read`, `receipts:write`), a **File scan** action
+  and panel on the Expenses screen, and `RECEIPT_DIR` in `.env.example`. 40 new tests (13 domain, 14
+  store, 9 route, 4 screen).

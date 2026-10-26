@@ -40,6 +40,14 @@ export interface Tms {
   setFlash: (flash: Flash | null) => void;
   allowed: (permission: Permission) => boolean;
   dispatch: (command: ClientCommand) => Promise<CommandResult>;
+  /**
+   * Files a scanned receipt against an expense (Q-51, D-100).
+   *
+   * Not a command: a file cannot travel in the command envelope, and the row that indexes a scan is
+   * written by the server only after the bytes are on the disk. The reply is the same shape as a
+   * command so a screen handles both the same way.
+   */
+  attachReceipt: (expenseId: string, file: File) => Promise<CommandResult>;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   setupAdministrator: (fullName: string, email: string, password: string) => Promise<CommandResult>;
@@ -138,6 +146,50 @@ export function useTmsState(): Tms {
     [currentUser],
   );
 
+  /** Applies a write reply — a command's or an upload's — to the screen. */
+  const applyWrite = useCallback(
+    (httpStatus: number, data: { ok: boolean; message?: string; errors?: Record<string, string>; database?: Database; auditTotal?: number } | null): CommandResult => {
+      if (httpStatus === 401) {
+        setCurrentUser(null);
+        setDb(emptyDatabase());
+        return { ok: false, message: "Your session has ended. Sign in again.", errors: {} };
+      }
+      if (!data) return { ok: false, message: NETWORK_ERROR, errors: {} };
+      if (!data.ok) return { ok: false, message: data.message ?? "The change was not saved.", errors: data.errors ?? {} };
+      if (data.database) {
+        setDb(data.database);
+        setAuditTotal(data.auditTotal ?? data.database.audit.length);
+      }
+      return { ok: true, db: data.database ?? emptyDatabase(), message: data.message ?? "Saved." };
+    },
+    [],
+  );
+
+  const attachReceipt = useCallback(
+    (expenseId: string, file: File): Promise<CommandResult> => {
+      setInFlight((n) => n + 1);
+      const run = async (): Promise<CommandResult> => {
+        try {
+          const body = new FormData();
+          body.append("expenseId", expenseId);
+          body.append("file", file);
+          // No content-type header: the browser sets `multipart/form-data` with its own boundary.
+          const response = await fetch("/api/receipts", { method: "POST", body, credentials: "same-origin" });
+          const data = (await response.json().catch(() => null)) as Parameters<typeof applyWrite>[1];
+          return applyWrite(response.status, data);
+        } catch {
+          setConnectionError(NETWORK_ERROR);
+          setStatus("offline");
+          return { ok: false, message: NETWORK_ERROR, errors: {} };
+        }
+      };
+      const next = queue.current.then(run, run);
+      queue.current = next.catch(() => undefined);
+      return next.finally(() => setInFlight((n) => Math.max(0, n - 1)));
+    },
+    [applyWrite],
+  );
+
   const dispatch = useCallback(
     (command: ClientCommand): Promise<CommandResult> => {
       setInFlight((n) => n + 1);
@@ -150,18 +202,7 @@ export function useTmsState(): Tms {
             database?: Database;
             auditTotal?: number;
           }>("/api/commands", command);
-          if (httpStatus === 401) {
-            setCurrentUser(null);
-            setDb(emptyDatabase());
-            return { ok: false, message: "Your session has ended. Sign in again.", errors: {} };
-          }
-          if (!data) return { ok: false, message: NETWORK_ERROR, errors: {} };
-          if (!data.ok) return { ok: false, message: data.message ?? "The change was not saved.", errors: data.errors ?? {} };
-          if (data.database) {
-            setDb(data.database);
-            setAuditTotal(data.auditTotal ?? data.database.audit.length);
-          }
-          return { ok: true, db: data.database ?? emptyDatabase(), message: data.message ?? "Saved." };
+          return applyWrite(httpStatus, data);
         } catch {
           setConnectionError(NETWORK_ERROR);
           setStatus("offline");
@@ -172,7 +213,7 @@ export function useTmsState(): Tms {
       queue.current = next.catch(() => undefined);
       return next.finally(() => setInFlight((n) => Math.max(0, n - 1)));
     },
-    [],
+    [applyWrite],
   );
 
   const signIn = useCallback(
@@ -245,6 +286,7 @@ export function useTmsState(): Tms {
     setFlash,
     allowed,
     dispatch,
+    attachReceipt,
     signIn,
     signOut,
     setupAdministrator,

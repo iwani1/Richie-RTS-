@@ -333,6 +333,24 @@ export interface ExpenseRow {
   data: Json;
 }
 
+export interface ReceiptFileRow {
+  id: string;
+  expense_id: string;
+  stored_name: string;
+  original_name: string;
+  mime_type: string;
+  byte_size: number;
+  sha256: string;
+  status: string;
+  removed_reason: string | null;
+  removed_by: string | null;
+  removed_at: Timestamp | null;
+  superseded_by_id: string | null;
+  uploaded_by: string;
+  uploaded_at: Timestamp;
+  data: Json;
+}
+
 export interface AuditEntryRow {
   id: string;
   at: Timestamp;
@@ -386,6 +404,7 @@ export interface KyselyDatabase {
   payment: PaymentRow;
   refund: RefundRow;
   expense: ExpenseRow;
+  receipt_file: ReceiptFileRow;
   audit_entry: AuditEntryRow;
   reference_counter: { scope: string; period: string; last: number };
   app_settings: AppSettingsRow;

@@ -52,6 +52,13 @@ describe("the commands the API route accepts", () => {
     expect(known.has("void_payment")).toBe(true);
   });
 
+  it("never accepts the receipt command that carries a file", () => {
+    // The row indexing a scan is written in the same request as the bytes (D-100). A browser that
+    // could send `attach_receipt` itself could point a row at a file that does not exist.
+    expect(known.has("attach_receipt")).toBe(false);
+    expect(known.has("remove_receipt")).toBe(true);
+  });
+
   it("never accepts a command that belongs to its own route", () => {
     // These bypass /api/commands on purpose (setup, restore, the person's own account, the public
     // enquiry form). Accepting them here would widen a route that was narrowed for a reason.

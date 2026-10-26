@@ -22,6 +22,7 @@ import {
   type CreditNote,
   type Refund,
   type Expense,
+  type ReceiptFile,
   type Database,
   type Driver,
   type Incident,
@@ -325,6 +326,24 @@ const refundRow = (r: Refund): Row => ({
   data: json(r),
 });
 
+const receiptRow = (r: ReceiptFile): Row => ({
+  id: r.id,
+  expense_id: r.expenseId,
+  stored_name: r.storedName,
+  original_name: r.originalName,
+  mime_type: r.mimeType,
+  byte_size: r.byteSize,
+  sha256: r.sha256,
+  status: r.status,
+  removed_reason: r.removedReason,
+  removed_by: r.removedBy,
+  removed_at: r.removedAt,
+  superseded_by_id: r.supersededById,
+  uploaded_by: r.uploadedBy,
+  uploaded_at: r.uploadedAt,
+  data: json(r),
+});
+
 const expenseRow = (e: Expense): Row => ({
   id: e.id,
   reference: e.reference,
@@ -414,7 +433,7 @@ async function auditRows(trx: Kysely<KyselyDatabase>, limit: number): Promise<Se
 
 /** Reads the whole working set. Audit is capped for the in-memory snapshot; the table keeps all. */
 export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Promise<Database> {
-  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, bookings, contracts, incidents, workOrders, documents, odometer, invoices, creditNotes, payments, refunds, expenses, counters, audit, settings] =
+  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, bookings, contracts, incidents, workOrders, documents, odometer, invoices, creditNotes, payments, refunds, expenses, receipts, counters, audit, settings] =
     await Promise.all([
       rows(executor, "app_user"),
       rows(executor, "vehicle"),
@@ -435,6 +454,7 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
       rows(executor, "payment"),
       rows(executor, "refund"),
       rows(executor, "expense"),
+      rows(executor, "receipt_file"),
       // Number series are what stop a second invoice or payment reusing INV-2026-0001. They are
       // stored outside the JSON snapshot, so this read is the only thing that carries them into
       // the next command (found by the workflow C integration test: without it every payment took
@@ -465,6 +485,7 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
     payments: payments.map((r) => r.data),
     refunds: refunds.map((r) => r.data),
     expenses: expenses.map((r) => r.data),
+    receipts: receipts.map((r) => r.data),
     referenceCounters: counters.map((counter) => ({
       scope: counter.scope as Database["referenceCounters"][number]["scope"],
       period: counter.period,
@@ -605,6 +626,26 @@ async function syncReservations(trx: Kysely<KyselyDatabase>, database: Database)
  * Order matters: parents before children on write, children before parents on delete, so foreign
  * keys hold throughout. Audit is insert-only — the table rejects updates and deletes by trigger.
  */
+/**
+ * Writes the receipt index in the one order the constraints allow.
+ *
+ * Two rules pull in opposite directions during a replacement:
+ *   * the partial unique index allows **one attached scan per expense**, so the scan being replaced
+ *     must be marked removed *before* the new one is inserted;
+ *   * `superseded_by_id` points at the scan that replaced it, which does not exist yet at that moment.
+ *
+ * The second is settled by making that foreign key deferred (migration 017), so it is checked at
+ * commit rather than at the statement. So: removals first, then the scans still (or newly) on file.
+ */
+async function writeReceipts(trx: Kysely<KyselyDatabase>, before: Database, after: Database): Promise<void> {
+  const previous = new Map(before.receipts.map((receipt) => [receipt.id, json(receiptRow(receipt))]));
+  const dirty = after.receipts.filter((receipt) => previous.get(receipt.id) !== json(receiptRow(receipt)));
+  if (!dirty.length) return;
+  const removals = dirty.filter((receipt) => receipt.status === "removed");
+  const attached = dirty.filter((receipt) => receipt.status !== "removed");
+  await upsert(trx, "receipt_file", [...removals, ...attached].map(receiptRow));
+}
+
 export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database, after: Database): Promise<void> {
   // 1. Release reservations that no longer exist before claiming new ones.
   await syncReservations(trx, after);
@@ -612,6 +653,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   // 2. Deletions, children first. The application archives rather than deletes (§5.9), so this is
   //    only reached when a backup import removes records.
   const order: (keyof Database)[] = [
+    "receipts",
     "expenses",
     "refunds",
     "payments",
@@ -633,6 +675,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
     "users",
   ];
   const tableOf: Record<string, keyof KyselyDatabase> = {
+    receipts: "receipt_file",
     expenses: "expense",
     refunds: "refund",
     payments: "payment",
@@ -685,6 +728,9 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
   await write("payment", after.payments.map(paymentRow), before.payments.map(paymentRow));
   await write("refund", after.refunds.map(refundRow), before.refunds.map(refundRow));
   await write("expense", after.expenses.map(expenseRow), before.expenses.map(expenseRow));
+  // A scan points at its expense, and a replacement scan points at the scan it supersedes, so these
+  // are written parents-first in two passes below rather than in arbitrary order.
+  await writeReceipts(trx, before, after);
   await write("booking", after.bookings.map(bookingRow), before.bookings.map(bookingRow));
   await write("contract", after.contracts.map(contractRow), before.contracts.map(contractRow));
 
@@ -738,7 +784,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
 export async function truncateAll(trx: Db | Trx): Promise<void> {
   await sql`
     truncate table resource_reservation, audit_entry, app_settings, odometer_reading,
-      payment, refund, credit_note, invoice, reference_counter, expense,
+      payment, refund, credit_note, invoice, reference_counter, receipt_file, expense,
       compliance_document, work_order, incident, booking, contract, trip, passenger, bus_route, rental,
       vehicle, driver, client, app_user restart identity cascade
   `.execute(trx);

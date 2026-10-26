@@ -7,13 +7,14 @@
   more — the page needs a server, because that is where authority lives.
 - Runtime: one Node.js process on the operator's workstation (Fedora), plus PostgreSQL. The
   database is the source of truth. See `docs/SETUP_AND_DEPLOYMENT.md` for the install and run commands.
-- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (19 tables: `refund` arrived in
+- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (20 tables: `refund` arrived in
   `010_refunds.sql`, D-92, `expense` in `011_expenses.sql`, D-93, and `contract` in
   `015_contracts.sql`, D-95; `013` and `014` replace the two ceiling functions so a cancellation is
   not counted against itself (D-94); `012_reference_counter_scopes.sql`
   widens the numbering-series constraint to match `REFERENCE_SERIES`; `016_passenger_accounts.sql`
   adds `app_user.passenger_id`, widens the role check to accept `passenger` and creates
-  `app_user_passenger_uq` (D-97); `btree_gist` +
+  `app_user_passenger_uq` (D-97); `017_receipt_scans.sql` adds `receipt_file`, the index to a scanned
+  receipt kept in a folder outside the database (Q-51, D-100); `btree_gist` +
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
 - Session: `iron-session` sealed cookie; passwords Argon2id (`@node-rs/argon2`) — D-51.
@@ -57,7 +58,7 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 20` (the migration number and the snapshot version are counted separately: three phases shipped without a new migration), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–20) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 21` (the migration number and the snapshot version are counted separately: three phases shipped without a new migration), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–21) |
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `mayReportOnRun`, `confinedClientId`, `confinedPassengerId`. Confines `driver`, `client_contact` and `passenger` to their one linked record. Fails closed |
@@ -80,6 +81,10 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 | `src/tms/staffReport.ts` | The staff transport report (RPT-02, D-99): runs scheduled/worked/cancelled/off-schedule, riders carried, expected, no-shows and **not recorded**, boarding rate, occupancy from the seat capacity of the bus that ran, delay over the late stops only, the seats people asked for by status, why seats were lost, per-route and per-client tables, and `STAFF_REPORT_LIMITS` — the facts the records do not hold. On-time is taken from `kpis.ts`, not recomputed |
 | `src/screens/StaffTransportReport.tsx` | The **Staff transport** tab on Reports: a service-date range, eight figures each with the sentence that qualifies it, the seats-requested and lost-seat tables, by route and by client, and a card naming what the report cannot say beside the coverage counts |
 | `src/tms/planning.ts` | The planning aid (RTE-04, D-96): every vehicle-and-driver pair for a run, judged by the same rule the save enforces, ranked with a sentence each, plus `PLANNING_LIMITS` — the facts the records do not hold. Reads only; assigns nothing |
+| `src/tms/receipts.ts` | The scanned copy of an expense receipt (Q-51, D-100): `RECEIPT_LIMITS` (2 MB, four types, three years), `receiptProblems`, `receiptFor`, and the `attach_receipt` / `remove_receipt` commands. It indexes files; it never touches one — that is `receiptStore.ts`. One scan on file per expense; a removed scan keeps its reason, its person and its file |
+| `src/server/receiptStore.ts` | The only code that touches the receipt folder: sniffs the type from the bytes, generates the name on disk, enforces the ceiling, reads back only names it wrote, and computes the retention date |
+| `src/app/api/receipts/route.ts` | `POST`, the one route that accepts a file: origin, session, `receipts:write`, sniff, save, then the server-only `attach_receipt` command — deleting the file again if the row is refused |
+| `src/app/api/receipts/[id]/route.ts` | `GET`: session, `receipts:read`, then the disk. Serves the image under a sanitised name, `no-store` and `nosniff`, and says so plainly when the index has a scan the folder does not |
 | `src/tms/expenses.ts` | Spending that is not a repair: `record_expense` / `void_expense`, numbered `EXP-YYYY-NNNN`, with the receipt number and whether the paper is held (D-93) |
 | `src/tms/commands.ts` | `executeCommand()`: the single router for every write (`AnyCommand`) |
 | `src/tms/crypto.ts` | PBKDF2-SHA256 password hashing via Web Crypto |

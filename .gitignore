@@ -11,6 +11,9 @@ tsconfig.tsbuildinfo
 # backups written by ./run.sh backup (contain personal data and credentials)
 backups/
 
+# scanned receipts (personal and financial data, kept on the office machine, never in git — D-100)
+data/receipts/
+
 # local environment
 .env
 .env.*

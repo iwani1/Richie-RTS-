@@ -12,6 +12,7 @@ import { executeFinance, isFinanceCommand, type FinanceCommand } from "./finance
 import { executeImport, isImportCommand, type ImportCommand } from "./import";
 import { executeLogistics, isLogisticsCommand, type LogisticsCommand } from "./logistics";
 import { executeMaintenance, isMaintenanceCommand, type MaintenanceCommand } from "./maintenance";
+import { executeReceipts, isReceiptCommand, type ReceiptCommand } from "./receipts";
 import { execute, type Actor, type Command, type CommandResult } from "./service";
 import type { Database } from "./types";
 
@@ -25,6 +26,7 @@ export type AnyCommand =
   | FinanceCommand
   | ExpenseCommand
   | ContractCommand
+  | ReceiptCommand
   | BookingCommand;
 
 export function executeCommand(db: Database, actor: Actor | null, command: AnyCommand, now?: string): CommandResult {
@@ -36,6 +38,7 @@ export function executeCommand(db: Database, actor: Actor | null, command: AnyCo
   if (isMaintenanceCommand(command)) return executeMaintenance(db, actor, command, now);
   if (isFinanceCommand(command)) return executeFinance(db, actor, command, now);
   if (isExpenseCommand(command)) return executeExpenses(db, actor, command, now);
+  if (isReceiptCommand(command)) return executeReceipts(db, actor, command, now);
   if (isContractCommand(command)) return executeContracts(db, actor, command, now);
   return execute(db, actor, command, now);
 }

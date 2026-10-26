@@ -1,7 +1,7 @@
 # Entity-relationship model
 
 The app stores these as arrays inside one JSON document (schema version 20; PostgreSQL keeps them in
-typed tables, migration `016` being the latest). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
+typed tables, migration `017` being the latest). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
 erDiagram
@@ -519,7 +519,16 @@ Constraints and triggers:
   reference, date, category, description, payee, amount, currency, method, receipt facts or who
   recorded it, makes the void one-way, and requires `voided_at` with the reason; `expense_no_delete_trg`
   refuses a delete. Indexes `expense_incurred_idx` and `expense_category_idx` keep the period and
-  category reports cheap. A scanned copy is **not** stored — only the number and whether the paper is
-  held (D-93).
+  category reports cheap.
+- **`receipt_file` (migration `017_receipt_scans.sql`, Q-51, D-100).** The index to a scanned copy of a
+  receipt; the image itself sits in a folder on the office machine (`RECEIPT_DIR`), never in the
+  database. Checks: `stored_name ~ '^rcpt_[A-Za-z0-9._-]{8,80}$'` (the name is the server's, never a
+  person's), `mime_type in (pdf/jpeg/png/webp)`, `byte_size` between 1 and 2 MB, a 64-character
+  `sha256`, `status in ('attached','removed')`, a removed scan carries a reason and a time. The partial
+  unique index `receipt_file_attached_uq` allows **one scan on file per expense**; `superseded_by_id`
+  points at the scan that replaced this one and is deferred so a replacement can be written in one
+  transaction. `receipt_file_frozen_trg` refuses any change to the file it indexes and makes a removal
+  one-way; `receipt_file_no_delete_trg` refuses a delete, so the file stays in the folder for its three
+  years and the register can still say a receipt was once filed.
 - `reference_counter` is written by the same transaction that writes the document, so two writers
   cannot allocate the same number.

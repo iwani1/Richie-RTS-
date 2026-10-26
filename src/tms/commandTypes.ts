@@ -35,6 +35,7 @@ export const KNOWN_COMMAND_TYPES = [
   "issue_credit_note", "void_credit_note",
   "record_refund", "void_refund",
   "record_expense", "void_expense",
+  "remove_receipt",
   "create_adhoc_trip",
   "record_backup_export",
   "import_records",
@@ -49,6 +50,12 @@ export type KnownCommandType = (typeof KNOWN_COMMAND_TYPES)[number];
  * `import_backup` is server-side only (scripts/restore.ts): a browser-supplied database would let
  * any signed-in user overwrite every table and every credential. The other three are the person's
  * own account and the public enquiry form, which have narrower routes of their own.
+ *
+ * `attach_receipt` (D-100) is here for a different reason: a receipt scan is a *file*, and the row
+ * that indexes it must only ever be written after the bytes are safely on the disk. If the browser
+ * could send the command, it could manufacture a row pointing at a file that does not exist — or at
+ * one belonging to another expense. The file and the row are made together, in `/api/receipts`.
+ * Removing a scan touches no file, so `remove_receipt` does travel through `/api/commands`.
  */
 export const COMMANDS_WITH_THEIR_OWN_ROUTE = [
   "setup_administrator",
@@ -56,6 +63,7 @@ export const COMMANDS_WITH_THEIR_OWN_ROUTE = [
   "update_profile",
   "change_own_password",
   "submit_enquiry",
+  "attach_receipt",
 ] as const;
 
 // The compiler holds this list to the service's own command union: a command added to `Command` and

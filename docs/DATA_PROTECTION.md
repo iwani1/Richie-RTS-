@@ -36,6 +36,7 @@ No retention period is set. Every period below is a proposal to confirm, and non
 | Driver records | Keep while employed plus a period to be set, for licence and legal records | No |
 | Rental customer records | Keep for billing and dispute periods to be set | No |
 | Audit log | Keep for an accountability period to be set; do not rewrite entries | No |
+| Scanned expense receipts | **Three years from filing**, decided by the owner (Q-51, D-100); the image sits in a folder on the office machine and the database holds only the index | Stated on the filing panel and in the deployment guide; the deletion itself is a manual step, not a job |
 | Backups | Same retention as the source data; store encrypted | No |
 
 ## 4. Known gaps in this build
@@ -55,7 +56,17 @@ These are not acceptable for live personal data. They must be closed before prod
 4. No workflow for subject access, correction or deletion requests.
 5. No retention jobs.
 6. No audit trail of reads. Only writes are audited.
-7. **Phase 3 addition.** Incident descriptions may name a driver or describe an accident, and
+7. **Scanned receipts are a new store of personal and financial data (Phase 51, D-100).** A receipt
+   can carry a supplier's name, a signature, a card's last four digits and sometimes a vehicle
+   registration. It is kept in a folder on the office machine that is **not encrypted by the
+   application** and is copied by the office's nightly backup, so the same disk-encryption
+   requirement in point 1 applies to it. Access is limited to finance and administrators and is
+   checked on the server before a byte is read; every filing and removal is audited, with the person
+   named. The image is never deleted by the application — removal is a record — so the three-year
+   retention date is a manual housekeeping step that the office is told about, and until that step
+   is run the folder keeps growing. Nothing purges it automatically, because a purge that guesses
+   wrong destroys evidence.
+8. **Phase 3 addition.** Incident descriptions may name a driver or describe an accident, and
    finance can read incidents so that breakdown costs can be recorded against the right event
    (OPEN_QUESTIONS Q-35). Until a narrower scope exists, treat incident descriptions as
    sensitive and keep them factual. Costs recorded on incidents and work orders are financial

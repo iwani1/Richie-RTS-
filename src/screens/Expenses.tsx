@@ -19,6 +19,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { formatAmount, fromMinor, toMinor } from "../tms/money";
 import type { CommandResult } from "../tms/service";
+import { RECEIPT_LIMITS, receiptFor } from "../tms/receipts";
 import type { Expense } from "../tms/types";
 import { EXPENSE_STATUS_LABELS } from "../tms/types";
 import { useTms } from "../tms/useTms";
@@ -48,7 +49,7 @@ const UNCATEGORISED = "Uncategorised";
 type CommandNotify = (flash: { tone: "success" | "error"; message: string }) => void;
 
 export function ExpensesPage() {
-  const { db, allowed, dispatch, setFlash } = useTms();
+  const { db, allowed, dispatch, attachReceipt, setFlash } = useTms();
   const today = todayYmd();
   const [from, setFrom] = useState(firstOfMonth(today));
   const [to, setTo] = useState(today);
@@ -56,6 +57,7 @@ export function ExpensesPage() {
   const [category, setCategory] = useState("");
   const [recording, setRecording] = useState(false);
   const [voiding, setVoiding] = useState<Expense | null>(null);
+  const [filing, setFiling] = useState<Expense | null>(null);
 
   const currency = db.settings.currencyCode;
   const reversed = from > to;
@@ -84,6 +86,11 @@ export function ExpensesPage() {
 
   const totalMinor = live.reduce((sum, expense) => sum + toMinor(expense.amount), 0);
   const noReceipt = live.filter((expense) => !expense.receiptReference);
+  // The scan is the evidence behind the number; an entry with no scan on file is a weaker fact and
+  // the screen counts it rather than letting the month look fully documented (D-100).
+  const noScan = live.filter((expense) => !receiptFor(db, expense.id));
+  const mayReadScans = allowed("receipts:read");
+  const mayFileScans = allowed("receipts:write");
   const noReceiptMinor = noReceipt.reduce((sum, expense) => sum + toMinor(expense.amount), 0);
 
   // Grouped in whole pesewas and converted once, so a hundred receipts cannot land a pesewa out.
@@ -161,6 +168,13 @@ export function ExpensesPage() {
               value={live.filter((expense) => expense.receiptHeld).length}
               caption={`of ${live.length} entr${live.length === 1 ? "y" : "ies"} — the paper is in the file`}
             />
+            {mayReadScans && (
+              <Stat
+                label="No scan on file"
+                value={noScan.length}
+                caption={noScan.length === 0 ? "every entry has its image filed" : "photograph or scan the paper and file it against the entry"}
+              />
+            )}
           </div>
 
           <div className="space-y-4">
@@ -226,6 +240,42 @@ export function ExpensesPage() {
                         <em className="rts-unset">no number</em>
                       ),
                   },
+                  ...(mayReadScans
+                    ? [
+                        {
+                          key: "scan",
+                          header: "Scan",
+                          render: (expense: Expense) => {
+                            const scan = receiptFor(db, expense.id);
+                            if (scan) {
+                              return (
+                                <span className="flex flex-col">
+                                  <a
+                                    className="rts-link text-xs font-medium"
+                                    href={`/api/receipts/${scan.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    aria-label={`Open the scan of ${expense.reference}`}
+                                  >
+                                    Open scan
+                                  </a>
+                                  <span className="text-xs text-stone-600">{scan.originalName}</span>
+                                </span>
+                              );
+                            }
+                            return expense.status === "void" ? (
+                              <em className="rts-unset">none</em>
+                            ) : mayFileScans ? (
+                              <Button variant="ghost" onClick={() => setFiling(expense)} aria-label={`File a scan for ${expense.reference}`}>
+                                File scan
+                              </Button>
+                            ) : (
+                              <em className="rts-unset">none</em>
+                            );
+                          },
+                        },
+                      ]
+                    : []),
                   { key: "method", header: "Method", render: (expense) => expense.method || <em className="rts-unset">not recorded</em> },
                   {
                     key: "amount",
@@ -272,8 +322,10 @@ export function ExpensesPage() {
 
             <p className="text-xs text-stone-500">
               Costs recorded against an incident or a work order live in Staff logistics and are entered there. Both kinds are added into the money report's
-              cost figure and into cost per trip, so the two screens cannot tell different stories. A scanned copy of a receipt is not yet stored: the register
-              holds the number on the paper and whether the paper is held.
+              cost figure and into cost per trip, so the two screens cannot tell different stories.
+              {mayReadScans
+                ? " A scan of the receipt is kept in a folder on this machine for three years, and only finance and administrators can open it; the expense itself stays visible to operations as before."
+                : " The number on the paper and whether the paper is held are recorded here. A scanned copy is kept by finance and administrators, and is not part of this register's reading."}
             </p>
           </div>
         </>
@@ -283,6 +335,14 @@ export function ExpensesPage() {
         <RecordExpenseForm
           onClosed={() => setRecording(false)}
           onSubmit={async (input) => dispatch({ type: "record_expense", input })}
+          notify={setFlash}
+        />
+      )}
+      {filing && (
+        <FileReceiptForm
+          expense={filing}
+          onClosed={() => setFiling(null)}
+          onSubmit={(file) => attachReceipt(filing.id, file)}
           notify={setFlash}
         />
       )}
@@ -450,6 +510,87 @@ function VoidExpenseForm({
           <Button onClick={onClosed}>Keep the expense</Button>
           <Button type="submit" variant="danger">
             Void expense
+          </Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+/**
+ * Filing the scanned copy of a receipt (Q-51, D-100).
+ *
+ * The panel exists because the paper usually arrives after the entry: somebody types the figure from
+ * the receipt at the filling station, and the photograph of it is filed later. It states the three
+ * rules the owner set — where the file goes, how long it is kept, who may open it — so nobody has to
+ * ask, and it refuses the wrong size before the file leaves the browser rather than after a two-megabyte
+ * upload fails on the server.
+ */
+function FileReceiptForm({
+  expense,
+  onSubmit,
+  notify,
+  onClosed,
+}: {
+  expense: Expense;
+  onClosed: () => void;
+  onSubmit: (file: File) => Promise<CommandResult>;
+  notify: CommandNotify;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const tooBig = file !== null && file.size > RECEIPT_LIMITS.maxBytes;
+  const megabytes = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!file) {
+      setErrors({ file: "Choose the scan or photograph of the receipt." });
+      return;
+    }
+    setSaving(true);
+    const result = await onSubmit(file);
+    setSaving(false);
+    notify({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) onClosed();
+    else setErrors(result.errors);
+  };
+
+  return (
+    <Panel
+      title={`File a scan for ${expense.reference}`}
+      description={`${expense.description} · ${money(expense.currencyCode, expense.amount)}. One scan per expense: filing a new one replaces this entry's earlier scan, which stays on the record as replaced.`}
+      onClose={onClosed}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        <Field
+          label="The scan or photograph"
+          hint={`PDF, JPEG, PNG or WebP, under ${megabytes(RECEIPT_LIMITS.maxBytes)}. A phone photograph is usually well over that — most phones will let you choose a smaller size.`}
+          error={errors.file ?? (tooBig ? `That file is ${megabytes(file.size)}. Photograph it smaller, or save it as a PDF.` : undefined)}
+        >
+          <input
+            type="file"
+            className="rts-input"
+            accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+            aria-label="Receipt scan"
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null);
+              setErrors({});
+            }}
+          />
+        </Field>
+
+        <Notice tone="info" title="Where this file goes">
+          It is stored in a folder on this machine beside the database, not inside it, and it is kept for {RECEIPT_LIMITS.retentionYears} years. The office
+          copies that folder to its backup every night. Only finance and administrators can open it.
+        </Notice>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClosed}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={saving || !file || tooBig}>
+            {saving ? "Filing…" : "File the scan"}
           </Button>
         </div>
       </form>

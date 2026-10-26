@@ -69,6 +69,10 @@ const SECTION_PERMISSIONS: { [K in keyof Database]?: Permission } = {
   // Spending that is not a repair (D-93), with its own read permission: finance records it, and
   // operations may read it because it is part of what its runs cost.
   expenses: "expenses:read",
+  // The receipt index (Q-51, D-100) travels with its own permission, never with the expense register:
+  // an operations account reads what the runs cost, not the supplier's paper. Finance and
+  // administrators hold `receipts:read`; nobody else receives even the file names.
+  receipts: "receipts:read",
   referenceCounters: "invoices:read",
   routes: "routes:read",
   settings: "settings:read",
@@ -167,6 +171,8 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       // D-93: an expense names a payee and what the business spent. It never travels to a driver or
       // a client contact.
       expenses: [],
+      // D-100: nor does the receipt index. A bound role has no view of the office's filing at all.
+      receipts: [],
       // D-95: a client contact gets the agreements covering its own account, a driver gets none.
       contracts: view.contracts,
       referenceCounters: [],

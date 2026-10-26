@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ExpensesPage } from "./Expenses";
 import { TmsContext, type Tms } from "../tms/useTms";
 import type { CommandResult } from "../tms/service";
-import { emptyDatabase, emptyRentalSettings, type Database, type Expense, type User } from "../tms/types";
+import { emptyDatabase, emptyRentalSettings, type Database, type Expense, type ReceiptFile, type User } from "../tms/types";
 
 afterEach(() => {
   cleanup();
@@ -56,12 +56,31 @@ const expense = (overrides: Partial<Expense> = {}): Expense => ({
   ...overrides,
 });
 
-const base = (expenses: Expense[] = [expense()]): Database => {
+const scan = (overrides: Partial<ReceiptFile> = {}): ReceiptFile => ({
+  id: "rc1",
+  expenseId: "ex1",
+  storedName: "rcpt_9f2c1ab34d5e6f708192a3b4.pdf",
+  originalName: "Total filing 4 Aug.pdf",
+  mimeType: "application/pdf",
+  byteSize: 184_320,
+  sha256: "c".repeat(64),
+  status: "attached",
+  removedReason: null,
+  removedBy: null,
+  removedAt: null,
+  supersededById: null,
+  uploadedBy: "Ama Mensah",
+  uploadedAt: at,
+  ...overrides,
+});
+
+const base = (expenses: Expense[] = [expense()], receipts: ReceiptFile[] = []): Database => {
   const db = emptyDatabase();
   return {
     ...db,
     users: [admin],
     expenses,
+    receipts,
     settings: {
       ...db.settings,
       companyName: "Richie Transport Services",
@@ -235,5 +254,74 @@ describe("the expenses screen", () => {
     expect(screen.queryByRole("button", { name: /Void EXP-2026-0001/ })).toBeNull();
     // Reading it is still allowed, which is why operations has the permission at all.
     expect(screen.getByText("EXP-2026-0001")).toBeTruthy();
+  });
+});
+
+describe("the scanned copy of a receipt (Q-51, D-100)", () => {
+  /** The role matrix, narrowed: everything allowed except the permissions named. */
+  const without = (denied: string[]) => ((permission: string) => !denied.includes(permission)) as unknown as Tms["allowed"];
+
+  it("offers to file a scan, and opens the one already on file", () => {
+    openJune(base([expense(), expense({ id: "ex2", reference: "EXP-2026-0002", receiptReference: "RCPT-2", receiptHeld: true })], [scan()]));
+
+    // The entry with a scan: a link that opens the image through the guarded route.
+    const open = screen.getByRole("link", { name: "Open the scan of EXP-2026-0001" });
+    expect(open.getAttribute("href")).toBe("/api/receipts/rc1");
+    expect(screen.getByText("Total filing 4 Aug.pdf")).toBeTruthy();
+
+    // The entry without one: a button that opens the filing panel, not a silent blank.
+    expect(screen.getByRole("button", { name: "File a scan for EXP-2026-0002" })).toBeTruthy();
+
+    // And the gap is counted for the whole period, with the count agreeing with the rows.
+    const stat = screen.getByText("No scan on file").closest(".rts-stat") as HTMLElement;
+    expect(within(stat).getByText("1")).toBeTruthy();
+  });
+
+  it("does not mention scans at all to a role that may not read them", () => {
+    // Operations reads the expense register but not the paper behind it.
+    openJune(base(), { allowed: without(["receipts:read", "receipts:write"]) });
+
+    expect(screen.queryByText("No scan on file")).toBeNull();
+    expect(screen.queryByRole("button", { name: /File a scan/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Open the scan/ })).toBeNull();
+    // The register itself is unchanged: the paper facts it has always shown are still there.
+    expect(screen.getByText("RCPT-0091")).toBeTruthy();
+    expect(screen.getByText(/kept by finance and administrators/)).toBeTruthy();
+  });
+
+  it("files the scan through the upload method, and says where the file goes first", async () => {
+    const attachReceipt = vi.fn(async () => ({ ok: true, message: "Scan filed against EXP-2026-0001." }) as CommandResult);
+    openJune(base(), { attachReceipt });
+
+    fireEvent.click(screen.getByRole("button", { name: "File a scan for EXP-2026-0001" }));
+    const panel = screen.getByRole("dialog", { name: /File a scan for EXP-2026-0001/ });
+    // Nothing is written anywhere until somebody presses the button.
+    expect(attachReceipt).not.toHaveBeenCalled();
+    // The three rules the owner set are stated in the panel, not discovered later.
+    expect(within(panel).getByText(/folder on this machine beside the database/)).toBeTruthy();
+    expect(within(panel).getByText(/kept for 3 years/)).toBeTruthy();
+    expect(within(panel).getByText(/Only finance and administrators can open it/)).toBeTruthy();
+
+    const file = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], "receipt.pdf", { type: "application/pdf" });
+    fireEvent.change(within(panel).getByLabelText("Receipt scan"), { target: { files: [file] } });
+    fireEvent.click(within(panel).getByRole("button", { name: "File the scan" }));
+
+    await waitFor(() => expect(attachReceipt).toHaveBeenCalledWith("ex1", file));
+  });
+
+  it("refuses a file that is too large before it is sent", async () => {
+    const attachReceipt = vi.fn(async () => ({ ok: true, message: "filed" }) as CommandResult);
+    openJune(base(), { attachReceipt });
+
+    fireEvent.click(screen.getByRole("button", { name: "File a scan for EXP-2026-0001" }));
+    const panel = screen.getByRole("dialog", { name: /File a scan for EXP-2026-0001/ });
+    // 2 MB is the ceiling; this file claims to be larger without carrying the bytes.
+    const huge = new File([new Uint8Array(1)], "huge.jpg", { type: "image/jpeg" });
+    Object.defineProperty(huge, "size", { value: 3 * 1024 * 1024 });
+    fireEvent.change(within(panel).getByLabelText("Receipt scan"), { target: { files: [huge] } });
+
+    expect(within(panel).getByText(/That file is 3.0 MB/)).toBeTruthy();
+    expect(within(panel).getByRole("button", { name: "File the scan" })).toHaveProperty("disabled", true);
+    expect(attachReceipt).not.toHaveBeenCalled();
   });
 });

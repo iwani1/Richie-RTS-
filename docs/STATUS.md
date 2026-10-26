@@ -29,7 +29,7 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 | **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting, corporate agreements, a planning aid | **Built, with narrower registers than the brief.** 25 IDs: 12 met, 13 partial, **0 not built**. Contracts arrived in Phase 46 (a transcribed term, the lifecycle, renewals, a booking gate) and the planning aid in Phase 47 — ranked pairs that explain themselves, with no geometry because no stop has a position |
 | **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, staff transport and financial reports | **Built.** 6 IDs: 3 met (finance dashboard, passenger portal, staff transport report), 3 partial, **0 not built**. The passenger portal arrived in Phase 48 — a rider's own journeys, seats and references, with the bus's position honestly absent because nothing records one. The staff transport report arrived in Phase 50 — runs worked, riders carried, no-shows, the gap nobody recorded, empty seats, delays where they were measured, and the seats people asked for |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
-| **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs: 2 met, 5 deferred. Met: expenses with a receipt number and whether the paper is held (no scanned copy yet), and the **printed management report** (a document the browser prints or saves as PDF — no stored file, no email) |
+| **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs: 2 met, 5 deferred. Met: expenses with a receipt number, whether the paper is held **and, since Phase 51, the scanned copy itself** (kept in a folder on the office machine for three years, open to finance and administrators only), and the **printed management report** (a document the browser prints or saves as PDF — no stored file, no email) |
 
 Totals across all 78 brief requirements: **26 met · 39 partial · 0 not built · 13 deferred.**
 
@@ -69,6 +69,11 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   counting as received, and the invoice goes back to what it actually owed — in the reports and on the
   printed sheet as well as on the screen. It is a one-way door, and a payment already matched to the
   bank statement warns what the match will be short by before it is cancelled.
+- **A scanned copy of a receipt**, filed against an expense rather than kept in a shoebox: the image
+  lives in a folder on the office machine, is kept three years, is copied to the backup every night,
+  and can be opened only by finance and administrators. A wrong scan is taken off with a reason and
+  stays on the record, so an auditor's question has an answer. The register counts the entries still
+  without one.
 - **Expenses**: money spent that is not a repair — fuel, tolls, permits, rent, allowances — entered
   from the receipt with the number printed on it and whether the paper is actually in the file. Each
   entry is numbered (EXP-2026-0001), never edited: a wrong one is voided with a reason and entered
@@ -164,7 +169,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**734 passed, 26 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**775 passed, 26 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

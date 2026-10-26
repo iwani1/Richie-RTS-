@@ -134,6 +134,16 @@ job. A driver and a client contact hold none of the three, because an expense na
 (`visibility.ts`, `SECTION_PERMISSIONS`). Recording requires the company currency, so a company that
 has not set one cannot enter spending at all.
 
+`receipts:read` and `receipts:write` (Q-51, D-100) cover the **scanned copy** of a receipt: filing the
+image against an entry, opening it, and taking it off with a reason. They are separate from
+`expenses:read` on purpose. Operations reads the expense register — fuel and tolls are part of what its
+runs cost — but a scan photographs a supplier's paper, a bank reference and sometimes a card. So the
+paper is finance's and the administrator's, and operations receives not even the file names: a receipt
+scan is a file whose access has to be decided on the server, before a byte leaves the folder. Reading
+and writing are one decision here rather than two, because filing a scan and opening one are the same
+act of keeping the office's paper in order (unlike invoices, where issuing and voiding are different
+acts by different people).
+
 Read scope: `invoices:read` also opens the invoice's payments, credit notes and refunds, because all
 three are part of the invoice — and it is the permission the **Statements** destination needs (D-90), because a
 statement is those same three collections read for one customer over a period. Record-bound roles receive none of the three collections, so a driver or client
@@ -199,6 +209,7 @@ administrators change them (`settings:update`).
 | costs:read | x | x | x | | |
 | expenses:read | x | x | x | | |
 | expenses:record / expenses:void | x | | x | | |
+| receipts:read / receipts:write | x | | x | | |
 
 Separation of duties: operations runs the response and the maintenance work; finance records and
 reviews costs. **Releasing a vehicle is a separate permission from advancing the work.**

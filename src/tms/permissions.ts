@@ -69,6 +69,12 @@ export const PERMISSIONS = [
   "expenses:read",
   "expenses:record",
   "expenses:void",
+  // The scanned copy of a receipt (Q-51, D-100). Deliberately not part of expenses:read: operations
+  // reads the expense register — fuel and tolls are part of what its runs cost — but a scan
+  // photographs a supplier's paper, a bank reference and sometimes a card. Finance and
+  // administrators only, and the check is on the server before a byte leaves the folder.
+  "receipts:read",
+  "receipts:write",
   "invoices:read",
   "invoices:issue",
   "invoices:void",
@@ -211,6 +217,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "expenses:read",
     "expenses:record",
     "expenses:void",
+    // Filing and reading the paper behind the figure is finance's job (D-100).
+    "receipts:read",
+    "receipts:write",
   ],
   // Own-record scope: a driver sees only the runs and incidents for the vehicle and
   // trips assigned to their linked driver record. See PERMISSIONS.md "Own-record scope".
