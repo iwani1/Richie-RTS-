@@ -213,6 +213,7 @@ from its own button, the scrim and Escape.
 | Expenses | Enter what the month actually cost | The period total, the biggest category, and what has no receipt | Period at the top, then four figures (recorded, biggest category, entries with no receipt number, receipts held), the register with receipts named per row, a category table beneath it, and a panel to record or void. A voided entry stays on the list, struck through, with its reason in words |
 | Statements | Chase what one customer owes | The balance and its age | Customer list ordered by what is owed beside the statement itself: five figures, the ageing bands in words, the entries in the period, the invoices still owing. Prints as the same A4 sheet as an invoice |
 | My journeys (passenger portal) | Catch the bus, and know whether the seat is real | The next run, then what state each seat is in | Page head, then **your next journey** as four facts in a row (time, stop, bus, status) with the status sentence underneath; a request button and a report button; then the upcoming runs as a table whose status cell carries the label *and* the sentence that qualifies it; then **where you have been**; then the company's policy beside the reports the rider has raised. Limits are printed, not hidden (D-97) |
+| Reports | Answer one of two questions, not both at once | The money, or the buses | Two tabs: **Hire and money** (the hire, financial and printed report) and **Staff transport** (RPT-02), the second offered only to a role that may read the roster. The staff tab: a service-date range, eight figures each with the sentence that qualifies it, then the seats asked for and why they were lost, by route, by client, and a card that names what the report cannot say beside the coverage counts (D-99) |
 | Printed management report | Answer the same questions on paper | The period, then the money | A4 sheet: letterhead with the period and printing reference, a one-line state (complete, or withheld with the reason), eight figures in a four-across grid each with its qualifying sentence, then one section per question (customer, service, costs, money back out, why lost, utilisation, per-unit cost), the coverage counts, and the reading notes. Sections keep whole and a heading never sits alone at the foot of a page (D-98) |
 | Printed invoice / credit note | Hand the customer a document | The figures and what is owed | A4 sheet in a preview overlay: letterhead and reference at the top, the line table, the totals in the lower right with the sentence that explains them beneath, footer with reference and print date. Print removes the app entirely |
 
@@ -227,7 +228,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **719 passed, 26 skipped** across 70 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **734 passed, 26 skipped** across 71 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are
@@ -261,8 +262,10 @@ screen scale, so what is approved on screen is what goes on the paper.
    readiness cannot be computed and links to the screen that fixes it; no ring is drawn.
 5. **The top bar does not blur.** It is opaque by choice; a translucent bar over a scrolling table
    reads as a filter rather than a frame.
-6. **Charts are absent by design** beyond the seven-day runs series: RPT-02/RPT-03 need fleet-hours
-   and cost inputs this installation does not collect.
+6. **Charts are absent by design** beyond the seven-day runs series. The staff transport report
+   (RPT-02) prints counts that are small and exact — a bar beside "3 carried of 20 seats" would be
+   decoration around a number that already fits — and the fleet-hours figure still has no screen
+   because nothing records it.
 7. **The printed report reuses the document sheet, not a second one.** The invoice, the credit note, the
    statement and the management report share `.rts-sheet`, so the paper a customer keeps and the paper a
    manager reads cannot drift apart in type, measure or margins (D-98). The report adds one thing the

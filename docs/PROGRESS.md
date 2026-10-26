@@ -87,13 +87,13 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | NTF-02 | 2 | SMS adapter through a Ghana-capable provider (candidates: Hubtel, Arkesel, mNotify; verify availability and pricing). SMS is the channel most staff… | Deferred | Phase 2. |
 | NTF-03 | 2 | Email adapter. | Deferred | Phase 2. |
 | RPT-01 | 1A | Rental reports: enquiries, quotations issued, acceptance rate, confirmed and completed rentals, revenue, outstanding balances, vehicle utilisation,… | Met | `src/tms/rentalReport.ts` + `src/screens/Reports.tsx` (Phase 17). All eight figures are computed from records, with coverage stated, a currency guard and a CSV of the same numbers; 7 domain tests and 3 screen tests. Formulas in `docs/KPIS.md`. |
-| RPT-02 | 1C | Staff transport and fleet reports: bookings received/confirmed/completed/cancelled, no-shows, on-time pickup rate, average delay, passengers… | Partial | On-time pickup rate with data coverage (`src/tms/kpis.ts`). Utilisation **definition** agreed in Q-29 and written down in `KPIS.md`; the fleet-wide screen is still to build. **No bookings, no-shows, passengers transported, route utilisation, contract performance, downtime, fuel, mileage.** |
+| RPT-02 | 1C | Staff transport and fleet reports: bookings received/confirmed/completed/cancelled, no-shows, on-time pickup rate, average delay, passengers… | Met | `src/tms/staffReport.ts` + `src/screens/StaffTransportReport.tsx` (Phase 50, D-99): **Staff transport**, its own tab on Reports (offered only to a role that may read the employee roster). Runs scheduled, worked, cancelled and outside the schedule; riders carried, expected, no-shows and **not recorded** (an expected rider with no boarding row is a named gap, never a silent zero); boarding rate; occupancy from the seat capacity of the bus that ran, not the roster size; average delay over the stops that were recorded late; on-time taken unchanged from `kpis.ts`. Then seats asked for by status (requested, confirmed, waiting list, offered, refused, cancelled), **why seats were lost** grouped by the reason the office typed, a **per-route** table (runs, carried, no-shows, not recorded, seats offered, occupancy) and a **per-client** table. A **"What this report cannot say"** card lists the four facts the records do not hold — fuel and mileage are not per route, downtime is not measured, a run records no agreement so contract performance is not measured, a delay is known only where a stop time was recorded — beside the coverage counts. Definitions in `docs/KPIS.md`; CSV of the same figures. Tests: 12 domain (`staffReport.test.ts`), 3 screen (`Reports.test.tsx`). |
 | RPT-03 | 1C | Financial reports: revenue by service and customer, payments received, outstanding invoices, expenses by category, cost per trip, cost per passenger… | Partial | `src/tms/financialReport.ts` + a section on the Reports screen (Phase 28): all six figures computed from records, with the period, coverage, cost-per-trip and cost-per-passenger definitions from Q-29, and a CSV. **Revenue by service has one line** because only vehicle hire is invoiced in this build; contract billing is FIN-02. No profit or margin (costs captured are maintenance only). |
 | RPT-04 | 1C | Filters (date range, service, client, customer, route, driver, vehicle, status) and CSV export, always permission-scoped. Every KPI formula is… | Partial | The rental report has a date range, a coverage panel and a CSV of the same figures (Phase 17); other screens have search and status filters. Formulas documented in `docs/KPIS.md`. The **customer statement** (Phase 39, D-90) is the per-customer view: one account for a chosen period, with the balance carried in, the ageing bands and a printable sheet; the **finance home** states the same bands for the whole company (Phase 40, D-91), from one banding function. **The other reports have no date range or CSV, and there is no cross-report filter bar** (service, client, route, driver, vehicle); the statement has no CSV because it is a document, not a data export. |
 | RPT-05 | 3 | PDF reports. | Met | `src/tms/printableReport.ts` + `src/screens/PrintableReport.tsx` (Phase 49, D-98): the management report as an A4 document — company and period in the head, eight figures each with the sentence that qualifies it, then revenue by customer, revenue by service, costs by category, money in and back out, why rentals were lost, fleet utilisation and the per-unit costs, followed by the coverage counts and the definitions a reader would otherwise assume. Every value is **the report's own number formatted, never a second addition**, and it prints through the browser's own engine to paper or to PDF (the sheet the invoice and statement already use, D-87). **Withheld, not zero:** with no company currency set every amount is "Not stated" and the page says why; an empty table says so; a backwards period prints no report at all. **A PDF file is produced by the print dialog, not stored or emailed** — there is no PDF library and no second rendering engine in the build. Tests: 10 domain (`printableReport.test.ts`), 3 screen (`Reports.test.tsx`). |
 | GPS-01 | 2 | Provider interface; last reported location with timestamp; clear distinction between live, stale and simulated locations; never fabricate… | Deferred | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
 
-**78 IDs: 25 met, 40 partial, 0 not built, 13 deferred** (by phase: 1A 29 - 9 met / 20 partial; 1B 25 - 12 met / 13 partial; 1C 6 - 2 met / 4 partial; 2 11 - 3 partial / 8 deferred; 3 7 - 2 met / 5 deferred; the register above is the count). Phase 1C is complete in this build.
+**78 IDs: 26 met, 39 partial, 0 not built, 13 deferred** (by phase: 1A 29 - 9 met / 20 partial; 1B 25 - 12 met / 13 partial; 1C 6 - 3 met / 3 partial; 2 11 - 3 partial / 8 deferred; 3 7 - 2 met / 5 deferred; the register above is the count). Phase 1C is complete in this build.
 
 ## Phase 0 - Inspect and plan (approved)
 
@@ -105,7 +105,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | ERD.md | Done | `docs/ERD.md`, with Mermaid diagram, constraints and exclusion constraints. |
 | PERMISSIONS.md | Done | `docs/PERMISSIONS.md`. |
 | STATE_MACHINES.md | Done | Vehicle, rental and trip machines in `docs/STATE_MACHINES.md`. Invoice, contract and incident machines Not Started. |
-| KPIS.md | Done | RPT-01 and RPT-03 implemented; utilisation, cost per trip and the cost-category list defined and approved (Q-29, D-78); RPT-02 screen outstanding. |
+| KPIS.md | Done | RPT-01, RPT-02 and RPT-03 implemented; utilisation, cost per trip and the cost-category list defined and approved (Q-29, D-78). |
 | DATA_PROTECTION.md | Done (draft) | Requires legal review. Retention periods unset (Q-18). |
 | DECISIONS.md | Done | D-01 to D-15. |
 | OPEN_QUESTIONS.md | Done | Q-01 to Q-32. |
@@ -155,7 +155,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | Completion: stop times, one outcome per active passenger, threshold snapshot | Done (verified) | `busing.test.ts`, `Busing.test.tsx` |
 | Cancel planned or dispatched trips with a reason | Done (verified) | `busing.test.ts` |
 | RPT-01 on-time rate with coverage and status | Done (verified); definition pending confirmation | `busing.test.ts`, `Busing.test.tsx` |
-| RPT-02 fleet utilisation, RPT-03 cost per trip | Defined | Q-29 definitions approved (Phase 28, D-78); RPT-03 built, RPT-02 screen outstanding |
+| RPT-02 staff transport report, RPT-03 cost per trip | Done (verified) | Q-29 definitions approved (Phase 28, D-78); RPT-03 built in Phase 28, RPT-02 in Phase 50 (`staffReport.test.ts`) |
 | Boarding codes | Blocked | Policy unknown (Q-19). Not implemented |
 | Passenger personal-data controls | Partial | Minimal fields and role limits; retention, notice and rights workflow not done (see DATA_PROTECTION.md) |
 | Server-side persistence and multi-tab safety | Done (verified) | Phase 13: writes are serialised server-side |
@@ -174,7 +174,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | Vehicle returns to service only when no other work order is active | Done (verified) | `logistics.test.ts` |
 | Cost entries on incidents and work orders, gated on company currency | Done (verified) | `logistics.test.ts` |
 | Cost report: period, total, entries, data coverage, explicit "not a zero" wording | Done (verified) | `logistics.test.ts`, `Logistics.test.tsx` |
-| RPT-02 fleet utilisation, RPT-03 cost per trip | Blocked | Definitions and inputs (Q-29). Shown as "Not configured" |
+| RPT-02 staff transport report, RPT-03 cost per trip | Done | Q-29 definitions answered; RPT-02 built in Phase 50, RPT-03 in Phase 28 |
 | Cause/fault taxonomy for incidents and maintenance | Blocked | Not supplied (Q-34). Free text used instead |
 | Driver-reported incidents | Blocked | No own-record scope for the driver role (Q-33) |
 | Service intervals and due-date/odometer reminders | Superseded by Phase 8 | Now configured per category with no defaults; see Phase 8 |
@@ -1204,3 +1204,32 @@ reasoning.
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **719 passed, 26 skipped**, `build`
 succeeds.
+
+## Phase 50 - What the buses did, in numbers a client can check (RPT-02, D-99)
+
+The on-time rate has been on the busing screen since Phase 12, but a client review asks more than
+that: how many runs were promised and how many were worked, how many riders were actually carried,
+who did not appear, where the empty seats are, and what happened to the seats people asked for. None
+of those answers existed as one reading. This phase builds the staff-transport report and gives it
+its own tab on Reports, because it answers a different question from the hire report over a
+different date range. `docs/DECISIONS.md` D-99 records the reasoning.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Runs promised, worked, cancelled and off-schedule | Done (verified) | `staffReport()` counts by **service date**: scheduled (not cancelled), completed, cancelled and ad-hoc, and a route whose only run was cancelled stays on the list with zero worked ("keeps a route whose only run was cancelled, with zero worked") |
+| Riders carried, expected and the gap between them | Done (verified) | Carried is a **boarding outcome recorded at the door**, never the roster size; expected is `manifestFor()` (roster plus seats still held); the difference is counted as **not recorded** and named on the card, so a shortfall is never unexplained ("counts runs worked, riders carried, no-shows and the gap nobody recorded") |
+| Occupancy is a measurement, not a share of the roster | Done (verified) | Seats offered are the seat capacity of the bus on each worked run; a run with no vehicle contributes no seats and is counted in the coverage ("counts seats offered from the bus that was on the run, so occupancy is a measurement") |
+| Delay where it was measured, and nowhere else | Done (verified) | Mean of the positive stop deltas only; an early arrival never cancels a late one out, and no recorded late stop means "Not available" rather than `0 min` ("measures a delay where it was recorded, and never lets an early stop cancel a late one", "says 'not available' for a delay when nothing was recorded late") |
+| On-time cannot disagree with the busing screen | Done (verified) | It calls `onTimeReport()` from `kpis.ts` rather than judging again; the threshold is the one snapshotted at completion |
+| Seats asked for, by where they stand | Done (verified) | Requested, confirmed, waiting list, offered after a cancellation, refused, cancelled — counted by the **service date of the run**, not the day the request was typed ("counts requests by the day of the run, not the day they were typed") |
+| Why seats were lost, in the office's own words | Done (verified) | Grouped by the reason typed on refusal or cancellation, most frequent first, comma-safe in the CSV ("groups the reasons the office recorded for refusing or cancelling a seat") |
+| Per route and per client | Done (verified) | Runs worked of scheduled, carried, no-shows, not recorded, seats offered, occupancy by route; routes, carried, no-shows and booked seats by client ("counts a held seat as held, and says which client it belongs to") |
+| The report states what it cannot say | Done (verified) | `STAFF_REPORT_LIMITS` and the coverage counts travel with the figures: runs with no vehicle, completed runs with no boarding recorded, stops recorded of stops expected, roster riders with no pickup stop ("names what it cannot say rather than leaving a reader to assume a zero") |
+| Three different empty periods | Done (verified) | A backwards range reports nothing and names the mistake; a period with no run says so and still prints the scheduled and cancelled counts; a period whose runs carried nobody is a third, ordinary case ("separates 'nothing ran' from 'nobody travelled'", "refuses a backwards period instead of reporting a slice of time") |
+| The same numbers leave the screen | Done (verified) | **Download CSV** writes the report's own fields, quotes a reason containing a comma, and writes "not available" where a rate is null ("exports the same figures, quoting a reason that contains a comma") |
+| Two reports, two tabs | Done (verified) | Reports now offers **Hire and money** to every role that may read reports, and **Staff transport** only to a role that may read the employee roster; the server has already withheld the roster from finance, so the tab is not drawn for them (screen tests "is not offered to a role that cannot read the employee roster") |
+| No new command, table, permission, dependency or migration | Done (verified) | It reads records the system already keeps; `commandTypes.test.ts` unchanged, `package.json` unchanged, schema still version 20 |
+| Tests | Done (verified) | 12 domain (`staffReport.test.ts`), 3 screen (`Reports.test.tsx`); the rental report, financial report and printed sheet suites unchanged and green |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **734 passed, 26 skipped** (66 files
+passed, 5 skipped), coverage 82.58 % statements / 86.47 % lines, `build` succeeds.

@@ -10,6 +10,7 @@ import { formatAmount } from "../tms/money";
 import { financialReport, financialReportCsv } from "../tms/financialReport";
 import { printableReport } from "../tms/printableReport";
 import { ReportPrintPreview } from "./PrintableReport";
+import { StaffTransportReport } from "./StaffTransportReport";
 import { rentalReport, rentalReportCsv } from "../tms/rentalReport";
 import { useTms } from "../tms/useTms";
 import {
@@ -31,7 +32,52 @@ const percent = (value: number | null) => (value === null ? "Not available" : `$
 
 const firstOfMonth = (today: string) => `${today.slice(0, 7)}-01`;
 
+/**
+ * The Reports destination, in two tabs (RPT-01/RPT-03 and RPT-02).
+ *
+ * Two reports with two different questions and two different date ranges do not belong stacked on one
+ * page: the hire report is about money, the staff report about people on buses, and a reader is only
+ * ever after one of them. The staff tab is offered only to a role that may read the employee roster —
+ * the server has already withheld it from finance, so drawing the tab would be a dead end.
+ */
 export function ReportsPage() {
+  const { allowed } = useTms();
+  const tabs = [
+    { id: "hire" as const, label: "Hire and money" },
+    ...(allowed("passengers:read") ? [{ id: "staff" as const, label: "Staff transport" }] : []),
+  ];
+  const [requested, setRequested] = useState<"hire" | "staff">("hire");
+  const tab = tabs.some((candidate) => candidate.id === requested) ? requested : "hire";
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Reporting"
+        title="Reports"
+        description={tab === "hire" ? "What was quoted, what was hired, what came in and what it cost." : "What the buses did: runs worked, riders carried, no-shows, empty seats and on-time performance."}
+      />
+      {tabs.length > 1 && (
+        <div role="tablist" aria-label="Report sections" className="rts-tabs">
+          {tabs.map((candidate) => (
+            <button
+              key={candidate.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === candidate.id}
+              onClick={() => setRequested(candidate.id)}
+              className="rts-tab"
+            >
+              {candidate.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === "staff" ? <StaffTransportReport /> : <HireReport />}
+    </div>
+  );
+}
+
+function HireReport() {
   const { db } = useTms();
   const today = todayYmd();
   const [from, setFrom] = useState(firstOfMonth(today));
@@ -70,23 +116,25 @@ export function ReportsPage() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Reporting"
-        title="Rental report"
-        description="What came in, what was quoted, what was accepted, what was billed and what is still owed — counted from the rental, invoice and payment records, with the coverage stated."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={download} disabled={reversed || report.status === "currency_not_set"}>
-              Download CSV
-            </Button>
-            {/* Printing is offered even when no currency is set: the sheet then says the money is
-                withheld, which is a truthful document, where a disabled button is a dead end. */}
-            <Button variant="primary" onClick={() => setPrinting(true)} disabled={reversed}>
-              Print or save as PDF
-            </Button>
-          </div>
-        }
-      />
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-stone-800">Hire report</h2>
+          <p className="max-w-2xl text-sm text-stone-600">
+            What came in, what was quoted, what was accepted, what was billed and what is still owed — counted from the rental, invoice and
+            payment records, with the coverage stated.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={download} disabled={reversed || report.status === "currency_not_set"}>
+            Download CSV
+          </Button>
+          {/* Printing is offered even when no currency is set: the sheet then says the money is
+              withheld, which is a truthful document, where a disabled button is a dead end. */}
+          <Button variant="primary" onClick={() => setPrinting(true)} disabled={reversed}>
+            Print or save as PDF
+          </Button>
+        </div>
+      </div>
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="From">

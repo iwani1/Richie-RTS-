@@ -11,7 +11,7 @@ confirmed and the screen says so.
 
 Every KPI on screen shows its reporting period, numerator, denominator and data coverage. A KPI with missing inputs shows "Not computed" or "Insufficient data", never a number.
 
-## On-time rate (implemented; belongs to RPT-02, definition pending confirmation)
+## On-time rate (implemented; used by the busing screen and RPT-02)
 
 > Labelled RPT-01 in an earlier draft. In the brief, RPT-01 is the rental report (below); on-time
 > performance is part of RPT-02, the staff transport report.
@@ -47,7 +47,7 @@ Every KPI on screen shows its reporting period, numerator, denominator and data 
 - Whether early arrivals should count as on time (Q-25).
 - Whether scheduled times should come from shift definitions (Q-27).
 
-## RPT-02 Fleet utilisation (definition agreed, not yet surfaced on its own screen)
+## Fleet utilisation (definition agreed, not yet surfaced on its own screen)
 
 The owner approved a definition in Q-29 (D-78), so the figure is no longer "unknown":
 
@@ -61,8 +61,61 @@ The owner approved a definition in Q-29 (D-78), so the figure is no longer "unkn
   on the same day are one vehicle-day, not two.
 
 The rental report already prints the rental-only half of this number under the label "Utilisation",
-and it says on screen that staff runs are not included. The fleet-wide figure needs the RPT-02 screen,
-which is still to be built; the definition itself is settled, so the remaining work is presentation.
+and it says on screen that staff runs are not included. The fleet-wide figure still has no screen of
+its own; the definition is settled, so what remains is presentation. The staff transport report
+(RPT-02, below) does **not** use this figure: it measures occupancy per worked run — riders carried
+over the seats the bus on that run actually offered — because a client asking "was my bus full?" is
+asking a different question from "was the fleet busy?".
+
+## Staff transport report (RPT-02, implemented)
+
+`src/tms/staffReport.ts`. Every count is by **service date** — the day of the run the rider was
+carried on, not the day a record was typed, so a seat booked on Friday for Monday belongs to Monday.
+
+| Metric | Formula | Population and exclusions |
+|---|---|---|
+| Runs scheduled | count of runs | Service date in the period, **status not `cancelled`**. A cancelled run is counted separately, never dropped |
+| Runs worked | count of runs | Service date in the period, status `completed` |
+| Runs cancelled | count of runs | Service date in the period, status `cancelled`, whatever the reason |
+| Runs outside the schedule | count of runs | Service date in the period, `origin = adhoc` (DSP-03) |
+| Expected | riders on the manifest of each **completed** run | `manifestFor()`: the route's active roster plus every seat that still holds one, a booking rider already on the roster counted once |
+| Carried | count of boarding records | `outcome = boarded` on a completed run. **Never the roster size** — a rider is carried when somebody recorded them at the door |
+| No-shows | count of boarding records | `outcome = no_show` on a completed run |
+| Not recorded | expected − (carried + no-shows), floored at zero | Riders the manifest expected on a completed run with no outcome recorded at all. Shown as its own count and never folded into a rate |
+| Boarding rate | carried ÷ (carried + no-shows) | Null when nothing was decided. "Not recorded" riders are outside the denominator, which is why the count travels with the rate |
+| Seats offered | sum of `vehicle.seatCapacity` | Completed runs in the period **with a vehicle assigned**. A completed run with no vehicle offers no seats and is counted in the coverage |
+| Occupancy | carried ÷ seats offered | Null when no seats were offered. Can be 0 % |
+| Average delay | mean of (actual − scheduled) over stops where the actual time is **later** than the timetable | Recorded stops on runs in the period. Early arrivals contribute nothing: an early stop is not a small delay, and averaging it in would let one early stop cancel one late one out. Null when no stop was recorded late |
+| Late stops | count of recorded stops later than the timetable | The denominator behind the average delay |
+| On time | `onTimeReport()` from `kpis.ts`, unchanged | Judged against the threshold snapshotted when the run was completed, so a corrected stop time flows in without re-judging old runs against today's setting |
+| Seats asked for | count of bookings by status | Bookings for a run whose **service date** is in the period — requested, confirmed, waiting list, offered, refused, cancelled |
+| Seats not held now | requested + waiting list + refused + cancelled | The complement of held: seats somebody asked for that are not on a manifest today |
+| Why seats were lost | count by the reason typed on refusal or cancellation | Most frequent first; a missing reason is reported as "No reason recorded" |
+
+**Per route and per client.** The same counts grouped by the run's route and by the route's client,
+plus booked seats per client. A route whose runs were all cancelled still appears, with zero worked:
+that is the thing worth seeing, and a route that vanished would read as one that never existed.
+
+**Coverage shown with the report.** Runs with no vehicle assigned (they contribute no seats, so
+occupancy is measured over fewer runs); completed runs with no boarding recorded; stops recorded of
+stops expected; roster riders with no pickup stop. Each one explains a total a reader would
+otherwise have to guess at.
+
+**What the report cannot say.** Stated on the screen beside the figures (`STAFF_REPORT_LIMITS`):
+fuel and mileage are not per route (an expense records no run and an odometer reading records no
+route, so both belong to the money report); downtime is not measured, because nothing records a
+vehicle being unavailable for a period; contract performance is not measured, because a run records
+no agreement; a delay is known only where a stop time was recorded, and an unrecorded stop counts as
+missing, never as on time.
+
+**Statuses.** `invalid_range` — the start date is after the end date, every figure is zero and the
+message names the mistake, because a slice of time would be read as a real period. `empty` — no run
+has a service date in the period, or none was completed; the scheduled and cancelled counts still
+print. `ok` otherwise. "Nothing ran" and "nobody travelled" are different sentences.
+
+**Permission scope.** The staff tab is offered only to a role that may read the employee roster
+(`passengers:read`); the payload has already been narrowed by the server, so the tab and the CSV can
+never contain a rider the signed-in role cannot see.
 
 ## RPT-03 Financial report (implemented)
 
@@ -154,7 +207,7 @@ The period is inclusive of both dates, by calendar day (Africa/Accra, no dayligh
 | Outstanding | sum of (invoice total − recorded payments − issued credit notes), floored at zero | Non-void invoices issued on or before the period end, including earlier periods, because money owed is a running balance. Same helper as the finance report |
 | Rental vehicle-days | count of days in the period on which a rental holds a vehicle | Rentals with status `confirmed`, `in_progress` or `completed` **and** an assigned vehicle, overlapping the day |
 | Available vehicle-days | vehicles in the fleet excluding `retired` × days in the period | The acting fleet, not the fleet as it was on each day — a limitation stated on screen |
-| Utilisation | rental vehicle-days ÷ available vehicle-days | Null when the period has no days or no vehicles. Can be 0%. Does not include staff-busing trips, which are RPT-02 |
+| Utilisation | rental vehicle-days ÷ available vehicle-days | Null when the period has no days or no vehicles. Can be 0%. Does not include staff-busing trips, which have their own occupancy measure in the staff transport report (RPT-02) |
 | Reasons | count by `resolutionReason` | Cancelled and declined rentals in the period; a missing reason is reported as "No reason recorded", never dropped |
 
 **Coverage shown with the report.** Requests in the period without a quotation; confirmed rentals with

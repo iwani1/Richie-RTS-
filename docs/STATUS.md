@@ -27,11 +27,11 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 |---|---|---|
 | **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 9 fully met, 20 met but narrower than the brief, **0 unbuilt** |
 | **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting, corporate agreements, a planning aid | **Built, with narrower registers than the brief.** 25 IDs: 12 met, 13 partial, **0 not built**. Contracts arrived in Phase 46 (a transcribed term, the lifecycle, renewals, a booking gate) and the planning aid in Phase 47 — ranked pairs that explain themselves, with no geometry because no stop has a position |
-| **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Built, with narrower reports.** 6 IDs: 2 met (finance dashboard, passenger portal), 4 partial, **0 not built**. The passenger portal arrived in Phase 48 — a rider's own journeys, seats and references, with the bus's position honestly absent because nothing records one |
+| **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, staff transport and financial reports | **Built.** 6 IDs: 3 met (finance dashboard, passenger portal, staff transport report), 3 partial, **0 not built**. The passenger portal arrived in Phase 48 — a rider's own journeys, seats and references, with the bus's position honestly absent because nothing records one. The staff transport report arrived in Phase 50 — runs worked, riders carried, no-shows, the gap nobody recorded, empty seats, delays where they were measured, and the seats people asked for |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
 | **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs: 2 met, 5 deferred. Met: expenses with a receipt number and whether the paper is held (no scanned copy yet), and the **printed management report** (a document the browser prints or saves as PDF — no stored file, no email) |
 
-Totals across all 78 brief requirements: **25 met · 40 partial · 0 not built · 13 deferred.**
+Totals across all 78 brief requirements: **26 met · 39 partial · 0 not built · 13 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -103,6 +103,12 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   or saved as a PDF from the browser. It is built from the reports on the screen, so the paper can
   never disagree with them; an amount that cannot be stated is printed as "Not stated" with the reason
   on the page rather than as a zero, and the coverage counts travel with it.
+- **A staff transport report**, as its own tab beside the hire report: runs promised, worked and
+  cancelled, riders carried out of those expected, no-shows, the riders nobody recorded, boarding
+  rate, occupancy measured against the seats of the bus that ran, delay averaged over the stops that
+  were actually late, the on-time rate the busing screen shows, seats asked for by status, why seats
+  were lost, and per-route and per-client tables — with a card naming the four things the records
+  cannot say. CSV of the same figures.
 - Reports: rental report with a date range, coverage and CSV; fleet readiness; cost report;
   financial report (revenue by customer, payments received, outstanding at the period end, expenses
   by category, cost per trip and per passenger) with CSV.
@@ -158,7 +164,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**680 passed, 26 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**734 passed, 26 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

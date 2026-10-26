@@ -1844,3 +1844,56 @@ decision the office makes, not one the system invents.
   `ReportPrintPreview`); a **Print or save as PDF** action and the preview on the Reports screen; report
   section, figure and coverage styles in `src/index.css` with print break rules; 13 new tests (10
   domain, 3 screen). No new command, table, permission or dependency.
+
+## D-99 - The staff report is its own tab, and it names its own gaps (RPT-02)
+
+- **Context.** The brief asks for a staff transport report: bookings received, confirmed and
+  cancelled, no-shows, the on-time pickup rate, average delay, passengers transported, and route and
+  contract performance. Most of that was already recorded — a run has a stop log and a boarding
+  outcome per rider, and a seat booking has a status and a reason — but none of it was readable as
+  one answer. Two questions had to be settled before writing the screen: where the report lives, and
+  what it does with the parts of the brief the records cannot support.
+- **Decision 1: a second tab on Reports, not a section under the hire report.** The hire report is
+  about money over a period a customer chooses; this one is about people on buses over a service
+  period. Stacked, one reader would scroll past the whole of the other report to reach their own, and
+  the two would share a date range that means different things in each (an invoice date is not a
+  service date). The tab is offered only to a role that may read the employee roster, because the
+  server has already withheld riders from finance — drawing the tab for them would be a dead end.
+- **Decision 2: every count is by service date.** A seat booked on Friday for Monday's run belongs to
+  Monday. Counting by the day a record was typed would put work in the week the office was busy
+  rather than the week the bus ran, which is the opposite of what a client is checking.
+- **Decision 3: carried is a boarding outcome, never the roster size.** The tempting short cut —
+  "the manifest says twenty, so twenty travelled" — would make the report agree with the plan instead
+  of the morning. Carried is `outcome = boarded`. The difference between the manifest and the recorded
+  outcomes is counted as **not recorded** and printed as its own number, because the honest failure
+  mode of a boarding register is a rider nobody recorded, not a rider who silently vanished.
+- **Decision 4: the report names what it cannot say instead of leaving a zero.** Four facts the brief
+  asks for are not in the records at all: fuel and mileage are not per route (an expense records no
+  run, an odometer reading records no route), downtime is not measured because nothing records a
+  vehicle being unavailable for a period, contract performance is not measured because a run records
+  no agreement, and a delay is known only where a stop time was recorded. Each is written on the
+  screen beside the coverage counts. A report that prints `0` for an unmeasured thing teaches a reader
+  to trust the wrong column; one that says "we do not know, and here is why" does not.
+- **Decision 5: delay averages only the late stops.** Averaging every stop's delta lets a bus that
+  left ten minutes early at one stop cancel a ten-minute delay at the next, and reports "on time" for
+  a morning everybody waited. The average is over stops recorded later than the timetable, the count
+  of those stops travels with it, and no late stop means "Not available" rather than `0 min`.
+- **Decision 6: occupancy is measured against the bus that ran.** Seats offered is the seat capacity
+  of the vehicle on each completed run, not the roster size and not the category's usual bus. A run
+  worked with no vehicle assigned offers no seats, contributes nothing to the ratio, and is counted in
+  the coverage so the reader knows the denominator is short.
+- **Decision 7: on time is not recomputed.** The report calls `onTimeReport()` from `kpis.ts`, the same
+  function the busing screen uses, so the two screens cannot disagree and a threshold that moved since
+  the run does not rewrite history.
+- **Rejected.** (a) *One long Reports page with the staff section underneath* — different question,
+  different period, and the reader is only ever after one. (b) *Counting carried from the manifest* —
+  it would make the report flattering and useless. (c) *Printing `0` where nothing was measured* — the
+  failure this codebase keeps rejecting (D-90, D-98). (d) *A fleet-wide utilisation figure on this
+  screen* — the approved vehicle-days definition (Q-29) answers "was the fleet busy?", not "was my bus
+  full?", and presenting one as the other would be a silent substitution. (e) *A chart* — the counts
+  are small and exact; a bar would be decoration around numbers that fit in a table.
+- **Consequence.** New modules `src/tms/staffReport.ts` (`staffReport`, `staffReportCsv`,
+  `STAFF_REPORT_LIMITS`) and `src/screens/StaffTransportReport.tsx`; `src/screens/Reports.tsx` becomes
+  a two-tab destination with the hire report as its own component; 15 new tests (12 domain, 3 screen).
+  No new command, table, permission, migration or dependency. Definitions are written down in
+  `docs/KPIS.md` under "Staff transport report".
