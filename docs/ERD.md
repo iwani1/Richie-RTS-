@@ -541,8 +541,9 @@ Constraints and triggers:
 - **`client_location` (migration `019_client_locations.sql`, CLI-01, D-102).** The branches and offices
   of a customer: `client_id` (foreign key to `client`), `name` (1–80 characters, what the office calls
   it), `address`, `phone`, `contact_name` and `status` (`client_location_status_check`: `active` or
-  `closed`). `client_location_name_uq` is unique on `(client_id, lower(btrim(name)))`, so one customer
-  cannot have two branches with the same name ignoring case and spacing. Nothing deletes a branch: a
+  `closed`). `client_location_name_uq` is unique on `(client_id, regexp_replace(btrim(lower(name)), '\s+', ' ', 'g'))`,
+  so one customer cannot have two branches with the same name — case is folded and so is any run of
+  spaces, which is the same comparison the form makes. Nothing deletes a branch: a
   closed one keeps its row and its address, because the trips and documents that named that office are
   still on file. `client` also gains `registration_number` and `registered_on` in the same migration —
   the certificate, when the office holds one, and blank when it does not.

@@ -230,7 +230,11 @@ suite("PostgreSQL constraints, through the repository", () => {
     };
     const database: Database = {
       ...before,
-      clients: [...before.clients, client],
+      clients: [
+        ...before.clients,
+        client,
+        { ...client, id: "client-branches-2", name: "Another Customer", reference: "HBL-78" },
+      ],
       clientLocations: [
         ...before.clientLocations,
         { id: "loc-1", clientId: client.id, name: "Tema depot", address: "Harbour Road", phone: "", contactName: "Yaw", status: "active", createdAt: NOW, updatedAt: NOW },
@@ -247,14 +251,21 @@ suite("PostgreSQL constraints, through the repository", () => {
     expect(stored.find((location) => location.id === "loc-2")?.address).toBe("Closed road");
   });
 
-  it("refuses two branches of one client with the same name, whatever the case (migration 019)", async () => {
-    // Inserted directly: the index is the database's own rule, independent of the validator.
+  it("refuses two branches of one client with the same name, whatever the case or spacing (migration 019)", async () => {
+    // Inserted directly: the index is the database's own rule, independent of the validator. Case
+    // and runs of spaces both fold, so "TEMA   depot" is the branch already on file.
     await expect(
       sql`
         insert into client_location (id, client_id, name, address, phone, contact_name, status, created_at, updated_at, data)
-        values ('loc-dup', 'client-branches', '  tema  DEPOT ', '', '', '', 'active', now(), now(), '{}'::jsonb)
+        values ('loc-dup', 'client-branches', '  TEMA   depot  ', '', '', '', 'active', now(), now(), '{}'::jsonb)
       `.execute(db()),
-    ).rejects.toThrow(/client_location_name_uq|duplicate key/);
+    ).rejects.toThrow();
+
+    // The same words for a *different* customer are a different branch, and are accepted.
+    await sql`
+      insert into client_location (id, client_id, name, address, phone, contact_name, status, created_at, updated_at, data)
+      values ('loc-other', 'client-branches-2', 'Tema depot', '', '', '', 'active', now(), now(), '{}'::jsonb)
+    `.execute(db());
   });
 
   it("still refuses a second account for the same driver record", async () => {

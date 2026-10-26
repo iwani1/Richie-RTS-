@@ -28,8 +28,11 @@ create table if not exists client_location (
   data         jsonb not null
 );
 
+-- The comparison is the application's own: case is ignored and so is *any* run of spaces, not just
+-- the spaces at the ends. "Tema  depot" (two spaces, as a hurried typist writes it) is the same
+-- branch as "Tema depot", and a picker must not be able to offer both.
 create unique index if not exists client_location_name_uq
-  on client_location (client_id, lower(btrim(name)));
+  on client_location (client_id, regexp_replace(btrim(lower(name)), '\s+', ' ', 'g'));
 
 create index if not exists client_location_client_idx on client_location (client_id);
 
