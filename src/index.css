@@ -2467,6 +2467,65 @@ select.rts-input option { background: var(--card); color: var(--ink); }
 
 .rts-sheet-words { width: min(100%, 340px); margin: 0; color: #3d4759; font-size: 12px; line-height: 1.6; }
 
+/* ---- the management report on paper (RPT-05, D-98) ---- */
+
+/* Eight figures: four across on A4, two across on a narrow screen. */
+.rts-sheet-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 16px;
+  padding: 16px 0 4px;
+}
+.rts-sheet-fig { break-inside: avoid; }
+.rts-sheet-fig-value {
+  margin: 0;
+  color: #0f172a;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.rts-sheet-fig-note { margin: 2px 0 0; color: #4a5468; font-size: 10.5px; line-height: 1.45; }
+
+.rts-sheet-section { margin-top: 20px; break-inside: avoid; }
+.rts-sheet-section-title {
+  margin: 0 0 3px;
+  padding-top: 10px;
+  border-top: 1px solid #d8dde8;
+  color: #0f172a;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+.rts-sheet-section-intro { margin: 0 0 8px; color: #4a5468; font-size: 11px; line-height: 1.5; }
+.rts-sheet-empty { margin: 0 0 4px; color: #4a5468; font-size: 11.5px; font-style: italic; }
+
+.rts-sheet-coverage { margin: 0; }
+.rts-sheet-coverage-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 0;
+  border-bottom: 1px solid #eceef4;
+}
+.rts-sheet-coverage-row dt { color: #1d2739; font-size: 11.5px; }
+.rts-sheet-coverage-note { display: block; color: #5f6a7d; font-size: 10.5px; }
+.rts-sheet-coverage-row dd {
+  margin: 0;
+  color: #0f172a;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rts-sheet-state-line { margin-top: 14px; }
+.rts-sheet-note-list { margin: 4px 0 0; padding-left: 16px; }
+.rts-sheet-note-list li { margin-bottom: 4px; }
+.rts-sheet-note-list li:last-child { margin-bottom: 0; }
+
 .rts-sheet-note {
   margin: 18px 0 0;
   padding-top: 10px;
@@ -2494,6 +2553,7 @@ select.rts-input option { background: var(--card); color: var(--ink); }
 
 @media (max-width: 820px) {
   .rts-sheet { width: 100%; min-height: 0; padding: 24px 18px 22px; }
+  .rts-sheet-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rts-sheet-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rts-sheet-closing { justify-items: stretch; gap: 12px; }
   .rts-sheet-totals,
@@ -2528,4 +2588,10 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   .rts-sheet-table tr,
   .rts-sheet-totals .rts-sheet-row { break-inside: avoid; }
   .rts-sheet-foot { break-inside: avoid; }
+
+  /* The report runs to more than one page, so a section that fits is kept whole and a heading is
+     never left alone at the foot of a sheet. */
+  .rts-sheet-section { break-inside: avoid; }
+  .rts-sheet-section-title { break-after: avoid; }
+  .rts-sheet-figures { break-inside: avoid; }
 }

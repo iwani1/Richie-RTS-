@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–48** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 49 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–49** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 50 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -29,9 +29,9 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 | **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting, corporate agreements, a planning aid | **Built, with narrower registers than the brief.** 25 IDs: 12 met, 13 partial, **0 not built**. Contracts arrived in Phase 46 (a transcribed term, the lifecycle, renewals, a booking gate) and the planning aid in Phase 47 — ranked pairs that explain themselves, with no geometry because no stop has a position |
 | **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, financial reports | **Built, with narrower reports.** 6 IDs: 2 met (finance dashboard, passenger portal), 4 partial, **0 not built**. The passenger portal arrived in Phase 48 — a rider's own journeys, seats and references, with the bus's position honestly absent because nothing records one |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
-| **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs, 6 deferred, 1 met (expenses with a receipt number and whether the paper is held — no scanned copy yet) |
+| **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs: 2 met, 5 deferred. Met: expenses with a receipt number and whether the paper is held (no scanned copy yet), and the **printed management report** (a document the browser prints or saves as PDF — no stored file, no email) |
 
-Totals across all 78 brief requirements: **24 met · 37 partial · 0 not built · 14 deferred.**
+Totals across all 78 brief requirements: **25 met · 40 partial · 0 not built · 13 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -97,6 +97,12 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   the run cannot be completed until somebody records whether they travelled. Request and cancellation cut-offs are optional settings: blank means no deadline.
 - Staff logistics: incidents, work orders with costs, and a vehicle release that needs its own
   permission and records who released it and when.
+- **A printable management report**: the same figures the Reports screen shows — a period, eight key
+  numbers, revenue by customer and by service, costs by category, money credited and refunded, why
+  hires were lost, fleet utilisation and the per-unit costs — laid out as an A4 document and printed
+  or saved as a PDF from the browser. It is built from the reports on the screen, so the paper can
+  never disagree with them; an amount that cannot be stated is printed as "Not stated" with the reason
+  on the page rather than as a zero, and the coverage counts travel with it.
 - Reports: rental report with a date range, coverage and CSV; fleet readiness; cost report;
   financial report (revenue by customer, payments received, outstanding at the period end, expenses
   by category, cost per trip and per passenger) with CSV.
@@ -122,8 +128,8 @@ is now built at least in part; what remains is the deferred Phase 2/3 work below
 
 **Deferred to Phase 2/3** (14 IDs): SMS and email, in-app notifications, GPS tracking, two-factor
 sign-in, offline driver mode, boarding codes/OTP, payment gateway, payroll and driver allowances,
-receipts on expenses, PDF reports. These need a provider, hardware or a decision the owner has not
-made, so they are recorded rather than half-built.
+receipts on expenses. These need a provider, hardware or a decision the owner has not made, so they
+are recorded rather than half-built.
 
 **Blocked by a missing provider**: email invitations and self-service password reset. An
 administrator creates accounts and resets passwords; there is no mail server, so nothing pretends to
@@ -173,10 +179,11 @@ These work, and the difference is worth knowing before relying on them:
    them, but the pricing basis, billing frequency and payment terms are free text the office types
    from the signed paper. The owner should decide the wording those four fields usually carry, so a
    clerk is choosing rather than composing (Q-13).
-3. **Passenger portal (PAX-01)** — the last brief ID with nothing behind it: passengers cannot sign
-   in to see their own journeys, and the public booking path does not exist yet.
-4. **Sending the documents** — an invoice and a credit note now print or save as a PDF, but nothing is
-   emailed and no copy is stored: sending one is still a manual step, because there is no mail server.
+3. **Sending the documents** — an invoice, a credit note, a statement and the management report now
+   print or save as a PDF from the browser, but nothing is emailed and no copy is stored: sending one
+   is still a manual step, because there is no mail server and nowhere agreed to keep a file (Q-51).
+4. **Where a file would live** — scanned receipts (Q-51) and a stored PDF of each document both need
+   an answer to the same question: which storage, and who may read it. The owner has not chosen one.
 
 Everything else on the missing list needs a provider (SMS, mail, GPS, card payments), hardware, or a
 business decision that has not been made.

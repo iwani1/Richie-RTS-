@@ -90,10 +90,10 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RPT-02 | 1C | Staff transport and fleet reports: bookings received/confirmed/completed/cancelled, no-shows, on-time pickup rate, average delay, passengers… | Partial | On-time pickup rate with data coverage (`src/tms/kpis.ts`). Utilisation **definition** agreed in Q-29 and written down in `KPIS.md`; the fleet-wide screen is still to build. **No bookings, no-shows, passengers transported, route utilisation, contract performance, downtime, fuel, mileage.** |
 | RPT-03 | 1C | Financial reports: revenue by service and customer, payments received, outstanding invoices, expenses by category, cost per trip, cost per passenger… | Partial | `src/tms/financialReport.ts` + a section on the Reports screen (Phase 28): all six figures computed from records, with the period, coverage, cost-per-trip and cost-per-passenger definitions from Q-29, and a CSV. **Revenue by service has one line** because only vehicle hire is invoiced in this build; contract billing is FIN-02. No profit or margin (costs captured are maintenance only). |
 | RPT-04 | 1C | Filters (date range, service, client, customer, route, driver, vehicle, status) and CSV export, always permission-scoped. Every KPI formula is… | Partial | The rental report has a date range, a coverage panel and a CSV of the same figures (Phase 17); other screens have search and status filters. Formulas documented in `docs/KPIS.md`. The **customer statement** (Phase 39, D-90) is the per-customer view: one account for a chosen period, with the balance carried in, the ageing bands and a printable sheet; the **finance home** states the same bands for the whole company (Phase 40, D-91), from one banding function. **The other reports have no date range or CSV, and there is no cross-report filter bar** (service, client, route, driver, vehicle); the statement has no CSV because it is a document, not a data export. |
-| RPT-05 | 3 | PDF reports. | Deferred | Phase 3. |
+| RPT-05 | 3 | PDF reports. | Met | `src/tms/printableReport.ts` + `src/screens/PrintableReport.tsx` (Phase 49, D-98): the management report as an A4 document — company and period in the head, eight figures each with the sentence that qualifies it, then revenue by customer, revenue by service, costs by category, money in and back out, why rentals were lost, fleet utilisation and the per-unit costs, followed by the coverage counts and the definitions a reader would otherwise assume. Every value is **the report's own number formatted, never a second addition**, and it prints through the browser's own engine to paper or to PDF (the sheet the invoice and statement already use, D-87). **Withheld, not zero:** with no company currency set every amount is "Not stated" and the page says why; an empty table says so; a backwards period prints no report at all. **A PDF file is produced by the print dialog, not stored or emailed** — there is no PDF library and no second rendering engine in the build. Tests: 10 domain (`printableReport.test.ts`), 3 screen (`Reports.test.tsx`). |
 | GPS-01 | 2 | Provider interface; last reported location with timestamp; clear distinction between live, stale and simulated locations; never fabricate… | Deferred | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
 
-**78 IDs: 24 met, 37 partial, 0 not built, 14 deferred.** Phase 1A: 29 IDs - 9 met, 20 partial, 0 not built. Phase 1C is now complete in this build: 6 IDs - 2 met, 4 partial, 0 not built.
+**78 IDs: 25 met, 40 partial, 0 not built, 13 deferred** (by phase: 1A 29 - 9 met / 20 partial; 1B 25 - 12 met / 13 partial; 1C 6 - 2 met / 4 partial; 2 11 - 3 partial / 8 deferred; 3 7 - 2 met / 5 deferred; the register above is the count). Phase 1C is complete in this build.
 
 ## Phase 0 - Inspect and plan (approved)
 
@@ -512,7 +512,7 @@ more passengers in the vehicle than it seats (`busing.test.ts`, D-61 follow-up).
 | Coverage statement and currency guard | Done (verified) | Tests "withholds money figures when the currency is not configured…" and the Coverage panel on screen |
 | CSV export of the same figures | Done (verified) | `rentalReportCsv`, quoting-safe; test "exports the same figures as CSV" |
 | Reports screen and destination | Done (verified) | `src/screens/Reports.tsx`, nav "Reports" gated by `kpis:read`; `src/screens/Reports.test.tsx` (3) |
-| **Not built** | — | Date-range presets, filters by client/customer, PDF (RPT-05, Phase 3) |
+| **Not built** | — | Date-range presets and filters by client/customer. The printed report arrived in Phase 49 (RPT-05) |
 
 Formulas are in `docs/KPIS.md` under "Rental report (RPT-01, implemented)".
 
@@ -1177,4 +1177,30 @@ and the same page is careful about the one thing it cannot say, which is where t
 | Tests | Done (verified) | 20 domain (`passenger.test.ts`), 4 payload (`visibility.test.ts`), 2 screen (`PassengerPortal.test.tsx`); the 680 earlier tests unchanged, and 26 added |
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **706 passed, 26 skipped**, `build`
+succeeds.
+
+## Phase 49 - The report as a document, printed by the machine that reads it (RPT-05, D-98)
+
+The management report could be read on screen and downloaded as a CSV, which is the right form for
+checking arithmetic and the wrong form for a management meeting: nobody reads a spreadsheet aloud.
+This phase prints the report as a document, and does it without adding a rendering engine to a
+program that has to run on one workstation with no network. `docs/DECISIONS.md` D-98 records the
+reasoning.
+
+| Item | Status | Evidence |
+|---|---|---|
+| The report prints as a document | Done (verified) | `printableReport()` builds the sheet from the two reports already on the screen; the preview reuses the invoice sheet (`rts-sheet`, D-87), and its button calls the browser's print dialog, whose own "Save as PDF" writes the file |
+| The paper cannot disagree with the screen | Done (verified) | The document model is fed `RentalReport` and `FinancialReport` and only formats them: "prints the money the reports calculated, and nothing it worked out itself" compares every figure on the sheet with the report's own field |
+| Nothing is invented and nothing is silently zero | Done (verified) | With no currency set every amount reads "Not stated" and the page states why ("withholds every amount when no currency is set, and says why on the page"); the counts still print because they are true without a currency |
+| A gap is printed as a gap | Done (verified) | Cost per run and cost per passenger print "Not available" with the denominator beside them ("states the count behind every 'not available', so a gap is never read as zero"); an empty table prints the sentence explaining why it is empty |
+| The page states its own limits | Done (verified) | Coverage counts and the notes a reader would otherwise have to know: only vehicle hire is invoiced, outstanding is valued at the period end, the currency in use ("carries the coverage counts and the definitions a reader would otherwise assume") |
+| The period is written the way a person reads it | Done (verified) | `periodLabel`: "1 – 30 June 2026", "28 May – 4 June 2026", "20 December 2025 – 5 January 2026"; a nonsense date falls back to plain words rather than throwing |
+| Identifying the printing | Done (verified) | Reference `RPT-<from>-to-<to>-<YYYYMMDDHHMM>`, the file name is the period, and the page title becomes the document name while the preview is open — that is what "Save as PDF" suggests as a file name |
+| A backwards period is not a document | Done (verified) | The sheet says the period is the wrong way round and calls nothing on it a report; the print button is not offered |
+| Offered where a reader needs it | Done (verified) | **Print or save as PDF** beside the CSV on Reports; the preview traps focus and closes on Escape like every other overlay |
+| Paper rules kept (D-87) | Done (verified) | White with dark ink whatever the theme, money in the monospaced face lined up on the right, the accent used once, sections that fit kept whole and a heading never left alone at the foot of a page (`@media print`) |
+| No new command, table, permission or dependency | Done (verified) | It reads the reports the screen already computed; `commandTypes.test.ts` unchanged; `package.json` unchanged |
+| Tests | Done (verified) | 10 domain (`printableReport.test.ts`), 3 screen (`Reports.test.tsx`); the existing report, invoice and statement suites unchanged and green |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **719 passed, 26 skipped**, `build`
 succeeds.

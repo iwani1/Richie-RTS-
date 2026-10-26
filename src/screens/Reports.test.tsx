@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The rental report (RPT-01): the figures an owner compares with their own records, and the
 // behaviour when the business has not supplied the thing a figure needs.
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReportsPage } from "./Reports";
 import { TmsContext, type Tms } from "../tms/useTms";
@@ -235,5 +235,49 @@ describe("money and cost section (RPT-03)", () => {
   it("says plainly when the financial period holds nothing", () => {
     renderReport({ ...world("GHS"), invoices: [], rentals: [] });
     expect(screen.getByText(/No invoices, payments, credit notes, refunds, recorded costs or completed runs/)).toBeTruthy();
+  });
+});
+
+describe("printing the report (RPT-05, D-98)", () => {
+  it("opens the sheet as a printer receives it, with the figures already checked on screen", () => {
+    renderReport({ ...world("GHS"), settings: { ...world("GHS").settings, companyName: "Richie Transport Services" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Print or save as PDF/i }));
+
+    // The preview is the paper: the company, the period, and the document's own name.
+    const dialog = screen.getByRole("dialog", { name: /Print preview: Management report/i });
+    expect(within(dialog).getByText("Richie Transport Services")).toBeTruthy();
+    expect(within(dialog).getByText("Management report")).toBeTruthy();
+    expect(within(dialog).getByText(/Printing RPT-/)).toBeTruthy();
+
+    // The money on the paper is the money the screen shows: nothing has been paid on this invoice.
+    expect(within(dialog).getAllByText("GHS 2000.00").length).toBeGreaterThan(0);
+    // A table with nothing in it says so rather than sitting blank.
+    expect(within(dialog).getByText(/No invoice was issued in this period|Acme Ltd/)).toBeTruthy();
+    // The one command that produces the file is the browser's own print dialog.
+    expect(within(dialog).getByRole("button", { name: /Print or save as PDF/i })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: /^Close$/ })).toBeTruthy();
+  });
+
+  it("prints a sheet that withholds money, rather than refusing to print at all", () => {
+    renderReport(world(null));
+
+    // The button is offered when no currency is set: the sheet then says what it cannot state.
+    const print = screen.getByRole("button", { name: /Print or save as PDF/i });
+    expect(print).toHaveProperty("disabled", false);
+    fireEvent.click(print);
+
+    const dialog = screen.getByRole("dialog", { name: /Print preview: Management report/i });
+    expect(within(dialog).getByText(/Money withheld: no currency is set/i)).toBeTruthy();
+    expect(within(dialog).getAllByText("Not stated").length).toBeGreaterThan(0);
+    // The company name is a stated gap, not a plausible-looking placeholder.
+    expect(within(dialog).getByText(/Company name not set in Settings/)).toBeTruthy();
+  });
+
+  it("does not offer paper for a period that is the wrong way round", () => {
+    renderReport(world("GHS"));
+    fireEvent.change(screen.getByLabelText(/Report to date/i), { target: { value: "2020-01-01" } });
+    fireEvent.change(screen.getByLabelText(/Report from date/i), { target: { value: "2020-02-01" } });
+    expect(screen.getByRole("button", { name: /Print or save as PDF/i })).toHaveProperty("disabled", true);
   });
 });

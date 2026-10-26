@@ -8,6 +8,8 @@
 import { useMemo, useState } from "react";
 import { formatAmount } from "../tms/money";
 import { financialReport, financialReportCsv } from "../tms/financialReport";
+import { printableReport } from "../tms/printableReport";
+import { ReportPrintPreview } from "./PrintableReport";
 import { rentalReport, rentalReportCsv } from "../tms/rentalReport";
 import { useTms } from "../tms/useTms";
 import {
@@ -34,9 +36,16 @@ export function ReportsPage() {
   const today = todayYmd();
   const [from, setFrom] = useState(firstOfMonth(today));
   const [to, setTo] = useState(today);
+  // The printed sheet is built from the two reports already on screen, so what is printed cannot
+  // disagree with what was checked (RPT-05, D-98).
+  const [printing, setPrinting] = useState(false);
 
   const report = useMemo(() => rentalReport(db, from, to), [db, from, to]);
   const moneyReport = useMemo(() => financialReport(db, from, to), [db, from, to]);
+  const sheet = useMemo(
+    () => printableReport({ rental: report, financial: moneyReport, companyName: db.settings.companyName, generatedAt: new Date().toISOString() }),
+    [report, moneyReport, db.settings.companyName],
+  );
   const reversed = from > to;
   const downloadMoney = () => {
     const blob = new Blob([financialReportCsv(moneyReport)], { type: "text/csv;charset=utf-8" });
@@ -66,9 +75,16 @@ export function ReportsPage() {
         title="Rental report"
         description="What came in, what was quoted, what was accepted, what was billed and what is still owed — counted from the rental, invoice and payment records, with the coverage stated."
         actions={
-          <Button onClick={download} disabled={reversed || report.status === "currency_not_set"}>
-            Download CSV
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={download} disabled={reversed || report.status === "currency_not_set"}>
+              Download CSV
+            </Button>
+            {/* Printing is offered even when no currency is set: the sheet then says the money is
+                withheld, which is a truthful document, where a disabled button is a dead end. */}
+            <Button variant="primary" onClick={() => setPrinting(true)} disabled={reversed}>
+              Print or save as PDF
+            </Button>
+          </div>
         }
       />
 
@@ -240,6 +256,8 @@ export function ReportsPage() {
           </section>
         </>
       )}
+
+      {printing && <ReportPrintPreview report={sheet} onClose={() => setPrinting(false)} />}
     </div>
   );
 }

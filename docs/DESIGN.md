@@ -213,6 +213,7 @@ from its own button, the scrim and Escape.
 | Expenses | Enter what the month actually cost | The period total, the biggest category, and what has no receipt | Period at the top, then four figures (recorded, biggest category, entries with no receipt number, receipts held), the register with receipts named per row, a category table beneath it, and a panel to record or void. A voided entry stays on the list, struck through, with its reason in words |
 | Statements | Chase what one customer owes | The balance and its age | Customer list ordered by what is owed beside the statement itself: five figures, the ageing bands in words, the entries in the period, the invoices still owing. Prints as the same A4 sheet as an invoice |
 | My journeys (passenger portal) | Catch the bus, and know whether the seat is real | The next run, then what state each seat is in | Page head, then **your next journey** as four facts in a row (time, stop, bus, status) with the status sentence underneath; a request button and a report button; then the upcoming runs as a table whose status cell carries the label *and* the sentence that qualifies it; then **where you have been**; then the company's policy beside the reports the rider has raised. Limits are printed, not hidden (D-97) |
+| Printed management report | Answer the same questions on paper | The period, then the money | A4 sheet: letterhead with the period and printing reference, a one-line state (complete, or withheld with the reason), eight figures in a four-across grid each with its qualifying sentence, then one section per question (customer, service, costs, money back out, why lost, utilisation, per-unit cost), the coverage counts, and the reading notes. Sections keep whole and a heading never sits alone at the foot of a page (D-98) |
 | Printed invoice / credit note | Hand the customer a document | The figures and what is owed | A4 sheet in a preview overlay: letterhead and reference at the top, the line table, the totals in the lower right with the sentence that explains them beneath, footer with reference and print date. Print removes the app entirely |
 
 **Paper is a different surface, and it has its own rules (D-87).** A sheet that becomes a physical
@@ -226,7 +227,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **706 passed, 26 skipped** across 69 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **719 passed, 26 skipped** across 70 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are
@@ -262,14 +263,19 @@ screen scale, so what is approved on screen is what goes on the paper.
    reads as a filter rather than a frame.
 6. **Charts are absent by design** beyond the seven-day runs series: RPT-02/RPT-03 need fleet-hours
    and cost inputs this installation does not collect.
-7. **The passenger portal's status is a word plus a sentence.** A rider reads "Bus assigned" and then
+7. **The printed report reuses the document sheet, not a second one.** The invoice, the credit note, the
+   statement and the management report share `.rts-sheet`, so the paper a customer keeps and the paper a
+   manager reads cannot drift apart in type, measure or margins (D-98). The report adds one thing the
+   invoices do not need: it runs past one page, so a section is kept whole across a page break and a
+   heading is never left alone at the foot of a sheet.
+8. **The passenger portal's status is a word plus a sentence.** A rider reads "Bus assigned" and then
    "A bus and a driver are on this run. It has not been released to leave yet" — one word alone cannot
    distinguish a held seat with no bus from a bus that has not left, and colour is never the carrier
    (D-97). Its absent map is stated on the page rather than left blank, so silence is not read as a
    fault.
-8. **The portals were re-skinned, not restructured.** Their tasks (one run, one account) are already
+9. **The portals were re-skinned, not restructured.** Their tasks (one run, one account) are already
    single-purpose; they inherit the system and keep their body layout.
-9. **Settings is one card per rule**, so on the longest form the page is taller than a two-column
+10. **Settings is one card per rule**, so on the longest form the page is taller than a two-column
    form would be. That is a trade of vertical space for a readable measure.
-10. **The sidebar shows at most six counts.** Groups without an outstanding number stay silent; if
+11. **The sidebar shows at most six counts.** Groups without an outstanding number stay silent; if
    more destinations gain counts, the sidebar needs a "see all" treatment rather than a wall of pills.

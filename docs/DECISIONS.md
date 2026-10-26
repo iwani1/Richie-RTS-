@@ -1798,3 +1798,49 @@ decision the office makes, not one the system invents.
   `notMyOwnRider` in `bookings.ts`, `src/tms/passenger.ts`, `src/screens/PassengerPortal.tsx`, the
   "My journeys" destination, the linked-rider field on the Users screen, and 26 new tests (20 domain,
   4 payload, 2 screen).
+
+## D-98 A report is a document the browser prints, and it withholds what it cannot state (RPT-05)
+
+- **Context.** The management report could be read on screen and downloaded as a CSV. Neither is what a
+  management meeting reads: a spreadsheet is checked, not read aloud, and the screen needs somebody
+  signed in. RPT-05 asks for PDF reports, and had been recorded as Phase 3 work on the assumption that
+  a PDF needs a library.
+- **Decision.** Build the report as a **document model** (`src/tms/printableReport.ts`) and print it
+  with the sheet the invoice, credit note and statement already use (D-87), through the browser's own
+  print engine and its "Save as PDF".
+  - **No PDF library, no headless browser.** A PDF library brings a dependency, a second layout engine,
+    a font pipeline and a binary into an installation that runs on one workstation; HTML-to-PDF brings a
+    Chromium that must be installed and patched. Both would put a second thing beside the engine on the
+    machine that can disagree with what the reader checked.
+  - **The document model formats; it does not calculate.** It is handed `RentalReport` and
+    `FinancialReport` and turns them into titled sections and formatted cells. Every figure on the paper
+    is a field of a report that was already tested on its own, so a printed total cannot drift from the
+    screen: the test compares each printed figure with the report's own value.
+  - **A figure that cannot be stated is withheld, on the page.** With no company currency set, every
+    amount reads "Not stated" and a line at the top says why. Printing "1 240.00" on a page a manager
+    keeps would be asserting a currency the company never chose. The counts still print, because "seven
+    requests" is true without a currency.
+  - **A gap is printed as a gap.** An empty table prints the sentence saying why it is empty. Cost per
+    run and cost per passenger print "Not available" beside their denominators ("0 runs completed"), so
+    nobody reads a missing ratio as a zero cost.
+  - **The paper states its own limits**, in words a reader of the paper needs and cannot look up:
+    outstanding is valued at the period end; only vehicle hire is invoiced in this build; refunds are
+    cash out and not a cost of the work; an acceptance rate belongs beside its quotation count. The
+    coverage counts travel with the report rather than staying on the screen.
+  - **A backwards period is not a document.** The sheet says the period is the wrong way round and
+    calls nothing on it a report of any period; the print button is not offered.
+  - **It can be identified afterwards.** The reference carries the period and the minute of printing
+    (`RPT-2026-06-01-to-2026-06-30-202606120830`), the footer repeats it with the print date, the file
+    is named after the period, and the page title becomes the document name while the preview is open —
+    which is what "Save as PDF" suggests as the file name.
+- **Rejected.** (a) *A PDF dependency or a headless browser* — reasons above. (b) *A separate stylesheet
+  for reports* — the document sheet is already measured for A4, print-tested in three places and
+  contrast-checked; a second one would drift. (c) *Storing a numbered PDF per printing* — a second
+  source of truth for figures that are already derivable, and nowhere agreed to keep a file (Q-51).
+  (d) *Emails the report* — no mail provider exists, and pretending to send one is the failure D-63
+  rejected for invitations.
+- **Consequence.** New module `src/tms/printableReport.ts` (`printableReport`, `periodLabel`,
+  `printableReportFileName`) and `src/screens/PrintableReport.tsx` (`ReportSheet`,
+  `ReportPrintPreview`); a **Print or save as PDF** action and the preview on the Reports screen; report
+  section, figure and coverage styles in `src/index.css` with print break rules; 13 new tests (10
+  domain, 3 screen). No new command, table, permission or dependency.
