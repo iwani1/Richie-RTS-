@@ -7,6 +7,7 @@ import { manifestAtStop, manifestFor, seatsHeld } from "./bookings";
 import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
 import { overdueServiceFor } from "./maintenance";
 import { audit, authorise, fail, isValidDate, makeId, norm, TIME_RE, type Actor, type CommandResult, type Errors } from "./service";
+import { licenceClassProblem } from "./driving";
 import { allocateReference } from "./references";
 import { mayActOnTrip } from "./scope";
 import {
@@ -436,6 +437,10 @@ export function assessResources(db: Database, route: BusRoute, trip: Trip, vehic
   else if (!driver) errors.driverId = "Unknown driver.";
   else if (driver.status !== "active") errors.driverId = `Driver is ${driver.status} and cannot be assigned.`;
   else if (driver.licenceExpiry < trip.serviceDate) errors.driverId = "Driver's licence expires before the service date.";
+  // FLT-04: the licence has to cover the *class* of vehicle, not merely be in date. Checked against
+  // the vehicle actually being signed to the run, because that is what will be driven.
+  else if (vehicle && licenceClassProblem(db, driver, vehicle.categoryId))
+    errors.driverId = licenceClassProblem(db, driver, vehicle.categoryId)!;
   else {
     const gaps = requiredDocumentGaps(db, "driver", driver.id, trip.serviceDate);
     if (gaps.length) errors.driverId = describeDocumentGaps(`Driver ${driver.fullName}`, gaps);

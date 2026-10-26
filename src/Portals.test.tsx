@@ -43,7 +43,7 @@ function seed(): { driverUserId: string; clientUserId: string; driverVehicleId: 
 
   run(admin, {
     type: "update_settings",
-    input: { ...db.settings, currencyCode: "GHS", vehicleCategories: [{ id: "", name: "Minibus" }], shifts: [], rental: emptyRentalSettings() },
+    input: { ...db.settings, currencyCode: "GHS", vehicleCategories: [{ id: "", name: "Minibus", licenceClasses: [] }], shifts: [], rental: emptyRentalSettings() },
   });
   const category = db.settings.vehicleCategories[0].id;
   run(ops, { type: "create_vehicle", input: { registration: "GT 100-26", categoryId: category, make: "", model: "", seatCapacity: "30", notes: "" } });

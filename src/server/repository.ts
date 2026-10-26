@@ -88,6 +88,8 @@ const driverRow = (d: Driver): Row => ({
   phone: d.phone,
   licence_number: d.licenceNumber,
   licence_expiry: d.licenceExpiry,
+  licence_classes: d.licenceClasses ?? [],
+  qualifications: d.qualifications ?? [],
   status: d.status,
   created_at: d.createdAt,
   updated_at: d.updatedAt,

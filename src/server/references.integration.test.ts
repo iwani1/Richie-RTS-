@@ -38,7 +38,7 @@ async function world(): Promise<{ adminId: string; categoryId: string }> {
       input: {
         ...setup.settings,
         currencyCode: "GHS",
-        vehicleCategories: [{ id: "", name: "Coaster" }],
+        vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
         rental: { ...setup.settings.rental, pricingBasis: "per_day", depositPercent: 20, paymentMethods: ["Cash"] },
       },
     },

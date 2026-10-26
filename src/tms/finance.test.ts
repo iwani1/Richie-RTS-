@@ -36,7 +36,7 @@ const settings = (overrides: Record<string, unknown> = {}) => ({
   companyName: "Richie Transport Services",
   currencyCode: "GHS",
   onTimeThresholdMinutes: 5,
-  vehicleCategories: [{ id: "", name: "Coaster" }],
+  vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
   shifts: [],
   rental: { ...emptyRentalSettings(), pricingBasis: "per_day" as const, depositPercent: 20, quotationValidityDays: 14, paymentMethods: ["Cash", "Bank transfer", "Mobile money"] },
   documentTypes: [],

@@ -97,11 +97,12 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Planning aid for dispatch: who can take each run, ranked, with the reason each pair works or cannot | Works; it reads the same rule the save enforces, so a suggestion is never refused, and it assigns nothing — the dispatcher still presses save |
 | Staff transport report: runs promised and worked, riders carried, no-shows, the riders nobody recorded, empty seats, delays where a stop time was recorded, and the seats people asked for | Works; it says on the page which figures the records cannot supply, and the on-time figure is the same one the busing screen shows |
 | Customer register with the office's own code, organisation or individual, company registration, billing address and tax number, named branches and a change history per customer | Works; the invoice prints the buyer's address and tax number **as they were when it was issued**, the row states which agreement is in force, and a detail nobody recorded reads "not recorded" rather than being guessed |
+| Driver register that holds the licence classes and certificates, and dispatch that refuses a driver whose licence does not cover the vehicle once the office has said which classes a vehicle type needs | Works; the class is read off the licence as the office types it, an unclassified vehicle type checks nothing, and availability is shown from the runs rather than a stored flag |
 | Scanned receipts, filed against an expense | Works; the image is kept in a folder on the office machine for three years and copied with the nightly backup, and only finance and administrators can open it |
 | Management report as an A4 document, printed or saved as a PDF by the browser | Works; the figures are the report's own, a figure it cannot state is printed as withheld, and no file is stored or emailed |
 | Notifications (SMS or email), offline driver app, GPS tracking, card/mobile-money gateway, payroll | **Not built** — see `docs/PROGRESS.md` |
 
-819 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+846 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

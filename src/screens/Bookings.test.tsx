@@ -155,7 +155,7 @@ function world(): { db: Database; dispatch: Tms["dispatch"] } {
     ],
     trips: [trip],
     bookings: [booking(1, "p3", "confirmed"), booking(2, "p4", "confirmed"), booking(3, "p5", "offered"), booking(4, "p6", "waitlisted")],
-    settings: { ...base.settings, vehicleCategories: [{ id: "cat", name: "Minibus" }] },
+    settings: { ...base.settings, vehicleCategories: [{ id: "cat", name: "Minibus", licenceClasses: [] }] },
   };
   const dispatch = vi.fn(async () => ({ ok: true, message: "done", db }) as CommandResult);
   return { db, dispatch };

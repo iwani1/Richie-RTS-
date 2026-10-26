@@ -61,7 +61,7 @@ function build(): World {
   const ops: Actor = { id: db.users[2].id, fullName: "Ops", role: "operations" };
   db = run(db, admin, {
     type: "update_settings",
-    input: { ...db.settings, companyName: "Richie Transport Services", currencyCode: "GHS", vehicleCategories: [{ id: "", name: "Coaster" }], shifts: [] },
+    input: { ...db.settings, companyName: "Richie Transport Services", currencyCode: "GHS", vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }], shifts: [] },
   });
   db = run(db, finance, {
     type: "record_expense",

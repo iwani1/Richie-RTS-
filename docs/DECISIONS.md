@@ -2042,3 +2042,54 @@ the offices its staff are collected from, and whether there is an agreement at a
   (`client_location`), schema version **23**, 21 tables; the register gains the certificate fields,
   a branch count per row, the agreement line and a **Branches** panel; 26 new tests (12 domain, 8
   command, 5 screen, 1 payload) plus 2 against real PostgreSQL.
+
+## D-103 - The licence has to cover the vehicle, and a blank class is not permission (FLT-04)
+
+A driver's record was a number and an expiry date, and dispatch checked the date. Nothing checked
+what the licence allowed: a driver licensed for a small car could be signed to a coach, and the
+system reported the licence as in order. For a company carrying other people's staff, that is the
+wrong thing to be silent about.
+
+- **Decision 1: the vocabulary is the office's, not this program's.** Classes are stored as the
+  office reads them off the licence — printed codes, upper-cased so "c" and "C" are one class — and
+  which of them covers a minibus, a coach or a tipper is declared per **vehicle category** in
+  Settings. Rejected: hard-coding a table of what each class means. Ghana's classes are printed on
+  the paper; the mapping from class to *this company's* vehicles is the operator's rule, and writing
+  my own version of it would be inventing a fact and grounding a fleet on it.
+- **Decision 2: an undeclared category checks nothing.** A category with no classes recorded is a
+  category nobody has classified, and dispatch behaves exactly as it did before this phase. The
+  alternative — refusing every assignment until somebody classifies the fleet — would take a working
+  bus company off the road to satisfy a rule it never made.
+- **Decision 3: once a requirement exists, a blank driver class fails closed.** If the office has
+  said a coach needs class D, a driver whose class is unrecorded cannot be shown to hold it, and the
+  assignment is refused with the sentence: *Driver Kofi Mensah's licence class is not recorded, and
+  Coach requires D. Record the class from their licence before assigning this vehicle.* That is the
+  whole design in one line — "we did not write it down" and "we checked and it is fine" must not look
+  the same to a dispatcher.
+- **Decision 4: both paths, one function.** Trips and hires both call `licenceClassProblem`, and the
+  planning aid (RTE-04, D-96) calls the same function the save uses, so a suggestion it offers can
+  never be refused by the save that follows. A check written twice is a check that disagrees with
+  itself the first time somebody edits one copy.
+- **Decision 5: the vehicle decides, not the request.** The check uses the category of the vehicle
+  actually being signed to the run, falling back to the requested category for a hire confirmed
+  before a vehicle was chosen. A hire moved to a different vehicle is re-checked at that moment,
+  which is the moment it matters.
+- **Decision 6: qualifications are recorded, not enforced.** "PSV", "Defensive driving", "First
+  aid" are typed as the office names them and shown on the driver's row. Nothing is refused for want
+  of one, because the office has not said which job needs which certificate — and a rule invented
+  here would refuse work the company does every day. This is asked as **Q-52**; answering it would
+  add a per-category requirement beside the licence classes.
+- **Decision 7: availability is derived, never stored.** A driver's row says *free today*, *on
+  TR-0001 (Northstar morning) today* or *on hire RR-0007 today*, read from live trips and hires. A
+  stored availability flag is the first thing that goes stale when a run is cancelled, and a
+  dispatcher who cannot trust it stops reading it.
+- **Decision 8: the public form learns nothing.** The enquiry endpoint still sends a category's id
+  and name. Which licence class the company requires for its own coaches is an internal rule, and a
+  test now asserts it does not leave the building.
+- **Consequence.** `Driver` gains `licenceClasses` and `qualifications`; `VehicleCategory` gains
+  `licenceClasses`; new module `src/tms/driving.ts` (`parseTags`, `validateTags`,
+  `licenceClassProblem`, `driverAvailabilityLine`, `DRIVING_LIMITS`); enforcement in
+  `assessResources` (busing) and `assign_rental` (service); Settings gains a licence-class field per
+  category; the driver register gains class, qualifications, a today line and a count of drivers
+  with no class recorded; the drivers CSV gains two optional columns; migration **020**, schema
+  version **24**; 27 new tests (20 domain, 1 planning, 5 screen, 1 import).

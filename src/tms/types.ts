@@ -68,6 +68,13 @@ export interface Driver {
   phone: string;
   licenceNumber: string;
   licenceExpiry: string; // YYYY-MM-DD
+  /**
+   * The classes printed on the licence, as the office reads them (FLT-04, D-103). Empty means
+   * nobody has recorded them — and an undeclared class is not the same as one we checked.
+   */
+  licenceClasses: string[];
+  /** Certificates the driver holds, as the office names them: "PSV", "Defensive driving". */
+  qualifications: string[];
   status: DriverStatus;
   createdAt: string;
   updatedAt: string;
@@ -145,6 +152,11 @@ export interface ClientLocation {
 export interface VehicleCategory {
   id: string;
   name: string;
+  /**
+   * The licence classes that may drive this category (FLT-04). Empty means the office has not
+   * classified it, and dispatch checks nothing — an empty cell must not ground the fleet.
+   */
+  licenceClasses: string[];
 }
 
 export interface Shift {
@@ -1132,7 +1144,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 /**
  * Every schema version this build can still read.
@@ -1142,7 +1154,7 @@ export const SCHEMA_VERSION = 23;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1249,7 +1261,13 @@ export function migrate(value: unknown): Database | null {
       primaryContact: u.primaryContact === true,
     })),
     vehicles: v.vehicles as Database["vehicles"],
-    drivers: v.drivers as Database["drivers"],
+    drivers: (v.drivers as Driver[]).map((driver) => ({
+      ...driver,
+      // FLT-04 arrived in schema 24. A licence class nobody wrote down is blank, not a guess, and
+      // an empty list checks nothing rather than grounding every driver.
+      licenceClasses: Array.isArray(driver.licenceClasses) ? driver.licenceClasses : [],
+      qualifications: Array.isArray(driver.qualifications) ? driver.qualifications : [],
+    })),
     clients: (v.clients as Client[]).map((client) => ({
       ...client,
       // CUS-01 arrived in schema 22. An older record has no code, no type and no billing details;
@@ -1370,7 +1388,11 @@ export function migrate(value: unknown): Database | null {
       companyName: (settings.companyName as string | null) ?? null,
       currencyCode: (settings.currencyCode as string | null) ?? null,
       onTimeThresholdMinutes: (settings.onTimeThresholdMinutes as number | null) ?? null,
-      vehicleCategories: (settings.vehicleCategories as VehicleCategory[]) ?? [],
+      // A category written before FLT-04 has no required classes, and therefore checks nothing.
+      vehicleCategories: ((settings.vehicleCategories as VehicleCategory[]) ?? []).map((category) => ({
+        ...category,
+        licenceClasses: Array.isArray(category.licenceClasses) ? category.licenceClasses : [],
+      })),
       shifts: (settings.shifts as Shift[]) ?? [],
       rental,
       // Records written before the flag existed are not required: the setting was never made.

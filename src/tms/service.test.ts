@@ -25,7 +25,7 @@ function seeded(): { db: Database; admin: Actor; ops: Actor; finance: Actor } {
 }
 
 function withCategory(db: Database, admin: Actor): Database {
-  const r = execute(db, admin, { type: "update_settings", input: { ...db.settings, vehicleCategories: [{ id: "", name: "Minibus" }] } }, NOW);
+  const r = execute(db, admin, { type: "update_settings", input: { ...db.settings, vehicleCategories: [{ id: "", name: "Minibus", licenceClasses: [] }] } }, NOW);
   if (!r.ok) throw new Error(r.message);
   return r.db;
 }
@@ -86,7 +86,7 @@ describe("settings", () => {
     const { db, admin } = seeded();
     expect(db.settings.currencyCode).toBeNull();
     expect(db.settings.vehicleCategories).toHaveLength(0);
-    const bad = execute(db, admin, { type: "update_settings", input: { ...db.settings, currencyCode: "cedis", vehicleCategories: [{ id: "", name: "Bus" }, { id: "", name: "bus" }] } }, NOW);
+    const bad = execute(db, admin, { type: "update_settings", input: { ...db.settings, currencyCode: "cedis", vehicleCategories: [{ id: "", name: "Bus", licenceClasses: [] }, { id: "", name: "bus", licenceClasses: [] }] } }, NOW);
     expect(bad.ok).toBe(false);
     if (!bad.ok) {
       expect(bad.errors.currencyCode).toBeDefined();

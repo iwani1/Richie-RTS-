@@ -41,7 +41,7 @@ function world(): World {
 
   run(admin, {
     type: "update_settings",
-    input: { ...db.settings, currencyCode: "GHS", vehicleCategories: [{ id: "", name: "Minibus" }], shifts: [], rental: emptyRentalSettings() },
+    input: { ...db.settings, currencyCode: "GHS", vehicleCategories: [{ id: "", name: "Minibus", licenceClasses: [] }], shifts: [], rental: emptyRentalSettings() },
   });
   const category = db.settings.vehicleCategories[0].id;
 

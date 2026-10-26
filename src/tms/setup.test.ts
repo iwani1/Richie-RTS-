@@ -37,7 +37,7 @@ describe("setup checklist", () => {
       companyName: "Richie Transport Services",
       currencyCode: "GHS",
       onTimeThresholdMinutes: 10,
-      vehicleCategories: [{ id: "c1", name: "Coaster" }],
+      vehicleCategories: [{ id: "c1", name: "Coaster", licenceClasses: [] }],
       shifts: [{ id: "s1", name: "Day", startTime: "06:00", endTime: "18:00" }],
     };
     const progress = setupProgress(settings);

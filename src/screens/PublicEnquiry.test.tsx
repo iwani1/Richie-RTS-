@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EMBED_HEIGHT_MESSAGE, PublicEnquiry } from "./PublicEnquiry";
 
-const categories = [{ id: "cat-1", name: "Coaster" }, { id: "cat-2", name: "Sprinter" }];
+const categories = [{ id: "cat-1", name: "Coaster", licenceClasses: [] }, { id: "cat-2", name: "Sprinter", licenceClasses: [] }];
 
 type Reply = { status: number; body: unknown };
 

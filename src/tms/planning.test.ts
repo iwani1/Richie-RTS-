@@ -57,6 +57,8 @@ const driver = (id: string, fullName: string, overrides: Partial<Driver> = {}): 
   phone: "0244000000",
   licenceNumber: `DL-${id}`,
   licenceExpiry: "2028-12-31",
+  licenceClasses: [],
+  qualifications: [],
   status: "active",
   createdAt: at,
   updatedAt: at,
@@ -250,6 +252,36 @@ describe("planning a run", () => {
       input: { vehicleId: "v-fixed", driverId: "d-old" },
     } as never, at);
     expect(saved.ok).toBe(false);
+  });
+
+  it("agrees with the save about a driver whose licence does not cover the bus (FLT-04)", () => {
+    // The office has said a coach needs class D. The only driver holds B, so neither the aid nor the
+    // save may put them on it — and both say which class is missing.
+    const base = emptyDatabase();
+    const db = world({
+      settings: {
+        ...base.settings,
+        currencyCode: "GHS",
+        rental: emptyRentalSettings(),
+        vehicleCategories: [{ id: "cat", name: "Coach", licenceClasses: ["D"] }],
+      },
+      drivers: [driver("d1", "Kojo Owusu", { licenceClasses: ["B"] })],
+    });
+
+    const plan = planRun(db, "t1", TODAY)!;
+    expect(plan.workable).toEqual([]);
+    expect(plan.refusals.map((refusal) => refusal.reasons.join(" ")).join(" | ")).toMatch(
+      /holds licence class B, and Coach requires D/,
+    );
+
+    const saved = executeBusing(db, { id: "u1", fullName: "Ama", role: "administrator" }, {
+      type: "assign_trip",
+      id: "t1",
+      input: { vehicleId: "v-small", driverId: "d1" },
+    } as never, at);
+    expect(saved.ok).toBe(false);
+    // The refusal names the class on the driver field the dispatcher has to fix.
+    if (!saved.ok) expect(saved.errors.driverId).toMatch(/holds licence class B, and Coach requires D/);
   });
 
   it("says there is nothing to send rather than showing an empty list", () => {

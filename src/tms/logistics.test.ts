@@ -39,7 +39,7 @@ function world(options: { currency?: boolean } = {}): World {
     input: {
       ...db.settings,
       currencyCode: options.currency === false ? null : "GHS",
-      vehicleCategories: [{ id: "", name: "Minibus" }],
+      vehicleCategories: [{ id: "", name: "Minibus", licenceClasses: [] }],
       costCategories: ["Parts", "Labour", "Recovery"],
     },
   });

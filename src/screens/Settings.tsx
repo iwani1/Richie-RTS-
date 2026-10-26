@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { parseTags } from "../tms/driving";
 import { setupProgress } from "../tms/setup";
 import { useTms } from "../tms/useTms";
 import type { Settings } from "../tms/types";
@@ -114,8 +115,8 @@ export function SettingsPage() {
       </Band>
 
       <Band label="Vehicle categories"
-        note="Required before any vehicle can be registered. Categories in use by a vehicle cannot be removed."
-        actions={editable ? <Button onClick={() => update({ vehicleCategories: [...draft.vehicleCategories, { id: "", name: "" }] })}>Add category</Button> : undefined}
+        note="Required before any vehicle can be registered. Categories in use by a vehicle cannot be removed. The licence classes are what dispatch holds a driver to: leave them empty and any licence may be signed to the vehicle."
+        actions={editable ? <Button onClick={() => update({ vehicleCategories: [...draft.vehicleCategories, { id: "", name: "", licenceClasses: [] }] })}>Add category</Button> : undefined}
       >
         {errors.vehicleCategories && <Notice tone="error" className="mb-3">{errors.vehicleCategories}</Notice>}
         {draft.vehicleCategories.length === 0 ? (
@@ -130,6 +131,26 @@ export function SettingsPage() {
                     onChange={(e) => update({ vehicleCategories: draft.vehicleCategories.map((c, j) => (j === i ? { ...c, name: e.target.value } : c)) })}
                     disabled={!editable}
                     invalid={!!errors[`vehicleCategories.${i}`]}
+                  />
+                </Field>
+                {/* FLT-04: the classes a driver must hold to be signed to this kind of vehicle. */}
+                <Field
+                  label="Licence classes that may drive it"
+                  hint="From the licences, such as C or D. Blank checks nothing."
+                  error={errors[`vehicleCategories.${i}.licenceClasses`]}
+                  className="flex-1"
+                >
+                  <TextInput
+                    value={(cat.licenceClasses ?? []).join(", ")}
+                    onChange={(e) =>
+                      update({
+                        vehicleCategories: draft.vehicleCategories.map((c, j) =>
+                          j === i ? { ...c, licenceClasses: parseTags(e.target.value, { upper: true }) } : c,
+                        ),
+                      })
+                    }
+                    disabled={!editable}
+                    invalid={!!errors[`vehicleCategories.${i}.licenceClasses`]}
                   />
                 </Field>
                 {editable && (

@@ -58,6 +58,9 @@ export interface DriverRow {
   phone: string;
   licence_number: string;
   licence_expiry: DateOnly;
+  /** Migration 020 (FLT-04). The full record also travels in `data`. */
+  licence_classes: string[];
+  qualifications: string[];
   status: string;
   created_at: Timestamp;
   updated_at: Timestamp;

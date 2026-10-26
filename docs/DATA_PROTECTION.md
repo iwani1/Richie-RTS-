@@ -7,7 +7,7 @@ Status: **draft proposal**. This is not legal advice. Ghana's Data Protection Ac
 | Subject | Data held | Why | Entered by | Who can see it |
 |---|---|---|---|---|
 | System users (staff) | Name, email, role, active flag, the driver, client or rider record the account is bound to, password hash and salt, audit actions | Account access and accountability | Administrator | Administrator (all); audit viewers see actor names |
-| Drivers | Name, phone, licence number, licence expiry, status | Dispatch, licence validity checks | Operations | Operations (read/write); finance (read); administrator |
+| Drivers | Name, phone, licence number, licence expiry, **licence classes and the certificates they hold**, status | Dispatch, and the check that a driver may legally take the vehicle they are signed to | Operations | Operations (read/write); finance (read); administrator. The public enquiry form receives none of it |
 | Corporate client contacts | Contact name, phone, email, and the registered company details the office supplied | Account communication, billing | Finance, administrator | Finance (read/write); operations (read); administrator |
 | Client branches and offices | Branch name, address, phone and the name of the person to ask for there | Saying which office a run serves | Operations, finance, administrator | Finance (read/write); operations (read); administrator; and a client contact sees only its own organisation's branches, never another customer's |
 | Passengers (employees of corporate clients) | Full name, employee reference, optional phone, route, pickup stop, status | Running staff busing routes | Operations (from the client's roster; source to be confirmed) | Operations (read/write); finance (read); administrator |

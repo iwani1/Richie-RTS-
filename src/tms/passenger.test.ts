@@ -65,7 +65,7 @@ function build(options: { cancellationCutoff?: number | null; requestCutoff?: nu
       companyName: "Richie Transport Services",
       currencyCode: "GHS",
       onTimeThresholdMinutes: 5,
-      vehicleCategories: [{ id: "", name: "Coaster" }],
+      vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
       shifts: [],
       rental: emptyRentalSettings(),
       documentTypes: [],

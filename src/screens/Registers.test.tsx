@@ -4,9 +4,9 @@
 // is primary - otherwise the reader assumes the person in the free-text field is the only one.
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ClientsPage } from "./Registers";
+import { ClientsPage, DriversPage } from "./Registers";
 import { TmsContext, type Tms } from "../tms/useTms";
-import { emptyDatabase, type Client, type ClientLocation, type Contract, type Database, type User } from "../tms/types";
+import { emptyDatabase, type Client, type ClientLocation, type Contract, type Database, type Driver, type User } from "../tms/types";
 
 afterEach(cleanup);
 
@@ -322,5 +322,103 @@ describe("the branches and the agreement behind a customer (CLI-01)", () => {
     expect(sent.input.clientId).toBe("c3");
     expect(sent.input.name).toBe("Tema depot");
     expect(sent.input.address).toBe("Harbour Road, Gate 3");
+  });
+});
+
+describe("what a driver is licensed to drive (FLT-04)", () => {
+  const driverRecord = (overrides: Partial<Driver> = {}): Driver => ({
+    id: "d1",
+    fullName: "Kofi Mensah",
+    phone: "0244000000",
+    licenceNumber: "DL-001",
+    licenceExpiry: "2031-05-01",
+    licenceClasses: ["C", "D"],
+    qualifications: ["PSV"],
+    status: "active",
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  });
+
+  function renderDrivers(db: Database) {
+    const tms = {
+      db,
+      actor: { id: admin.id, fullName: admin.fullName, role: admin.role },
+      currentUser: admin,
+      status: "ready",
+      connectionError: null,
+      auditTotal: 0,
+      setupRequired: false,
+      flash: null,
+      setFlash: () => {},
+      allowed: () => true,
+      dispatch: vi.fn(async () => ({ ok: true, message: "" })),
+      signIn: vi.fn(async () => null),
+      signOut: vi.fn(async () => {}),
+      setupAdministrator: vi.fn(async () => ({ ok: true, message: "" })),
+      exportBackup: vi.fn(async () => null),
+      refresh: vi.fn(async () => {}),
+    } as unknown as Tms;
+    render(
+      <TmsContext.Provider value={tms}>
+        <DriversPage />
+      </TmsContext.Provider>,
+    );
+    return tms;
+  }
+
+  it("shows the licence class beside the number, and the qualifications they hold", () => {
+    renderDrivers({ ...emptyDatabase(), users: [admin], drivers: [driverRecord()] });
+    const row = rowFor("Kofi Mensah");
+    expect(row.textContent).toContain("DL-001");
+    expect(row.textContent).toContain("Class C, D");
+    expect(row.textContent).toContain("PSV");
+  });
+
+  it("says the class and qualifications are not recorded rather than showing a blank", () => {
+    renderDrivers({
+      ...emptyDatabase(),
+      users: [admin],
+      drivers: [driverRecord({ licenceClasses: [], qualifications: [] })],
+    });
+    const row = rowFor("Kofi Mensah");
+    expect(row.textContent).toContain("class not recorded");
+    expect(row.textContent).toContain("none recorded");
+  });
+
+  it("counts the drivers whose class nobody has written down", () => {
+    renderDrivers({
+      ...emptyDatabase(),
+      users: [admin],
+      drivers: [driverRecord(), driverRecord({ id: "d2", fullName: "Ama Boateng", licenceClasses: [] })],
+    });
+    expect(screen.getByText(/1 with no licence class recorded/)).toBeTruthy();
+  });
+
+  it("says what the driver is doing today, from the runs rather than a stored flag", () => {
+    renderDrivers({ ...emptyDatabase(), users: [admin], drivers: [driverRecord()] });
+    expect(rowFor("Kofi Mensah").textContent).toContain("Free today");
+  });
+
+  it("sends the classes and qualifications with the driver", async () => {
+    const tms = renderDrivers({ ...emptyDatabase(), users: [admin], drivers: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Add driver" }));
+
+    fireEvent.change(screen.getByLabelText(/Full name/), { target: { value: "Kofi Mensah" } });
+    fireEvent.change(screen.getByLabelText(/^Phone/), { target: { value: "0244000000" } });
+    fireEvent.change(screen.getByLabelText(/Licence number/), { target: { value: "DL-001" } });
+    fireEvent.change(screen.getByLabelText(/Licence expiry/), { target: { value: "2031-05-01" } });
+    fireEvent.change(screen.getByLabelText(/Licence classes/), { target: { value: "C, D" } });
+    fireEvent.change(screen.getByLabelText(/Qualifications/), { target: { value: "PSV" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save driver" }));
+
+    await waitFor(() => expect(tms.dispatch).toHaveBeenCalled());
+    const sent = (tms.dispatch as unknown as { mock: { calls: [unknown][] } }).mock.calls[0][0] as {
+      type: string;
+      input: Record<string, unknown>;
+    };
+    expect(sent.type).toBe("create_driver");
+    expect(sent.input.licenceClasses).toBe("C, D");
+    expect(sent.input.qualifications).toBe("PSV");
   });
 });

@@ -36,7 +36,7 @@ function world(options: { documentTypes?: boolean } = { documentTypes: true }): 
     type: "update_settings",
     input: {
       ...db.settings,
-      vehicleCategories: [{ id: "", name: "Minibus" }],
+      vehicleCategories: [{ id: "", name: "Minibus", licenceClasses: [] }],
       documentTypes: options.documentTypes
         ? [
             { id: "", name: "Insurance", appliesTo: "vehicle", required: false },

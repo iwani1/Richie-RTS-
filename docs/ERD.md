@@ -547,5 +547,12 @@ Constraints and triggers:
   closed one keeps its row and its address, because the trips and documents that named that office are
   still on file. `client` also gains `registration_number` and `registered_on` in the same migration —
   the certificate, when the office holds one, and blank when it does not.
+- **`driver` licence classes (migration `020_driver_licence_classes.sql`, FLT-04, D-103).** Two text
+  arrays, both defaulting to empty: `licence_classes` (the codes printed on the licence, upper-cased)
+  and `qualifications` (certificates as the office names them). The classes are not a check
+  constraint over a fixed list — the codes come off the paper, and which of them covers which of the
+  company's vehicles is declared per vehicle category in `app_settings`, not in the schema. Empty
+  means "not recorded", and an assignment to a category that declares classes is refused while the
+  driver's list is empty.
 - `reference_counter` is written by the same transaction that writes the document, so two writers
   cannot allocate the same number.

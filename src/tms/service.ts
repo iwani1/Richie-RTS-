@@ -3,6 +3,7 @@
 // unchanged. In this environment it runs in the browser (see docs/DECISIONS.md D-01).
 
 import { validateClientLocation, type ClientLocationInput } from "./clients";
+import { DRIVING_LIMITS, licenceClassProblem, parseTags, validateTags } from "./driving";
 import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
 import { overdueServiceFor } from "./maintenance";
 import { can, type Permission } from "./permissions";
@@ -67,6 +68,10 @@ export interface DriverInput {
   phone: string;
   licenceNumber: string;
   licenceExpiry: string;
+  /** The classes printed on the licence, as typed: "C, D". Stored as a list (FLT-04). */
+  licenceClasses?: string;
+  /** Certificates the driver holds, as typed: "PSV, Defensive driving". */
+  qualifications?: string;
   status: DriverStatus;
 }
 
@@ -351,8 +356,31 @@ export function validateDriver(db: Database, input: DriverInput, excludeId?: str
   else if (db.drivers.some((d) => d.id !== excludeId && d.licenceNumber.toUpperCase() === licenceNumber))
     errors.licenceNumber = "A driver with this licence number already exists.";
   if (!isValidDate(input.licenceExpiry)) errors.licenceExpiry = "Enter the licence expiry date (YYYY-MM-DD).";
+  // What the licence allows (FLT-04). Classes are upper-cased because that is how they are printed,
+  // so "c" and "C" are one class rather than two.
+  const licenceClasses = parseTags(input.licenceClasses ?? "", { upper: true });
+  const qualifications = parseTags(input.qualifications ?? "");
+  Object.assign(
+    errors,
+    validateTags("licenceClasses", licenceClasses, {
+      max: DRIVING_LIMITS.classesPerDriver,
+      length: DRIVING_LIMITS.classLength,
+      label: "licence class",
+    }),
+  );
+  Object.assign(
+    errors,
+    validateTags("qualifications", qualifications, {
+      max: DRIVING_LIMITS.qualificationsPerDriver,
+      length: DRIVING_LIMITS.qualificationLength,
+      label: "qualification",
+    }),
+  );
   if (!DRIVER_STATUSES.includes(input.status)) errors.status = "Invalid status.";
-  return { errors, value: { fullName, phone, licenceNumber, licenceExpiry: input.licenceExpiry, status: input.status } };
+  return {
+    errors,
+    value: { fullName, phone, licenceNumber, licenceExpiry: input.licenceExpiry, licenceClasses, qualifications, status: input.status },
+  };
 }
 
 export function validateClient(db: Database, input: ClientInput, excludeId?: string, today?: string) {
@@ -526,12 +554,29 @@ export function validateSettings(db: Database, input: Settings) {
   if (threshold !== null && (!Number.isInteger(threshold) || threshold < 0))
     errors.onTimeThresholdMinutes = "Enter a whole number of minutes (0 or more).";
 
-  const categories = input.vehicleCategories.map((c) => ({ id: c.id || makeId(), name: c.name.trim() }));
+  const categories = input.vehicleCategories.map((c) => ({
+    id: c.id || makeId(),
+    name: c.name.trim(),
+    // The classes that may drive this category (FLT-04). Left empty, the category checks nothing.
+    licenceClasses: parseTags(typeof c.licenceClasses === "string" ? c.licenceClasses : (c.licenceClasses ?? []).join(", "), { upper: true }),
+  }));
   const seenCat = new Set<string>();
   categories.forEach((c, i) => {
     if (!c.name) errors[`vehicleCategories.${i}`] = "Category name is required.";
     else if (seenCat.has(norm(c.name))) errors[`vehicleCategories.${i}`] = "Duplicate category name.";
     seenCat.add(norm(c.name));
+    Object.assign(
+      errors,
+      Object.fromEntries(
+        Object.entries(
+          validateTags(`vehicleCategories.${i}.licenceClasses`, c.licenceClasses, {
+            max: DRIVING_LIMITS.classesPerDriver,
+            length: DRIVING_LIMITS.classLength,
+            label: "licence class",
+          }),
+        ),
+      ),
+    );
   });
   const removedInUse = db.settings.vehicleCategories.filter(
     (old) => !categories.some((c) => c.id === old.id) && db.vehicles.some((v) => v.categoryId === old.id),
@@ -1378,6 +1423,16 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         else if (!driver) errors.driverId = "Unknown driver.";
         else if (driver.status !== "active") errors.driverId = `Driver is ${driver.status} and cannot be assigned.`;
         else if (driver.licenceExpiry < existing.endDate) errors.driverId = "Driver's licence expires before the rental end date.";
+        else if (
+          licenceClassProblem(
+            db,
+            driver,
+            // The vehicle actually being hired decides the class; the requested category is the
+            // fallback for a hire confirmed before a vehicle was chosen.
+            vehicle?.categoryId ?? existing.vehicleCategoryId,
+          )
+        )
+          errors.driverId = licenceClassProblem(db, driver, vehicle?.categoryId ?? existing.vehicleCategoryId)!;
         else {
           const gaps = requiredDocumentGaps(db, "driver", driver.id, existing.startDate);
           if (gaps.length) errors.driverId = describeDocumentGaps(`Driver ${driver.fullName}`, gaps);

@@ -63,14 +63,16 @@ export const IMPORT_SPECS: Record<ImportKind, KindSpec> = {
   drivers: {
     label: "drivers",
     permission: "drivers:create",
-    template: "name,phone,licence number,licence expiry,status",
-    example: "Kofi Mensah,+233201234567,DL-001,2031-05-01,active",
-    note: "The licence number identifies a driver, so a number that is already on file is rejected.",
+    template: "name,phone,licence number,licence expiry,licence classes,qualifications,status",
+    example: "Kofi Mensah,+233201234567,DL-001,2031-05-01,C; D,PSV,active",
+    note: "The licence number identifies a driver, so a number that is already on file is rejected. Licence classes and qualifications are optional and separated by semicolons or commas inside quotes: a blank cell stays blank rather than becoming a guess (FLT-04).",
     columns: {
       name: { aliases: ["name", "full name", "driver"], required: true },
       phone: { aliases: ["phone", "telephone", "mobile"], required: true },
       licence: { aliases: ["licence", "license", "licence number", "license number"], required: true },
       expiry: { aliases: ["licence expiry", "license expiry", "expiry", "expiry date"], required: true },
+      classes: { aliases: ["licence classes", "license classes", "classes", "licence class", "class"], required: false },
+      qualifications: { aliases: ["qualifications", "qualification", "certificates"], required: false },
       status: { aliases: ["status"], required: false },
     },
   },
@@ -287,6 +289,8 @@ function rowCommand(db: Database, kind: ImportKind, values: string[], index: Rec
       phone: cell(values, index, "phone"),
       licenceNumber: cell(values, index, "licence"),
       licenceExpiry: cell(values, index, "expiry"),
+      licenceClasses: cell(values, index, "classes"),
+      qualifications: cell(values, index, "qualifications"),
       status: (cell(values, index, "status") || "active") as DriverStatus,
     };
     return { module: "core", command: { type: "create_driver", input } };

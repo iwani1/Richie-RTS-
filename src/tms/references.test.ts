@@ -164,7 +164,7 @@ describe("commands that mint references", () => {
         input: {
           ...setup.db.settings,
           currencyCode: "GHS",
-          vehicleCategories: [{ id: "", name: "Coaster" }],
+          vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
           rental: { ...setup.db.settings.rental, pricingBasis: "per_day", depositPercent: 20, paymentMethods: ["Cash"] },
         },
       },

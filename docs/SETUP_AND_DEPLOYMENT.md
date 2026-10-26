@@ -244,8 +244,8 @@ and columns the importer does not use are reported, not silently ignored.
 vehicles   registration,category,make,model,seats,notes
            GT 1234-26,Coaster,Toyota,Coaster,22,
 
-drivers    name,phone,licence number,licence expiry,status
-           Kofi Mensah,+233201234567,DL-001,2031-05-01,active
+drivers    name,phone,licence number,licence expiry,licence classes,qualifications,status
+           Kofi Mensah,+233201234567,DL-001,2031-05-01,"C; D",PSV,active
 
 clients    name,code,type,contact name,contact phone,contact email,billing address,tin,status
            Volta Foods Ltd,VFL-01,organisation,Efua Owusu,+233244000111,ops@example.test,Industrial Area Accra,C0012345678,active

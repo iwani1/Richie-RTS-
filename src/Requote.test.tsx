@@ -38,7 +38,7 @@ function seedExpiredQuote() {
       ...db.settings,
       companyName: "Richie Transport Services",
       currencyCode: "GHS",
-      vehicleCategories: [{ id: "", name: "Minibus" }],
+      vehicleCategories: [{ id: "", name: "Minibus", licenceClasses: [] }],
       rental: { pricingBasis: "per_day", depositPercent: 25, quotationValidityDays: 7, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer"], requotePolicy: null },
     },
   });

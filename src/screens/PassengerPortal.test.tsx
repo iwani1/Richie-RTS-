@@ -54,7 +54,7 @@ function seed(): { userId: string; riderId: string; colleagueId: string; evening
       ...db.settings,
       companyName: "Richie Transport Services",
       currencyCode: "GHS",
-      vehicleCategories: [{ id: "", name: "Minibus" }],
+      vehicleCategories: [{ id: "", name: "Minibus", licenceClasses: [] }],
       shifts: [],
       rental: emptyRentalSettings(),
       booking: { requestCutoffMinutes: null, cancellationCutoffMinutes: null },

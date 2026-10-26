@@ -84,6 +84,8 @@ const driver = (id: string, fullName: string): Driver => ({
   phone: "",
   licenceNumber: `DL-${id}`,
   licenceExpiry: "2028-12-31",
+  licenceClasses: [],
+  qualifications: [],
   status: "active",
   createdAt: at,
   updatedAt: at,

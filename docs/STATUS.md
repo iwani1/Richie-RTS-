@@ -150,7 +150,10 @@ send mail.
 
 These work, and the difference is worth knowing before relying on them:
 
-- **Driver register** — licence number and expiry, not licence class or qualifications.
+- **Driver register** — licence number, expiry, the classes printed on the licence and the
+  certificates held, with dispatch refusing a driver whose class does not cover the vehicle once the
+  office has said which classes a vehicle category needs. A qualification is **recorded, not
+  enforced** — which job needs which certificate is Q-52.
 - **Vehicle statuses** — four (available, maintenance, out of service, retired), not the brief's
   seven; "reserved" and "on trip" are derived from assignments rather than stored.
 - **Rental request** — dates, not departure and return times; no intermediate stops or luggage notes.
@@ -172,7 +175,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**819 passed, 28 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**846 passed, 28 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

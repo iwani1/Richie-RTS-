@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const runCommand = vi.fn();
-const settingsRow = { data: { vehicleCategories: [{ id: "cat-1", name: "Coaster" }] } };
+const settingsRow = { data: { vehicleCategories: [{ id: "cat-1", name: "Coaster", licenceClasses: [] }] } };
 
 vi.mock("../../../server/commands", () => ({ runCommand }));
 vi.mock("../../../server/db", () => ({
@@ -77,7 +77,9 @@ describe("public enquiry endpoint", () => {
     expect(response.status).toBe(200);
     expect(payload).toMatchObject({ ok: true, open: true, categories: [{ id: "cat-1", name: "Coaster" }] });
     expect(typeof payload.token).toBe("string");
-    // Nothing else travels: no vehicles, no prices, no counts.
+    // Nothing else travels: no vehicles, no prices, no counts — and no licence classes either,
+    // which are the office's rule for its own drivers (FLT-04), not the public's business.
+    expect(JSON.stringify(payload)).not.toContain("licenceClasses");
     expect(Object.keys(payload).sort()).toEqual(["categories", "ok", "open", "token"]);
   });
 

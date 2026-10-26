@@ -58,8 +58,8 @@ function build(): World {
       currencyCode: "GHS",
       onTimeThresholdMinutes: 5,
       vehicleCategories: [
-        { id: "", name: "Coaster" },
-        { id: "", name: "Minibus" },
+        { id: "", name: "Coaster", licenceClasses: [] },
+        { id: "", name: "Minibus", licenceClasses: [] },
       ],
       shifts: [],
       rental: emptyRentalSettings(),

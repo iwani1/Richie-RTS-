@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import type { ClientInput, DriverInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { clientAgreementLine, type ClientLocationInput } from "../tms/clients";
+import { driverAvailabilityLine } from "../tms/driving";
 import { CLIENT_LOCATION_STATUSES, CLIENT_STATUSES, CLIENT_TYPE_LABELS, CLIENT_TYPES, DRIVER_STATUSES, type Client, type ClientLocation, type ClientType, type Driver } from "../tms/types";
 import { Badge, Button, DataTable, EmptyState, Field, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 import { ImportPanel } from "../ui/ImportPanel";
@@ -10,8 +11,24 @@ type Errors = Record<string, string>;
 
 // ---------------- Drivers ----------------
 
-const emptyDriver = (): DriverInput => ({ fullName: "", phone: "", licenceNumber: "", licenceExpiry: "", status: "active" });
-const driverToInput = (d: Driver): DriverInput => ({ fullName: d.fullName, phone: d.phone, licenceNumber: d.licenceNumber, licenceExpiry: d.licenceExpiry, status: d.status });
+const emptyDriver = (): DriverInput => ({
+  fullName: "",
+  phone: "",
+  licenceNumber: "",
+  licenceExpiry: "",
+  licenceClasses: "",
+  qualifications: "",
+  status: "active",
+});
+const driverToInput = (d: Driver): DriverInput => ({
+  fullName: d.fullName,
+  phone: d.phone,
+  licenceNumber: d.licenceNumber,
+  licenceExpiry: d.licenceExpiry,
+  licenceClasses: (d.licenceClasses ?? []).join(", "),
+  qualifications: (d.qualifications ?? []).join(", "),
+  status: d.status,
+});
 
 export function DriversPage() {
   const { db, allowed, dispatch, setFlash } = useTms();
@@ -21,10 +38,13 @@ export function DriversPage() {
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return db.drivers.filter((d) => !q || `${d.fullName} ${d.phone} ${d.licenceNumber}`.toLowerCase().includes(q)).sort((a, b) => a.fullName.localeCompare(b.fullName));
+    return db.drivers.filter((d) => !q || `${d.fullName} ${d.phone} ${d.licenceNumber} ${(d.licenceClasses ?? []).join(" ")} ${(d.qualifications ?? []).join(" ")}`.toLowerCase().includes(q)).sort((a, b) => a.fullName.localeCompare(b.fullName));
   }, [db.drivers, query]);
 
   const expiredCount = rows.filter((d) => d.licenceExpiry < today).length;
+  // Whether the licence class is on file matters as much as the expiry: a vehicle category that
+  // names required classes will refuse a driver whose class is blank (D-103).
+  const unclassified = rows.filter((d) => (d.licenceClasses ?? []).length === 0).length;
 
   const handle = async (input: DriverInput): Promise<Errors> => {
     if (!panel) return {};
@@ -52,9 +72,13 @@ export function DriversPage() {
       <TableCard
         title="Driver register"
         summary={
-          expiredCount > 0
-            ? `${rows.length} of ${db.drivers.length} shown · ${expiredCount} with an expired licence`
-            : `${rows.length} of ${db.drivers.length} shown`
+          [
+            `${rows.length} of ${db.drivers.length} shown`,
+            expiredCount > 0 ? `${expiredCount} with an expired licence` : null,
+            unclassified > 0 ? `${unclassified} with no licence class recorded` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
         }
         toolbar={
           <>
@@ -72,7 +96,33 @@ export function DriversPage() {
         columns={[
           { key: "name", header: "Name", render: (d) => <span className="font-semibold text-stone-900">{d.fullName}</span> },
           { key: "phone", header: "Phone", render: (d) => d.phone },
-          { key: "lic", header: "Licence", render: (d) => <span className="font-mono text-xs">{d.licenceNumber}</span> },
+          {
+            key: "lic",
+            header: "Licence",
+            render: (d) => (
+              <span className="flex flex-col">
+                <span className="font-mono text-xs">{d.licenceNumber}</span>
+                <span className="text-xs text-stone-600">
+                  {(d.licenceClasses ?? []).length > 0 ? `Class ${(d.licenceClasses ?? []).join(", ")}` : <em className="rts-unset">class not recorded</em>}
+                </span>
+              </span>
+            ),
+          },
+          {
+            key: "quals",
+            header: "Qualifications",
+            render: (d) =>
+              (d.qualifications ?? []).length > 0 ? (
+                <span className="text-xs text-stone-700">{(d.qualifications ?? []).join(" · ")}</span>
+              ) : (
+                <em className="rts-unset">none recorded</em>
+              ),
+          },
+          {
+            key: "today",
+            header: "Today",
+            render: (d) => <span className="text-xs text-stone-700">{driverAvailabilityLine(db, d.id, today)}</span>,
+          },
           {
             key: "exp",
             header: "Licence expiry",
@@ -116,6 +166,20 @@ function DriverForm({ initial, title, onClose, onSubmit }: { initial: DriverInpu
         <Field label="Phone" error={errors.phone}><TextInput value={values.phone} onChange={(e) => set({ phone: e.target.value })} invalid={!!errors.phone} inputMode="tel" /></Field>
         <Field label="Licence number" error={errors.licenceNumber}><TextInput value={values.licenceNumber} onChange={(e) => set({ licenceNumber: e.target.value })} invalid={!!errors.licenceNumber} /></Field>
         <Field label="Licence expiry" error={errors.licenceExpiry}><TextInput type="date" value={values.licenceExpiry} onChange={(e) => set({ licenceExpiry: e.target.value })} invalid={!!errors.licenceExpiry} /></Field>
+        <Field
+          label="Licence classes"
+          hint="As printed on the licence, separated by commas: C, D. A vehicle category may require one of these."
+          error={errors.licenceClasses}
+        >
+          <TextInput value={values.licenceClasses ?? ""} onChange={(e) => set({ licenceClasses: e.target.value })} invalid={!!errors.licenceClasses} />
+        </Field>
+        <Field
+          label="Qualifications"
+          hint="Certificates they hold, separated by commas: PSV, Defensive driving. Recorded on the record; nothing is refused for want of one."
+          error={errors.qualifications}
+        >
+          <TextInput value={values.qualifications ?? ""} onChange={(e) => set({ qualifications: e.target.value })} invalid={!!errors.qualifications} />
+        </Field>
         <Field label="Status" error={errors.status}>
           <Select value={values.status} onChange={(e) => set({ status: e.target.value as DriverInput["status"] })}>
             {DRIVER_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}

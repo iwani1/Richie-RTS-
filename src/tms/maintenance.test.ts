@@ -55,7 +55,7 @@ function build(options: { secondVehicle?: boolean } = {}): World {
 
   result = run(db, admin, {
     type: "update_settings",
-    input: { ...db.settings, vehicleCategories: [{ id: "", name: "Coach" }], maintenance: { blockOnOverdueService: false, schedules: [] } },
+    input: { ...db.settings, vehicleCategories: [{ id: "", name: "Coach", licenceClasses: [] }], maintenance: { blockOnOverdueService: false, schedules: [] } },
   });
   if (!result.ok) throw new Error(result.message);
   db = result.db;

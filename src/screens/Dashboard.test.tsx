@@ -35,6 +35,8 @@ const driver = (name: string, licenceExpiry: string): Driver => ({
   phone: "+233 00 000 0000",
   licenceNumber: `DL-${name}`,
   licenceExpiry,
+  licenceClasses: [],
+  qualifications: [],
   status: "active",
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
@@ -87,7 +89,7 @@ describe("operations board", () => {
         ...emptyDatabase().settings,
         companyName: "Richie Transport Services",
         currencyCode: "GHS",
-        vehicleCategories: [{ id: "c1", name: "Coaster" }],
+        vehicleCategories: [{ id: "c1", name: "Coaster", licenceClasses: [] }],
         shifts: [{ id: "s1", name: "Day", startTime: "06:00", endTime: "18:00" }],
         onTimeThresholdMinutes: 10,
       },
@@ -121,7 +123,7 @@ describe("operations board", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-      settings: { ...emptyDatabase().settings, vehicleCategories: [{ id: "c1", name: "Coaster" }] },
+      settings: { ...emptyDatabase().settings, vehicleCategories: [{ id: "c1", name: "Coaster", licenceClasses: [] }] },
       routes: [
         {
           id: "r1",

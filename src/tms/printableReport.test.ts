@@ -52,7 +52,7 @@ function world(currencyCode: string | null = "GHS"): Database {
       invoiceDueDays: 14,
       taxPosition: "not_registered",
       taxLines: [],
-      vehicleCategories: [{ id: "", name: "Coaster" }],
+      vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
       shifts: [],
       costCategories: ["Fuel", "Parts"],
       booking: { requestCutoffMinutes: null, cancellationCutoffMinutes: null },

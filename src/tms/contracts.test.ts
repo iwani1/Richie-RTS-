@@ -62,7 +62,7 @@ function build(): World {
       companyName: "Richie Transport Services",
       currencyCode: "GHS",
       onTimeThresholdMinutes: 5,
-      vehicleCategories: [{ id: "", name: "Coaster" }],
+      vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
       shifts: [{ id: "", name: "Day", startTime: "06:00", endTime: "14:00" }],
       rental: emptyRentalSettings(),
       documentTypes: [],

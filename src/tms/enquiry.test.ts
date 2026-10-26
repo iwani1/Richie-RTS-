@@ -29,7 +29,7 @@ function world(): Database {
         ...created.db.settings,
         companyName: "Richie Transport Services",
         currencyCode: "GHS",
-        vehicleCategories: [{ id: "", name: "Coaster" }],
+        vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
         rental: { ...created.db.settings.rental, pricingBasis: "per_day", depositPercent: 20, paymentMethods: ["Cash"] },
       },
     },

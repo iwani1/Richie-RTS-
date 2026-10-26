@@ -23,7 +23,7 @@ function world(): { db: Database; admin: Actor; ops: Actor; finance: Actor } {
     if (!r.ok) throw new Error(r.message);
     db = r.db;
   }
-  r = execute(db, admin, { type: "update_settings", input: { ...db.settings, vehicleCategories: [{ id: "", name: "Coaster" }, { id: "", name: "Minibus" }] } }, NOW);
+  r = execute(db, admin, { type: "update_settings", input: { ...db.settings, vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }, { id: "", name: "Minibus", licenceClasses: [] }] } }, NOW);
   if (!r.ok) throw new Error(r.message);
   db = r.db;
   const ops: Actor = { id: db.users[1].id, fullName: "Ops", role: "operations" };
@@ -175,6 +175,27 @@ describe("import", () => {
     expect(result.db.clients.map((client) => client.name)).toEqual(["Harbour Logistics"]);
     expect(result.message).toMatch(/line 2/);
     expect(result.message).toMatch(/Sole trader/);
+  });
+
+  it("carries a driver's licence classes and qualifications from the file (FLT-04)", () => {
+    const { db, admin } = world();
+    const result = executeImport(db, admin, {
+      type: "import_records",
+      kind: "drivers",
+      csv:
+        "name,phone,licence number,licence expiry,licence classes,qualifications,status\n" +
+        'Kofi Mensah,+233201234567,DL-001,2031-05-01,"C; D",PSV,active\n' +
+        "Ama Boateng,+233207654321,DL-002,2030-01-01,,,active\n",
+    }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const [kofi, ama] = result.db.drivers;
+    expect(kofi.licenceClasses).toEqual(["C", "D"]);
+    expect(kofi.qualifications).toEqual(["PSV"]);
+    // A blank cell is "not recorded", not an empty class that would count as a licence.
+    expect(ama.licenceClasses).toEqual([]);
+    expect(ama.qualifications).toEqual([]);
   });
 
   it("fails as a whole when every row is rejected, so nothing half-imports", () => {
