@@ -89,6 +89,8 @@ const client = (id: string, name: string): Client => ({
   billingAddress: "",
   tin: "",
   notes: "",
+  registrationNumber: "",
+  registeredOn: "",
   status: "active",
   createdAt: at,
   updatedAt: at,

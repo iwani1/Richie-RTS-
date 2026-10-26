@@ -195,7 +195,7 @@ suite("PostgreSQL constraints, through the repository", () => {
       ...before,
       clients: [
         ...before.clients,
-        { id: "client-1", name: "Northstar Foods", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", status: "active", createdAt: NOW, updatedAt: NOW },
+        { id: "client-1", name: "Northstar Foods", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", registrationNumber: "", registeredOn: "", status: "active", createdAt: NOW, updatedAt: NOW },
       ],
       users: [...before.users, account("user-1", "ops@northstar.test", false), account("user-2", "accounts@northstar.test", true)],
     };
@@ -207,6 +207,54 @@ suite("PostgreSQL constraints, through the repository", () => {
     expect(accounts.map((u) => u.email).sort()).toEqual(["accounts@northstar.test", "ops@northstar.test"]);
     // The primary mark is carried in the row's data, so it survives the round trip.
     expect(accounts.filter((u) => u.primaryContact).map((u) => u.email)).toEqual(["accounts@northstar.test"]);
+  });
+
+  it("stores the branches of a client and keeps a closed one (migration 019, CLI-01)", async () => {
+    const before = await loadDatabase();
+    const client = {
+      id: "client-branches",
+      name: "Harbour Logistics",
+      contactName: "",
+      contactPhone: "",
+      contactEmail: "",
+      reference: "HBL-77",
+      type: "organisation" as const,
+      billingAddress: "",
+      tin: "",
+      notes: "",
+      registrationNumber: "",
+      registeredOn: "",
+      status: "active" as const,
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    const database: Database = {
+      ...before,
+      clients: [...before.clients, client],
+      clientLocations: [
+        ...before.clientLocations,
+        { id: "loc-1", clientId: client.id, name: "Tema depot", address: "Harbour Road", phone: "", contactName: "Yaw", status: "active", createdAt: NOW, updatedAt: NOW },
+        { id: "loc-2", clientId: client.id, name: "Old yard", address: "Closed road", phone: "", contactName: "", status: "closed", createdAt: NOW, updatedAt: NOW },
+      ],
+    };
+
+    await write(database, before);
+    const reloaded = await loadDatabase();
+    const stored = reloaded.clientLocations.filter((location) => location.clientId === client.id);
+    expect(stored.map((location) => location.name).sort()).toEqual(["Old yard", "Tema depot"]);
+    // Closing a branch is a status, not a delete: it is still there with its address.
+    expect(stored.find((location) => location.id === "loc-2")?.status).toBe("closed");
+    expect(stored.find((location) => location.id === "loc-2")?.address).toBe("Closed road");
+  });
+
+  it("refuses two branches of one client with the same name, whatever the case (migration 019)", async () => {
+    // Inserted directly: the index is the database's own rule, independent of the validator.
+    await expect(
+      sql`
+        insert into client_location (id, client_id, name, address, phone, contact_name, status, created_at, updated_at, data)
+        values ('loc-dup', 'client-branches', '  tema  DEPOT ', '', '', '', 'active', now(), now(), '{}'::jsonb)
+      `.execute(db()),
+    ).rejects.toThrow(/client_location_name_uq|duplicate key/);
   });
 
   it("still refuses a second account for the same driver record", async () => {

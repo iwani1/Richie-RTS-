@@ -62,7 +62,7 @@ export function inspectBackup(value: unknown): { database: Database | null; prob
     return rows as unknown[];
   };
 
-  for (const key of ["vehicles", "drivers", "clients", "rentals", "routes", "passengers", "trips", "incidents", "workOrders", "documents", "odometerReadings", "audit"] as const) {
+  for (const key of ["vehicles", "drivers", "clients", "clientLocations", "rentals", "routes", "passengers", "trips", "incidents", "workOrders", "documents", "odometerReadings", "audit"] as const) {
     collection(key).forEach((row, i) => {
       if (!isRecord(row)) fail(`${key}[${i}]`, "Expected a record.");
       else if (!isText(row.id, 100)) fail(`${key}[${i}].id`, "Missing record id.");

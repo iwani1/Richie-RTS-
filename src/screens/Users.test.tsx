@@ -78,6 +78,8 @@ const client = {
   billingAddress: "",
   tin: "",
   notes: "",
+  registrationNumber: "",
+  registeredOn: "",
   status: "active" as const,
   createdAt: at,
   updatedAt: at,

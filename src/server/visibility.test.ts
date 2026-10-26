@@ -61,6 +61,8 @@ const client = (id: string): Client => ({
   billingAddress: "",
   tin: "",
   notes: "",
+  registrationNumber: "",
+  registeredOn: "",
   status: "active",
   createdAt: at,
   updatedAt: at,
@@ -219,6 +221,25 @@ describe("snapshot scope", () => {
     expect(visible.drivers).toEqual([]);
     expect(visible.vehicles).toEqual([]);
     expect(visible.audit).toEqual([]);
+  });
+
+  it("gives a client contact its own branches and no other customer's (CLI-01)", () => {
+    const w = world();
+    w.clientLocations = [
+      { id: "l1", clientId: "c1", name: "Tema depot", address: "Harbour Road", phone: "", contactName: "", status: "active", createdAt: at, updatedAt: at },
+      { id: "l2", clientId: "c2", name: "Another customer's office", address: "Elsewhere", phone: "", contactName: "", status: "active", createdAt: at, updatedAt: at },
+    ];
+
+    const contact = scopeDatabase(w, actor("client-user", "client_contact"))!;
+    expect(contact.clientLocations.map((location) => location.id)).toEqual(["l1"]);
+
+    // A driver is not given the customer's addresses at all, not even the ones on their own run.
+    const driver = scopeDatabase(w, actor("driver-user", "driver"))!;
+    expect(driver.clientLocations).toEqual([]);
+
+    // Internal staff with the client book see every branch, because branches are part of it.
+    const ops = scopeDatabase(w, actor("ops-user", "operations"))!;
+    expect(ops.clientLocations.map((location) => location.id).sort()).toEqual(["l1", "l2"]);
   });
 
   it("gives finance rentals and costs but not the employee roster, documents, accounts or audit", () => {

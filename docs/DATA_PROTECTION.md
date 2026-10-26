@@ -8,7 +8,8 @@ Status: **draft proposal**. This is not legal advice. Ghana's Data Protection Ac
 |---|---|---|---|---|
 | System users (staff) | Name, email, role, active flag, the driver, client or rider record the account is bound to, password hash and salt, audit actions | Account access and accountability | Administrator | Administrator (all); audit viewers see actor names |
 | Drivers | Name, phone, licence number, licence expiry, status | Dispatch, licence validity checks | Operations | Operations (read/write); finance (read); administrator |
-| Corporate client contacts | Contact name, phone, email | Account communication | Finance, administrator | Finance (read/write); operations (read); administrator |
+| Corporate client contacts | Contact name, phone, email, and the registered company details the office supplied | Account communication, billing | Finance, administrator | Finance (read/write); operations (read); administrator |
+| Client branches and offices | Branch name, address, phone and the name of the person to ask for there | Saying which office a run serves | Operations, finance, administrator | Finance (read/write); operations (read); administrator; and a client contact sees only its own organisation's branches, never another customer's |
 | Passengers (employees of corporate clients) | Full name, employee reference, optional phone, route, pickup stop, status | Running staff busing routes | Operations (from the client's roster; source to be confirmed) | Operations (read/write); finance (read); administrator |
 | Boarding and stop-time records | Per trip: boarded or no-show per passenger; actual time at each stop | Attendance, on-time measurement | Operations at trip completion | Operations; administrator; KPI views show aggregates only |
 | Rental customers | Name, phone, email, purpose, pickup and drop-off locations | Quotation, booking, billing | Operations, finance | Finance; operations; administrator |

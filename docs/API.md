@@ -110,7 +110,7 @@ A successful command returns the **new scoped snapshot**, so the caller never ne
 |---|---|
 | Accounts and settings | `setup_administrator`, `record_sign_in`, `create_user`, `update_user`, `reset_user_password`, `update_settings` |
 | Fleet | `create_vehicle`, `update_vehicle`, `transition_vehicle`, `create_driver`, `update_driver`, `record_odometer`, `void_odometer` |
-| Clients and rentals | `create_client`, `update_client`, `create_contract`, `update_contract`, `advance_contract`, `create_rental`, `update_rental`, `quote_rental`, `requote_rental`, `confirm_rental`, `assign_rental`, `start_rental`, `complete_rental`, `decline_rental`, `cancel_rental` |
+| Clients and rentals | `create_client`, `update_client`, `create_client_location`, `update_client_location`, `create_contract`, `update_contract`, `advance_contract`, `create_rental`, `update_rental`, `quote_rental`, `requote_rental`, `confirm_rental`, `assign_rental`, `start_rental`, `complete_rental`, `decline_rental`, `cancel_rental` |
 | Routes and trips | `create_route`, `update_route`, `generate_trips`, `assign_trip`, `dispatch_trip`, `start_trip`, `record_trip_stop`, `complete_trip`, `cancel_trip`, `correct_trip_record` |
 | Roster | `create_passenger`, `update_passenger` |
 | Incidents and maintenance | `create_incident`, `update_incident`, `advance_incident`, `add_incident_cost`, `remove_incident_cost`, `create_work_order`, `update_work_order`, `advance_work_order`, `add_work_order_cost`, `remove_work_order_cost` |

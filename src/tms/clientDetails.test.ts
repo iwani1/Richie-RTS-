@@ -163,6 +163,136 @@ describe("the customer register (CUS-01)", () => {
   });
 });
 
+describe("the certificate a company supplied (CLI-01)", () => {
+  it("keeps the registration number and the date on it", () => {
+    const w = build();
+    step(w, "admin", {
+      type: "create_client",
+      input: clientInput({ registrationNumber: " CS-1234567 ", registeredOn: "2019-04-12" }),
+    });
+
+    const saved = w.db.clients[0];
+    expect(saved.registrationNumber).toBe("CS-1234567");
+    expect(saved.registeredOn).toBe("2019-04-12");
+  });
+
+  it("leaves both blank on a customer who never supplied one, and on an older record", () => {
+    const w = build();
+    step(w, "admin", { type: "create_client", input: clientInput() });
+    expect(w.db.clients[0].registrationNumber).toBe("");
+    expect(w.db.clients[0].registeredOn).toBe("");
+
+    const old = migrate({ ...emptyDatabase(), schemaVersion: 22, clients: [{ ...w.db.clients[0], registrationNumber: undefined, registeredOn: undefined }] });
+    expect(old?.clients[0].registrationNumber).toBe("");
+    expect(old?.clients[0].registeredOn).toBe("");
+  });
+
+  it("refuses a day that is not a day, and a registration dated in the future", () => {
+    const w = build();
+    const notADay = attempt(w, "admin", {
+      type: "create_client",
+      input: clientInput({ registeredOn: "2019-02-30" }),
+    });
+    expect(errorsOf(notADay).registeredOn).toBe("Enter the registration date as a real day.");
+
+    const future = attempt(w, "admin", {
+      type: "create_client",
+      input: clientInput({ name: "Tomorrow Ltd", reference: "", registeredOn: "2027-01-01" }),
+    });
+    expect(errorsOf(future).registeredOn).toBe("A company cannot be registered in the future.");
+
+    const longNumber = attempt(w, "admin", {
+      type: "create_client",
+      input: clientInput({ name: "Long Ltd", reference: "", registrationNumber: "x".repeat(41) }),
+    });
+    expect(errorsOf(longNumber).registrationNumber).toBe("Keep the registration number to 40 characters.");
+  });
+
+  it("keeps the certificate details when the rest of the record is edited", () => {
+    const w = build();
+    step(w, "admin", { type: "create_client", input: clientInput({ registrationNumber: "CS-1234567", registeredOn: "2019-04-12" }) });
+    const saved = w.db.clients[0];
+
+    step(w, "admin", {
+      type: "update_client",
+      id: saved.id,
+      input: clientInput({ contactPhone: "0302000111", registrationNumber: saved.registrationNumber, registeredOn: saved.registeredOn }),
+    });
+    expect(w.db.clients[0].registrationNumber).toBe("CS-1234567");
+    expect(w.db.clients[0].registeredOn).toBe("2019-04-12");
+  });
+});
+
+describe("the branches of a customer, written as commands (CLI-01)", () => {
+  const branchInput = (overrides: Record<string, unknown> = {}) => ({
+    clientId: "ignored",
+    name: "Tema depot",
+    address: "Harbour Road, Gate 3",
+    phone: "0244000111",
+    contactName: "Yaw Mensah",
+    ...overrides,
+  });
+
+  it("adds a branch under the customer, and the customer's own history shows who did it", () => {
+    const w = build();
+    step(w, "admin", { type: "create_client", input: clientInput() });
+    const clientId = w.db.clients[0].id;
+
+    step(w, "admin", { type: "create_client_location", input: { ...branchInput(), clientId } as never });
+
+    expect(w.db.clientLocations).toHaveLength(1);
+    const entry = w.db.audit.find((row) => row.action === "clients:location_create")!;
+    expect(entry.entity).toBe("client");
+    expect(entry.entityId).toBe(clientId);
+    expect(entry.actorName).toBe("Admin");
+    expect(entry.summary).toBe("Added branch Tema depot (Harbour Road, Gate 3) to Northstar Foods.");
+  });
+
+  it("closes a branch without throwing its address away, and says so in the history", () => {
+    const w = build();
+    step(w, "admin", { type: "create_client", input: clientInput() });
+    const clientId = w.db.clients[0].id;
+    step(w, "admin", { type: "create_client_location", input: { ...branchInput(), clientId } as never });
+    const locationId = w.db.clientLocations[0].id;
+
+    step(w, "admin", {
+      type: "update_client_location",
+      id: locationId,
+      input: { ...branchInput(), clientId, status: "closed" } as never,
+    });
+
+    expect(w.db.clientLocations[0].status).toBe("closed");
+    expect(w.db.clientLocations[0].address).toBe("Harbour Road, Gate 3");
+    expect(w.db.audit[0].summary).toBe("Closed branch Tema depot of Northstar Foods. The address is kept.");
+  });
+
+  it("refuses a duplicate branch name and a branch on a customer that does not exist", () => {
+    const w = build();
+    step(w, "admin", { type: "create_client", input: clientInput() });
+    const clientId = w.db.clients[0].id;
+    step(w, "admin", { type: "create_client_location", input: { ...branchInput(), clientId } as never });
+
+    const twice = attempt(w, "admin", { type: "create_client_location", input: { ...branchInput({ name: "tema DEPOT" }), clientId } as never });
+    expect(twice.ok).toBe(false);
+    expect(errorsOf(twice).name).toBe("This customer already has a branch with this name.");
+
+    const orphan = attempt(w, "admin", { type: "create_client_location", input: { ...branchInput({ name: "Somewhere" }), clientId: "nobody" } as never });
+    expect(orphan.ok).toBe(false);
+    expect(errorsOf(orphan).clientId).toBe("Choose the customer this branch belongs to.");
+  });
+
+  it("is closed to a role that may read the client book but not change it", () => {
+    const w = build();
+    step(w, "admin", { type: "create_client", input: clientInput() });
+    const clientId = w.db.clients[0].id;
+
+    // Operations reads the client book to dispatch; it does not add branches to a customer.
+    const denied = attempt(w, "ops", { type: "create_client_location", input: { ...branchInput(), clientId } as never });
+    expect(denied.ok).toBe(false);
+    expect(w.db.clientLocations).toHaveLength(0);
+  });
+});
+
 describe("the invoice carries the buyer's details (CUS-01)", () => {
   /** A completed rental for a customer who is on the client register. */
   function completedRentalFor(clientId: string): World {

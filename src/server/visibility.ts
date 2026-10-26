@@ -51,6 +51,8 @@ const SECTION_PERMISSIONS: { [K in keyof Database]?: Permission } = {
   audit: "audit:read",
   bookings: "bookings:read",
   clients: "clients:read",
+  // Branches are part of a customer record, so the permission that opens the client book opens them.
+  clientLocations: "clients:read",
   documents: "documents:read",
   drivers: "drivers:read",
   incidents: "incidents:read",
@@ -143,6 +145,11 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       users: link.user ? [link.user] : [],
       drivers: link.driver ? [link.driver] : [],
       clients: link.client ? [link.client] : [],
+      // A corporate contact sees the addresses of its own offices — that is where its staff are
+      // collected from — and no other customer's.
+      clientLocations: link.client
+        ? database.clientLocations.filter((location) => location.clientId === link.client!.id)
+        : [],
       trips: view.trips,
       incidents: view.incidents,
       routes: view.routes,

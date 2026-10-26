@@ -1995,3 +1995,50 @@ and the office was re-typing both whenever the question came up.
   **22**; validation in `validateClient`; the register gains a Billing column, a History panel and the
   new form fields; the invoice sheet prints the buyer block; 16 new tests (9 domain, 2 import, 3
   register screen, 2 sheet).
+
+## D-102 - A customer's branches are records, and its agreement is read rather than copied (CLI-01)
+
+The corporate client record was a name, one contact and a status. CUS-01 added what a document
+prints. What was still missing is the shape of the business: the certificate it was registered on,
+the offices its staff are collected from, and whether there is an agreement at all.
+
+- **Decision 1: the registration number and date are typed from the certificate and never
+  reformatted.** Both are optional; a customer who never supplied one has blanks, and the register
+  prints nothing rather than a placeholder. Only the length and the fact that the date is a real day
+  are checked, plus one rule that matters: a company cannot be registered in the future. Whether a
+  registration *date* is plausible against the customer's first job was **rejected** as a guess.
+- **Decision 2: a branch is a record with an owner, not text on the customer.** The office already
+  says "Tema depot" and "Head office", and a run or an invoice may name one of them. Held as free
+  text, the same place gets typed three ways and no picker can offer it. `client_location` is its own
+  table with a foreign key to the customer; a branch cannot outlive the customer it belongs to.
+- **Decision 3: one name per customer, compared ignoring case and spaces, enforced twice.** The form
+  refuses a duplicate and so does a unique index on `(client_id, lower(btrim(name)))`. The form gives
+  a sentence a person can act on; the index is what holds when a backup restore or a second writer
+  arrives. A database rule that only the application respects is not a rule.
+- **Decision 4: a closed branch keeps its row.** Closing sets `status = 'closed'`. Trip records,
+  invoices and the customer's own history already name that office, and deleting the branch would
+  leave them naming nothing. There is no delete command, and the same reason applies as in D-100:
+  what an auditor asks a year later is "where was this run collected from?", not "why is there a gap?".
+- **Decision 5: the agreement line is computed, never stored.** The row shows "CT-0001 active to
+  2026-12-31" or *no agreement on file*, from `db.contracts`. A stored flag would be a second copy of
+  a fact the contract holds, and the copy is the one that goes stale — an agreement terminated in
+  Contracts would still read active on the customer. The line prefers an agreement in force, then one
+  waiting to start, then the most recent that has ended, and ties break on the start date so the
+  answer never depends on array order.
+- **Decision 6: no new permission.** Branches use `clients:create` / `clients:update`. A branch is
+  part of a customer record, and a separate permission for it would be a second way to say the same
+  thing — with the failure mode that somebody holds one and not the other.
+- **Decision 7: the portal sees its own offices.** A client contact is given its own customer's
+  branches — that is where its staff are collected from — and no other customer's, and a driver is
+  given none. The snapshot rule is the same one that already narrows users, passengers and contracts.
+- **Decision 8: branches are not on the invoice.** The document prints the customer's billing
+  address (D-101). Which branch a run served belongs to the trip record, not to the bill, and putting
+  it on the invoice would invite two addresses disagreeing on one piece of paper. **Rejected** for
+  now: a per-branch billing address, which would be a different feature and would need a rule for
+  which branch an invoice is billed to.
+- **Consequence.** `Client` gains `registrationNumber` and `registeredOn`; new `ClientLocation` type
+  and `clientLocations` collection; new module `src/tms/clients.ts` (validation and the agreement
+  line); commands `create_client_location` and `update_client_location`; migration **019**
+  (`client_location`), schema version **23**, 21 tables; the register gains the certificate fields,
+  a branch count per row, the agreement line and a **Branches** panel; 26 new tests (12 domain, 8
+  command, 5 screen, 1 payload) plus 2 against real PostgreSQL.

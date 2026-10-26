@@ -100,6 +100,10 @@ export interface Client {
   name: string;
   /** A company or a person. Null until somebody says which. */
   type: ClientType | null;
+  /** The company registration number, when the office has the certificate (CLI-01). */
+  registrationNumber: string;
+  /** The date on that certificate, `YYYY-MM-DD`, or blank when it was not written down. */
+  registeredOn: string;
   contactName: string;
   contactPhone: string;
   contactEmail: string;
@@ -109,6 +113,31 @@ export interface Client {
   tin: string;
   notes: string;
   status: ClientStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const CLIENT_LOCATION_STATUSES = ["active", "closed"] as const;
+/** A branch is open for business or it has closed. Nothing is deleted, so the address survives. */
+export type ClientLocationStatus = (typeof CLIENT_LOCATION_STATUSES)[number];
+
+/**
+ * A branch or office of a customer (CLI-01).
+ *
+ * Kept beside the client rather than as free text on it, because a corporate customer has several
+ * — a head office that receives the bill and depots that the staff are picked up from — and the
+ * question "which of their offices is this run for?" needs an answer that is one of a list.
+ */
+export interface ClientLocation {
+  id: string;
+  clientId: string;
+  /** What the office calls it: "Head office", "Tema depot". */
+  name: string;
+  address: string;
+  phone: string;
+  /** The person at that branch, when it is not the same person as the client's contact. */
+  contactName: string;
+  status: ClientLocationStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -1103,7 +1132,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 23;
 
 /**
  * Every schema version this build can still read.
@@ -1113,7 +1142,7 @@ export const SCHEMA_VERSION = 22;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1121,6 +1150,7 @@ export interface Database {
   vehicles: Vehicle[];
   drivers: Driver[];
   clients: Client[];
+  clientLocations: ClientLocation[];
   rentals: Rental[];
   routes: BusRoute[];
   passengers: Passenger[];
@@ -1153,6 +1183,7 @@ export function emptyDatabase(): Database {
     vehicles: [],
     drivers: [],
     clients: [],
+    clientLocations: [],
     rentals: [],
     routes: [],
     passengers: [],
@@ -1228,7 +1259,21 @@ export function migrate(value: unknown): Database | null {
       billingAddress: typeof client.billingAddress === "string" ? client.billingAddress : "",
       tin: typeof client.tin === "string" ? client.tin : "",
       notes: typeof client.notes === "string" ? client.notes : "",
+      // CLI-01 arrived in schema 23. A certificate number the office never wrote down is blank,
+      // not an invented one.
+      registrationNumber: typeof client.registrationNumber === "string" ? client.registrationNumber : "",
+      registeredOn: typeof client.registeredOn === "string" ? client.registeredOn : "",
     })),
+    // Branches arrived in schema 23; an older backup has none, which is a fact about that backup.
+    clientLocations: Array.isArray(v.clientLocations)
+      ? (v.clientLocations as ClientLocation[]).map((location) => ({
+          ...location,
+          address: typeof location.address === "string" ? location.address : "",
+          phone: typeof location.phone === "string" ? location.phone : "",
+          contactName: typeof location.contactName === "string" ? location.contactName : "",
+          status: location.status === "closed" ? "closed" : "active",
+        }))
+      : [],
     rentals: Array.isArray(v.rentals) ? (v.rentals as Rental[]).map((rental) => ({ ...rental, quoteHistory: rental.quoteHistory ?? [] })) : [],
     routes: Array.isArray(v.routes) ? (v.routes as BusRoute[]) : [],
     passengers: Array.isArray(v.passengers) ? (v.passengers as Passenger[]) : [],

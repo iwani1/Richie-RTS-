@@ -17,6 +17,7 @@ import {
   type AuditEntry,
   type BusRoute,
   type Client,
+  type ClientLocation,
   type ComplianceDocument,
   type Contract,
   type CreditNote,
@@ -108,6 +109,19 @@ const clientRow = (c: Client): Row => ({
   created_at: c.createdAt,
   updated_at: c.updatedAt,
   data: json(c),
+});
+
+const clientLocationRow = (location: ClientLocation): Row => ({
+  id: location.id,
+  client_id: location.clientId,
+  name: location.name,
+  address: location.address,
+  phone: location.phone,
+  contact_name: location.contactName,
+  status: location.status,
+  created_at: location.createdAt,
+  updated_at: location.updatedAt,
+  data: json(location),
 });
 
 const rentalRow = (r: Rental): Row => ({
@@ -440,12 +454,13 @@ async function auditRows(trx: Kysely<KyselyDatabase>, limit: number): Promise<Se
 
 /** Reads the whole working set. Audit is capped for the in-memory snapshot; the table keeps all. */
 export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Promise<Database> {
-  const [users, vehicles, drivers, clients, rentals, routes, passengers, trips, bookings, contracts, incidents, workOrders, documents, odometer, invoices, creditNotes, payments, refunds, expenses, receipts, counters, audit, settings] =
+  const [users, vehicles, drivers, clients, clientLocations, rentals, routes, passengers, trips, bookings, contracts, incidents, workOrders, documents, odometer, invoices, creditNotes, payments, refunds, expenses, receipts, counters, audit, settings] =
     await Promise.all([
       rows(executor, "app_user"),
       rows(executor, "vehicle"),
       rows(executor, "driver"),
       rows(executor, "client"),
+      rows(executor, "client_location"),
       rows(executor, "rental"),
       rows(executor, "bus_route"),
       rows(executor, "passenger"),
@@ -477,6 +492,7 @@ export async function loadDatabase(executor: Kysely<KyselyDatabase> = db()): Pro
     vehicles: vehicles.map((r) => r.data),
     drivers: drivers.map((r) => r.data),
     clients: clients.map((r) => r.data),
+    clientLocations: clientLocations.map((r) => r.data),
     rentals: rentals.map((r) => r.data),
     routes: routes.map((r) => r.data),
     passengers: passengers.map((r) => r.data),
@@ -678,6 +694,8 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
     "rentals",
     "vehicles",
     "drivers",
+    // A branch points at its customer, so it goes before the customer does.
+    "clientLocations",
     "clients",
     "users",
   ];
@@ -701,6 +719,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
     vehicles: "vehicle",
     drivers: "driver",
     clients: "client",
+    clientLocations: "client_location",
     users: "app_user",
   };
   for (const key of order) {
@@ -720,6 +739,7 @@ export async function saveDatabase(trx: Kysely<KyselyDatabase>, before: Database
 
   await write("app_user", after.users.map(userRow), before.users.map(userRow));
   await write("client", after.clients.map(clientRow), before.clients.map(clientRow));
+  await write("client_location", after.clientLocations.map(clientLocationRow), before.clientLocations.map(clientLocationRow));
   await write("driver", after.drivers.map(driverRow), before.drivers.map(driverRow));
   await write("vehicle", after.vehicles.map(vehicleRow), before.vehicles.map(vehicleRow));
   await write("rental", after.rentals.map(rentalRow), before.rentals.map(rentalRow));
@@ -793,7 +813,7 @@ export async function truncateAll(trx: Db | Trx): Promise<void> {
     truncate table resource_reservation, audit_entry, app_settings, odometer_reading,
       payment, refund, credit_note, invoice, reference_counter, receipt_file, expense,
       compliance_document, work_order, incident, booking, contract, trip, passenger, bus_route, rental,
-      vehicle, driver, client, app_user restart identity cascade
+      vehicle, driver, client, client_location, app_user restart identity cascade
   `.execute(trx);
 }
 

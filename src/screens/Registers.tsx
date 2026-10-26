@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { ClientInput, DriverInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
-import { CLIENT_STATUSES, CLIENT_TYPE_LABELS, CLIENT_TYPES, DRIVER_STATUSES, type Client, type ClientType, type Driver } from "../tms/types";
+import { clientAgreementLine, type ClientLocationInput } from "../tms/clients";
+import { CLIENT_LOCATION_STATUSES, CLIENT_STATUSES, CLIENT_TYPE_LABELS, CLIENT_TYPES, DRIVER_STATUSES, type Client, type ClientLocation, type ClientType, type Driver } from "../tms/types";
 import { Badge, Button, DataTable, EmptyState, Field, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 import { ImportPanel } from "../ui/ImportPanel";
 
@@ -141,6 +142,8 @@ const emptyClient = (): ClientInput => ({
   billingAddress: "",
   tin: "",
   notes: "",
+  registrationNumber: "",
+  registeredOn: "",
   status: "active",
 });
 const clientToInput = (c: Client): ClientInput => ({
@@ -153,20 +156,34 @@ const clientToInput = (c: Client): ClientInput => ({
   billingAddress: c.billingAddress,
   tin: c.tin,
   notes: c.notes,
+  registrationNumber: c.registrationNumber,
+  registeredOn: c.registeredOn,
   status: c.status,
 });
 
 export function ClientsPage() {
   const { db, allowed, dispatch, setFlash } = useTms();
-  const [panel, setPanel] = useState<{ mode: "create" } | { mode: "edit"; client: Client } | { mode: "import" } | { mode: "history"; client: Client } | null>(null);
+  const [panel, setPanel] = useState<
+    | { mode: "create" }
+    | { mode: "edit"; client: Client }
+    | { mode: "import" }
+    | { mode: "history"; client: Client }
+    | { mode: "branches"; client: Client }
+    | null
+  >(null);
+  const today = todayYmd();
   const [query, setQuery] = useState("");
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return db.clients
-      .filter((c) => !q || `${c.reference} ${c.name} ${c.contactName} ${c.contactEmail} ${c.tin}`.toLowerCase().includes(q))
+      .filter((c) => !q || `${c.reference} ${c.name} ${c.contactName} ${c.contactEmail} ${c.tin} ${c.registrationNumber}`.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [db.clients, query]);
+
+  // The count on the row's own button: a customer with no branches says "0 branches", which is the
+  // truth and is more use than a button that hides whether anything is behind it.
+  const branchCount = (clientId: string) => db.clientLocations.filter((location) => location.clientId === clientId).length;
 
   const handle = async (input: ClientInput): Promise<Errors> => {
     if (!panel) return {};
@@ -214,6 +231,13 @@ export function ClientsPage() {
                   {" · "}
                   {c.type ? CLIENT_TYPE_LABELS[c.type] : <em className="rts-unset">type not recorded</em>}
                 </span>
+                {(c.registrationNumber || c.registeredOn) && (
+                  <span className="text-xs text-stone-600">
+                    {c.registrationNumber && <span className="rts-mono">Reg. {c.registrationNumber}</span>}
+                    {c.registrationNumber && c.registeredOn ? " · " : ""}
+                    {c.registeredOn ? `registered ${formatDate(c.registeredOn)}` : ""}
+                  </span>
+                )}
               </span>
             ),
           },
@@ -251,7 +275,16 @@ export function ClientsPage() {
                 <em className="rts-unset">not recorded</em>
               ),
           },
-          { key: "status", header: "Status", render: (c) => <Badge tone={c.status === "active" ? "success" : "neutral"}>{c.status}</Badge> },
+          {
+            key: "status",
+            header: "Status",
+            render: (c) => (
+              <span className="flex flex-col gap-1">
+                <Badge tone={c.status === "active" ? "success" : "neutral"}>{c.status}</Badge>
+                <span className="text-[11px] text-stone-600">{clientAgreementLine(c.id, db.contracts, today)}</span>
+              </span>
+            ),
+          },
           {
             key: "actions",
             header: "",
@@ -260,6 +293,9 @@ export function ClientsPage() {
               <span className="flex justify-end gap-1">
                 <Button variant="ghost" onClick={() => setPanel({ mode: "history", client: c })} aria-label={`History of ${c.name}`}>
                   History
+                </Button>
+                <Button variant="ghost" onClick={() => setPanel({ mode: "branches", client: c })} aria-label={`Branches of ${c.name}`}>
+                  {branchCount(c.id)} {branchCount(c.id) === 1 ? "branch" : "branches"}
                 </Button>
                 {allowed("clients:update") ? <Button variant="ghost" onClick={() => setPanel({ mode: "edit", client: c })}>Edit</Button> : null}
               </span>
@@ -270,6 +306,7 @@ export function ClientsPage() {
       </TableCard>
       {panel && panel.mode === "import" && <ImportPanel kind="clients" onClose={() => setPanel(null)} />}
       {panel && panel.mode === "history" && <ClientHistory client={panel.client} onClose={() => setPanel(null)} />}
+      {panel && panel.mode === "branches" && <ClientBranches client={panel.client} onClose={() => setPanel(null)} />}
       {panel && panel.mode !== "import" && (
           <ClientForm key={panel.mode === "edit" ? panel.client.id : "create"} title={panel.mode === "edit" ? `Edit ${panel.client.name}` : "Add client"} initial={panel.mode === "edit" ? clientToInput(panel.client) : emptyClient()} onClose={() => setPanel(null)} onSubmit={handle} />
       )}
@@ -308,6 +345,16 @@ function ClientForm({ initial, title, onClose, onSubmit }: { initial: ClientInpu
             ))}
           </Select>
         </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* The certificate, when the office holds one. Both fields stay blank on a customer who
+              never supplied it, and the register prints nothing rather than a placeholder. */}
+          <Field label="Company registration number" hint="From the certificate. Optional." error={errors.registrationNumber}>
+            <TextInput value={values.registrationNumber ?? ""} onChange={(e) => set({ registrationNumber: e.target.value })} invalid={!!errors.registrationNumber} />
+          </Field>
+          <Field label="Registered on" hint="The date on that certificate. Optional." error={errors.registeredOn}>
+            <TextInput type="date" value={values.registeredOn ?? ""} onChange={(e) => set({ registeredOn: e.target.value })} invalid={!!errors.registeredOn} />
+          </Field>
+        </div>
         <Field label="Contact person"><TextInput value={values.contactName} onChange={(e) => set({ contactName: e.target.value })} /></Field>
         <Field label="Contact phone"><TextInput value={values.contactPhone} onChange={(e) => set({ contactPhone: e.target.value })} inputMode="tel" /></Field>
         <Field label="Contact email" error={errors.contactEmail}><TextInput type="email" value={values.contactEmail} onChange={(e) => set({ contactEmail: e.target.value })} invalid={!!errors.contactEmail} /></Field>
@@ -366,5 +413,154 @@ function ClientHistory({ client, onClose }: { client: Client; onClose: () => voi
         <Button onClick={onClose}>Close</Button>
       </div>
     </Panel>
+  );
+}
+
+/**
+ * A customer's branches (CLI-01).
+ *
+ * A corporate customer has a head office that receives the bill and depots its staff are collected
+ * from, and the office already names them. Listing them here rather than in one free-text address
+ * means "which office is this run for?" has an answer that is one of a list. A branch that closes is
+ * marked closed and keeps its address: the trips and invoices that named it are still on file.
+ */
+function ClientBranches({ client, onClose }: { client: Client; onClose: () => void }) {
+  const { db, allowed, dispatch, setFlash } = useTms();
+  const [editing, setEditing] = useState<{ location?: ClientLocation } | null>(null);
+
+  const locations = db.clientLocations
+    .filter((location) => location.clientId === client.id)
+    .sort((a, b) =>
+      a.status === b.status ? a.name.localeCompare(b.name) : a.status === "active" ? -1 : 1,
+    );
+  const open = locations.filter((location) => location.status === "active").length;
+  const mayEdit = allowed("clients:update");
+
+  const handle = async (input: ClientLocationInput): Promise<Errors> => {
+    const result = editing?.location
+      ? await dispatch({ type: "update_client_location", id: editing.location.id, input })
+      : await dispatch({ type: "create_client_location", input });
+    setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) setEditing(null);
+    return result.ok ? {} : result.errors;
+  };
+
+  return (
+    <Panel
+      title={`Branches of ${client.name}`}
+      description="The offices and depots this customer has. Closing a branch keeps its address, because the runs and documents that named it are still on file."
+      onClose={onClose}
+    >
+      {editing ? (
+        <BranchForm
+          key={editing.location?.id ?? "new"}
+          initial={editing.location}
+          clientId={client.id}
+          onCancel={() => setEditing(null)}
+          onSubmit={handle}
+        />
+      ) : (
+        <>
+          <p className="pb-3 text-sm text-stone-600">
+            {locations.length === 0
+              ? "No branches recorded yet. The billing address above is where documents go; branches are the places themselves."
+              : `${locations.length} recorded · ${open} open${locations.length - open ? ` · ${locations.length - open} closed` : ""}`}
+          </p>
+          {locations.length > 0 && (
+            <ul className="space-y-3">
+              {locations.map((location) => (
+                <li key={location.id} className="border-b border-stone-200 pb-3 last:border-0 last:pb-0">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="font-semibold text-stone-900">{location.name}</span>
+                    <Badge tone={location.status === "active" ? "success" : "neutral"}>{location.status === "active" ? "open" : "closed"}</Badge>
+                  </div>
+                  <p className="text-sm text-stone-700">{location.address || <em className="rts-unset">address not recorded</em>}</p>
+                  <p className="text-xs text-stone-600">
+                    {location.contactName || "contact not recorded"}
+                    {location.phone ? ` · ${location.phone}` : ""}
+                  </p>
+                  {mayEdit && (
+                    <div className="pt-1">
+                      <Button variant="ghost" onClick={() => setEditing({ location })} aria-label={`Edit branch ${location.name}`}>
+                        Edit
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex justify-between gap-2 pt-4">
+            {allowed("clients:create") ? (
+              <Button variant="primary" onClick={() => setEditing({})}>
+                Add branch
+              </Button>
+            ) : (
+              <span />
+            )}
+            <Button onClick={onClose}>Close</Button>
+          </div>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function BranchForm({
+  initial,
+  clientId,
+  onCancel,
+  onSubmit,
+}: {
+  initial?: ClientLocation;
+  clientId: string;
+  onCancel: () => void;
+  onSubmit: (input: ClientLocationInput) => Promise<Errors>;
+}) {
+  const [values, setValues] = useState<ClientLocationInput>({
+    clientId,
+    name: initial?.name ?? "",
+    address: initial?.address ?? "",
+    phone: initial?.phone ?? "",
+    contactName: initial?.contactName ?? "",
+    status: initial?.status ?? "active",
+  });
+  const [errors, setErrors] = useState<Errors>({});
+  const set = (patch: Partial<ClientLocationInput>) => setValues({ ...values, ...patch });
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={async (e: FormEvent) => {
+        e.preventDefault();
+        setErrors(await onSubmit(values));
+      }}
+    >
+      <Field label="Branch name" hint="What the office calls it, such as Head office or Tema depot." error={errors.name}>
+        <TextInput value={values.name} onChange={(e) => set({ name: e.target.value })} invalid={!!errors.name} autoFocus />
+      </Field>
+      <Field label="Address" error={errors.address}>
+        <TextArea value={values.address} onChange={(e) => set({ address: e.target.value ?? "" })} invalid={!!errors.address} />
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Person at this branch" error={errors.contactName}>
+          <TextInput value={values.contactName} onChange={(e) => set({ contactName: e.target.value })} invalid={!!errors.contactName} />
+        </Field>
+        <Field label="Phone" error={errors.phone}>
+          <TextInput value={values.phone} onChange={(e) => set({ phone: e.target.value })} inputMode="tel" invalid={!!errors.phone} />
+        </Field>
+      </div>
+      <Field label="State" hint="A closed branch keeps its address; nothing is deleted." error={errors.status}>
+        <Select value={values.status} onChange={(e) => set({ status: e.target.value as ClientLocationInput["status"] })}>
+          {CLIENT_LOCATION_STATUSES.map((status) => (
+            <option key={status} value={status}>{status === "active" ? "Open" : "Closed"}</option>
+          ))}
+        </Select>
+      </Field>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button type="submit" variant="primary">Save branch</Button>
+      </div>
+    </form>
   );
 }

@@ -7,7 +7,7 @@
   more — the page needs a server, because that is where authority lives.
 - Runtime: one Node.js process on the operator's workstation (Fedora), plus PostgreSQL. The
   database is the source of truth. See `docs/SETUP_AND_DEPLOYMENT.md` for the install and run commands.
-- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (20 tables: `refund` arrived in
+- Persistence: PostgreSQL 18, schema in `db/migrations/*.sql` (21 tables: `refund` arrived in
   `010_refunds.sql`, D-92, `expense` in `011_expenses.sql`, D-93, and `contract` in
   `015_contracts.sql`, D-95; `013` and `014` replace the two ceiling functions so a cancellation is
   not counted against itself (D-94); `012_reference_counter_scopes.sql`
@@ -17,7 +17,8 @@
   receipt kept in a folder outside the database (Q-51, D-100); `018_customer_details.sql` adds the
   customer code, the organisation/individual classification, the billing address, the tax number and a
   note to `client`, plus the buyer's address and tax number **copied onto** `invoice` at issue
-  (CUS-01, D-101); `btree_gist` +
+  (CUS-01, D-101); `019_client_locations.sql` adds `client_location`, the branches and offices of a
+  customer, one name per customer and closed rather than deleted (CLI-01, D-102); `btree_gist` +
   `pgcrypto`, exclusion constraint on resource reservations, append-only audit trigger, monotonic
   odometer trigger). Access is through `src/server/repository.ts` (Kysely, typed SQL — D-50).
 - Session: `iron-session` sealed cookie; passwords Argon2id (`@node-rs/argon2`) — D-51.
@@ -61,7 +62,7 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 22` (the migration number and the snapshot version are counted separately: one phase shipped without a new migration), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–22) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 23` (the migration number and the snapshot version are counted separately: one phase shipped without a new migration), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–23) |
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `mayReportOnRun`, `confinedClientId`, `confinedPassengerId`. Confines `driver`, `client_contact` and `passenger` to their one linked record. Fails closed |

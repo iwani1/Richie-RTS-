@@ -17,7 +17,7 @@ export const KNOWN_COMMAND_TYPES = [
   "update_settings",
   "create_vehicle", "update_vehicle", "transition_vehicle",
   "create_driver", "update_driver",
-  "create_client", "update_client",
+  "create_client", "update_client", "create_client_location", "update_client_location",
   "create_contract", "update_contract", "advance_contract",
   "create_rental", "update_rental", "quote_rental", "requote_rental", "confirm_rental",
   "assign_rental", "start_rental", "complete_rental", "decline_rental", "cancel_rental",

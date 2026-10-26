@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClientsPage } from "./Registers";
 import { TmsContext, type Tms } from "../tms/useTms";
-import { emptyDatabase, type Client, type Database, type User } from "../tms/types";
+import { emptyDatabase, type Client, type ClientLocation, type Contract, type Database, type User } from "../tms/types";
 
 afterEach(cleanup);
 
@@ -39,6 +39,8 @@ const client = (id: string, name: string): Client => ({
   billingAddress: "",
   tin: "",
   notes: "",
+  registrationNumber: "",
+  registeredOn: "",
   status: "active",
   createdAt: at,
   updatedAt: at,
@@ -197,5 +199,128 @@ describe("the customer details a document needs (CUS-01)", () => {
     expect(within(panel).queryByText(/Added vehicle/)).toBeNull();
     // It is a record, not an editor: every button in the panel only closes it.
     expect([...new Set(within(panel).getAllByRole("button").map((button) => button.textContent))]).toEqual(["Close"]);
+  });
+});
+
+describe("the branches and the agreement behind a customer (CLI-01)", () => {
+  const contract = (overrides: Partial<Contract> = {}): Contract => ({
+    id: "ct1",
+    reference: "CT-0001",
+    clientId: "c3",
+    clientName: "Harbour Logistics",
+    serviceType: "staff_transport",
+    startDate: "2026-01-01",
+    endDate: "2026-12-31",
+    status: "active",
+    routeIds: [],
+    weekdays: [],
+    shiftIds: [],
+    vehicleCategoryId: "",
+    pricingModel: "",
+    billingFrequency: "",
+    paymentTerms: "",
+    serviceLevelTargets: "",
+    notes: "",
+    replacesId: null,
+    history: [],
+    createdBy: "u1",
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  });
+
+  const branch = (overrides: Partial<ClientLocation> = {}): ClientLocation => ({
+    id: "l1",
+    clientId: "c3",
+    name: "Tema depot",
+    address: "Harbour Road, Gate 3",
+    phone: "0244000111",
+    contactName: "Yaw Mensah",
+    status: "active",
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  });
+
+  it("shows the certificate when the office holds one, and nothing when it does not", () => {
+    renderClients({
+      ...emptyDatabase(),
+      users: [admin],
+      clients: [
+        { ...client("c3", "Harbour Logistics"), registrationNumber: "CS-1234567", registeredOn: "2019-04-12" },
+        client("c4", "Walk-in Hire"),
+      ],
+    });
+
+    const withCertificate = rowFor("Harbour Logistics");
+    expect(withCertificate.textContent).toContain("Reg. CS-1234567");
+    expect(withCertificate.textContent).toContain("registered");
+    // A customer who never supplied one shows no placeholder at all.
+    expect(rowFor("Walk-in Hire").textContent).not.toContain("Reg.");
+  });
+
+  it("says whether there is an agreement, and names the one in force", () => {
+    renderClients({
+      ...emptyDatabase(),
+      users: [admin],
+      clients: [client("c3", "Harbour Logistics"), client("c4", "Walk-in Hire")],
+      contracts: [contract()],
+    });
+
+    expect(rowFor("Harbour Logistics").textContent).toContain("CT-0001 active to 2026-12-31");
+    expect(rowFor("Walk-in Hire").textContent).toContain("no agreement on file");
+  });
+
+  it("counts the branches on the row and lists them in their own panel", () => {
+    renderClients({
+      ...emptyDatabase(),
+      users: [admin],
+      clients: [client("c3", "Harbour Logistics")],
+      clientLocations: [
+        branch(),
+        branch({ id: "l2", name: "Head office", address: "Industrial Area", phone: "", contactName: "", status: "closed" }),
+      ],
+    });
+
+    expect(screen.getByRole("button", { name: "Branches of Harbour Logistics" }).textContent).toContain("2 branches");
+
+    fireEvent.click(screen.getByRole("button", { name: "Branches of Harbour Logistics" }));
+    const panel = screen.getByRole("dialog", { name: /Branches of Harbour Logistics/ });
+    expect(within(panel).getByText("Tema depot")).toBeTruthy();
+    expect(within(panel).getByText("Harbour Road, Gate 3")).toBeTruthy();
+    // The second branch has no person recorded, so it is not credited with the first one's.
+    expect(within(panel).getAllByText("Yaw Mensah · 0244000111")).toHaveLength(1);
+    // A closed branch is still listed, and says so.
+    expect(within(panel).getByText("Head office")).toBeTruthy();
+    expect(within(panel).getByText("closed")).toBeTruthy();
+    expect(within(panel).getByText(/2 recorded · 1 open · 1 closed/)).toBeTruthy();
+  });
+
+  it("says plainly when a customer has no branches yet", () => {
+    renderClients({ ...emptyDatabase(), users: [admin], clients: [client("c4", "Walk-in Hire")] });
+
+    expect(screen.getByRole("button", { name: "Branches of Walk-in Hire" }).textContent).toContain("0 branches");
+    fireEvent.click(screen.getByRole("button", { name: "Branches of Walk-in Hire" }));
+    expect(screen.getByText(/No branches recorded yet/)).toBeTruthy();
+  });
+
+  it("sends a new branch with the customer it belongs to", async () => {
+    const tms = renderClients({ ...emptyDatabase(), users: [admin], clients: [client("c3", "Harbour Logistics")] });
+
+    fireEvent.click(screen.getByRole("button", { name: "Branches of Harbour Logistics" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add branch" }));
+    fireEvent.change(screen.getByLabelText(/Branch name/), { target: { value: "Tema depot" } });
+    fireEvent.change(screen.getByLabelText(/^Address/), { target: { value: "Harbour Road, Gate 3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save branch" }));
+
+    await waitFor(() => expect(tms.dispatch).toHaveBeenCalled());
+    const sent = (tms.dispatch as unknown as { mock: { calls: [unknown][] } }).mock.calls[0][0] as {
+      type: string;
+      input: Record<string, unknown>;
+    };
+    expect(sent.type).toBe("create_client_location");
+    expect(sent.input.clientId).toBe("c3");
+    expect(sent.input.name).toBe("Tema depot");
+    expect(sent.input.address).toBe("Harbour Road, Gate 3");
   });
 });

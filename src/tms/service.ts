@@ -2,6 +2,7 @@
 // Pure and synchronous so it can be unit-tested and, later, moved behind an HTTP API
 // unchanged. In this environment it runs in the browser (see docs/DECISIONS.md D-01).
 
+import { validateClientLocation, type ClientLocationInput } from "./clients";
 import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
 import { overdueServiceFor } from "./maintenance";
 import { can, type Permission } from "./permissions";
@@ -21,6 +22,7 @@ import {
   migrate,
   type AuditEntry,
   type Client,
+  type ClientLocation,
   type ClientStatus,
   type ClientType,
   type Database,
@@ -68,12 +70,18 @@ export interface DriverInput {
   status: DriverStatus;
 }
 
+export type { ClientLocationInput };
+
 export interface ClientInput {
   /** The code the office already uses for this customer. Optional: a walk-in has none. */
   reference?: string;
   name: string;
   /** Company or person. Null is allowed and shown as "not recorded" rather than guessed. */
   type?: ClientType | null;
+  /** The company registration number, when the office has the certificate (CLI-01). */
+  registrationNumber?: string;
+  /** The date on that certificate, or blank when it was not written down (CLI-01). */
+  registeredOn?: string;
   contactName: string;
   contactPhone: string;
   contactEmail: string;
@@ -180,6 +188,8 @@ export type Command =
   | { type: "update_driver"; id: string; input: DriverInput }
   | { type: "create_client"; input: ClientInput }
   | { type: "update_client"; id: string; input: ClientInput }
+  | { type: "create_client_location"; input: ClientLocationInput }
+  | { type: "update_client_location"; id: string; input: ClientLocationInput }
   | { type: "create_rental"; input: RentalRequestInput }
   | { type: "submit_enquiry"; input: EnquiryInput }
   | { type: "update_rental"; id: string; input: RentalRequestInput }
@@ -345,7 +355,7 @@ export function validateDriver(db: Database, input: DriverInput, excludeId?: str
   return { errors, value: { fullName, phone, licenceNumber, licenceExpiry: input.licenceExpiry, status: input.status } };
 }
 
-export function validateClient(db: Database, input: ClientInput, excludeId?: string) {
+export function validateClient(db: Database, input: ClientInput, excludeId?: string, today?: string) {
   const errors: Errors = {};
   const name = input.name.trim();
   const contactEmail = input.contactEmail.trim().toLowerCase();
@@ -353,6 +363,8 @@ export function validateClient(db: Database, input: ClientInput, excludeId?: str
   const billingAddress = (input.billingAddress ?? "").trim();
   const tin = (input.tin ?? "").trim();
   const notes = (input.notes ?? "").trim();
+  const registrationNumber = (input.registrationNumber ?? "").trim();
+  const registeredOn = (input.registeredOn ?? "").trim();
 
   if (!name) errors.name = "Client name is required.";
   else if (db.clients.some((c) => c.id !== excludeId && norm(c.name) === norm(name)))
@@ -372,6 +384,15 @@ export function validateClient(db: Database, input: ClientInput, excludeId?: str
   // A TIN is whatever the customer's own document says; only its shape is checked, never its meaning.
   if (tin && !/^[A-Za-z0-9][A-Za-z0-9 /-]{3,29}$/.test(tin)) errors.tin = "A tax number is 4–30 letters, digits, spaces or hyphens.";
   if (notes.length > 500) errors.notes = "Keep the note to 500 characters.";
+  // The certificate number is typed from the paper and is not reformatted: offices write it with
+  // their own punctuation, and only the length is this program's business.
+  if (registrationNumber.length > 40) errors.registrationNumber = "Keep the registration number to 40 characters.";
+  if (registeredOn) {
+    if (!isValidDate(registeredOn)) errors.registeredOn = "Enter the registration date as a real day.";
+    // A certificate cannot be issued tomorrow. Without a reference day the check is skipped rather
+    // than guessed, which is what the older call sites (tests of validation alone) rely on.
+    else if (today && registeredOn > today) errors.registeredOn = "A company cannot be registered in the future.";
+  }
   if (!CLIENT_STATUSES.includes(input.status)) errors.status = "Invalid status.";
 
   return {
@@ -386,6 +407,8 @@ export function validateClient(db: Database, input: ClientInput, excludeId?: str
       billingAddress,
       tin: tin.toUpperCase(),
       notes,
+      registrationNumber,
+      registeredOn,
       status: input.status,
     },
   };
@@ -1071,7 +1094,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
     case "create_client": {
       const denied = authorise(actor, "clients:create");
       if (denied) return denied;
-      const { errors, value } = validateClient(db, command.input);
+      const { errors, value } = validateClient(db, command.input, undefined, now.slice(0, 10));
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
       const client: Client = { id: makeId(), ...value, createdAt: now, updatedAt: now };
       const next = audit({ ...db, clients: [...db.clients, client] }, actor, {
@@ -1088,7 +1111,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (denied) return denied;
       const existing = db.clients.find((c) => c.id === command.id);
       if (!existing) return fail("Client not found.");
-      const { errors, value } = validateClient(db, command.input, existing.id);
+      const { errors, value } = validateClient(db, command.input, existing.id, now.slice(0, 10));
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
       const updated: Client = { ...existing, ...value, updatedAt: now };
       const next = audit({ ...db, clients: db.clients.map((c) => (c.id === updated.id ? updated : c)) }, actor, {
@@ -1098,6 +1121,49 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         summary: `Updated client ${updated.name} (${updated.status}).`,
       }, now);
       return { ok: true, db: next, message: `Client ${updated.name} updated.` };
+    }
+
+    case "create_client_location": {
+      const denied = authorise(actor, "clients:create");
+      if (denied) return denied;
+      const { errors, value } = validateClientLocation(db, command.input);
+      if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
+      const location: ClientLocation = { id: makeId(), ...value, createdAt: now, updatedAt: now };
+      const client = db.clients.find((c) => c.id === location.clientId);
+      const next = audit({ ...db, clientLocations: [...db.clientLocations, location] }, actor, {
+        action: "clients:location_create",
+        // The entry belongs to the customer, so the customer's own History panel shows it.
+        entity: "client",
+        entityId: location.clientId,
+        summary: `Added branch ${location.name}${location.address ? ` (${location.address})` : ""} to ${client?.name ?? "the customer"}.`,
+      }, now);
+      return { ok: true, db: next, message: `Branch ${location.name} added to ${client?.name ?? "the customer"}.` };
+    }
+
+    case "update_client_location": {
+      const denied = authorise(actor, "clients:update");
+      if (denied) return denied;
+      const existing = db.clientLocations.find((location) => location.id === command.id);
+      if (!existing) return fail("Branch not found.");
+      const { errors, value } = validateClientLocation(db, command.input, existing.id);
+      if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
+      const updated: ClientLocation = { ...existing, ...value, updatedAt: now };
+      const client = db.clients.find((c) => c.id === updated.clientId);
+      const next = audit(
+        { ...db, clientLocations: db.clientLocations.map((location) => (location.id === updated.id ? updated : location)) },
+        actor,
+        {
+          action: "clients:location_update",
+          entity: "client",
+          entityId: updated.clientId,
+          summary:
+            updated.status === "closed" && existing.status !== "closed"
+              ? `Closed branch ${updated.name} of ${client?.name ?? "the customer"}. The address is kept.`
+              : `Updated branch ${updated.name} of ${client?.name ?? "the customer"}.`,
+        },
+        now,
+      );
+      return { ok: true, db: next, message: `Branch ${updated.name} updated.` };
     }
 
     case "create_rental": {

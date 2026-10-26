@@ -83,6 +83,20 @@ export interface ClientRow {
   data: Json;
 }
 
+/** A branch of a customer (CLI-01, migration 019). The address also travels in `data`. */
+export interface ClientLocationRow {
+  id: string;
+  client_id: string;
+  name: string;
+  address: string;
+  phone: string;
+  contact_name: string;
+  status: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  data: Json;
+}
+
 export interface RentalRow {
   id: string;
   reference: string;
@@ -398,6 +412,7 @@ export interface KyselyDatabase {
   vehicle: VehicleRow;
   driver: DriverRow;
   client: ClientRow;
+  client_location: ClientLocationRow;
   rental: RentalRow;
   bus_route: BusRouteRow;
   passenger: PassengerRow;
