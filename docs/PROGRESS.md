@@ -35,7 +35,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RNT-08 | 1A | Cancellation releases reserved resources; reasons recorded. | Met | Verified live: a cancelled rental's dates were reusable immediately; reason required. |
 | RNT-09 | 1C | Rental customer portal: own requests, quotations, payment status; accept or cancel where permitted. | Partial | Client portal lists own requests and quotations. **No accept/cancel action and no payment status** (no payments). |
 | WEB-01 | 1A | Public rental enquiry endpoint and embeddable form for the existing website, with rate limiting and spam protection. It creates a Submitted request… | Met | `GET/POST /api/enquiry` (unauthenticated, `src/app/api/enquiry/route.ts`) creates a draft request through the `submit_enquiry` command and returns the reference and a sentence — no records, no counts. Throttled 8 per 10 minutes per address (`rateLimit.take`), plus a signed time-trap (`src/server/enquiryToken.ts`) and a honeypot. The form is `src/screens/PublicEnquiry.tsx` at `/enquiry` (`?embed=1` for the website iframe), the only path allowed to be framed (`next.config.ts`). *Submitted* is a `draft` in the existing status vocabulary — the office still quotes and confirms. Adding to PROGRESS 2026-10-24: no acknowledgement email (no mail provider). |
-| FLT-01 | 1A | Vehicle register: ID, registration number, make/model, category, seats, photo, fuel type, ownership/leasing, odometer, insurance, roadworthiness,… | Partial | Registration, make, model, category, seats, status, notes, odometer readings. **No photo, fuel type, ownership/leasing, usual driver.** Insurance/roadworthiness exist as compliance documents. |
+| FLT-01 | 1A | Vehicle register: ID, registration number, make/model, category, seats, photo, fuel type, ownership/leasing, odometer, insurance, roadworthiness,… | Partial | Registration, make, model, category, seats, status, notes; **fuel type, ownership and the lessor, and the usual driver since Phase 57** (D-107) — displayed on the row, counted when missing, and carried by the CSV importer. Odometer readings, insurance/roadworthiness and service dates exist as their own records. **The vehicle's photograph is not built**: it needs a file store and its own upload route, which is the next piece (D-108) |
 | FLT-02 | 1A | Vehicle statuses: Available, Reserved, Assigned, On Trip, Under Maintenance, Out of Service, Pending Inspection. Define the rule for each state in… | Partial | 4 statuses (`available`, `maintenance`, `out_of_service`, `retired`); blocking enforced and observed. Reserved/Assigned/On Trip/Pending Inspection do not exist. |
 | FLT-03 | 1A | Vehicle documents with expiry dates and configurable reminders. | Partial | Document register with expiry and configurable lead time; status computed per day. A type may be marked required, which blocks assignment while it is missing or lapsed (Phase 26). **Reminders are not sent** (no job runner, no notifications). |
 | FLT-04 | 1A | Driver register: licence class and expiry, qualifications, availability, status. | Met | `src/screens/Registers.tsx` + `src/tms/driving.ts` (Phase 54, D-103): each driver records **the classes printed on their licence** (upper-cased, compared ignoring case, up to 8) and **the certificates they hold**, beside the number, expiry and status that were already there. A **vehicle category may declare the classes that may drive it**, and dispatch then refuses a driver whose licence does not cover that vehicle — on both the trip and the hire path, and in the planning aid, which agrees with the save by construction. A blank class **fails closed once a requirement is declared** and says so in those words; an undeclared category checks nothing. **Availability** is shown as *free today* / *on TR-0001 (Northstar morning) today* / *on hire RR-0007 today*, derived from the runs and never stored. Tests: 20 domain (`driving.test.ts`), 1 planning-aid (`planning.test.ts`), 5 screen (`Registers.test.tsx`), 1 import (`import.test.ts`) |
@@ -1377,5 +1377,33 @@ gate. `docs/DECISIONS.md` D-105 records the reasoning.
 | Old runs | Done (verified) | Schema 26. A run written before this phase gains an empty history ("a run written before delays existed") |
 | Tests | Done (verified) | 16 domain (`delays.test.ts`), 8 service (`busing.test.ts`), 4 form (`TripDelayForm.test.tsx`), 2 portals (`Portals.test.tsx`), 1 dispatch screen (`Busing.test.tsx`), 3 rider states (`passenger.test.ts`) — 33 in all |
 
-Gates after this phase: `typecheck` clean, `lint` clean, `test` **899 passed, 28 skipped** (75 files passed, 5 skipped), coverage 84.00 % statements /
-87.79 % lines, `build` succeeds.
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **899 passed, 28 skipped** (75 files passed, 5 skipped), coverage 84.00 % statements / 87.79 % lines, `build` succeeds.
+
+## Phase 57 - What the fleet register was not saying about the vehicle (FLT-01)
+
+The register knew a registration, a category, a seat count and a status. It did not know what the bus
+runs on, whether it is ours, whose it is if it is not, or which driver habitually takes it out. Those
+are the questions a dispatcher asks when fuel is bought, when a leased bus is withdrawn, or when the
+same driver keeps reporting the same fault. `docs/DECISIONS.md` D-107 records the reasoning.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Fuel type | Done (verified) | Free text in the office's own words, trimmed, capped at 30 characters ("takes fuel in the office's own words, trimmed, and keeps it short") |
+| Ownership, and the lessor when it is not ours | Done (verified) | `owned`, `leased` or `hire purchase`, **null when nobody has recorded it — never assumed to be ours**, and a leased or hire-purchase vehicle must name its owner ("keeps an unrecorded ownership unrecorded, rather than calling it ours", "makes a leased or hire-purchase vehicle name its owner") |
+| An owner on a vehicle that is ours is refused, not stored invisibly | Done (verified) | "refuses an owner on a vehicle that is ours, instead of storing a name nobody will see" |
+| The usual driver | Done (verified) | A driver already on the register and not inactive; a habit, not an assignment, and nothing in dispatch reads it ("requires the usual driver to be a driver on the register, and one who still works here") |
+| The register shows them | Done (verified) | The row prints "Diesel · Leased from Ama Transport" under the make and model, names the usual driver (and marks one who is no longer active), and says "fuel and ownership not recorded" rather than leaving a blank ("prints the fuel and the ownership under the make and model", "names the usual driver, and marks one who is no longer active") |
+| The gaps are counted | Done (verified) | "1 with no fuel type · 1 with no ownership of 2", retired vehicles excluded ("counts the live vehicles with no fuel type and no ownership") |
+| The form asks for them | Done (verified) | A "The vehicle itself" section; the owner box appears only once the vehicle is not ours, and the whole section may be left blank ("offers fuel, ownership and the usual driver when adding a vehicle, and sends them") |
+| A spreadsheet carries them | Done (verified) | CSV columns `fuel`, `ownership`, `owner`; "Lease" is read as leased; an unreadable ownership and a lease with no owner are row errors naming the line ("carries fuel, ownership and the owner from the file", "names the line whose ownership nobody can read") |
+| Old records | Done (verified) | Schema 27. A vehicle written before this phase gains blanks and a null ownership ("gains blanks and a null ownership rather than claiming the fleet is ours") |
+| Tests | Done (verified) | 16 domain (`vehicles.test.ts`), 7 register screen (`Registers.test.tsx`), 4 importer (`import.test.ts`) — 20 new, and the service and importer suites unchanged and green |
+
+**Not yet built: the vehicle's photograph.** A photo is a file, and every other file in this program
+goes through a store that sniffs the bytes, generates the name on disk and pairs the row with the
+bytes in one order — receipts (D-100). Reusing that pattern for the fleet is the next piece rather
+than a corner cut at the end of this one; until it exists, the row shows no photo and the register
+does not pretend to hold one.
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **927 passed, 28 skipped** (76 files
+passed, 5 skipped), coverage 84.24 % statements / 88.02 % lines, `build` succeeds.

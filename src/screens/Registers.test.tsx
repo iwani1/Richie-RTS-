@@ -5,8 +5,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClientsPage, DriversPage } from "./Registers";
+import { VehiclesPage } from "./Vehicles";
 import { TmsContext, type Tms } from "../tms/useTms";
-import { emptyDatabase, type Client, type ClientLocation, type Contract, type Database, type Driver, type User } from "../tms/types";
+import { emptyDatabase, type Client, type ClientLocation, type Contract, type Database, type Driver, type User, type Vehicle } from "../tms/types";
 
 afterEach(cleanup);
 
@@ -420,5 +421,174 @@ describe("what a driver is licensed to drive (FLT-04)", () => {
     expect(sent.type).toBe("create_driver");
     expect(sent.input.licenceClasses).toBe("C, D");
     expect(sent.input.qualifications).toBe("PSV");
+  });
+});
+
+// FLT-01, D-106: the register now says what a vehicle runs on, whose it is and who normally takes
+// it out — and counts the vehicles where nobody has written it down.
+describe("what the fleet register says about the vehicle itself (FLT-01)", () => {
+  const vehicleRecord = (overrides: Partial<Vehicle> = {}): Vehicle => ({
+    id: "v1",
+    registration: "GT 100-26",
+    categoryId: "cat",
+    make: "Toyota",
+    model: "Coaster",
+    seatCapacity: 30,
+    status: "available",
+    fuelType: "Diesel",
+    ownership: "owned",
+    ownerName: "",
+    usualDriverId: null,
+    notes: "",
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  });
+
+  const driverRecord = (overrides: Partial<Driver> = {}): Driver => ({
+    id: "d1",
+    fullName: "Kofi Mensah",
+    phone: "0244000000",
+    licenceNumber: "DL-001",
+    licenceExpiry: "2031-05-01",
+    licenceClasses: ["D"],
+    qualifications: [],
+    status: "active",
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  });
+
+  function renderVehicles(db: Database) {
+    const tms = {
+      db,
+      actor: { id: admin.id, fullName: admin.fullName, role: admin.role },
+      currentUser: admin,
+      status: "ready",
+      connectionError: null,
+      auditTotal: 0,
+      setupRequired: false,
+      flash: null,
+      setFlash: () => {},
+      allowed: () => true,
+      dispatch: vi.fn(async () => ({ ok: true, message: "" })),
+      signIn: vi.fn(async () => null),
+      signOut: vi.fn(async () => {}),
+      setupAdministrator: vi.fn(async () => ({ ok: true, message: "" })),
+      exportBackup: vi.fn(async () => null),
+      refresh: vi.fn(async () => {}),
+    } as unknown as Tms;
+    render(
+      <TmsContext.Provider value={tms}>
+        <VehiclesPage navigate={() => {}} />
+      </TmsContext.Provider>,
+    );
+    return tms;
+  }
+
+  it("prints the fuel and the ownership under the make and model", () => {
+    renderVehicles({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()] });
+    expect(rowFor("GT 100-26").textContent).toContain("Diesel · Owned");
+  });
+
+  it("names the lessor when the vehicle is not ours", () => {
+    renderVehicles({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord({ ownership: "leased", ownerName: "Ama Transport" })],
+    });
+    expect(rowFor("GT 100-26").textContent).toContain("Diesel · Leased from Ama Transport");
+  });
+
+  it("says fuel and ownership are not recorded rather than leaving the cell blank", () => {
+    renderVehicles({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord({ fuelType: "", ownership: null })],
+    });
+    expect(rowFor("GT 100-26").textContent).toContain("fuel and ownership not recorded");
+  });
+
+  it("names the usual driver, and marks one who is no longer active", () => {
+    const drivers = [driverRecord(), driverRecord({ id: "d2", fullName: "Ama Boateng", status: "suspended" })];
+    const { unmount } = render(
+      <TmsContext.Provider
+        value={
+          {
+            db: { ...emptyDatabase(), users: [admin], drivers, vehicles: [vehicleRecord({ usualDriverId: "d1" })] },
+            actor: { id: admin.id, fullName: admin.fullName, role: admin.role },
+            currentUser: admin,
+            allowed: () => true,
+            dispatch: vi.fn(),
+            setFlash: () => {},
+            flash: null,
+          } as unknown as Tms
+        }
+      >
+        <VehiclesPage navigate={() => {}} />
+      </TmsContext.Provider>,
+    );
+    expect(rowFor("GT 100-26").textContent).toContain("Kofi Mensah");
+    unmount();
+
+    renderVehicles({
+      ...emptyDatabase(),
+      users: [admin],
+      drivers,
+      vehicles: [vehicleRecord({ usualDriverId: "d2" })],
+    });
+    const row = rowFor("GT 100-26");
+    expect(row.textContent).toContain("Ama Boateng");
+    expect(row.textContent).toContain("suspended");
+  });
+
+  it("says when nobody has recorded a usual driver", () => {
+    renderVehicles({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()] });
+    expect(rowFor("GT 100-26").textContent).toContain("not recorded");
+  });
+
+  it("counts the live vehicles with no fuel type and no ownership", () => {
+    renderVehicles({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [
+        vehicleRecord(),
+        vehicleRecord({ id: "v2", registration: "GT 200-26", fuelType: "", ownership: null }),
+      ],
+    });
+    expect(screen.getByText(/1 with no fuel type · 1 with no ownership of 2/)).toBeTruthy();
+  });
+
+  it("offers fuel, ownership and the usual driver when adding a vehicle, and sends them", async () => {
+    const tms = renderVehicles({
+      ...emptyDatabase(),
+      users: [admin],
+      drivers: [driverRecord()],
+      settings: { ...emptyDatabase().settings, vehicleCategories: [{ id: "cat", name: "Coaster", licenceClasses: [] }] },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^Add vehicle$/ }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/^Registration/), { target: { value: "GT 500-26" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Category/), { target: { value: "cat" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Seat capacity/), { target: { value: "22" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Fuel type/), { target: { value: "Petrol" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Ownership/), { target: { value: "leased" } });
+    // The owner box appears only once the vehicle is not ours.
+    fireEvent.change(within(dialog).getByLabelText(/^Whose vehicle is it/), { target: { value: "Ama Transport" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Usual driver/), { target: { value: "d1" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Save vehicle/ }));
+
+    await waitFor(() => expect(tms.dispatch).toHaveBeenCalled());
+    expect(tms.dispatch).toHaveBeenCalledWith({
+      type: "create_vehicle",
+      input: expect.objectContaining({
+        registration: "GT 500-26",
+        fuelType: "Petrol",
+        ownership: "leased",
+        ownerName: "Ama Transport",
+        usualDriverId: "d1",
+      }),
+    });
   });
 });

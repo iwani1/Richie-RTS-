@@ -11,6 +11,7 @@ import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
 import { formatAmount, isPercentWithTwoDecimals, linesTotal, parseAmount, parseQuantity, percentOf, toMinor } from "./money";
 import { allocateReference } from "./references";
+import { readVehicleDetail } from "./vehicles";
 import { confinedClientId } from "./scope";
 import {
   CLIENT_STATUSES,
@@ -60,6 +61,12 @@ export interface VehicleInput {
   make: string;
   model: string;
   seatCapacity: string;
+  /** What it runs on, in the office's words. Optional so old callers and the importer still work. */
+  fuelType?: string;
+  /** `""` means not recorded; stored as null (FLT-01, D-106). */
+  ownership?: string;
+  ownerName?: string;
+  usualDriverId?: string;
   notes: string;
 }
 
@@ -332,6 +339,11 @@ export function validateVehicle(db: Database, input: VehicleInput, excludeId?: s
   const seats = Number(input.seatCapacity);
   if (input.seatCapacity.trim() === "" || !Number.isInteger(seats) || seats < 1)
     errors.seatCapacity = "Seat capacity must be a whole number of at least 1.";
+  // What the vehicle itself is (FLT-01, D-106): what it runs on, whether it is ours, whose it is and
+  // which driver habitually takes it out. Kept in its own module so the form, the register and the
+  // importer cannot disagree about the same record.
+  const detail = readVehicleDetail(db, input);
+  Object.assign(errors, detail.errors);
   return {
     errors,
     value: {
@@ -340,6 +352,7 @@ export function validateVehicle(db: Database, input: VehicleInput, excludeId?: s
       make: input.make.trim(),
       model: input.model.trim(),
       seatCapacity: seats,
+      ...detail.value,
       notes: input.notes.trim(),
     },
   };

@@ -283,6 +283,13 @@ to read it: migration 006 replaced the whole-table unique index with a partial o
 scheduled run per route per day" survives while an emergency run can still be created (D-82). The
 reason for an ad hoc run stays in the row's data, because nothing queries it.
 
+`Vehicle.fuelType`, `ownership`, `ownerName` and `usualDriverId` sit in the row's data too (schema 27,
+D-107). None of them is queried by the database: `ownership` is deliberately **null** when nobody has
+recorded it, because a default of "owned" would put a hired bus on the company's asset list.
+`usualDriverId` names a `drivers.id`, and nothing in the database enforces it — the check happens
+where the form and the importer meet (`readVehicleDetail`), because a dangling id must produce a
+sentence a person can act on rather than a constraint violation.
+
 `Booking.history` is embedded on the booking rather than kept in a table of its own: it is written
 once with the change it describes, never edited, and read whole beside the booking (BKG-06).
 

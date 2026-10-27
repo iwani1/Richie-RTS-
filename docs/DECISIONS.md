@@ -2180,3 +2180,48 @@ the run finishes, which is the one moment nobody is ringing.
   `runningLate`, `minutesLabel`, `DELAY_LIMITS`); `record_trip_delay` in `busing.ts` and the command
   catalogue; a shared `TripDelayForm` used by the dispatch sheet and the driver's portal; the run row
   and the dispatch desk show what is behind schedule; 33 new tests.
+
+## D-107 - Four facts about the vehicle itself (FLT-01)
+
+The register knew a registration, a category, a seat count and a status. The brief also asks for the
+vehicle's photo, fuel type, ownership or leasing, and its usual driver. Insurance, roadworthiness and
+service dates were already there as compliance documents and maintenance records, and the odometer as
+readings; these four were the gap. This entry covers the three that are facts about the vehicle; the
+photograph is a file and is dealt with next (D-108).
+
+- **Decision 1: fuel type is free text, not a fixed list.** "Diesel" and "Petrol" are the common
+  answers, but a converted bus reads "Petrol and LPG" and a workshop may have its own word. A closed
+  list would refuse the truth. It is trimmed, capped at 30 characters, and stored exactly as the office
+  wrote it — no silent title-casing, because "PETROL" is how somebody chose to type it.
+- **Decision 2: an unrecorded ownership is null, never `owned`.** This is the whole point of the
+  field. A default of "owned" would put a bus the company leases on its own asset list, which is the
+  one error a fleet register must not make. The screen says "not recorded" and the register counts the
+  vehicles in that state.
+- **Decision 3: a vehicle that is not ours names its owner.** Leased or hire purchase without a
+  lessor is half a record, and the missing half is the name of the person to ring when the bus is
+  taken back. The reverse is refused too: a name on a vehicle recorded as ours is usually one left
+  behind by a change of mind, and storing it where no screen will show it again is worse than saying so.
+- **Decision 4: the usual driver must be a driver on the register, and not an inactive one.** A name
+  typed into a box is not a driver. An inactive driver cannot be a bus's usual driver, because the
+  record would then point at somebody who may not take a run out.
+- **Decision 5: the usual driver is a habit, not an assignment.** It never stands in for the run's own
+  driver, and nothing in `assessResources` reads it. Making it an assignment would be a second,
+  invisible way to crew a run — and the run sheet would disagree with the fleet register about who is
+  driving.
+- **Decision 6: everything is optional, and the gaps are counted.** A register that refused to record
+  a bus because nobody knew its fuel is worse than one that records the bus and says what is missing.
+  The vehicles table prints "3 with no fuel type · 2 with no ownership of 12" beside the status line,
+  retired vehicles excluded — the same rule as the stop directions (D-104).
+- **Decision 7: the importer carries the three facts, with the usual spellings accepted.** A
+  spreadsheet cell says "Lease" and the form says "Leased"; `normaliseOwnership` maps the words people
+  actually use and refuses anything else rather than guessing. The usual driver is deliberately not a
+  CSV column: a spreadsheet has a name, and this field needs one of the drivers already on file.
+- **Decision 8: schema 27, no SQL migration.** The four facts live inside the vehicle's own record;
+  `migrate()` fills blanks and a null ownership for older records. `VehicleInput`'s new fields are
+  optional, so every existing caller — the importer, the tests, any command already in the log —
+  keeps working without a change.
+- **Consequence.** `VehicleOwnership` and the four fields on `Vehicle`; new module `src/tms/vehicles.ts`
+  (`readVehicleDetail`, `normaliseOwnership`, `ownershipLine`, `vehicleDetailLine`, `usualDriverOf`,
+  `fleetDetailGaps`, `isThirdParty`, `VEHICLE_DETAIL_LIMITS`); the vehicle form gained a "The vehicle
+  itself" section; the register prints the facts, the usual driver and the gap count; the CSV importer
+  gained `fuel`, `ownership` and `owner`; 20 new tests.

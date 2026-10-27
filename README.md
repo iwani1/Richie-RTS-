@@ -95,6 +95,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | CSV import for vehicles, drivers, clients and staff rosters | Works; rejects a row with its line number, never merges an existing person |
 | Corporate agreements: term, service, routes, pricing and payment terms transcribed from the signed paper, with approval, suspension, termination and a renewal watch | Works; an approved agreement's terms are frozen by the database, a booking is refused under an agreement that is not active, and expiry is read from the end date rather than recorded |
 | Planning aid for dispatch: who can take each run, ranked, with the reason each pair works or cannot | Works; it reads the same rule the save enforces, so a suggestion is never refused, and it assigns nothing — the dispatcher still presses save |
+| Vehicle register that says what each bus runs on, who owns it and which driver normally takes it out | Works; a leased or hire-purchase vehicle must name its owner, an unrecorded ownership stays unrecorded, and the register counts the vehicles nobody has described |
 | Delays: minutes behind the timetable and why, reported while the run is out — seen by the dispatcher, the driver, the client's portal and the rider | Works; append-only, a run can report it caught up, and a finished run is measured from its stop times instead |
 | Staff transport report: runs promised and worked, riders carried, no-shows, the riders nobody recorded, empty seats, delays where a stop time was recorded, and the seats people asked for | Works; it says on the page which figures the records cannot supply, and the on-time figure is the same one the busing screen shows |
 | Customer register with the office's own code, organisation or individual, company registration, billing address and tax number, named branches and a change history per customer | Works; the invoice prints the buyer's address and tax number **as they were when it was issued**, the row states which agreement is in force, and a detail nobody recorded reads "not recorded" rather than being guessed |
@@ -104,7 +105,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Management report as an A4 document, printed or saved as a PDF by the browser | Works; the figures are the report's own, a figure it cannot state is printed as withheld, and no file is stored or emailed |
 | Notifications (SMS or email), offline driver app, GPS tracking, card/mobile-money gateway, payroll | **Not built** — see `docs/PROGRESS.md` |
 
-899 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+927 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

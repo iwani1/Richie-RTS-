@@ -1,7 +1,15 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { VEHICLE_TRANSITIONS, type VehicleInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
-import { VEHICLE_STATUS_LABELS, VEHICLE_STATUSES, type Vehicle, type VehicleStatus } from "../tms/types";
+import { fleetDetailGaps, isThirdParty, usualDriverOf, vehicleDetailLine } from "../tms/vehicles";
+import {
+  VEHICLE_OWNERSHIPS,
+  VEHICLE_OWNERSHIP_LABELS,
+  VEHICLE_STATUS_LABELS,
+  VEHICLE_STATUSES,
+  type Vehicle,
+  type VehicleStatus,
+} from "../tms/types";
 import { Badge, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDateTime } from "../ui/primitives";
 import { ImportPanel } from "../ui/ImportPanel";
 import type { Route } from "../routes";
@@ -15,8 +23,30 @@ const statusTone: Record<VehicleStatus, "success" | "warning" | "error" | "neutr
   retired: "neutral",
 };
 
-const emptyInput = (): VehicleInput => ({ registration: "", categoryId: "", make: "", model: "", seatCapacity: "", notes: "" });
-const toInput = (v: Vehicle): VehicleInput => ({ registration: v.registration, categoryId: v.categoryId, make: v.make, model: v.model, seatCapacity: String(v.seatCapacity), notes: v.notes });
+const emptyInput = (): VehicleInput => ({
+  registration: "",
+  categoryId: "",
+  make: "",
+  model: "",
+  seatCapacity: "",
+  fuelType: "",
+  ownership: "",
+  ownerName: "",
+  usualDriverId: "",
+  notes: "",
+});
+const toInput = (v: Vehicle): VehicleInput => ({
+  registration: v.registration,
+  categoryId: v.categoryId,
+  make: v.make,
+  model: v.model,
+  seatCapacity: String(v.seatCapacity),
+  fuelType: v.fuelType,
+  ownership: v.ownership ?? "",
+  ownerName: v.ownerName,
+  usualDriverId: v.usualDriverId ?? "",
+  notes: v.notes,
+});
 
 export function VehiclesPage({ navigate }: { navigate: (route: Route) => void }) {
   const { db, allowed, dispatch, setFlash } = useTms();
@@ -32,7 +62,7 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
     const q = query.trim().toLowerCase();
     return db.vehicles
       .filter((v) => statusFilter === "all" || v.status === statusFilter)
-      .filter((v) => !q || `${v.registration} ${v.make} ${v.model} ${categoryName(v.categoryId)}`.toLowerCase().includes(q))
+      .filter((v) => !q || `${v.registration} ${v.make} ${v.model} ${categoryName(v.categoryId)} ${v.fuelType} ${v.ownerName}`.toLowerCase().includes(q))
       .sort((a, b) => a.registration.localeCompare(b.registration));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db.vehicles, query, statusFilter, categories]);
@@ -76,6 +106,21 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
             <p className="rts-filter-bar-note" role="status">
               {db.vehicles.filter((v) => v.status === "maintenance").length} in maintenance · {db.vehicles.filter((v) => v.status === "out_of_service").length} off road
             </p>
+            {/* FLT-01, D-106: what the register still cannot say, counted rather than glossed over.
+                A fleet that looks complete but cannot be told from the one it leases is a problem
+                the office should see on the screen, not discover at audit time. */}
+            {(() => {
+              const gaps = fleetDetailGaps(db);
+              const parts = [
+                gaps.noFuelType ? `${gaps.noFuelType} with no fuel type` : "",
+                gaps.noOwnership ? `${gaps.noOwnership} with no ownership` : "",
+              ].filter(Boolean);
+              return parts.length > 0 ? (
+                <p className="rts-filter-bar-note rts-unset" role="status">
+                  {parts.join(" · ")} of {gaps.total}
+                </p>
+              ) : null;
+            })()}
           </>
         }
       >
@@ -86,7 +131,35 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
         columns={[
           { key: "reg", header: "Registration", render: (v) => <span className="font-mono text-xs font-semibold text-stone-900">{v.registration}</span> },
           { key: "cat", header: "Category", render: (v) => categoryName(v.categoryId) },
-          { key: "mm", header: "Make / model", render: (v) => [v.make, v.model].filter(Boolean).join(" ") || <span className="text-stone-400">-</span> },
+          {
+            key: "mm",
+            header: "Make / model",
+            // The vehicle's own line, under the name: what it runs on and whose it is (D-106).
+            render: (v) => (
+              <>
+                <span className="block">{[v.make, v.model].filter(Boolean).join(" ") || <span className="text-stone-400">-</span>}</span>
+                {vehicleDetailLine(v) ? (
+                  <span className="block text-xs text-stone-600">{vehicleDetailLine(v)}</span>
+                ) : (
+                  <span className="block text-xs rts-unset">fuel and ownership not recorded</span>
+                )}
+              </>
+            ),
+          },
+          {
+            key: "usual",
+            header: "Usual driver",
+            render: (v) => {
+              const driver = usualDriverOf(db, v);
+              if (!driver) return <span className="text-xs rts-unset">not recorded</span>;
+              return (
+                <span className="text-sm">
+                  {driver.fullName}
+                  {driver.status !== "active" && <span className="block text-xs text-amber-800">{driver.status}</span>}
+                </span>
+              );
+            },
+          },
           { key: "seats", header: "Seats", className: "rts-num", render: (v) => v.seatCapacity },
           { key: "status", header: "Status", render: (v) => <Badge tone={statusTone[v.status]}>{VEHICLE_STATUS_LABELS[v.status]}</Badge> },
           { key: "upd", header: "Updated", render: (v) => <span className="text-xs text-stone-500">{formatDateTime(v.updatedAt)}</span> },
@@ -180,6 +253,46 @@ function VehicleForm({ initial, title, onClose, onSubmit }: { initial: VehicleIn
         <Field label="Seat capacity" error={errors.seatCapacity}>
           <TextInput type="number" min={1} step={1} value={values.seatCapacity} onChange={(e) => set({ seatCapacity: e.target.value })} invalid={!!errors.seatCapacity} />
         </Field>
+
+        {/* FLT-01, D-106: the vehicle itself. Everything here may be left blank — a register that
+            refuses to record a bus because nobody knows its fuel is worse than one that says so. */}
+        <fieldset className="space-y-4 rounded-sm border border-stone-200 p-3">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-stone-500">The vehicle itself</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Fuel type" hint="As the office says it: Diesel, Petrol." error={errors.fuelType}>
+              <TextInput value={values.fuelType ?? ""} onChange={(e) => set({ fuelType: e.target.value })} invalid={!!errors.fuelType} />
+            </Field>
+            <Field label="Ownership" hint="Leave blank if nobody knows yet — that is not the same as ours." error={errors.ownership}>
+              <Select value={values.ownership ?? ""} onChange={(e) => set({ ownership: e.target.value, ownerName: e.target.value === "owned" ? "" : values.ownerName })} invalid={!!errors.ownership}>
+                <option value="">Not recorded</option>
+                {VEHICLE_OWNERSHIPS.map((ownership) => (
+                  <option key={ownership} value={ownership}>{VEHICLE_OWNERSHIP_LABELS[ownership]}</option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          {/* Asked only when the answer can exist: an owned bus has no other owner. */}
+          {isThirdParty((values.ownership || null) as never) && (
+            <Field label="Whose vehicle is it?" hint="The lessor, or the company it is being paid off to." error={errors.ownerName}>
+              <TextInput value={values.ownerName ?? ""} onChange={(e) => set({ ownerName: e.target.value })} invalid={!!errors.ownerName} />
+            </Field>
+          )}
+          <Field
+            label="Usual driver (optional)"
+            hint="Who normally takes it out. A habit, not an assignment — the run's own driver is what dispatch records."
+            error={errors.usualDriverId}
+          >
+            <Select value={values.usualDriverId ?? ""} onChange={(e) => set({ usualDriverId: e.target.value })} invalid={!!errors.usualDriverId}>
+              <option value="">No usual driver</option>
+              {db.drivers
+                .filter((driver) => driver.status !== "inactive")
+                .map((driver) => (
+                  <option key={driver.id} value={driver.id}>{driver.fullName}</option>
+                ))}
+            </Select>
+          </Field>
+        </fieldset>
+
         <Field label="Notes"><TextArea value={values.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
         <div className="flex justify-end gap-2 pt-2">
           <Button onClick={onClose}>Cancel</Button>

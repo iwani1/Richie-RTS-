@@ -46,6 +46,20 @@ export const VEHICLE_STATUS_LABELS: Record<VehicleStatus, string> = {
   retired: "Retired",
 };
 
+/**
+ * Whether the bus is ours, hired in, or being paid off (FLT-01, D-106).
+ *
+ * Null on a record nobody has classified. That is not the same as "owned": assuming ownership of a
+ * leased bus is how a fleet report ends up claiming assets the company does not have.
+ */
+export const VEHICLE_OWNERSHIPS = ["owned", "leased", "hire_purchase"] as const;
+export type VehicleOwnership = (typeof VEHICLE_OWNERSHIPS)[number];
+export const VEHICLE_OWNERSHIP_LABELS: Record<VehicleOwnership, string> = {
+  owned: "Owned",
+  leased: "Leased",
+  hire_purchase: "Hire purchase",
+};
+
 export interface Vehicle {
   id: string;
   registration: string;
@@ -54,6 +68,17 @@ export interface Vehicle {
   model: string;
   seatCapacity: number;
   status: VehicleStatus;
+  /** What it runs on, in the office's own words: "Diesel", "Petrol". Blank = not recorded. */
+  fuelType: string;
+  /** Owned, leased or on hire purchase. Null = nobody has recorded it (not "owned"). */
+  ownership: VehicleOwnership | null;
+  /** Whose vehicle it is when it is not ours. Blank when owned, or when nobody has said. */
+  ownerName: string;
+  /**
+   * The driver who normally takes this vehicle out (FLT-01). A habit, not an assignment: the run's
+   * own vehicle and driver are what dispatch records, and this never stands in for them.
+   */
+  usualDriverId: string | null;
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -1178,7 +1203,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 26;
+export const SCHEMA_VERSION = 27;
 
 /**
  * Every schema version this build can still read.
@@ -1188,7 +1213,7 @@ export const SCHEMA_VERSION = 26;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1294,7 +1319,19 @@ export function migrate(value: unknown): Database | null {
       passengerId: u.passengerId ?? null,
       primaryContact: u.primaryContact === true,
     })),
-    vehicles: v.vehicles as Database["vehicles"],
+    // The fleet facts arrived in schema 27. An older vehicle gains blanks and a null ownership,
+    // which the register prints as "not recorded" rather than claiming it is owned (D-106).
+    vehicles: Array.isArray(v.vehicles)
+      ? (v.vehicles as Vehicle[]).map((vehicle) => ({
+          ...vehicle,
+          fuelType: typeof vehicle.fuelType === "string" ? vehicle.fuelType : "",
+          ownership: VEHICLE_OWNERSHIPS.includes(vehicle.ownership as VehicleOwnership)
+            ? (vehicle.ownership as VehicleOwnership)
+            : null,
+          ownerName: typeof vehicle.ownerName === "string" ? vehicle.ownerName : "",
+          usualDriverId: typeof vehicle.usualDriverId === "string" && vehicle.usualDriverId !== "" ? vehicle.usualDriverId : null,
+        }))
+      : [],
     drivers: (v.drivers as Driver[]).map((driver) => ({
       ...driver,
       // FLT-04 arrived in schema 24. A licence class nobody wrote down is blank, not a guess, and

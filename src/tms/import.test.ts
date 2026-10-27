@@ -368,3 +368,62 @@ describe("importing a staff roster (EMP-02, D-81)", () => {
     expect(result.message).toMatch(/lacks passengers:create/);
   });
 });
+
+// FLT-01, D-106: the fleet facts travel with a spreadsheet too, and a half-recorded lease is a row
+// error rather than a vehicle saved without its owner.
+describe("fleet facts from a spreadsheet (FLT-01)", () => {
+  it("carries fuel, ownership and the owner from the file", () => {
+    const { db, admin } = world();
+    const result = executeImport(db, admin, {
+      type: "import_records",
+      kind: "vehicles",
+      csv:
+        "registration,category,make,model,seats,fuel,ownership,owner,notes\n" +
+        "GT 100-26,Coaster,Toyota,Coaster,30,Diesel,Owned,,\n" +
+        "GT 200-26,Minibus,,,14,Petrol,Leased,Ama Transport,\n",
+    }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const [ours, hired] = result.db.vehicles;
+    expect(ours).toMatchObject({ fuelType: "Diesel", ownership: "owned", ownerName: "" });
+    expect(hired).toMatchObject({ fuelType: "Petrol", ownership: "leased", ownerName: "Ama Transport" });
+  });
+
+  it("names the line whose ownership nobody can read, rather than guessing one", () => {
+    const { db, admin } = world();
+    const result = executeImport(db, admin, {
+      type: "import_records",
+      kind: "vehicles",
+      csv: "registration,category,seats,ownership\nGT 300-26,Coaster,30,Borrowed from a friend\n",
+    }, NOW);
+    // Every row was refused, so nothing is written and the line is named with its reason.
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors["line 2"]).toMatch(/owned, leased or hire purchase/i);
+  });
+
+  it("refuses a leased vehicle whose row leaves the owner blank", () => {
+    const { db, admin } = world();
+    const result = executeImport(db, admin, {
+      type: "import_records",
+      kind: "vehicles",
+      csv: "registration,category,seats,ownership,owner\nGT 400-26,Coaster,30,Lease,\n",
+    }, NOW);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors["line 2"]).toMatch(/whose vehicle it is/i);
+  });
+
+  it("still imports a row that says nothing about the vehicle", () => {
+    const { db, admin } = world();
+    const result = executeImport(db, admin, {
+      type: "import_records",
+      kind: "vehicles",
+      csv: "registration,category,seats\nGT 500-26,Coaster,30\n",
+    }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.db.vehicles[0]).toMatchObject({ fuelType: "", ownership: null, ownerName: "", usualDriverId: null });
+  });
+});

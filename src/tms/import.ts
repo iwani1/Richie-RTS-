@@ -15,6 +15,7 @@
 // so those three are resolved by name before the command is built. An unknown name is a row error
 // listing what does exist — the same rule vehicles follow for categories (D-81).
 import { executeBusing, type BusingCommand, type PassengerInput } from "./busing";
+import { normaliseOwnership } from "./vehicles";
 import type { Permission } from "./permissions";
 import { can } from "./permissions";
 import { audit, execute, type Actor, type ClientInput, type Command, type CommandResult, type DriverInput, type VehicleInput } from "./service";
@@ -48,15 +49,18 @@ export const IMPORT_SPECS: Record<ImportKind, KindSpec> = {
   vehicles: {
     label: "vehicles",
     permission: "vehicles:create",
-    template: "registration,category,make,model,seats,notes",
-    example: "GT 1234-26,Coaster,Toyota,Coaster,22,",
-    note: "Vehicle category names must already exist in Settings.",
+    template: "registration,category,make,model,seats,fuel,ownership,owner,notes",
+    example: "GT 1234-26,Coaster,Toyota,Coaster,22,Diesel,owned,,",
+    note: "Vehicle category names must already exist in Settings. Fuel, ownership and owner are optional; ownership is \"owned\", \"leased\" or \"hire purchase\", and a leased or hire-purchase vehicle must name its owner (FLT-01). The usual driver is set on the vehicle afterwards, because a spreadsheet column is a name and this needs one of the drivers already on the register.",
     columns: {
       registration: { aliases: ["registration", "registration number", "reg", "plate"], required: true },
       category: { aliases: ["category", "vehicle category", "type"], required: true },
       make: { aliases: ["make", "manufacturer"], required: false },
       model: { aliases: ["model"], required: false },
       seats: { aliases: ["seats", "seat capacity", "capacity"], required: true },
+      fuel: { aliases: ["fuel", "fuel type"], required: false },
+      ownership: { aliases: ["ownership", "owned", "lease"], required: false },
+      owner: { aliases: ["owner", "owner name", "lessor"], required: false },
       notes: { aliases: ["notes", "note", "remarks"], required: false },
     },
   },
@@ -363,6 +367,11 @@ function rowCommand(db: Database, kind: ImportKind, values: string[], index: Rec
     make: cell(values, index, "make"),
     model: cell(values, index, "model"),
     seatCapacity: cell(values, index, "seats"),
+    fuelType: cell(values, index, "fuel"),
+    // Read the way a person writes it: "Owned" and "owned" are the same answer, and the domain
+    // refuses anything it does not know rather than guessing a category.
+    ownership: normaliseOwnership(cell(values, index, "ownership")),
+    ownerName: cell(values, index, "owner"),
     notes: cell(values, index, "notes"),
   };
   return { module: "core", command: { type: "create_vehicle", input } };

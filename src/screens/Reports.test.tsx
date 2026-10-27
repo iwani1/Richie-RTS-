@@ -317,7 +317,7 @@ describe("staff transport tab (RPT-02)", () => {
       clients: [{ id: "c1", name: "Acme Ltd", contactName: "", contactPhone: "", contactEmail: "", reference: "", type: null, billingAddress: "", tin: "", notes: "", registrationNumber: "", registeredOn: "", status: "active", createdAt: at, updatedAt: at }],
       routes: [route],
       vehicles: [
-        { id: "v1", registration: "GT 100-26", categoryId: "cat", make: "", model: "", seatCapacity: 20, status: "available", notes: "", createdAt: at, updatedAt: at },
+        { id: "v1", registration: "GT 100-26", categoryId: "cat", make: "", model: "", seatCapacity: 20, status: "available", fuelType: "", ownership: null, ownerName: "", usualDriverId: null, notes: "", createdAt: at, updatedAt: at },
       ],
       passengers: [
         { id: "p1", clientId: "c1", fullName: "Ama", employeeRef: "E-1", phone: "", routeId: "route1", stopId: "s1", status: "active", createdAt: at, updatedAt: at },
