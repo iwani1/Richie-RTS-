@@ -189,6 +189,10 @@ labels.
 the stylesheet re-skins every legacy `rts-*` class (`rts-band`, `rts-board`, `rts-meter`, `rts-steps`,
 `rts-lead`…), so no screen renders an off-palette colour or an editorial radius.
 
+**Copying a reference** — a small ghost button beside the number, its label "Copy" and then "Copied"
+for four seconds, with a hidden live region naming what was copied. No tint, no tick, no animation;
+the button holds a fixed width so a table cell does not shift while it changes word (D-111).
+
 **Accessibility** — 2px indigo focus ring with 2px offset; skip link to `#main-content`;
 `aria-current="page"` on the active destination; the ring and the bar series carry text alternatives
 or are `aria-hidden` beside their numbers; state is never carried by colour alone; the drawer closes
@@ -233,7 +237,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1035 passed, 28 skipped** across 88 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1045 passed, 28 skipped** across 90 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are

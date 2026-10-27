@@ -36,6 +36,7 @@ import {
   formatDate,
   todayYmd,
 } from "../ui/primitives";
+import { CopyButton } from "../ui/CopyButton";
 
 const STATUS_TONE: Record<InvoiceStatus, "success" | "warning" | "error" | "neutral" | "info"> = {
   issued: "info",
@@ -435,6 +436,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
         actions={
           <>
             <Button onClick={onBack}>Back to invoices</Button>
+            <CopyButton value={invoice.reference} what="invoice number" />
             <Button onClick={() => setPrinting({ kind: "invoice" })}>Print invoice</Button>
             {allowed("payments:record") && invoice.status !== "void" && outstanding > 0 && (
               <Button variant="primary" onClick={() => setPaying(true)}>

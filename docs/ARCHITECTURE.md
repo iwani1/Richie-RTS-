@@ -112,6 +112,7 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 | `src/ui/useDialogFocus.ts` | The keyboard contract every overlay shares: focus in, Tab trapped, Escape closes, focus restored. Used by `Panel` and the print preview |
 | `src/pages/*` | Screens. `StaffBusing.tsx` holds Routes, Passengers, Trips, Bookings and Performance tabs |
 | `src/ui/primitives.tsx` | Shared form, table, panel and notice components |
+| `src/ui/CopyButton.tsx` | Copies a reference to the clipboard and says so in words (D-111): the Clipboard API, a selected-textarea fallback, and an honest failure line. Used by invoices, rentals, run cards and expense rows |
 | `src/docs/BriefDesk.tsx` | Read-only viewer for the source brief (kept per Integrity rule 6) |
 
 Dependency direction: pages depend on `useTms`, which depends on `commands`, which depends on `busing` and `service`. `busing` and `service` never import pages or React. `busing` and `bookings` import helpers from `service` (`authorise`, `audit`, `fail`, validators). `service` imports neither, so there is no cycle.

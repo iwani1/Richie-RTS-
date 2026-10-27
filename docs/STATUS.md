@@ -191,7 +191,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**1035 passed, 28 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**1045 passed, 28 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

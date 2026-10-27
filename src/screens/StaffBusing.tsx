@@ -30,6 +30,7 @@ import {
   type Trip,
   type TripStatus,
 } from "../tms/types";
+import { CopyButton } from "../ui/CopyButton";
 import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, Stat, TableCard, TextArea, TextInput, formatDate, formatDateTime, todayYmd } from "../ui/primitives";
 
 type Errors = Record<string, string>;
@@ -1550,6 +1551,7 @@ function BookingsTab() {
                 key={trip.id}
                 title={`${route?.name ?? "Route missing"} · ${trip.reference}`}
                 summary={`${startOf(trip) || "—"} · ${capacity.vehicle ?? "no vehicle yet"} · ${seats} · ${capacity.roster} on the roster · ${capacity.free} free`}
+                actions={<CopyButton value={trip.reference} what="trip reference" />}
               >
                 <DataTable
                   rows={rows}

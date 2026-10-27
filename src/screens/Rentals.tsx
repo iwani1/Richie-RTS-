@@ -4,6 +4,7 @@ import { rentalQuotingReady, type AssignmentInput, type DepositInput, type Quote
 import { readinessReport } from "../tms/maintenance";
 import { useTms } from "../tms/useTms";
 import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, type Rental, type RentalStatus } from "../tms/types";
+import { CopyButton } from "../ui/CopyButton";
 import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 import type { Route } from "../routes";
 
@@ -213,7 +214,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
         eyebrow={`Rental ${rental.reference}`}
         title={rental.customerName}
         description={`${categoryName} · ${formatDate(rental.startDate)} - ${formatDate(rental.endDate)} · ${rental.passengers} passenger(s)`}
-        actions={<div className="flex flex-wrap gap-2">{actions}</div>}
+        actions={<div className="flex flex-wrap gap-2"><CopyButton value={rental.reference} what="rental reference" />{actions}</div>}
       />
 
       {rental.status === "declined" || rental.status === "cancelled" ? (

@@ -4,7 +4,7 @@
 // The point of this screen is that spending which is not a repair finally belongs somewhere, and that
 // what it says can be trusted: the total is the sum of the records, a voided entry is listed but counts
 // for nothing, and the count of spending with no receipt number on it is shown rather than hidden.
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ExpensesPage } from "./Expenses";
 import { TmsContext, type Tms } from "../tms/useTms";
@@ -323,5 +323,28 @@ describe("the scanned copy of a receipt (Q-51, D-100)", () => {
     expect(within(panel).getByText(/That file is 3.0 MB/)).toBeTruthy();
     expect(within(panel).getByRole("button", { name: "File the scan" })).toHaveProperty("disabled", true);
     expect(attachReceipt).not.toHaveBeenCalled();
+  });
+});
+
+describe("copying a receipt number (D-111)", () => {
+  it("offers the receipt number from the row, and copies the number as typed", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    openJune(base([expense()]));
+
+    const copy = screen.getByRole("button", { name: "Copy receipt number RCPT-0091" });
+    await act(async () => {
+      fireEvent.click(copy);
+    });
+
+    expect(writeText).toHaveBeenCalledWith("RCPT-0091");
+    const wrapper = copy.closest(".rts-copy") as HTMLElement;
+    expect(within(wrapper).getByRole("status").textContent).toBe("Receipt number RCPT-0091 copied.");
+  });
+
+  it("offers nothing to copy where the expense has no receipt number", () => {
+    openJune(base([expense({ receiptReference: "" })]));
+    expect(screen.queryByRole("button", { name: /^Copy receipt number/ })).toBeNull();
+    expect(screen.getByText("no number")).toBeTruthy();
   });
 });

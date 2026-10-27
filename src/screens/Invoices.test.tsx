@@ -2,7 +2,7 @@
 // The invoice and payment screen (FIN-02, FIN-03). It is the only place where the money a rental
 // produces becomes visible, so the test checks the three things a user relies on: what is still
 // owed, what has been received, and that an invoice with money against it offers no void action.
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InvoicesPage } from "./Invoices";
 import { TmsContext, type Tms } from "../tms/useTms";
@@ -434,5 +434,22 @@ describe("refunds paid back on the invoice screen (D-92)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /Cancel refund/i }));
 
     expect(tms.dispatch).toHaveBeenCalledWith({ type: "void_refund", id: "rf1", reason: "Transfer never left the bank" });
+  });
+});
+
+describe("copying an invoice number (D-111)", () => {
+  it("offers the number from the open invoice and says when it has copied it", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderInvoices(base());
+    fireEvent.click(screen.getByRole("button", { name: /Open INV-2026-0001/i }));
+
+    const copy = screen.getByRole("button", { name: "Copy invoice number INV-2026-0001" });
+    await act(async () => {
+      fireEvent.click(copy);
+    });
+
+    expect(writeText).toHaveBeenCalledWith("INV-2026-0001");
+    expect(copy.textContent).toBe("Copied");
   });
 });

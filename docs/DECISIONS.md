@@ -2400,3 +2400,41 @@ message needs a provider this program does not have (Phase 2, deferred). The bri
   `reminderTiming`, `reminderLine`); the `acknowledge_document_reminder` command under
   `documents:update`; a **Renewals** card on the compliance screen with a two-field panel; a row on the
   dashboard's attention list. 32 new tests (11 domain, 8 command, 13 screen).
+
+## D-111 - A reference can be copied, and copying says so in words (Phase 61)
+
+The office quotes numbers on the phone all day — an invoice number to a customer, a receipt number to
+a supplier, a rental or run reference to a driver. Until now the only way to get one out of the program
+was to read it off the screen and type it into a message, which is where wrong digits come from. A
+review of the `uselayouts` component library offered a "middle truncation" and a tactile press effect;
+the library itself was rejected (D-109 note: animation, 3D, gradients and three extra dependencies
+against a Daylight interface that has none of them). One idea survived, rebuilt here in about eighty
+lines with no dependency: a quiet **Copy** button beside a reference.
+
+- **Decision 1: the confirmation is a word plus a sentence in a live region, not a colour or a
+  flourish.** The button's own label changes to "Copied" for four seconds, and a `role="status"` line
+  beside it says which reference was copied ("Invoice number INV-2026-0001 copied."). A button that
+  tints green, or a tick that slides in, tells a screen-reader user nothing and is easy to miss; the
+  design direction also has no decorative motion. The accessible name of the button never changes —
+  it stays "Copy invoice number INV-2026-0001" — so focus does not appear to land on a different
+  control after a click.
+- **Decision 2: the Clipboard API first, a selected textarea second, and an honest sentence when both
+  fail.** An office machine reached over plain `http` on the local network is not a secure context and
+  has no `navigator.clipboard`; some embedded views refuse it too. The fallback selects a temporary
+  textarea and copies that, then removes it. If both routes fail the button reads "Not copied" and the
+  live region says "Select the number and copy it by hand." A button that looks like it worked when it
+  did not is worse than no button.
+- **Decision 3: only references get one, and only where a number actually exists.** Invoice numbers on
+  the invoice, rental references on the request, run references on the run cards, receipt numbers on
+  the expense row. A **statement has no number of its own** — it is a customer's account between two
+  dates — so it gets no button rather than an invented identifier. That is the same rule as the rest of
+  the program: no business fact is made up to fill a gap in the interface.
+- **Decision 4: the receipt button appears only where a number was recorded.** An expense with no
+  number keeps its "no number" mark and nothing to copy, so the missing evidence stays visible.
+- **Decision 5: nothing new on the server, nothing on the wire, no dependency.** The value copied is
+  the string already on screen. No command, no permission, no schema change, no library.
+- **Consequence.** `src/ui/CopyButton.tsx` (`CopyButton`, `writeToClipboard`); two rules in
+  `src/index.css` (`.rts-copy`, `.rts-copy-note`); wired into the invoice detail header, the rental
+  detail header, the run cards on the busing bookings tab, and the receipt column of the expenses
+  table. 10 new tests (5 on the button itself, including both failure routes; 5 proving each of the
+  four places is wired to the value on screen).

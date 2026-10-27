@@ -41,6 +41,7 @@ import {
   formatDate,
   todayYmd,
 } from "../ui/primitives";
+import { CopyButton } from "../ui/CopyButton";
 
 const money = (currency: string | null, amount: number) => (currency ? `${currency} ${formatAmount(amount)}` : "Not configured");
 const firstOfMonth = (today: string) => `${today.slice(0, 7)}-01`;
@@ -232,8 +233,11 @@ export function ExpensesPage() {
                     header: "Receipt",
                     render: (expense) =>
                       expense.receiptReference ? (
-                        <span className="flex flex-col">
-                          <span className="rts-mono text-xs">{expense.receiptReference}</span>
+                        <span className="flex flex-col gap-1">
+                          <span className="flex flex-wrap items-center gap-1">
+                            <span className="rts-mono text-xs">{expense.receiptReference}</span>
+                            <CopyButton value={expense.receiptReference} what="receipt number" />
+                          </span>
                           <span className="text-xs text-stone-600">{expense.receiptHeld ? "paper held" : "paper not held"}</span>
                         </span>
                       ) : (

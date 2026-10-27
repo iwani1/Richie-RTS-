@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Correcting a recorded run (D-74, Q-42): the screen has to offer only what can actually be
 // corrected, and it has to send the reason with it. The record itself is never edited in place.
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StaffBusingPage } from "./StaffBusing";
 import { TmsContext, type Tms } from "../tms/useTms";
@@ -257,5 +257,30 @@ describe("stopping a run that has started", () => {
     expect(screen.getByText(/Cancel TR-0001/i)).toBeTruthy();
     expect(screen.queryByLabelText(/Incident that stopped the run/i)).toBeNull();
     expect(screen.getByRole("button", { name: /Cancel this trip/i })).toBeTruthy();
+  });
+});
+
+describe("copying a trip reference (D-111)", () => {
+  it("offers the run's reference so the office can paste it rather than read it out", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const { db, dispatch } = world();
+    render(
+      <TmsContext.Provider value={makeTms(db, dispatch)}>
+        <StaffBusingPage />
+      </TmsContext.Provider>,
+    );
+    // The run cards with their references are on the bookings tab, one card per run.
+    fireEvent.click(screen.getByRole("tab", { name: /Bookings/i }));
+
+    const copy = screen.getByRole("button", { name: "Copy trip reference TR-0001" });
+    await act(async () => {
+      fireEvent.click(copy);
+    });
+
+    expect(writeText).toHaveBeenCalledWith("TR-0001");
+    // The page has other live regions; read the one that belongs to this button.
+    const wrapper = copy.closest(".rts-copy") as HTMLElement;
+    expect(within(wrapper).getByRole("status").textContent).toBe("Trip reference TR-0001 copied.");
   });
 });

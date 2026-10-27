@@ -1490,3 +1490,22 @@ that is a record of somebody taking the renewal on, not a message.
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **1035 passed, 28 skipped** (83 files
 passed, 5 skipped), coverage 84.44 % statements / 88.16 % lines, `build` succeeds.
+
+## Phase 61 - A number can be copied instead of typed (D-111)
+
+A small piece taken from a review of the `uselayouts` component library, and the only piece: the
+library's animated, gradient and 3D components were rejected as contrary to the Daylight interface.
+What was worth having was the idea that a reference on a screen should be easy to move somewhere else.
+
+| Item | Status | Evidence |
+|---|---|---|
+| A reference can be copied | Done (verified) | A **Copy** button beside the invoice number on the open invoice, the rental reference on the request, the run reference on each run card, and the receipt number on an expense row ("offers the reference from the open request and puts it on the clipboard", "offers the number from the open invoice and says when it has copied it", "offers the run's reference so the office can paste it rather than read it out", "offers the receipt number from the row, and copies the number as typed") |
+| Copying is confirmed in words | Done (verified) | The button reads "Copied" for four seconds and a `role="status"` line names the reference; the accessible name never changes ("puts the reference on the clipboard and says so", "goes back to 'Copy' after a few seconds") |
+| Works where the browser has no Clipboard API | Done (verified) | A selected textarea fallback, removed afterwards ("falls back to selecting the text when the Clipboard API is missing") |
+| Says so when it cannot copy | Done (verified) | "Not copied", with a sentence a person can act on ("says the browser would not copy it, rather than pretending it did") |
+| Nothing invented | Done (verified) | A statement has no reference of its own and gets no button; an expense with no receipt number has nothing to copy ("offers nothing to copy where the expense has no receipt number") |
+| No new dependency, no server or schema change | Done (verified) | `src/ui/CopyButton.tsx` and two CSS rules; `package.json` unchanged at 13 runtime dependencies; schema stays 29 |
+| Tests | Done (verified) | 5 on the button (`CopyButton.test.tsx`), 1 on the invoice, 1 on the rental, 1 on the run card, 2 on the receipt — 10 new, every existing suite unchanged and green |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **1045 passed, 28 skipped** (85 files
+passed, 5 skipped), coverage 84.47 % statements / 88.2 % lines, `build` succeeds.
