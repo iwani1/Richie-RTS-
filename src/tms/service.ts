@@ -15,6 +15,7 @@ import { readVehicleDetail } from "./vehicles";
 import { buildAcceptance, canAcceptQuotation } from "./acceptance";
 import { QUOTATION_TERMS_LIMIT, quotationIsLive, validityEndsAt, validityProblem } from "./quotations";
 import { readRun, runLine } from "./run";
+import { readRequestDetails, type RentalPlanInput } from "./request";
 import { confinedClientId } from "./scope";
 import {
   CLIENT_STATUSES,
@@ -126,7 +127,7 @@ export interface UserInput {
   primaryContact?: boolean;
 }
 
-export interface RentalRequestInput {
+export interface RentalRequestInput extends RentalPlanInput {
   clientId: string | null;
   customerName: string;
   customerPhone: string;
@@ -809,7 +810,12 @@ export function validateRentalRequest(db: Database, input: RentalRequestInput, e
   if (!errors.startDate && !errors.endDate && input.endDate < input.startDate) errors.endDate = "End date cannot be before the start date.";
   const passengers = Number(input.passengers);
   if (input.passengers.trim() === "" || !Number.isInteger(passengers) || passengers < 1) errors.passengers = "Passengers must be a whole number of at least 1.";
-  void excludeId;
+  // The journey the customer asked for (RNT-01, D-119). A correction that leaves a field out of the
+  // form keeps what the record already holds, which is why the existing plan is handed over rather
+  // than starting from blanks.
+  const existing = excludeId ? db.rentals.find((rental) => rental.id === excludeId) ?? null : null;
+  const details = readRequestDetails(input, { startDate: input.startDate, endDate: input.endDate }, existing?.plan ?? null);
+  Object.assign(errors, details.errors);
   return {
     errors,
     value: {
@@ -826,6 +832,7 @@ export function validateRentalRequest(db: Database, input: RentalRequestInput, e
       vehicleCategoryId: input.vehicleCategoryId,
       driverRequired: input.driverRequired,
       notes: input.notes.trim(),
+      plan: details.plan,
     },
   };
 }
@@ -904,6 +911,18 @@ export function validateEnquiry(db: Database, input: EnquiryInput, today: string
       vehicleCategoryId: categoryId,
       driverRequired: false,
       notes,
+      // The one thing an enquiry does know about its own journey: it came in through the web form.
+      // Every other plan field is blank, because the form never asked (D-119).
+      plan: {
+        departureTime: "",
+        returnTime: "",
+        stops: [],
+        luggage: "",
+        specialNeeds: "",
+        tripContactName: "",
+        tripContactPhone: "",
+        source: "website" as const,
+      },
     },
   };
 }

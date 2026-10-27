@@ -97,6 +97,7 @@ const unbilled: Rental = {
   quoteHistory: [],
   acceptance: null,
       run: null,
+      plan: null,
   assignedVehicleId: null,
   assignedDriverId: null,
   deposit: null,

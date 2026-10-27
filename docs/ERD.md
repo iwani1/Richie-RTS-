@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 33; PostgreSQL keeps them in
+The app stores these as arrays inside one JSON document (schema version 34; PostgreSQL keeps them in
 typed tables, migration `020` being the latest). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
@@ -425,6 +425,39 @@ terms stood when it was issued.
 Unique `(rental_id, revision_number)` and unique `reference`; quote and line snapshots are immutable. The initial
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous
 snapshot, so the current quote count equals history length + 1.
+
+**The journey a request asked for (RNT-01, D-119).** `rental.plan` is the pair to `rental.run`: the two
+clock times, the stops in the order the vehicle calls, luggage, special needs, the contact for the day
+and the channel the request arrived through. Relationally it belongs on the rental as a one-to-one
+row, because a request has one plan:
+
+```mermaid
+erDiagram
+  RENTAL ||--o| RENTAL_PLAN : "asks for"
+  RENTAL_PLAN {
+    uuid id PK
+    uuid rental_id FK
+    time departure_time
+    time return_time
+    text luggage
+    text special_needs
+    text trip_contact_name
+    text trip_contact_phone
+    text source
+  }
+  RENTAL_PLAN ||--o{ RENTAL_PLAN_STOP : "calls at"
+  RENTAL_PLAN_STOP {
+    uuid id PK
+    uuid plan_id FK
+    integer position
+    text place
+  }
+```
+
+`position` is what keeps the stops in the order the customer gave them; the duration is **not** a
+column, because it is the difference between the two times and the two dates, and a stored copy could
+drift. `source` is nullable: a request whose origin nobody recorded says so rather than being filed
+under the phone by default.
 
 **The run a hire actually had (RNT-07, D-118).** In the browser schema this is one object on the
 rental, `rental.run`: departure and return instants, two odometer readings, the distance and its source

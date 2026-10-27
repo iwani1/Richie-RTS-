@@ -252,12 +252,23 @@ async function main() {
       vehicleCategoryId: db.settings.vehicleCategories[0].id,
       driverRequired: false,
       notes: "",
+      // RNT-01 (D-119): the journey the customer asked for travels with the request over HTTP.
+      departureTime: "6:30",
+      returnTime: "17:00",
+      stops: "Nkawkaw",
+      luggage: "Twelve suitcases",
+      tripContactName: "Ama Mensah",
+      tripContactPhone: "0244000000",
+      source: "phone",
     },
   });
   const rental = db.rentals.find((candidate: any) => candidate.customerName === customer);
   ok(Boolean(rental), "rental request created");
   const rentalId = rental.id;
   ok(rental.status === "draft", "rental request is recorded as a Draft");
+  ok(rental.plan?.departureTime === "06:30", `the request keeps the departure time as ${rental.plan?.departureTime}`);
+  ok(rental.plan?.stops?.[0] === "Nkawkaw", "the request keeps the stop on the way");
+  ok(rental.plan?.source === "phone", "the request says how it came in");
 
   // 7. Quotation: 2 days at 1,500 = 3,000 with a 20% deposit required.
   const byRental = (database: any) => database.rentals.find((candidate: any) => candidate.id === rentalId);

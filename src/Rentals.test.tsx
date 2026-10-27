@@ -80,10 +80,26 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     setField(/Start date/i, dayFromNow(0), within(dialog));
     setField(/End date/i, dayFromNow(2), within(dialog));
     setField(/Passengers/i, "25", within(dialog));
+    // The journey the customer asked for (RNT-01, D-119): the desk writes down what it was told.
+    setField(/^Departure time/i, "08:00", within(dialog));
+    setField(/^Return time/i, "17:30", within(dialog));
+    setField(/Stops on the way/i, "Achimota\nNsawam", within(dialog));
+    setField(/^Luggage/i, "Twelve suitcases", within(dialog));
+    setField(/Special needs/i, "One wheelchair", within(dialog));
+    setField(/Who to ring on the day/i, "Ama Mensah", within(dialog));
+    setField(/Their phone/i, "024 000 0000", within(dialog));
+    fireEvent.change(within(dialog).getByLabelText(/How did this request arrive/i), { target: { value: "phone" } });
     fireEvent.click(within(dialog).getByRole("button", { name: /Save request/i }));
 
-    // Detail view opens on RR-0001.
+    // Detail view opens on RR-0001, and the journey is on it rather than only in the desk's head.
     await screen.findByText(/Rental RR-0001/i);
+    expect(screen.getByText(/Leaves at 08:00/)).toBeTruthy();
+    expect(screen.getByText(/and back at 17:30/)).toBeTruthy();
+    expect(screen.getByText("Calls at Achimota, then Nsawam.")).toBeTruthy();
+    expect(screen.getByText("Twelve suitcases")).toBeTruthy();
+    expect(screen.getByText("One wheelchair")).toBeTruthy();
+    expect(screen.getByText("On the day, ring Ama Mensah on 024 000 0000.")).toBeTruthy();
+    expect(screen.getByText("Phone call")).toBeTruthy();
 
     // Issue a quotation.
     fireEvent.click(screen.getByRole("button", { name: /Issue quotation/i }));

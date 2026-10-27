@@ -471,6 +471,39 @@ export interface RentalRun {
   recordedAt: string;
 }
 
+/**
+ * Where a rental request came from (RNT-01, D-119).
+ *
+ * A channel is a fact somebody chooses from a list, not a guess: the office knows whether the phone
+ * rang or the customer walked in. An empty string is a request whose source nobody wrote down, and
+ * the screens say exactly that rather than assuming the phone.
+ */
+export const REQUEST_SOURCES = ["phone", "walk_in", "email", "whatsapp", "website", "portal", "referral", "other"] as const;
+export type RequestSource = (typeof REQUEST_SOURCES)[number];
+
+/**
+ * The journey the customer asked for (RNT-01, D-119).
+ *
+ * The pair to `RentalRun` (D-118): the plan is what was asked for, the run is what happened. Keeping
+ * them apart is what lets a screen say "asked for 08:00, left 08:40" without either overwriting the
+ * other, and it is why a request written before these fields existed carries `plan: null` — nothing
+ * about its times, stops or origin was recorded, so nothing is claimed.
+ */
+export interface RentalPlan {
+  /** Clock time on the start date, "HH:MM" in 24-hour form, or "" when nobody wrote one down. */
+  departureTime: string;
+  /** Clock time on the end date, or "" when the request says only how many days it needs. */
+  returnTime: string;
+  /** Intermediate stops between the pickup and the destination, in the order the vehicle calls. */
+  stops: string[];
+  luggage: string;
+  specialNeeds: string;
+  /** Who to ring on the day, when it is not the person who booked. */
+  tripContactName: string;
+  tripContactPhone: string;
+  source: RequestSource | "";
+}
+
 export interface Rental {
   id: string;
   reference: string; // RR-0001
@@ -495,6 +528,8 @@ export interface Rental {
   acceptance: RentalAcceptance | null;
   /** What actually happened on the road, or null while nothing has been recorded (D-118). */
   run: RentalRun | null;
+  /** The journey the customer asked for, or null for a request written before it was recorded (D-119). */
+  plan: RentalPlan | null;
   assignedVehicleId: string | null;
   assignedDriverId: string | null;
   deposit: DepositPayment | null;
@@ -1347,7 +1382,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 33;
+export const SCHEMA_VERSION = 34;
 
 /**
  * Every schema version this build can still read.
@@ -1357,7 +1392,7 @@ export const SCHEMA_VERSION = 33;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1455,6 +1490,30 @@ function legacyQuote(quote: Quote): Quote {
     revision: Number.isInteger(raw.revision) ? (raw.revision as number) : 1,
     terms: typeof raw.terms === "string" ? raw.terms : "",
     driverIncluded: raw.driverIncluded === true,
+  };
+}
+
+/**
+ * The journey a request asked for, as it stands in a stored record.
+ *
+ * A request written before schema 34 has no `plan` at all, and this keeps it that way: the office may
+ * well have known the departure time, but nothing here recorded it, and a blank-looking plan would say
+ * "the customer asked for no stops, no luggage and no special needs" — a fact nobody stated (D-119).
+ * A half-written plan (an object missing a key, a hand-edited backup) is filled in field by field.
+ */
+function readLegacyPlan(value: unknown): RentalPlan | null {
+  if (typeof value !== "object" || value === null) return null;
+  const raw = value as Partial<RentalPlan>;
+  const text = (field: unknown) => (typeof field === "string" ? field : "");
+  return {
+    departureTime: text(raw.departureTime),
+    returnTime: text(raw.returnTime),
+    stops: Array.isArray(raw.stops) ? raw.stops.filter((stop): stop is string => typeof stop === "string") : [],
+    luggage: text(raw.luggage),
+    specialNeeds: text(raw.specialNeeds),
+    tripContactName: text(raw.tripContactName),
+    tripContactPhone: text(raw.tripContactPhone),
+    source: REQUEST_SOURCES.includes(raw.source as RequestSource) ? (raw.source as RequestSource) : "",
   };
 }
 
@@ -1556,6 +1615,10 @@ export function migrate(value: unknown): Database | null {
           // know when the bus left and came back, but nothing here recorded it, and a plausible
           // timestamp would be a fact this program invented (D-118).
           run: rental.run && typeof rental.run.recordedAt === "string" ? rental.run : null,
+          // The journey the customer asked for arrived in schema 34. A request written before it has
+          // no plan: its times, stops, luggage and origin were never recorded, and filling them with
+          // blanks dressed up as facts would read as "the customer asked for none" (D-119).
+          plan: readLegacyPlan(rental.plan),
           acceptance:
             rental.acceptance && typeof rental.acceptance.at === "string" && typeof rental.acceptance.quotedAt === "string"
               ? rental.acceptance

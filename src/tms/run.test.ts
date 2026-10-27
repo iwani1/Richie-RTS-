@@ -145,6 +145,7 @@ describe("what the hire cost and what is still owed (RNT-07)", () => {
     quoteHistory: [],
     acceptance: null,
     run: null,
+    plan: null,
     assignedVehicleId: "v1",
     assignedDriverId: null,
     deposit: null,

@@ -974,7 +974,7 @@ describe("a customer accepting a quotation (RNT-05, D-116)", () => {
 
   it("leaves an older backup with no acceptance, rather than inventing one", () => {
     // Schema 31 is readable: a record written before acceptance existed loads with none.
-    expect(SCHEMA_VERSION).toBe(33);
+    expect(SCHEMA_VERSION).toBe(34);
   });
 });
 
@@ -1225,5 +1225,96 @@ describe("what actually happened on a hire (RNT-07, D-118)", () => {
     const balance = rentalBalance(paid.db, paid.db.rentals[0]);
     expect(balance?.outstanding).toBe(2000);
     expect(balanceLine(balance!)).toBe(`Invoice ${invoice.reference}: GHS 3000.00 billed, GHS 2000.00 still outstanding.`);
+  });
+});
+
+describe("the journey a customer asked for (RNT-01, D-119)", () => {
+  const withJourney = (catId: string, start: string, end: string, journey: Record<string, string>) => ({
+    type: "create_rental" as const,
+    input: { ...requestInput(catId, start, end).input, ...journey },
+  });
+
+  it("writes down the times, the stops, the luggage, who to ring and how it came in", () => {
+    const w = rentalReady();
+    const result = execute(
+      w.db,
+      w.admin,
+      withJourney(w.catId, "2026-03-01", "2026-03-03", {
+        departureTime: "7:30",
+        returnTime: "18:00",
+        stops: "Achimota\nNsawam",
+        luggage: "Twelve suitcases",
+        specialNeeds: "One wheelchair: a ramp is needed",
+        tripContactName: "Ama Mensah",
+        tripContactPhone: "024 000 0000",
+        source: "phone",
+      }),
+      NOW,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // "7:30" is stored as "07:30": one form to type, one form to sort and compare.
+    expect(result.db.rentals[0].plan).toEqual({
+      departureTime: "07:30",
+      returnTime: "18:00",
+      stops: ["Achimota", "Nsawam"],
+      luggage: "Twelve suitcases",
+      specialNeeds: "One wheelchair: a ramp is needed",
+      tripContactName: "Ama Mensah",
+      tripContactPhone: "024 000 0000",
+      source: "phone",
+    });
+  });
+
+  it("records blanks when the desk knows nothing about the journey, rather than filling them in", () => {
+    const w = rentalReady();
+    const result = execute(w.db, w.admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.db.rentals[0].plan).toEqual({
+      departureTime: "",
+      returnTime: "",
+      stops: [],
+      luggage: "",
+      specialNeeds: "",
+      tripContactName: "",
+      tripContactPhone: "",
+      source: "",
+    });
+  });
+
+  it("refuses a one-day hire that comes back before it leaves, and stores nothing", () => {
+    const w = rentalReady();
+    const refused = execute(
+      w.db,
+      w.admin,
+      withJourney(w.catId, "2026-03-01", "2026-03-01", { departureTime: "17:00", returnTime: "08:00" }),
+      NOW,
+    );
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.errors.returnTime).toContain("cannot be back before it leaves");
+    expect(w.db.rentals).toHaveLength(0);
+  });
+
+  it("refuses more stops than the form can carry, and says where the rest goes", () => {
+    const w = rentalReady();
+    const stops = Array.from({ length: 9 }, (_, i) => `Stop ${i + 1}`).join("\n");
+    const refused = execute(w.db, w.admin, withJourney(w.catId, "2026-03-01", "2026-03-03", { stops }), NOW);
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.errors.stops).toContain("Put the rest of the day in the notes.");
+  });
+
+  it("keeps the journey when a correction leaves it out of the form", () => {
+    const w = rentalReady();
+    const created = execute(w.db, w.admin, withJourney(w.catId, "2026-03-01", "2026-03-03", { stops: "Achimota", source: "walk_in" }), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const edited = execute(created.db, w.admin, { type: "update_rental", id, input: { ...requestInput(w.catId, "2026-03-01", "2026-03-03").input, purpose: "Board meeting" } }, NOW);
+    expect(edited.ok).toBe(true);
+    if (!edited.ok) return;
+    expect(edited.db.rentals[0].purpose).toBe("Board meeting");
+    expect(edited.db.rentals[0].plan).toMatchObject({ stops: ["Achimota"], source: "walk_in" });
   });
 });

@@ -2775,3 +2775,49 @@ and the ones a damage claim is argued from, and they were living in the office's
   **What happened** card on the rentails detail, and 25 new tests (20 domain in `run.test.ts`, 4
   service, 1 screen) — the suite moves from 1,169 to 1,195. **Still open:** an approval record for
   additional charges (Q-12), which is a decision about who signs off an extra, not a field.
+
+## D-119 - A rental request records the journey, not just the dates (RNT-01)
+
+The request form asked for the customer, the two dates, the two places and the passenger count.
+Everything else the desk was told on the phone had to go into a free-text notes box, if it went
+anywhere: that the vehicle leaves at half seven, calls at Achimota on the way, is carrying twelve
+suitcases and one wheelchair, and that the office should ring Ama on the morning rather than the man
+who booked. A quotation priced from half the facts, and a driver ringing the office at six in the
+morning, are what that gap costs.
+
+- **Decision 1: the plan is its own record, and it is the pair to the run.** `Rental.plan` holds the
+  two clock times, the stops, the luggage, the special needs, the contact for the day and how the
+  request arrived. D-118 gave the hire a `run` for what happened; this is what was asked for, so a
+  screen can say *asked for 08:00, left 08:40* without either overwriting the other.
+- **Decision 2: a time is one form.** "7:30" is accepted and stored as "07:30"; "7", "8.0", "24:00"
+  and "noon" are refused with a plain sentence. One form to type, one form to sort and compare, and
+  no guessed clock time for a schedule nobody can argue with.
+- **Decision 3: a one-day hire cannot come back before it leaves.** On a same-day request the return
+  time must be after the departure time; the refusal names both possible corrections. The two times
+  are not swapped behind the office's back, because only they know which of the two is the typo.
+- **Decision 4: the duration is worked out, never stored.** `plannedMinutes` derives it from the two
+  times and the two dates. A stored duration would eventually disagree with the dates it was made
+  from, and the quotation's own day count already exists elsewhere.
+- **Decision 5: the stops are a list, in the order given.** One per line, up to eight, each a short
+  name; anything longer belongs in the notes. A stop is not a price and not a route — nothing here
+  computes mileage, adds a charge or touches a driver's list, because a stop that costs money is a
+  decision somebody makes on the quotation.
+- **Decision 6: nobody signs off a stop.** There is no approval step, and none is implied: the plan
+  records what the customer asked for, and the quotation is still the document that prices it.
+- **Decision 7: the source is recorded when somebody says, and left blank when nobody does.** The
+  channel is a fact the office chooses from a short list, not something this program infers — a
+  request from the public web form records `website` and a portal request records `portal`, because
+  those two really are known. An older request has `plan: null` and the screen says its times, stops
+  and origin are unknown. Filling blanks in would read as "the customer asked for no stops and no
+  luggage", which is a fact nobody stated.
+- **Decision 8: a correction keeps what the form leaves out.** `update_rental` merges the plan against
+  what the record already holds, so editing the purpose does not wipe the stops. Sending a field
+  explicitly — even as empty — still changes it; that is the difference between "nobody mentioned it"
+  and "it is cancelled".
+- **Consequence.** `src/tms/request.ts` (`readRequestDetails`, `planLine`, `stopsLine`,
+  `tripContactLine`, `sourceLabel`, `plannedMinutes`, `planHasDetails`), `src/tms/time.ts`
+  (`readClock`, `humanDuration`), `Rental.plan`, schema **34** with a migration that leaves older
+  requests with no plan (no SQL migration: the request is a JSON document), the journey block on the
+  request form and the matching rows on the request card, and 30 new tests — the suite moves from
+  1,195 to 1,225. **Still open:** the customer's own portal form asks only for the basics, so a
+  portal-raised request records `source: portal` and nothing else about its journey (RNT-09).

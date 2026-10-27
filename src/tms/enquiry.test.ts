@@ -72,7 +72,19 @@ describe("public enquiry", () => {
     expect(rental.finalInvoice).toBeNull();
     expect(rental.clientId).toBeNull();
     expect(rental).toMatchObject({ customerName: "Akosua Boateng", startDate: "2026-07-01", passengers: 18 });
-    // The provenance is in the record, so nobody mistakes it for something taken at the desk.
+    // The provenance is in the record, so nobody mistakes it for something taken at the desk — in the
+    // notes and, since RNT-01 (D-119), in the request's own account of where it came from. Every other
+    // plan field is blank because the form never asked: a web enquiry states no times and no stops.
+    expect(rental.plan).toEqual({
+      departureTime: "",
+      returnTime: "",
+      stops: [],
+      luggage: "",
+      specialNeeds: "",
+      tripContactName: "",
+      tripContactPhone: "",
+      source: "website",
+    });
     expect(rental.notes).toContain("public enquiry form");
     expect(rental.notes).toContain("Boateng Weddings");
     expect(rental.notes).toContain("Two stops on the way back.");

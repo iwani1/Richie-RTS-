@@ -4,9 +4,10 @@ import { rentalQuotingReady, type AssignmentInput, type CompleteRentalInput, typ
 import { balanceLine, damageLine, distanceLine, rentalBalance, runLine, toLocalInput } from "../tms/run";
 import { acceptanceLine, acceptanceStateOf, canAcceptQuotation } from "../tms/acceptance";
 import { quotationHeading, quotationIsNumbered, validityLine } from "../tms/quotations";
+import { MAX_STOPS, planLine, SOURCE_LABELS, sourceLabel, stopsLine, tripContactLine } from "../tms/request";
 import { readinessReport } from "../tms/maintenance";
 import { useTms } from "../tms/useTms";
-import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, type Rental, type RentalStatus } from "../tms/types";
+import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, REQUEST_SOURCES, type Rental, type RentalStatus } from "../tms/types";
 import { CopyButton } from "../ui/CopyButton";
 import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, formatDateTime, todayYmd } from "../ui/primitives";
 import type { Route } from "../routes";
@@ -47,6 +48,16 @@ const emptyRequest = (): RentalRequestInput => ({
   vehicleCategoryId: "",
   driverRequired: false,
   notes: "",
+  // The journey the customer asked for (RNT-01, D-119). Blank until somebody types it; the source
+  // stays blank until the desk says how the request arrived.
+  departureTime: "",
+  returnTime: "",
+  stops: "",
+  luggage: "",
+  specialNeeds: "",
+  tripContactName: "",
+  tripContactPhone: "",
+  source: "",
 });
 
 const toRequestInput = (r: Rental): RentalRequestInput => ({
@@ -63,6 +74,14 @@ const toRequestInput = (r: Rental): RentalRequestInput => ({
   vehicleCategoryId: r.vehicleCategoryId,
   driverRequired: r.driverRequired,
   notes: r.notes,
+  departureTime: r.plan?.departureTime ?? "",
+  returnTime: r.plan?.returnTime ?? "",
+  stops: (r.plan?.stops ?? []).join("\n"),
+  luggage: r.plan?.luggage ?? "",
+  specialNeeds: r.plan?.specialNeeds ?? "",
+  tripContactName: r.plan?.tripContactName ?? "",
+  tripContactPhone: r.plan?.tripContactPhone ?? "",
+  source: r.plan?.source ?? "",
 });
 
 export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) {
@@ -273,6 +292,12 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
             <dt className="text-stone-500">Pickup</dt><dd className="text-stone-800">{rental.pickupLocation || "-"}</dd>
             <dt className="text-stone-500">Drop-off</dt><dd className="text-stone-800">{rental.dropoffLocation || "-"}</dd>
             <dt className="text-stone-500">Driver</dt><dd className="text-stone-800">{needsDriver ? "Required" : "Not required"}</dd>
+            <dt className="text-stone-500">Journey</dt><dd className="text-stone-800">{planLine(rental)}</dd>
+            <dt className="text-stone-500">Stops</dt><dd className="text-stone-800">{stopsLine(rental)}</dd>
+            {rental.plan && rental.plan.luggage !== "" && <><dt className="text-stone-500">Luggage</dt><dd className="text-stone-800">{rental.plan.luggage}</dd></>}
+            {rental.plan && rental.plan.specialNeeds !== "" && <><dt className="text-stone-500">Special needs</dt><dd className="text-stone-800">{rental.plan.specialNeeds}</dd></>}
+            <dt className="text-stone-500">On the day</dt><dd className="text-stone-800">{tripContactLine(rental)}</dd>
+            <dt className="text-stone-500">Came in by</dt><dd className="text-stone-800">{sourceLabel(rental.plan?.source ?? "")}</dd>
             {rental.notes && <><dt className="text-stone-500">Notes</dt><dd className="text-stone-800">{rental.notes}</dd></>}
           </dl>
         </Card>
@@ -498,6 +523,42 @@ function RequestForm({ initial, title, onClose, onSubmit }: { initial: RentalReq
           <Field label="Drop-off location"><TextInput value={values.dropoffLocation} onChange={(e) => set({ dropoffLocation: e.target.value })} /></Field>
         </div>
         <Field label="Purpose"><TextInput value={values.purpose} onChange={(e) => set({ purpose: e.target.value })} /></Field>
+        <fieldset className="space-y-3 rounded-sm border border-stone-200 p-3">
+          <legend className="px-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500">The journey asked for</legend>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Departure time" hint="Leave blank if nobody said." error={errors.departureTime}>
+              <TextInput type="time" value={values.departureTime ?? ""} onChange={(e) => set({ departureTime: e.target.value })} invalid={!!errors.departureTime} />
+            </Field>
+            <Field label="Return time" error={errors.returnTime}>
+              <TextInput type="time" value={values.returnTime ?? ""} onChange={(e) => set({ returnTime: e.target.value })} invalid={!!errors.returnTime} />
+            </Field>
+          </div>
+          <Field label="Stops on the way" hint={`One per line, in the order the vehicle calls. Up to ${MAX_STOPS}.`} error={errors.stops}>
+            <TextArea rows={3} value={values.stops ?? ""} onChange={(e) => set({ stops: e.target.value })} invalid={!!errors.stops} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Luggage" hint="Suitcases, boxes, equipment." error={errors.luggage}>
+              <TextInput value={values.luggage ?? ""} onChange={(e) => set({ luggage: e.target.value })} invalid={!!errors.luggage} />
+            </Field>
+            <Field label="Special needs" hint="Anything the vehicle must carry or allow for." error={errors.specialNeeds}>
+              <TextInput value={values.specialNeeds ?? ""} onChange={(e) => set({ specialNeeds: e.target.value })} invalid={!!errors.specialNeeds} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Who to ring on the day" hint="Leave blank to use the customer's own number." error={errors.tripContactName}>
+              <TextInput value={values.tripContactName ?? ""} onChange={(e) => set({ tripContactName: e.target.value })} invalid={!!errors.tripContactName} />
+            </Field>
+            <Field label="Their phone" error={errors.tripContactPhone}>
+              <TextInput inputMode="tel" value={values.tripContactPhone ?? ""} onChange={(e) => set({ tripContactPhone: e.target.value })} invalid={!!errors.tripContactPhone} />
+            </Field>
+          </div>
+          <Field label="How did this request arrive?" error={errors.source}>
+            <Select value={values.source ?? ""} onChange={(e) => set({ source: e.target.value })} invalid={!!errors.source}>
+              <option value="">Not recorded</option>
+              {REQUEST_SOURCES.map((source) => <option key={source} value={source}>{SOURCE_LABELS[source]}</option>)}
+            </Select>
+          </Field>
+        </fieldset>
         <Field label="Notes"><TextArea value={values.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
         <div className="flex justify-end gap-2 pt-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary">Save request</Button></div>
       </form>

@@ -560,6 +560,9 @@ function RequestRental({
     vehicleCategoryId: vehicleCategories[0]?.id ?? "",
     driverRequired: true,
     notes: "",
+    // The one thing this form knows about its own journey: it was raised in the customer's portal
+    // (RNT-01, D-119). The times, stops and luggage are not asked for here yet, so they stay blank.
+    source: "portal",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 

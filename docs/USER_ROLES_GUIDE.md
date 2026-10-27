@@ -31,6 +31,10 @@ is no other company in the database.
   finance or an administrator), or by the customer itself in the portal on its own request. It records
   what was agreed and through which channel; it takes no money and confirms nothing. Agreeing to a
   price and paying the deposit are separate acts, and the second one still belongs to finance.
+- **Taking a request** records the journey the customer asks for, not only the dates: the times, the
+  stops on the way, luggage, special needs, who to ring on the day, and how the enquiry arrived. A
+  one-day hire whose return time is before its departure time is refused, because one of the two is a
+  typing mistake only the office can put right.
 - **Completing a hire** records the final charges and, when somebody knows them, the times the vehicle
   was out, its odometer readings, any damage and what the customer said. The journey is optional and
   the screen says so: a hire completed without a reading has no distance rather than an invented one.

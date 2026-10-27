@@ -98,6 +98,7 @@ const rental = (id: string, vehicleId: string, startDate: string, endDate: strin
   quoteHistory: [],
   acceptance: null,
       run: null,
+      plan: null,
   assignedVehicleId: vehicleId,
   assignedDriverId: null,
   deposit: null,

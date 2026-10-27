@@ -60,6 +60,7 @@ function rental(id: string, overrides: Partial<Rental>): Rental {
     quoteHistory: [],
   acceptance: null,
     run: null,
+    plan: null,
     assignedVehicleId: "veh-1",
     assignedDriverId: null,
     deposit: null,
