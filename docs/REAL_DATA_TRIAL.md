@@ -122,7 +122,7 @@ Open **Settings** and complete, with your own values:
 | Company name, currency | Every quote and invoice prints it |
 | Tax position and tax lines | Issuing an invoice is refused while the position is unset; a VAT-registered company with no tax line is refused too |
 | Payment terms (days) | An invoice has no due date without it |
-| Deposit percentage, quotation validity | The deposit on confirmation and the quote's expiry are computed from these |
+| Deposit percentage, quotation validity (in hours since D-117), quotation terms | The deposit on confirmation, the moment the price stops holding and the conditions printed on the sheet are taken from these |
 | Payment methods | Recording a payment needs a method that exists here |
 | Vehicle categories | Vehicles cannot be created, and the public form cannot open, without at least one |
 

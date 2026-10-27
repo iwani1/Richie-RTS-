@@ -289,7 +289,7 @@ describe("the refusal reaches the save, not just the register (FLT-04)", () => {
         ...db.settings,
         currencyCode: "GHS",
         vehicleCategories: [{ id: "", name: "Coach", licenceClasses: ["D"] }],
-        rental: { ...emptyRentalSettings(), pricingBasis: "per_day", depositPercent: 25, quotationValidityDays: 7, paymentMethods: ["Cash"] },
+        rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 25, quotationValidityHours: 168, paymentMethods: ["Cash"] },
       },
     });
     const categoryId = db.settings.vehicleCategories[0].id;

@@ -2,11 +2,12 @@ import { useMemo, useState, type FormEvent } from "react";
 import { formatAmount, fromMinor, lineAmount, linesTotalFromText, percentOf, toMinor } from "../tms/money";
 import { rentalQuotingReady, type AssignmentInput, type DepositInput, type QuoteInput, type QuoteLineInput, type RentalRequestInput } from "../tms/service";
 import { acceptanceLine, acceptanceStateOf, canAcceptQuotation } from "../tms/acceptance";
+import { quotationHeading, quotationIsNumbered, validityLine } from "../tms/quotations";
 import { readinessReport } from "../tms/maintenance";
 import { useTms } from "../tms/useTms";
 import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, type Rental, type RentalStatus } from "../tms/types";
 import { CopyButton } from "../ui/CopyButton";
-import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, formatDateTime, todayYmd } from "../ui/primitives";
 import type { Route } from "../routes";
 
 type Errors = Record<string, string>;
@@ -168,7 +169,10 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
   const driver = db.drivers.find((d) => d.id === rental.assignedDriverId);
   const client = db.clients.find((c) => c.id === rental.clientId);
   const quoteMissing = rentalQuotingReady(db.settings);
-  const expired = rental.quote ? rental.quote.validUntil < todayYmd() : false;
+  // D-117: a quotation is a moment, not a day — it stops holding at the hour it was issued plus the
+  // configured period, so the check compares instants.
+  const nowIso = new Date().toISOString();
+  const expired = rental.quote ? new Date(rental.quote.validUntil).getTime() < new Date(nowIso).getTime() : false;
   const needsDriver = rental.driverRequired || db.settings.rental.driversAlwaysIncluded === true;
 
   const run = async (pending: ReturnType<typeof dispatch>): Promise<Errors> => {
@@ -189,7 +193,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
     // RNT-05, D-116: most customers agree on the phone, so the office can write the yes down. The
     // button appears only when the quotation can actually be accepted — unless the customer has
     // already accepted it, in which case there is nothing left to record.
-    const acceptanceProblems = canAcceptQuotation(rental, todayYmd());
+    const acceptanceProblems = canAcceptQuotation(rental, nowIso);
     if (allowed("rentals:accept") && Object.keys(acceptanceProblems).length === 0)
       actions.push(<Button key="accept" onClick={() => { setAcceptNote(""); setPanel("accept"); }}>Record customer acceptance</Button>);
     if (allowed("rentals:confirm")) actions.push(<Button key="confirm" variant="primary" disabled={expired} title={expired ? "Quotation expired" : undefined} onClick={() => setPanel("confirm")}>Record deposit & confirm</Button>);
@@ -275,6 +279,20 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
         <Card title="Quotation">
           {rental.quote ? (
             <div className="text-sm">
+              {/* D-117: the document a customer can name. The number is copied rather than read out
+                  loud over a bad line, and the revision says which version of the price it is. */}
+              {quotationIsNumbered(rental.quote) ? (
+                <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-stone-200 pb-2">
+                  <span className="font-mono text-sm font-semibold">{quotationHeading(rental.quote)}</span>
+                  <CopyButton value={rental.quote.number} what="quotation number" />
+                  <span className={`text-xs ${expired ? "text-red-700" : "text-stone-600"}`}>{validityLine(rental.quote.validUntil, nowIso)}</span>
+                </div>
+              ) : (
+                <Notice tone="warning" title="This quotation has no number" className="mb-3">
+                  It was issued before quotations were numbered, so it cannot be given to a customer as a document. Issue a new
+                  quotation on a new request, or wait for this one to expire and renew it.
+                </Notice>
+              )}
               <table className="w-full text-left">
                 <thead className="text-[10px] uppercase tracking-wider text-stone-500"><tr><th className="pb-1">Description</th><th className="pb-1 text-right">Qty</th><th className="pb-1 text-right">Unit</th><th className="pb-1 text-right">Line</th></tr></thead>
                 <tbody className="divide-y divide-stone-100">
@@ -287,15 +305,23 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
                 <div className="flex justify-between"><dt className="text-stone-500">Pricing basis</dt><dd>{PRICING_BASIS_LABELS[rental.quote.pricingBasis]}</dd></div>
                 <div className="flex justify-between font-semibold"><dt>Subtotal</dt><dd>{money(rental.quote.subtotal, rental.quote.currencyCode)}</dd></div>
                 <div className="flex justify-between"><dt className="text-stone-500">Deposit ({rental.quote.depositPercent}%)</dt><dd>{money(rental.quote.depositRequired, rental.quote.currencyCode)}</dd></div>
-                <div className="flex justify-between"><dt className="text-stone-500">Valid until</dt><dd className={expired ? "text-red-700" : ""}>{formatDate(rental.quote.validUntil)}</dd></div>
+                <div className="flex justify-between"><dt className="text-stone-500">Driver included</dt><dd>{rental.quote.driverIncluded ? "Yes" : "No"}</dd></div>
+                <div className="flex justify-between"><dt className="text-stone-500">Valid until</dt><dd className={expired ? "text-red-700" : ""}>{formatDateTime(rental.quote.validUntil)}</dd></div>
               </dl>
               {/* D-116: the customer's own answer, in their own record — and a warning when the
                   quotation has moved on since they gave it. */}
               {rental.acceptance && (
-                <p className={`mt-2 text-xs ${acceptanceStateOf(rental, todayYmd()) === "current" ? "text-stone-700" : "text-amber-800"}`}>
-                  {acceptanceLine(rental, todayYmd())}
+                <p className={`mt-2 text-xs ${acceptanceStateOf(rental, nowIso) === "current" ? "text-stone-700" : "text-amber-800"}`}>
+                  {acceptanceLine(rental, nowIso)}
                   {rental.acceptance.note && <span className="block text-stone-600">&ldquo;{rental.acceptance.note}&rdquo;</span>}
                 </p>
+              )}
+              {/* The conditions the customer agreed to, kept with the quotation they were printed on. */}
+              {rental.quote.terms && (
+                <div className="mt-3 border-t border-stone-200 pt-2">
+                  <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Terms</h3>
+                  <p className="whitespace-pre-line text-xs text-stone-700">{rental.quote.terms}</p>
+                </div>
               )}
               <p className="mt-2 text-[11px] text-stone-400">No tax lines are applied; VAT/levy treatment is an open question (Q-14).</p>
               {rental.quoteHistory.length > 0 && (
@@ -304,8 +330,8 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
                   <ol className="space-y-2">
                     {rental.quoteHistory.map((previous, index) => (
                       <li key={`${previous.quotedAt}-${index}`} className="rounded-sm bg-stone-50 px-3 py-2">
-                        <div className="flex justify-between gap-2 text-xs"><span className="font-semibold">Revision {index + 1}</span><span>{money(previous.subtotal, previous.currencyCode)}</span></div>
-                        <p className="mt-0.5 text-[10px] text-stone-500">Quoted {formatDate(previous.quotedAt.slice(0, 10))} by {previous.quotedBy} · valid until {formatDate(previous.validUntil)}</p>
+                        <div className="flex justify-between gap-2 text-xs"><span className="font-semibold">{quotationIsNumbered(previous) ? `Revision ${previous.revision}` : "Unnumbered"}</span><span>{money(previous.subtotal, previous.currencyCode)}</span></div>
+                        <p className="mt-0.5 text-[10px] text-stone-500">Quoted {formatDate(previous.quotedAt.slice(0, 10))} by {previous.quotedBy} · valid until {formatDateTime(previous.validUntil)}</p>
                       </li>
                     ))}
                   </ol>
@@ -369,7 +395,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
               <dt className="text-stone-500">Quoted</dt>
               <dd className="font-semibold text-stone-900">{money(rental.quote?.subtotal ?? 0, rental.quote?.currencyCode ?? null)}</dd>
               <dt className="text-stone-500">Held until</dt>
-              <dd className="text-stone-800">{rental.quote ? formatDate(rental.quote.validUntil) : "—"}</dd>
+              <dd className="text-stone-800">{rental.quote ? formatDateTime(rental.quote.validUntil) : "—"}</dd>
             </dl>
             <Field label="What they said (optional)" hint="For example: agreed on the phone with the transport officer, or the pickup time they asked for.">
               <TextArea value={acceptNote} onChange={(event) => setAcceptNote(event.target.value)} />

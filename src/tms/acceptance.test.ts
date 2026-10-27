@@ -20,6 +20,10 @@ const quote = (overrides: Partial<Quote> = {}): Quote => ({
   validUntil: "2026-06-20",
   quotedAt: "2026-06-08T10:00:00.000Z",
   quotedBy: "Finance",
+  number: "QUO-0001",
+  revision: 1,
+  terms: "The price holds until the validity date.",
+  driverIncluded: false,
   ...overrides,
 });
 

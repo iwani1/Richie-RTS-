@@ -95,7 +95,7 @@ function world(currencyCode: string | null): Database {
     settings: {
       ...base.settings,
       currencyCode,
-      rental: { ...emptyRentalSettings(), pricingBasis: "per_day" },
+      rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day" },
     },
   };
 }

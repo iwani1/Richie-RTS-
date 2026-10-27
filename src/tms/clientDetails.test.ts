@@ -63,7 +63,7 @@ const settings = () => ({
   onTimeThresholdMinutes: 5,
   vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
   shifts: [],
-  rental: { ...emptyRentalSettings(), pricingBasis: "per_day" as const, depositPercent: 20, quotationValidityDays: 14, paymentMethods: ["Cash", "Bank transfer"] },
+  rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day" as const, depositPercent: 20, quotationValidityHours: 336, paymentMethods: ["Cash", "Bank transfer"] },
   documentTypes: [],
   documentReminderLeadDays: null,
   taxPosition: "registered" as const,

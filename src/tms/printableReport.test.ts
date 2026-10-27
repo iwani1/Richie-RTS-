@@ -43,9 +43,10 @@ function world(currencyCode: string | null = "GHS"): Database {
       currencyCode,
       rental: {
         ...emptyRentalSettings(),
+        quotationTerms: "Prices are firm for the validity period.",
         pricingBasis: "per_day",
         depositPercent: 0,
-        quotationValidityDays: 30,
+        quotationValidityHours: 720,
         driversAlwaysIncluded: false,
         paymentMethods: ["cash"],
       },

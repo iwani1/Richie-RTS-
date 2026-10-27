@@ -39,7 +39,7 @@ function seedExpiredQuote() {
       companyName: "Richie Transport Services",
       currencyCode: "GHS",
       vehicleCategories: [{ id: "", name: "Minibus", licenceClasses: [] }],
-      rental: { pricingBasis: "per_day", depositPercent: 25, quotationValidityDays: 7, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer"], requotePolicy: null },
+      rental: { quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 25, quotationValidityHours: 168, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer"], requotePolicy: null },
     },
   });
   const categoryId = db.settings.vehicleCategories[0].id;
@@ -97,7 +97,7 @@ describe("Expired quotation policy end-to-end (jsdom)", () => {
     expect(within(dialog).getByDisplayValue("Airport transfer")).toBeTruthy();
     fireEvent.change(within(dialog).getByLabelText(/Unit amount/i), { target: { value: "1500" } });
     fireEvent.click(within(dialog).getByRole("button", { name: /Issue revised quotation/i }));
-    await screen.findByText(/Quotation renewed for RR-0001 as revision 2; prior quotation retained/i);
+    await screen.findByText(/Quotation QUO-0001 renewed for RR-0001 as revision 2; prior quotation retained/i);
     expect(screen.getByText(/Previous quotations retained/i)).toBeTruthy();
     expect(screen.getByText("Revision 1")).toBeTruthy();
     expect(screen.getAllByText("Airport transfer").length).toBeGreaterThan(0);

@@ -235,10 +235,22 @@ export const PRICING_BASIS_LABELS: Record<PricingBasis, string> = {
 export interface RentalSettings {
   pricingBasis: PricingBasis | null;
   depositPercent: number | null; // 0..100
-  quotationValidityDays: number | null;
+  /**
+   * How long a quotation holds, in hours (RNT-04, D-117). It replaced whole days in schema 32: a
+   * price quoted on a Friday morning and held "for seven days" runs out at a different hour from one
+   * quoted on Friday afternoon, and a customer ringing on the last afternoon is entitled to be told
+   * whether the price still stands. Stored in hours, printed in days until the remaining time is under
+   * two days.
+   */
+  quotationValidityHours: number | null;
   driversAlwaysIncluded: boolean | null;
   paymentMethods: string[];
   requotePolicy: RequotePolicy | null;
+  /**
+   * The terms printed on every quotation (RNT-04, D-117). Free text the company writes, not a policy
+   * this build invents: until it is set, quotations cannot be issued, and the screen says so.
+   */
+  quotationTerms: string;
 }
 
 // Compliance document types (Q-16). Admin-defined, same pattern as VehicleCategory/Shift:
@@ -370,6 +382,17 @@ export interface Quote {
   validUntil: string; // YYYY-MM-DD
   quotedAt: string;
   quotedBy: string;
+  /**
+   * The quotation's own number, QUO-0001 (RNT-04, D-117), and which revision it is: 1 on the first
+   * issue, 2 on the first renewal. A customer quoting a number back to the office names one document;
+   * the revision says which version of it they were reading.
+   */
+  number: string;
+  revision: number;
+  /** The terms printed under the figures, as agreed when the quotation was issued (D-117). */
+  terms: string;
+  /** Whether the proposal includes a driver, decided when the quotation was issued. */
+  driverIncluded: boolean;
 }
 
 export interface DepositPayment {
@@ -1225,7 +1248,7 @@ export interface TaxLineSetting {
  * A numbering series. Rentals, routes, trips, incidents and work orders are numbered continuously
  * and filed under the period `all`; invoices and payments restart each year (audit D-03).
  */
-export const REFERENCE_SCOPES = ["rental", "route", "trip", "incident", "workOrder", "contract", "invoice", "creditNote", "payment", "refund", "expense", "booking"] as const;
+export const REFERENCE_SCOPES = ["rental", "quotation", "route", "trip", "incident", "workOrder", "contract", "invoice", "creditNote", "payment", "refund", "expense", "booking"] as const;
 export type ReferenceScope = (typeof REFERENCE_SCOPES)[number];
 
 export interface ReferenceCounter {
@@ -1291,7 +1314,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 32;
 
 /**
  * Every schema version this build can still read.
@@ -1301,7 +1324,7 @@ export const SCHEMA_VERSION = 31;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1333,7 +1356,7 @@ export interface Database {
 }
 
 export function emptyRentalSettings(): RentalSettings {
-  return { pricingBasis: null, depositPercent: null, quotationValidityDays: null, driversAlwaysIncluded: null, paymentMethods: [], requotePolicy: null };
+  return { pricingBasis: null, depositPercent: null, quotationValidityHours: null, driversAlwaysIncluded: null, paymentMethods: [], requotePolicy: null, quotationTerms: "" };
 }
 
 export function emptyDatabase(): Database {
@@ -1384,6 +1407,24 @@ export function emptyDatabase(): Database {
   };
 }
 
+/**
+ * A quotation from before schema 32, given the fields it never had — and no invented values.
+ *
+ * `number` stays empty and `revision` is 1, so `quotationIsNumbered` can tell the office this is a
+ * price without a document behind it. The terms were never agreed, so they are blank; the driver
+ * question is taken from the request only if the quotation was written after that field existed.
+ */
+function legacyQuote(quote: Quote): Quote {
+  const raw = quote as Partial<Quote>;
+  return {
+    ...quote,
+    number: typeof raw.number === "string" ? raw.number : "",
+    revision: Number.isInteger(raw.revision) ? (raw.revision as number) : 1,
+    terms: typeof raw.terms === "string" ? raw.terms : "",
+    driverIncluded: raw.driverIncluded === true,
+  };
+}
+
 // Forward-compatible migration for data stored by earlier versions (schema 1 had no
 // rentals and no rental settings). Returns null if the value is not a recognised DB.
 export function migrate(value: unknown): Database | null {
@@ -1394,11 +1435,23 @@ export function migrate(value: unknown): Database | null {
   if (typeof v.settings !== "object" || v.settings === null) return null;
   const settings = v.settings as Record<string, unknown>;
   const legacyRental = (settings.rental as Partial<RentalSettings>) ?? {};
+  // RNT-04 (D-117): validity moved from whole days to hours in schema 32. An older backup's days are
+  // converted at 24 hours a day — the same price holding for the same length of time, not a rewrite.
+  const legacyDays = (legacyRental as { quotationValidityDays?: number | null }).quotationValidityDays;
   const rental = {
     ...emptyRentalSettings(),
     ...legacyRental,
+    quotationValidityHours:
+      typeof legacyRental.quotationValidityHours === "number"
+        ? legacyRental.quotationValidityHours
+        : typeof legacyDays === "number"
+          ? legacyDays * 24
+          : null,
+    // Terms are the company's own words. A backup written before them has none, and none is what it
+    // gets: a quotation with invented conditions would bind a customer to something nobody wrote.
+    quotationTerms: typeof legacyRental.quotationTerms === "string" ? legacyRental.quotationTerms : "",
     requotePolicy: legacyRental.requotePolicy ?? null,
-  };
+  } as RentalSettings;
   return {
     schemaVersion: SCHEMA_VERSION,
     users: (v.users as User[]).map((u) => ({
@@ -1462,7 +1515,10 @@ export function migrate(value: unknown): Database | null {
     rentals: Array.isArray(v.rentals)
       ? (v.rentals as Rental[]).map((rental) => ({
           ...rental,
-          quoteHistory: rental.quoteHistory ?? [],
+          // A quotation written before numbering existed (schema 32) keeps its figures and gains no
+          // number: the screen says it is unnumbered rather than printing a reference nobody issued.
+          quote: rental.quote ? legacyQuote(rental.quote) : null,
+          quoteHistory: (rental.quoteHistory ?? []).map(legacyQuote),
           acceptance:
             rental.acceptance && typeof rental.acceptance.at === "string" && typeof rental.acceptance.quotedAt === "string"
               ? rental.acceptance

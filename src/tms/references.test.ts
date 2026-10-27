@@ -54,6 +54,7 @@ describe("reference series", () => {
     }
     expect(taken).toEqual({
       rental: "RR-0001",
+      quotation: "QUO-0001",
       route: "RT-001",
       trip: "TR-0001",
       incident: "IN-0001",
@@ -166,7 +167,8 @@ describe("commands that mint references", () => {
           ...setup.db.settings,
           currencyCode: "GHS",
           vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
-          rental: { ...setup.db.settings.rental, pricingBasis: "per_day", depositPercent: 20, paymentMethods: ["Cash"] },
+          rental: {
+            ...setup.db.settings.rental, pricingBasis: "per_day", depositPercent: 20, paymentMethods: ["Cash"] },
         },
       },
       NOW,

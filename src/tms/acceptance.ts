@@ -18,6 +18,7 @@
 // Nothing here decides the price or changes the rental's status: accepting a quotation is not the
 // same act as taking the deposit, and the deposit stays where it was (D-90's rule, one money rule).
 import { formatAmount } from "./money";
+import { quotationIsLive } from "./quotations";
 import type { Rental, RentalAcceptance } from "./types";
 
 /** How long a note on an acceptance may be. A sentence, not a paragraph. */
@@ -42,16 +43,20 @@ export function acceptanceIsCurrent(rental: Rental): boolean {
   return acceptance.quotedAt === rental.quote.quotedAt;
 }
 
-export function acceptanceStateOf(rental: Rental, today: string): AcceptanceState {
+/**
+ * How the answer stands at `now` — a moment, not a date, because a price can run out at 09:00 on a day
+ * the customer rings at noon (D-117 moved validity from whole days to hours for exactly this reason).
+ */
+export function acceptanceStateOf(rental: Rental, now: string): AcceptanceState {
   if (rental.acceptance) return acceptanceIsCurrent(rental) ? "current" : "superseded";
-  if (rental.quote && ymd(rental.quote.validUntil) < today) return "expired";
+  if (rental.quote && !quotationIsLive(rental.quote, now)) return "expired";
   return "none";
 }
 
 /** The sentence a screen prints about the customer's answer. Empty when there is nothing to say. */
-export function acceptanceLine(rental: Rental, today: string): string {
+export function acceptanceLine(rental: Rental, now: string): string {
   const acceptance = rental.acceptance;
-  const state = acceptanceStateOf(rental, today);
+  const state = acceptanceStateOf(rental, now);
   if (!acceptance) {
     if (state === "expired") return "The quotation's validity date has passed, so it cannot be accepted as it stands.";
     return "";
@@ -75,7 +80,7 @@ export interface AcceptanceProblems {
  * The same check runs in the service and on the screen: the screen hides the button, the service
  * refuses the command, and neither is the control on its own (the rule D-60 set out).
  */
-export function canAcceptQuotation(rental: Rental, today: string): AcceptanceProblems {
+export function canAcceptQuotation(rental: Rental, now: string): AcceptanceProblems {
   const problems: AcceptanceProblems = {};
   if (rental.status === "draft") {
     problems.status = "No quotation has been issued yet, so there is nothing to accept.";
@@ -85,7 +90,7 @@ export function canAcceptQuotation(rental: Rental, today: string): AcceptancePro
     problems.status = "A declined or cancelled rental cannot be accepted.";
   }
   if (!rental.quote) problems.quote = "There is no quotation on this rental to accept.";
-  else if (ymd(rental.quote.validUntil) < today) {
+  else if (!quotationIsLive(rental.quote, now)) {
     problems.quote = `The quotation expired on ${ymd(rental.quote.validUntil)}. Issue a new one before the customer accepts.`;
   }
   if (Object.keys(problems).length === 0 && acceptanceIsCurrent(rental)) {

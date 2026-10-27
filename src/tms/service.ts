@@ -13,6 +13,7 @@ import { MAX_AMOUNT, formatAmount, isPercentWithTwoDecimals, linesTotal, parseAm
 import { allocateReference } from "./references";
 import { readVehicleDetail } from "./vehicles";
 import { buildAcceptance, canAcceptQuotation } from "./acceptance";
+import { QUOTATION_TERMS_LIMIT, quotationIsLive, validityEndsAt, validityProblem } from "./quotations";
 import { confinedClientId } from "./scope";
 import {
   CLIENT_STATUSES,
@@ -34,6 +35,7 @@ import {
   type FinalInvoice,
   type Quote,
   type QuoteLine,
+  type ReferenceCounter,
   type Rental,
   type RentalSettings,
   type RentalStatus,
@@ -612,10 +614,13 @@ export function validateSettings(db: Database, input: Settings) {
   const rental: RentalSettings = {
     pricingBasis: rentalIn.pricingBasis,
     depositPercent: rentalIn.depositPercent,
-    quotationValidityDays: rentalIn.quotationValidityDays,
+    quotationValidityHours: rentalIn.quotationValidityHours,
     driversAlwaysIncluded: rentalIn.driversAlwaysIncluded,
     paymentMethods: rentalIn.paymentMethods.map((m) => m.trim()).filter(Boolean),
     requotePolicy: rentalIn.requotePolicy,
+    // RNT-04 (D-117): the terms are the company's words, trimmed and kept as typed. No default is
+    // supplied anywhere, and quoting stays blocked until somebody writes them.
+    quotationTerms: (rentalIn.quotationTerms ?? "").trim(),
   };
   if (rental.pricingBasis !== null && !PRICING_BASES.includes(rental.pricingBasis)) errors["rental.pricingBasis"] = "Invalid pricing basis.";
   // A percentage is computed in integer basis points (money.ts), so it may not carry more precision
@@ -625,8 +630,12 @@ export function validateSettings(db: Database, input: Settings) {
     errors["rental.depositPercent"] = "Deposit must be between 0 and 100 percent.";
   else if (rental.depositPercent !== null && !isPercentWithTwoDecimals(rental.depositPercent))
     errors["rental.depositPercent"] = "Give the deposit to at most two decimal places.";
-  if (rental.quotationValidityDays !== null && (!Number.isInteger(rental.quotationValidityDays) || rental.quotationValidityDays < 1))
-    errors["rental.quotationValidityDays"] = "Validity must be a whole number of days (1 or more).";
+  const validityError = validityProblem(rental.quotationValidityHours);
+  // Not set is a setting to fill in later, not a mistake to correct: only a number out of range is
+  // refused here, and quoting says "not set" when it is missing.
+  if (rental.quotationValidityHours !== null && validityError) errors["rental.quotationValidityHours"] = validityError;
+  if (rental.quotationTerms.length > QUOTATION_TERMS_LIMIT)
+    errors["rental.quotationTerms"] = `Keep the terms under ${QUOTATION_TERMS_LIMIT} characters.`;
   const seenMethod = new Set<string>();
   for (const m of rental.paymentMethods) {
     if (seenMethod.has(norm(m))) errors["rental.paymentMethods"] = "Duplicate payment method.";
@@ -775,7 +784,10 @@ export function rentalQuotingReady(settings: Settings): string[] {
   if (!settings.currencyCode) missing.push("billing currency");
   if (!settings.rental.pricingBasis) missing.push("rental pricing basis");
   if (settings.rental.depositPercent === null) missing.push("deposit percentage");
-  if (settings.rental.quotationValidityDays === null) missing.push("quotation validity");
+  if (settings.rental.quotationValidityHours === null) missing.push("quotation validity");
+  // D-117: a quotation carries terms, and this build writes none of its own. Until the company has
+  // written them, there is no sheet to send.
+  if (settings.rental.quotationTerms.trim() === "") missing.push("quotation terms");
   if (settings.rental.paymentMethods.length === 0) missing.push("at least one payment method");
   return missing;
 }
@@ -918,29 +930,48 @@ export function validateQuoteLines(input: QuoteInput) {
   return { errors, lines, subtotal };
 }
 
-function buildQuote(db: Database, actor: Actor, input: QuoteInput, now: string): { ok: true; quote: Quote } | Failure {
+/**
+ * The quotation to write (RNT-04, D-117).
+ *
+ * It draws its own number from the `quotation` series, records which revision it is, copies the
+ * company's terms as they stand today, and holds the price for the configured number of hours from the
+ * minute it was issued. A renewal passes the previous quotation so the number is kept and the revision
+ * goes up: one document, two versions, and the customer can say which one they are holding.
+ */
+function buildQuote(
+  db: Database,
+  actor: Actor,
+  input: QuoteInput,
+  now: string,
+  rental: Rental,
+  previous: Quote | null,
+): { ok: true; quote: Quote; counters: ReferenceCounter[] } | Failure {
   const missing = rentalQuotingReady(db.settings);
   if (missing.length)
     return fail(`Blocked: quotation settings are incomplete. An administrator must set: ${missing.join(", ")}.`);
   const { errors, lines, subtotal } = validateQuoteLines(input);
   if (Object.keys(errors).length) return fail("Please correct the quotation line items.", errors);
   const depositPercent = db.settings.rental.depositPercent!;
-  const validityDays = db.settings.rental.quotationValidityDays!;
-  const validUntil = new Date(new Date(now).getTime() + validityDays * 86_400_000).toISOString().slice(0, 10);
-  return {
-    ok: true,
-    quote: {
-      currencyCode: db.settings.currencyCode!,
-      pricingBasis: db.settings.rental.pricingBasis!,
-      lines,
-      subtotal,
-      depositPercent,
-      depositRequired: percentOf(subtotal, depositPercent),
-      validUntil,
-      quotedAt: now,
-      quotedBy: actor.fullName,
-    },
+  const validityHours = db.settings.rental.quotationValidityHours!;
+  // A renewal keeps the number it was issued under; a first issue draws the next one in the series.
+  const allocated = previous ? null : allocateReference(db, "quotation", now.slice(0, 4));
+  const quote: Quote = {
+    currencyCode: db.settings.currencyCode!,
+    pricingBasis: db.settings.rental.pricingBasis!,
+    lines,
+    subtotal,
+    depositPercent,
+    depositRequired: percentOf(subtotal, depositPercent),
+    validUntil: validityEndsAt(now, validityHours),
+    quotedAt: now,
+    quotedBy: actor.fullName,
+    number: previous ? previous.number : allocated!.reference,
+    revision: previous ? previous.revision + 1 : 1,
+    terms: db.settings.rental.quotationTerms.trim(),
+    // The policy answers it when it has been set; otherwise the request's own answer stands.
+    driverIncluded: db.settings.rental.driversAlwaysIncluded ?? rental.driverRequired,
   };
+  return { ok: true, quote, counters: allocated ? allocated.counters : db.referenceCounters };
 }
 
 export function isDatabaseShape(value: unknown): value is Database {
@@ -1342,17 +1373,17 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       const existing = db.rentals.find((r) => r.id === command.id);
       if (!existing) return fail("Rental not found.");
       if (!RENTAL_TRANSITIONS[existing.status].includes("quoted")) return fail(`A quotation cannot be issued from status "${existing.status}".`);
-      const built = buildQuote(db, actor!, command.input, now);
+      const built = buildQuote(db, actor!, command.input, now, existing, null);
       if (!built.ok) return built;
       const quote = built.quote;
       const updated: Rental = { ...existing, status: "quoted", quote, updatedAt: now };
-      const next = audit({ ...db, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
+      const next = audit({ ...db, referenceCounters: built.counters, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
         action: "rentals:quote",
         entity: "rental",
         entityId: updated.id,
-        summary: `${updated.reference} quoted: ${quote.currencyCode} ${quote.subtotal.toFixed(2)} (deposit ${quote.currencyCode} ${quote.depositRequired.toFixed(2)}), valid until ${quote.validUntil}.`,
+        summary: `${updated.reference} quoted as ${quote.number} (revision ${quote.revision}): ${quote.currencyCode} ${quote.subtotal.toFixed(2)} (deposit ${quote.currencyCode} ${quote.depositRequired.toFixed(2)}), valid until ${quote.validUntil}.`,
       }, now);
-      return { ok: true, db: next, message: `Quotation issued for ${updated.reference}.` };
+      return { ok: true, db: next, message: `Quotation ${quote.number} issued for ${updated.reference}.` };
     }
 
     case "requote_rental": {
@@ -1362,7 +1393,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (!existing) return fail("Rental not found.");
       if (existing.status !== "quoted" || !existing.quote)
         return fail("Only a quoted rental can be renewed. The request must remain in quoted status.");
-      if (existing.quote.validUntil >= now.slice(0, 10))
+      if (quotationIsLive(existing.quote, now))
         return fail("This quotation has not expired yet. Renewal is available only after the validity date.");
       const policy = db.settings.rental.requotePolicy;
       if (policy === null)
@@ -1371,7 +1402,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         return fail("Management requires a new request for an expired quotation. Cancel this request and create a new one.");
       if (policy !== "revise_in_place") return fail("The expired-quotation policy is invalid. Ask an administrator to review Settings.");
 
-      const built = buildQuote(db, actor!, command.input, now);
+      const built = buildQuote(db, actor!, command.input, now, existing, existing.quote);
       if (!built.ok) return built;
       const quote = built.quote;
       const updated: Rental = {
@@ -1380,14 +1411,14 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         quote,
         updatedAt: now,
       };
-      const currentRevision = updated.quoteHistory.length + 1;
-      const next = audit({ ...db, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
+      const currentRevision = quote.revision;
+      const next = audit({ ...db, referenceCounters: built.counters, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
         action: "rentals:requote",
         entity: "rental",
         entityId: updated.id,
-        summary: `${updated.reference} quotation renewed in place (revision ${currentRevision}): ${quote.currencyCode} ${quote.subtotal.toFixed(2)}, valid until ${quote.validUntil}. Prior quotation retained.`,
+        summary: `${updated.reference} quotation ${quote.number} renewed in place (revision ${currentRevision}): ${quote.currencyCode} ${quote.subtotal.toFixed(2)}, valid until ${quote.validUntil}. Prior quotation retained.`,
       }, now);
-      return { ok: true, db: next, message: `Quotation renewed for ${updated.reference} as revision ${currentRevision}; prior quotation retained.` };
+      return { ok: true, db: next, message: `Quotation ${quote.number} renewed for ${updated.reference} as revision ${currentRevision}; prior quotation retained.` };
     }
 
     // The customer saying yes to a quotation (RNT-05, D-116).
@@ -1409,7 +1440,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         return fail("This request is not on your account.");
       }
 
-      const problems = canAcceptQuotation(existing, now.slice(0, 10));
+      const problems = canAcceptQuotation(existing, now);
       if (Object.keys(problems).length) return fail(problems.status ?? problems.quote ?? problems.acceptance ?? "This quotation cannot be accepted.", problems);
 
       const acceptance = buildAcceptance(
@@ -1441,7 +1472,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (!existing) return fail("Rental not found.");
       if (!RENTAL_TRANSITIONS[existing.status].includes("confirmed")) return fail(`A rental cannot be confirmed from status "${existing.status}".`);
       if (!existing.quote) return fail("This rental has no quotation to confirm.");
-      if (existing.quote.validUntil < now.slice(0, 10)) return fail("The quotation has expired. Issue a new quotation before confirming.");
+      if (!quotationIsLive(existing.quote, now)) return fail("The quotation has expired. Issue a new quotation before confirming.");
       const errors: Errors = {};
       const parsed = parseAmount(command.input.amount ?? "");
       const method = command.input.method.trim();

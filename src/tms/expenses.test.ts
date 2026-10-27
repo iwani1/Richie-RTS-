@@ -48,7 +48,7 @@ function world(overrides: Partial<Database> = {}): Database {
       ...base.settings,
       currencyCode: "GHS",
       costCategories: ["Fuel", "Tolls", "Permits"],
-      rental: { ...emptyRentalSettings(), paymentMethods: ["Cash", "Bank transfer", "Mobile money"] },
+      rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", paymentMethods: ["Cash", "Bank transfer", "Mobile money"] },
     },
     ...overrides,
   };

@@ -24,6 +24,9 @@ export const REFERENCE_SERIES: Record<ReferenceScope, { prefix: string; width: n
   // Rentals, routes, trips and work orders are numbered continuously: the reference is quoted in
   // conversation, and a year inside it earns nothing.
   rental: { prefix: "RR", width: 4, perYear: false },
+  // A quotation is its own document now (RNT-04, D-117): the customer quotes this number back, and a
+  // renewal keeps it, so the series is continuous and never restarts in January.
+  quotation: { prefix: "QUO", width: 4, perYear: false },
   route: { prefix: "RT", width: 3, perYear: false },
   trip: { prefix: "TR", width: 4, perYear: false },
   incident: { prefix: "IN", width: 4, perYear: false },
@@ -57,6 +60,13 @@ function existingReferences(db: Database, scope: ReferenceScope): string[] {
   switch (scope) {
     case "rental":
       return db.rentals.map((record) => record.reference);
+    case "quotation":
+      // Every quotation ever issued on every request, current and retained revisions alike, so a
+      // counter that went missing cannot hand out a number that is already on a customer's sheet.
+      return db.rentals.flatMap((rental) => [rental.quote, ...(rental.quoteHistory ?? [])])
+        .filter((quote): quote is NonNullable<typeof quote> => Boolean(quote))
+        .map((quote) => quote.number)
+        .filter((number) => typeof number === "string" && number !== "");
     case "route":
       return db.routes.map((record) => record.reference);
     case "trip":

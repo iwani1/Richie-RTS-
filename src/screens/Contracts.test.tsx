@@ -87,7 +87,7 @@ const base = (overrides: Partial<Database> = {}): Database => {
     users: [admin],
     clients: [client("c1", "Acme Ltd")],
     contracts: [contract()],
-    settings: { ...db.settings, currencyCode: "GHS", documentReminderLeadDays: 30, rental: { ...emptyRentalSettings(), paymentMethods: ["Cash"] } },
+    settings: { ...db.settings, currencyCode: "GHS", documentReminderLeadDays: 30, rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", paymentMethods: ["Cash"] } },
     ...overrides,
   };
 };

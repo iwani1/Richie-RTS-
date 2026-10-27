@@ -86,7 +86,7 @@ const base = (expenses: Expense[] = [expense()], receipts: ReceiptFile[] = []): 
       companyName: "Richie Transport Services",
       currencyCode: "GHS",
       costCategories: ["Fuel", "Tolls", "Permits"],
-      rental: { ...emptyRentalSettings(), paymentMethods: ["Cash", "Bank transfer"] },
+      rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", paymentMethods: ["Cash", "Bank transfer"] },
     },
   };
 };

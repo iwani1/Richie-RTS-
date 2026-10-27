@@ -38,7 +38,7 @@ const settings = (overrides: Record<string, unknown> = {}) => ({
   onTimeThresholdMinutes: 5,
   vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
   shifts: [],
-  rental: { ...emptyRentalSettings(), pricingBasis: "per_day" as const, depositPercent: 20, quotationValidityDays: 14, paymentMethods: ["Cash", "Bank transfer", "Mobile money"] },
+  rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day" as const, depositPercent: 20, quotationValidityHours: 336, paymentMethods: ["Cash", "Bank transfer", "Mobile money"] },
   documentTypes: [],
   documentReminderLeadDays: null,
   taxPosition: "registered" as const,
@@ -468,7 +468,14 @@ describe("money arithmetic on real documents (audit D-04)", () => {
       input: settings({
         taxPosition: "registered",
         taxLines,
-        rental: { ...emptyRentalSettings(), pricingBasis: "per_day", depositPercent, quotationValidityDays: 14, paymentMethods: ["Cash", "Bank transfer"] },
+        rental: {
+          ...emptyRentalSettings(),
+          quotationTerms: "Prices are firm for the validity period.",
+          pricingBasis: "per_day",
+          depositPercent,
+          quotationValidityHours: 336,
+          paymentMethods: ["Cash", "Bank transfer"],
+        },
       }),
     });
     const categoryId = w.db.settings.vehicleCategories[0].id;

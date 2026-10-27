@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 31; PostgreSQL keeps them in
+The app stores these as arrays inside one JSON document (schema version 32; PostgreSQL keeps them in
 typed tables, migration `020` being the latest). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
@@ -402,7 +402,10 @@ erDiagram
   RENTAL_QUOTE {
     uuid id PK
     uuid rental_id FK
+    text reference
     int revision_number
+    text terms
+    bool driver_included
     text currency_code
     text pricing_basis
     numeric subtotal
@@ -414,7 +417,12 @@ erDiagram
   }
 ```
 
-Unique `(rental_id, revision_number)`; quote and line snapshots are immutable. The initial
+`reference` is the quotation's own number (RNT-04, D-117): drawn from `reference_counter` under the
+`quotation` scope and shared by every revision of the same document, so `QUO-0001` revision 2 is the
+second version of one sheet, not a second sheet. `terms` are copied onto each revision as the company's
+terms stood when it was issued.
+
+Unique `(rental_id, revision_number)` and unique `reference`; quote and line snapshots are immutable. The initial
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous
 snapshot, so the current quote count equals history length + 1.
 

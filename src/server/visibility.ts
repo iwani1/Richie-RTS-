@@ -103,10 +103,11 @@ function journeySettings(settings: Database["settings"]): Database["settings"] {
     rental: {
       pricingBasis: null,
       depositPercent: null,
-      quotationValidityDays: null,
+      quotationValidityHours: null,
       driversAlwaysIncluded: null,
       paymentMethods: [],
       requotePolicy: null,
+      quotationTerms: "",
     },
     documentTypes: [],
     taxPosition: null,

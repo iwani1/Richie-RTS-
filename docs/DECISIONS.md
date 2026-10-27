@@ -2681,3 +2681,50 @@ figure on the sheet — nor to *which* figure, after a requote.
   permission, the portal's quotation column and **Accept quotation** panel, the office's **Record
   customer acceptance** action, and 19 new tests (11 domain, 6 service, 1 scoping, 1 portal screen) —
   the suite moves from 1,135 to 1,154.
+
+## D-117 - A quotation is a document with a number, a clock and its own words (RNT-04)
+
+The quotation builder has carried line items, a deposit and a validity date since Phase 11, and it has
+been the least finished document in the system. It had **no number**: the customer was told "RR-0001"
+— the request — and, after a revision, nobody could say which version of the price they had agreed to.
+It held a price for a number of **whole days**, so a quotation issued at 16:50 on a Friday and one
+issued at 09:10 the same morning both ran out at the same moment. And it carried **no terms at all**.
+
+- **Decision 1: the quotation gets its own series.** `QUO-0001`, drawn from the same allocator every
+  other record uses (a counter, not the length of a list, so simultaneous issues cannot collide and a
+  deleted record cannot reissue a printed number). `references.integration.test.ts` walks every series
+  and inserts a counter for it, so migration `021` widening the constraint is tested rather than
+  trusted — that check exists because refunds were once refused by a database that had never learned
+  their name.
+- **Decision 2: a revision keeps the number.** The document is the quotation; revisions are versions
+  of it. `number` stays `QUO-0001` and `revision` goes 1, 2, 3. A customer holding the sheet says
+  "QUO-0001, revision 2", and the office can put that exact version on screen. Two numbers for two
+  versions of one price would make that sentence impossible.
+- **Decision 3: validity is counted in hours, and compared to the minute.** Nine-to-five businesses do
+  not agree to prices that lapse at midnight, and a customer ringing at 09:05 for a price that ran out
+  at 09:00 deserves a straight answer. The setting moved from `quotationValidityDays` to
+  `quotationValidityHours` (schema 32, with old days converted at 24 hours a day — the same promise of
+  time, not a rewritten one), `validUntil` became a timestamp instead of a date, and every check — the
+  customer's acceptance, the deposit, the renewal — compares instants.
+- **Decision 4: the terms are the company's, and there are no default terms.** A default indemnity,
+  default cancellation window or default "50% deposit" clause would be a contract term nobody in the
+  business agreed to. `settings.rental.quotationTerms` starts empty, and while it is empty a quotation
+  cannot be issued; the screen says why and sends the reader to Settings. The terms are **copied** onto
+  each quotation as they stood when it was issued, for the same reason the acceptance copies its
+  figures: changing the terms tomorrow must not rewrite what a customer was sent today.
+- **Decision 5: old quotations are marked, not backfilled.** A quotation written before schema 32 has
+  no number, no revision and no terms. Rather than invent `QUO-0000` or stamp today's terms onto a
+  document that was never sent with them, the migration gives them an empty number, revision 1 and
+  blank terms, and the screen prints a warning that the quotation has no number and cannot be handed to
+  a customer as a document. Nothing is invented; the office reissues it.
+- **Decision 6: the customer sees the same document.** The portal's quotation column carries the
+  number and revision, and the acceptance panel prints the figure, the deposit, the terms and the exact
+  moment the price stops holding before the customer presses accept — the same facts the office sees,
+  because agreeing to a price you cannot read is not agreeing to it.
+- **Consequence.** `src/tms/quotations.ts` (`validityEndsAt`, `quotationIsLive`, `validityLine`,
+  `quotationHeading`, `quotationIsNumbered`, `termsProblem`, `validityProblem`), the `quotation` series
+  in `references.ts`, `Quote.{number, revision, terms, driverIncluded}`,
+  `RentalSettings.{quotationValidityHours, quotationTerms}`, schema **32** with the days → hours
+  migration, SQL migration `021`, the terms field in Settings, the quotation card on Rentals and the
+  number in the customer portal. 15 new tests (10 domain in `quotations.test.ts`, 5 service); the
+  suite moves from 1,154 to 1,169. No new permission and no new dependency.

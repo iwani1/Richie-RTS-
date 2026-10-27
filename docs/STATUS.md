@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–66** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the queued policy answers, then the requirement IDs one at a time — and so on | **All 65 phase headings closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–67** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the queued policy answers, then the requirement IDs one at a time — and so on | **All 66 phase headings closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -59,6 +59,8 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
 - CSV import for vehicles, drivers, clients and staff rosters: preview first, every rejected row
   named by line number, nothing merged or silently dropped; a rider who looks like someone already
   on the roster is flagged **Check** rather than refused.
+- **A quotation a customer can name**: its own number (`QUO-0001`), a revision when it is renewed,
+  the terms the company wrote for itself, and a validity counted to the minute rather than to midnight.
 - Bus rentals: request → quotation (with revisions) → **the customer's own yes, recorded once and
   against that quotation** → deposit → vehicle and driver assignment → start → completion → invoice →
   payments. Agreeing is not paying: the deposit is still what confirms the hire, and nothing here
@@ -201,7 +203,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**1154 passed, 28 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**1169 passed, 28 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

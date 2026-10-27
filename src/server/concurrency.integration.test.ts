@@ -52,9 +52,10 @@ async function world(): Promise<{ adminId: string; vehicleId: string }> {
         vehicleCategories: [{ id: "", name: "Coaster", licenceClasses: [] }],
         rental: {
           ...setup.settings.rental,
+          quotationTerms: "Prices are firm for the validity period.",
           pricingBasis: "per_day",
           depositPercent: 20,
-          quotationValidityDays: 14,
+          quotationValidityHours: 336,
           paymentMethods: ["Cash", "Bank transfer"],
         },
       },

@@ -48,7 +48,9 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     setField(/Billing currency/i, "GHS");
     fireEvent.change(screen.getByLabelText(/Pricing basis/i), { target: { value: "per_day" } });
     setField(/Deposit \(% of quotation\)/i, "25");
-    setField(/Quotation validity/i, "7");
+    // RNT-04, D-117: validity is in hours (168 = one week) and the terms are the company's own words.
+    setField(/Quotation validity \(hours\)/i, "168");
+    setField(/Quotation terms/i, "Prices are firm for the validity period.");
     fireEvent.click(screen.getByRole("button", { name: /Add method/i }));
     // the payment method input has no label; set by placeholder
     const methodInput = screen.getByPlaceholderText(/Bank transfer, Mobile money/i) as HTMLInputElement;

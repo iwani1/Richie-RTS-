@@ -157,7 +157,7 @@ function world(overrides: Partial<Database> = {}): Database {
       ...db.settings,
       companyName: "Richie Transport Services",
       currencyCode: "GHS",
-      rental: { ...emptyRentalSettings(), pricingBasis: "per_day", depositPercent: 20, quotationValidityDays: 14, paymentMethods: ["Cash"] },
+      rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 20, quotationValidityHours: 336, paymentMethods: ["Cash"] },
       taxPosition: "registered",
       taxLines: [{ id: "", name: "VAT", ratePercent: 15 }],
       invoiceDueDays: 14,

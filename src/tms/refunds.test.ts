@@ -92,7 +92,7 @@ function world(overrides: Partial<Database> = {}): Database {
   return {
     ...base,
     users: [finance, ops],
-    settings: { ...base.settings, currencyCode: "GHS", rental: { ...emptyRentalSettings(), paymentMethods: ["Cash", "Bank transfer", "Mobile money"] } },
+    settings: { ...base.settings, currencyCode: "GHS", rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", paymentMethods: ["Cash", "Bank transfer", "Mobile money"] } },
     invoices: [{ ...invoice, amountPaid: 4600, status: "paid" }],
     payments: [paid],
     creditNotes: [creditNote],

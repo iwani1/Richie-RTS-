@@ -11,7 +11,7 @@ const settings = () => ({
   onTimeThresholdMinutes: 5,
   vehicleCategories: [],
   shifts: [],
-  rental: { ...emptyRentalSettings(), pricingBasis: "per_day" as const, depositPercent: 20, quotationValidityDays: 14, paymentMethods: ["Cash"] },
+  rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day" as const, depositPercent: 20, quotationValidityHours: 336, paymentMethods: ["Cash"] },
   documentTypes: [],
   documentReminderLeadDays: null,
   taxPosition: "registered" as const,
@@ -66,6 +66,10 @@ const quoteAt = (quotedAt: string) => ({
   validUntil: "2026-06-20",
   quotedAt,
   quotedBy: "Ama",
+  number: "QUO-0001",
+  revision: 1,
+  terms: "The price holds until the validity date.",
+  driverIncluded: false,
 });
 
 const invoice = (overrides: Partial<Invoice>): Invoice => ({

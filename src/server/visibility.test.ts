@@ -715,7 +715,8 @@ describe("what a passenger account receives (PAX-01, D-97)", () => {
       companyName: "Richie Transport Services",
       invoiceDueDays: 30,
       booking: { requestCutoffMinutes: 60, cancellationCutoffMinutes: 30 },
-      rental: { ...w.settings.rental, depositPercent: 40 },
+      rental: {
+        ...w.settings.rental, depositPercent: 40 },
     };
     const visible = scopeDatabase(w, actor("rider-user", "passenger"))!;
     expect(visible.settings.companyName).toBe("Richie Transport Services");

@@ -28,7 +28,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RNT-01 | 1A | Rental request: customer, service date, departure time, return time or duration, pickup, destination, intermediate stops, passenger count, luggage or… | Partial | Has customer, start/end date, pickup, drop-off, passengers, purpose, category, driver requirement, notes. **Missing departure/return times, intermediate stops, luggage/special needs, trip contact, request source.** |
 | RNT-02 | 1A | Rental status workflow: Draft, Submitted, Under Review, Awaiting Quotation, Quotation Sent, Awaiting Customer Confirmation, Confirmed, Dispatched, In… | Partial | 7 states (`draft → quoted → confirmed → in_progress → completed`, plus `declined`, `cancelled`) with an explicit transition table and rejection of invalid moves. **No separate quotation/booking entities and no Submitted/Under Review/Awaiting Quotation/Dispatched states.** |
 | RNT-03 | 1A | Availability check by vehicle category, capacity, operating status and time range; driver availability when a driver is required. | Met | Live: wrong-category vehicle refused; overlapping assignment refused; driver licence expiry checked; a required document that is missing or lapsed on the hire date refuses the vehicle or the driver (Phase 26, D-76). Capacity checked at assignment against `passengers` (see D-01 for the mid-run gap). |
-| RNT-04 | 1A | Quotation builder: quotation number, versioned, line items (base charge, distance charge, driver charge, approved waiting/overtime, other charges),… | Partial | Line items, deposit, validity, currency, requote history (`quoteHistory`). **No quotation number, no tax lines, no discount line, no terms and conditions, no approval record.** Expiry is enforced on confirmation (live). |
+| RNT-04 | 1A | Quotation builder: quotation number, versioned, line items (base charge, distance charge, driver charge, approved waiting/overtime, other charges),… | Partial | Line items, deposit, currency and requote history (`quoteHistory`) — and since Phase 67 (D-117) **a number and a version on every quotation** (`QUO-0001`, revision 1, 2, …; a renewal keeps the number and raises the revision), **terms** in the company's own words, copied onto each quotation as they stood when it was issued, whether a driver is included, and a **validity counted in hours** rather than whole days, so the price stops holding at the hour it was quoted for. **Still missing: tax lines, a discount line, and an approval record** — a quotation is not yet a document a second person signs off. |
 | RNT-05 | 1A | Confirmation: validate the request; check vehicle schedule, capacity, status and driver availability; detect conflicts; record customer acceptance… | Partial | Validation, conflict check, deposit-per-policy recorded, reservation created via constraint, and since Phase 66 (D-116) **the customer's own answer to the quotation**: who agreed, when, to which quotation and through which channel, recorded once, refused on a lapsed quotation, and refused on a second yes. Agreeing is not paying — finance still records the deposit and the deposit is still what confirms the hire. **No notification**: there is no mail or SMS provider, so nothing is sent; the record says what happened and never that a message went out. |
 | RNT-06 | 1A | Assign and reassign vehicle and driver, with history. | Met | Reassignment allowed while confirmed/in progress; each assignment writes an audit entry. History lives in the audit log, not a dedicated table. |
 | RNT-07 | 1A | Completion: actual departure/return, actual distance when available, vehicle and driver, trip status, additional charges (approval required), damage… | Partial | Completion captures final line items (including extra charges). **No actual departure/return times, distance, damage notes, feedback, or balance** (no payments). |
@@ -1645,3 +1645,25 @@ quotation had been revised. This phase adds that record, and nothing that moves 
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **1154 passed, 28 skipped** (94 files
 passed, 5 skipped), coverage 85.29 % statements / 88.94 % lines, `build` succeeds.
+
+## Phase 67 - A quotation with a number, a clock and terms (RNT-04, D-117)
+
+The quotation is the document a customer reads, keeps and argues about, and it was the least finished
+one in the build: no number of its own, a price that lapsed at midnight on a day counted in whole days,
+and no terms at all. This phase closes those three gaps and leaves tax lines, discounts and an approval
+signature where they were.
+
+| Item | Status | Evidence |
+|---|---|---|
+| A quotation number | Done (verified) | `QUO-0001` from its own series, drawn from the counter every other record uses; the message and the audit entry name it ("numbers each quotation in its own series, and says so in the message") |
+| Versioned | Done (verified) | A renewal keeps the number and raises `revision` to 2, 3, … with the earlier version kept in `quoteHistory` ("keeps the number on a renewal and raises the revision") |
+| Terms and conditions | Done (verified) | `settings.rental.quotationTerms`, written by the company; **no default text exists**, quoting is blocked while it is empty ("refuses to issue a quotation when nobody has written the terms"), and the terms are copied onto each quotation so a later edit cannot rewrite what was sent ("copies the company's terms onto the quotation as they stand when it is issued") |
+| Validity counted to the minute | Done (verified) | `quotationValidityHours` replaces whole days (schema 32, old days × 24); `validUntil` is a timestamp; every check compares instants ("stops being acceptable at the hour it was quoted for, not at midnight") |
+| What the price includes | Done (verified) | `driverIncluded` recorded on the quotation from policy or the request, and printed on the office's card |
+| An unnumbered old quotation is marked, not backfilled | Done (verified) | The migration gives it no number and blank terms; the screen warns it cannot be given to a customer as a document ("keeps an old quotation's figures and marks it as having no document behind it") |
+| The customer sees the same document | Done (verified) | The portal's quotation column shows the number and revision; the acceptance panel prints the figure, the deposit, the terms and the moment the price stops holding (`ClientPortal.test.tsx`) |
+| Tax lines, discounts, approval record | **Not built, and said so** | A quotation carries no tax lines (Q-14 is open), no discount line, and nobody signs one off. The register keeps all three named as RNT-04's remaining gaps |
+| Tests | Done (verified) | 15 new: 10 domain (`quotations.test.ts`), 5 service (`service.test.ts`) — every existing suite green |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **1169 passed, 28 skipped** (95 files
+passed, 5 skipped), coverage 85.35 % statements / 89 % lines, `build` succeeds.

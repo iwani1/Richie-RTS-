@@ -6,6 +6,8 @@ import { emptyDatabase, SCHEMA_VERSION, type Database } from "./types";
 
 const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const NOW = "2026-01-01T00:00:00.000Z";
+/** The terms the test company writes for itself (D-117). The build supplies none. */
+const TERMS = "Prices are firm for the validity period.";
 
 function seeded(): { db: Database; admin: Actor; ops: Actor; finance: Actor } {
   let db = emptyDatabase();
@@ -235,7 +237,7 @@ function rentalReady(): { db: Database; admin: Actor; ops: Actor; finance: Actor
   const catId = db.settings.vehicleCategories[0].id;
   const r = execute(db, admin, {
     type: "update_settings",
-    input: { ...db.settings, currencyCode: "GHS", rental: { pricingBasis: "per_day", depositPercent: 25, quotationValidityDays: 7, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer", "Mobile money"], requotePolicy: null } },
+    input: { ...db.settings, currencyCode: "GHS", rental: { quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 25, quotationValidityHours: 168, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer", "Mobile money"], requotePolicy: null } },
   }, NOW);
   if (!r.ok) throw new Error(r.message);
   db = r.db;
@@ -293,7 +295,8 @@ describe("money precision at the settings and quotation gates (audit D-04)", () 
   it("refuses a deposit percentage the arithmetic cannot represent", () => {
     const { db, admin } = rentalReady();
     const settings = (depositPercent: number) =>
-      execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: { ...db.settings.rental, depositPercent } } }, NOW);
+      execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: {
+        ...db.settings.rental, depositPercent } } }, NOW);
     const tooPrecise = settings(33.333);
     expect(tooPrecise.ok).toBe(false);
     if (!tooPrecise.ok) expect(tooPrecise.errors["rental.depositPercent"]).toMatch(/two decimal places/);
@@ -359,7 +362,13 @@ describe("rentals - full lifecycle", () => {
     expect(rentalQuoted.status).toBe("quoted");
     expect(rentalQuoted.quote?.subtotal).toBe(3500);
     expect(rentalQuoted.quote?.depositRequired).toBe(875); // 25% of 3500
-    expect(rentalQuoted.quote?.validUntil).toBe("2026-01-08"); // NOW + 7 days
+    // NOW + 168 hours (D-117: the price holds to the minute, not to the end of a day).
+    expect(rentalQuoted.quote?.validUntil).toBe("2026-01-08T00:00:00.000Z");
+    // RNT-04: the sheet a customer can name, numbered from its own series.
+    expect(rentalQuoted.quote?.number).toBe("QUO-0001");
+    expect(rentalQuoted.quote?.revision).toBe(1);
+    expect(rentalQuoted.quote?.terms).toBe(TERMS);
+    expect(rentalQuoted.quote?.driverIncluded).toBe(false);
 
     // deposit below required is rejected
     const low = execute(db, admin, { type: "confirm_rental", id, input: { amount: "100", method: "Bank transfer", reference: "TX1" } }, NOW);
@@ -623,7 +632,8 @@ describe("rentals - full lifecycle", () => {
   it("honours the cancel-and-reraise policy without mutating the expired quote", () => {
     const { db: startingDb, admin } = rentalReady();
     let db = startingDb;
-    const settings = execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: { ...db.settings.rental, requotePolicy: "new_request" } } }, NOW);
+    const settings = execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: {
+      ...db.settings.rental, requotePolicy: "new_request" } } }, NOW);
     if (!settings.ok) throw new Error(settings.message);
     db = settings.db;
     const catId = db.settings.vehicleCategories[0].id;
@@ -648,7 +658,8 @@ describe("rentals - full lifecycle", () => {
   it("revises only an expired quote in place and preserves each immutable quote snapshot", () => {
     const { db: startingDb, admin } = rentalReady();
     let db = startingDb;
-    const settings = execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: { ...db.settings.rental, requotePolicy: "revise_in_place" } } }, NOW);
+    const settings = execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: {
+      ...db.settings.rental, requotePolicy: "revise_in_place" } } }, NOW);
     if (!settings.ok) throw new Error(settings.message);
     db = settings.db;
     const catId = db.settings.vehicleCategories[0].id;
@@ -666,7 +677,10 @@ describe("rentals - full lifecycle", () => {
     expect(rental.status).toBe("quoted");
     expect(rental.quote?.subtotal).toBe(1400);
     expect(rental.quote?.depositRequired).toBe(350); // configured deposit percentage still applies
-    expect(rental.quote?.validUntil).toBe("2026-01-17");
+    expect(rental.quote?.validUntil).toBe("2026-01-17T00:00:00.000Z");
+    // A renewal keeps the number and raises the revision: one document, two versions.
+    expect(rental.quote?.number).toBe("QUO-0001");
+    expect(rental.quote?.revision).toBe(2);
     expect(rental.quoteHistory).toEqual([firstQuote]);
 
     const third = execute(second.db, admin, { type: "requote_rental", id, input: { lines: [{ description: "Hire final", quantity: "1", unitAmount: "900" }] } }, "2026-01-20T00:00:00.000Z");
@@ -685,7 +699,8 @@ describe("rentals - full lifecycle", () => {
   it("migrates schema-7 rentals with an empty quote history and no policy default", () => {
     const { db: startingDb, admin } = rentalReady();
     let db = startingDb;
-    const configured = execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: { ...db.settings.rental, requotePolicy: "revise_in_place" } } }, NOW);
+    const configured = execute(db, admin, { type: "update_settings", input: { ...db.settings, rental: {
+      ...db.settings.rental, requotePolicy: "revise_in_place" } } }, NOW);
     if (!configured.ok) throw new Error(configured.message);
     db = configured.db;
     const created = execute(db, admin, requestInput(db.settings.vehicleCategories[0].id, "2026-03-01", "2026-03-02"), NOW);
@@ -693,7 +708,8 @@ describe("rentals - full lifecycle", () => {
     const id = created.db.rentals[0].id;
     const quoted = execute(created.db, admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
     if (!quoted.ok) throw new Error(quoted.message);
-    const legacy = { ...quoted.db, schemaVersion: 7, rentals: quoted.db.rentals.map((rental) => { const copy = { ...rental } as Record<string, unknown>; delete copy.quoteHistory; return copy; }), settings: { ...quoted.db.settings, rental: { ...quoted.db.settings.rental, requotePolicy: undefined } } } as unknown as Database;
+    const legacy = { ...quoted.db, schemaVersion: 7, rentals: quoted.db.rentals.map((rental) => { const copy = { ...rental } as Record<string, unknown>; delete copy.quoteHistory; return copy; }), settings: { ...quoted.db.settings, rental: {
+      ...quoted.db.settings.rental, requotePolicy: undefined } } } as unknown as Database;
     // rentalReady historically builds its database using a second fresh fixture; use the
     // administrator identity from the actual database for the anti-lockout import check.
     const importer: Actor = { id: quoted.db.users[0].id, fullName: quoted.db.users[0].fullName, role: "administrator" };
@@ -946,6 +962,107 @@ describe("a customer accepting a quotation (RNT-05, D-116)", () => {
 
   it("leaves an older backup with no acceptance, rather than inventing one", () => {
     // Schema 31 is readable: a record written before acceptance existed loads with none.
-    expect(SCHEMA_VERSION).toBe(31);
+    expect(SCHEMA_VERSION).toBe(32);
+  });
+});
+
+describe("a quotation as a document (RNT-04, D-117)", () => {
+  /** Two requests quoted one after the other, so a series is something to look at. */
+  function twoQuoted() {
+    const w = rentalReady();
+    const admin: Actor = w.admin;
+    let db = w.db;
+    const ids: string[] = [];
+    for (let i = 0; i < 2; i += 1) {
+      const created = execute(db, admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
+      if (!created.ok) throw new Error(created.message);
+      db = created.db;
+      const id = db.rentals[db.rentals.length - 1].id;
+      ids.push(id);
+      const quoted = execute(db, w.finance, { type: "quote_rental", id, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1000" }] } }, NOW);
+      if (!quoted.ok) throw new Error(quoted.message);
+      db = quoted.db;
+    }
+    return { ...w, db, ids };
+  }
+
+  it("numbers each quotation in its own series, and says so in the message", () => {
+    const w = twoQuoted();
+    expect(w.db.rentals.map((rental) => rental.quote?.number)).toEqual(["QUO-0001", "QUO-0002"]);
+    expect(w.db.rentals[0].quote?.revision).toBe(1);
+    // The counter travels with the data, so a restore cannot hand the number out twice.
+    expect(w.db.referenceCounters.find((counter) => counter.scope === "quotation")).toEqual({ scope: "quotation", period: "all", last: 2 });
+  });
+
+  it("keeps the number on a renewal and raises the revision", () => {
+    const w = twoQuoted();
+    // Management's policy has to say a renewal is allowed on the same request (Q-11).
+    const policy = execute(w.db, w.admin, {
+      type: "update_settings",
+      input: { ...w.db.settings, rental: { ...w.db.settings.rental, requotePolicy: "revise_in_place" } },
+    }, NOW);
+    if (!policy.ok) throw new Error(policy.message);
+    // Seven days of validity; renew the first once it has run out.
+    const renewed = execute(policy.db, w.finance, {
+      type: "requote_rental",
+      id: w.ids[0],
+      input: { lines: [{ description: "Two days hire, revised", quantity: "2", unitAmount: "1200" }] },
+    }, "2026-01-09T00:00:00.000Z");
+    expect(renewed.ok).toBe(true);
+    if (!renewed.ok) return;
+    const rental = renewed.db.rentals[0];
+    expect(rental.quote?.number).toBe("QUO-0001");
+    expect(rental.quote?.revision).toBe(2);
+    expect(rental.quoteHistory[0]?.number).toBe("QUO-0001");
+    expect(rental.quoteHistory[0]?.revision).toBe(1);
+    // A renewal is not a new document, so the series does not advance.
+    expect(renewed.db.referenceCounters.find((counter) => counter.scope === "quotation")?.last).toBe(2);
+  });
+
+  it("copies the company's terms onto the quotation as they stand when it is issued", () => {
+    const w = twoQuoted();
+    expect(w.db.rentals[0].quote?.terms).toBe(TERMS);
+    const changed = execute(w.db, w.admin, {
+      type: "update_settings",
+      input: { ...w.db.settings, rental: { ...w.db.settings.rental, quotationTerms: "Half the price is due before the hire." } },
+    }, NOW);
+    if (!changed.ok) throw new Error(changed.message);
+    const created = execute(changed.db, w.admin, requestInput(w.catId, "2026-04-01", "2026-04-02"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const third = execute(created.db, w.finance, { type: "quote_rental", id: created.db.rentals[2].id, input: { lines: [{ description: "One day", quantity: "1", unitAmount: "500" }] } }, NOW);
+    if (!third.ok) throw new Error(third.message);
+    // The old quotation keeps the words it was sent with; the new one carries today's.
+    expect(third.db.rentals[0].quote?.terms).toBe(TERMS);
+    expect(third.db.rentals[2].quote?.terms).toBe("Half the price is due before the hire.");
+  });
+
+  it("refuses to issue a quotation when nobody has written the terms", () => {
+    const w = rentalReady();
+    const cleared = execute(w.db, w.admin, {
+      type: "update_settings",
+      input: { ...w.db.settings, rental: { ...w.db.settings.rental, quotationTerms: "" } },
+    }, NOW);
+    if (!cleared.ok) throw new Error(cleared.message);
+    const created = execute(cleared.db, w.admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const quoted = execute(created.db, w.finance, { type: "quote_rental", id: created.db.rentals[0].id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "900" }] } }, NOW);
+    expect(quoted.ok).toBe(false);
+    if (!quoted.ok) expect(quoted.message).toBe("Blocked: quotation settings are incomplete. An administrator must set: quotation terms.");
+  });
+
+  it("stops being acceptable at the hour it was quoted for, not at midnight", () => {
+    const w = rentalReady();
+    const created = execute(w.db, w.admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const quoted = execute(created.db, w.finance, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "900" }] } }, NOW);
+    if (!quoted.ok) throw new Error(quoted.message);
+    // Issued at 00:00 on 1 January for 168 hours: the price stops holding at 00:00 on the 8th.
+    expect(quoted.db.rentals[0].quote?.validUntil).toBe("2026-01-08T00:00:00.000Z");
+    const justInTime = execute(quoted.db, w.admin, { type: "accept_quotation", id, note: "" }, "2026-01-07T23:59:00.000Z");
+    expect(justInTime.ok).toBe(true);
+    const tooLate = execute(quoted.db, w.admin, { type: "accept_quotation", id, note: "" }, "2026-01-08T00:01:00.000Z");
+    expect(tooLate.ok).toBe(false);
+    if (!tooLate.ok) expect(tooLate.errors.quote).toBe("The quotation expired on 2026-01-08. Issue a new one before the customer accepts.");
   });
 });

@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { RentalRequestInput } from "../tms/service";
 import { acceptanceLine, canAcceptQuotation, type AcceptanceProblems } from "../tms/acceptance";
+import { quotationIsNumbered, validityLine } from "../tms/quotations";
 import { clientAccount, type ClientAdjustmentRow, type ClientInvoiceState, type ClientInvoiceRow, type ClientPaymentRow } from "../tms/clientAccount";
 import { formatAmount } from "../tms/money";
 import { scopedView } from "../tms/scope";
@@ -34,6 +35,7 @@ import {
   TextArea,
   TextInput,
   formatDate,
+  formatDateTime,
   todayYmd,
 } from "../ui/primitives";
 
@@ -83,6 +85,8 @@ export function ClientPortalPage() {
   // D-105: the day's runs are the reason a client opens this page at 07:30 — and the reason it rings
   // the office when one of them is late. Sorted by the time the run leaves, not by reference.
   const today = todayYmd();
+  // D-117: quotations stop holding at an hour, not at midnight.
+  const nowIso = new Date().toISOString();
   const todayTrips = view.trips
     .filter((trip) => trip.serviceDate === today)
     .sort((a, b) => {
@@ -393,10 +397,16 @@ export function ClientPortalPage() {
                     r.quote ? (
                       <span>
                         <span className="font-medium">{money(r.quote.currencyCode, r.quote.subtotal)}</span>
+                        {/* D-117: the number the customer can quote back, and how long the price holds. */}
+                        {quotationIsNumbered(r.quote) && (
+                          <span className="block font-mono text-[11px] text-stone-600">
+                            {r.quote.number} · revision {r.quote.revision}
+                          </span>
+                        )}
                         <span className="block text-xs text-stone-600">
-                          Deposit {money(r.quote.currencyCode, r.quote.depositRequired)} · valid until {formatDate(r.quote.validUntil)}
+                          Deposit {money(r.quote.currencyCode, r.quote.depositRequired)} · {validityLine(r.quote.validUntil, nowIso)}
                         </span>
-                        {acceptanceLine(r, today) && <span className="block text-xs text-stone-700">{acceptanceLine(r, today)}</span>}
+                        {acceptanceLine(r, nowIso) && <span className="block text-xs text-stone-700">{acceptanceLine(r, nowIso)}</span>}
                       </span>
                     ) : (
                       <span className="text-stone-500">No quotation yet</span>
@@ -406,7 +416,7 @@ export function ClientPortalPage() {
                   key: "answer",
                   header: "",
                   render: (r: Rental) => {
-                    const problems = canAcceptQuotation(r, today);
+                    const problems = canAcceptQuotation(r, nowIso);
                     const open = Object.keys(problems).length === 0;
                     if (!allowed("rentals:accept") || !open) return null;
                     return (
@@ -492,8 +502,20 @@ function AcceptQuotation({
           <dt className="text-stone-500">Deposit</dt>
           <dd className="text-stone-800">{money(quote.currencyCode, quote.depositRequired)} ({quote.depositPercent}%)</dd>
           <dt className="text-stone-500">Held until</dt>
-          <dd className="text-stone-800">{formatDate(quote.validUntil)}</dd>
+          <dd className="text-stone-800">{formatDateTime(quote.validUntil)} ({validityLine(quote.validUntil, new Date().toISOString()).toLowerCase()})</dd>
+          {quotationIsNumbered(quote) && (
+            <>
+              <dt className="text-stone-500">Quotation</dt>
+              <dd className="font-mono text-xs text-stone-800">{quote.number} · revision {quote.revision}</dd>
+            </>
+          )}
         </dl>
+        {quote.terms && (
+          <div>
+            <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Terms</h3>
+            <p className="whitespace-pre-line text-xs text-stone-700">{quote.terms}</p>
+          </div>
+        )}
         <Field label="Anything to add? (optional)" error={errors.note} hint="For example a pickup time, or who will travel.">
           <TextArea value={note} onChange={(event) => setNote(event.target.value)} invalid={Boolean(errors.note)} />
         </Field>

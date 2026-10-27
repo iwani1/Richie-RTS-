@@ -16,7 +16,7 @@ const settings = (overrides: Partial<Database["settings"]> = {}) => ({
   onTimeThresholdMinutes: 5,
   vehicleCategories: [],
   shifts: [],
-  rental: { ...emptyRentalSettings(), pricingBasis: "per_day" as const, depositPercent: 20, quotationValidityDays: 14, paymentMethods: ["Cash"] },
+  rental: { ...emptyRentalSettings(), quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day" as const, depositPercent: 20, quotationValidityHours: 336, paymentMethods: ["Cash"] },
   documentTypes: [],
   documentReminderLeadDays: null,
   taxPosition: "registered" as const,

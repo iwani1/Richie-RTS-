@@ -50,7 +50,7 @@ document, not a decision baked into code.
 | Q-06 | On-time threshold (minutes after scheduled time still counted on time) | RPT-01 on-time KPI | `settings.onTimeThresholdMinutes` |
 | Q-07 | Rental pricing basis (per day / per km / per trip / mixed) | Quotations | `settings.rental.pricingBasis` (no default); mixed not yet supported |
 | Q-08 | Deposit amount or percentage for rentals | Booking confirmation | `settings.rental.depositPercent` (no default) |
-| Q-09 | Quotation validity period | Quotation expiry | `settings.rental.quotationValidityDays` (no default) |
+| Q-09 | Quotation validity period | Quotation expiry | `settings.rental.quotationValidityHours` (no default; hours since D-117, so the price stops holding at the hour it was quoted for; older backups' days are converted ×24). The **terms** printed on the sheet are `settings.rental.quotationTerms`, also with no default — quoting is blocked until the company writes them |
 | Q-10 | Cancellation windows and refund rules | Cancellations, credit notes | Not yet modelled (cancel captures a reason only; no refund calc) |
 | Q-11 | Are drivers always included in rentals? | Rental resource assignment | `settings.rental.driversAlwaysIncluded` (no default; per-request fallback) |
 | Q-12 | Who approves quotations and additional charges? | Approval workflow | Not yet modelled |

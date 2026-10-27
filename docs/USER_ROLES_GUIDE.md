@@ -50,7 +50,8 @@ entry — records are archived by status, never removed.
 
 1. Open the application. While no account exists it asks for the first administrator: give the owner's name, email and a password of at least the configured minimum.
 2. **Settings** — set the company name, currency, vehicle categories, payment methods, deposit
-   percentage, quotation validity and on-time threshold. Everything left blank stays blank, and the
+   percentage, quotation validity in hours, the terms printed on every quotation and the on-time
+   threshold. Everything left blank stays blank, and the
    feature that needs it stays blocked.
 3. **Users** — add the operations and finance accounts, then the drivers and client contacts.
 4. **Fleet** — add vehicles and drivers (or import them from CSV in **Vehicles → Import**).

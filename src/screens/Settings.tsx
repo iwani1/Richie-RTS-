@@ -4,7 +4,7 @@ import { setupProgress } from "../tms/setup";
 import { useTms } from "../tms/useTms";
 import type { Settings } from "../tms/types";
 import { PRICING_BASES, PRICING_BASIS_LABELS, REQUOTE_POLICIES, TAX_POSITIONS, TAX_POSITION_LABELS } from "../tms/types";
-import { Badge, Band, Button, Field, Notice, PageHeader, Select, TextInput } from "../ui/primitives";
+import { Badge, Band, Button, Field, Notice, PageHeader, Select, TextArea, TextInput } from "../ui/primitives";
 
 export function SettingsPage() {
   const { db, allowed, dispatch, setFlash } = useTms();
@@ -283,8 +283,8 @@ export function SettingsPage() {
           <Field label="Deposit (% of quotation)" error={errors["rental.depositPercent"]}>
             <TextInput type="number" min={0} max={100} step="0.01" value={draft.rental.depositPercent ?? ""} onChange={(e) => update({ rental: { ...draft.rental, depositPercent: e.target.value === "" ? null : Number(e.target.value) } })} disabled={!editable} placeholder="Not set" invalid={!!errors["rental.depositPercent"]} />
           </Field>
-          <Field label="Quotation validity (days)" error={errors["rental.quotationValidityDays"]}>
-            <TextInput type="number" min={1} step={1} value={draft.rental.quotationValidityDays ?? ""} onChange={(e) => update({ rental: { ...draft.rental, quotationValidityDays: e.target.value === "" ? null : Number(e.target.value) } })} disabled={!editable} placeholder="Not set" invalid={!!errors["rental.quotationValidityDays"]} />
+          <Field label="Quotation validity (hours)" hint="How long a price holds, counted from the minute the quotation is issued. 168 is one week." error={errors["rental.quotationValidityHours"]}>
+            <TextInput type="number" min={24} max={8760} step={1} value={draft.rental.quotationValidityHours ?? ""} onChange={(e) => update({ rental: { ...draft.rental, quotationValidityHours: e.target.value === "" ? null : Number(e.target.value) } })} disabled={!editable} placeholder="Not set" invalid={!!errors["rental.quotationValidityHours"]} />
           </Field>
           <Field label="Are drivers always included?" hint="If not set, each request chooses whether a driver is required.">
             <Select value={draft.rental.driversAlwaysIncluded === null ? "" : draft.rental.driversAlwaysIncluded ? "yes" : "no"} onChange={(e) => update({ rental: { ...draft.rental, driversAlwaysIncluded: e.target.value === "" ? null : e.target.value === "yes" } })} disabled={!editable}>
@@ -311,6 +311,26 @@ export function SettingsPage() {
                 </li>
               ))}
             </ul>
+          )}
+        </div>
+        {/* RNT-04, D-117: the conditions printed on every quotation. Written by the company, never
+            supplied by the build — until they are written, a quotation cannot be issued. */}
+        <div className="mt-4">
+          <Field
+            label="Quotation terms"
+            hint="Printed on every quotation: what the price includes, the deposit, and what happens if the hire is cancelled. Required before a quotation can be issued."
+            error={errors["rental.quotationTerms"]}
+          >
+            <TextArea
+              value={draft.rental.quotationTerms}
+              onChange={(e) => update({ rental: { ...draft.rental, quotationTerms: e.target.value } })}
+              disabled={!editable}
+              invalid={!!errors["rental.quotationTerms"]}
+              rows={5}
+            />
+          </Field>
+          {draft.rental.quotationTerms.trim() === "" && (
+            <p className="mt-1 text-xs text-stone-600">No terms have been written, so quotations are blocked. Nothing is filled in for you.</p>
           )}
         </div>
       </Band>
