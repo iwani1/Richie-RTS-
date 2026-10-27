@@ -209,7 +209,7 @@ the table rather than only in the documentation. The photograph panel shows the 
 | Rentals | Move a request through its states | The state machine of the selected record | Request list in a register card; then a five-step strip, request and quote side by side, actions for that state |
 | Busing | Run the day | Today's runs and the next action on each | Tabs, run sheet (departure in the gutter, route and crew in the middle, next action at the right), dispatch desk beside it. The planning aid sits inside the assign panel as one line of conclusion over three ranked pairs, each with its reason, and collapses what it cannot see behind a disclosure (D-96) |
 | Logistics | Close the response to a breakdown | What is open and what it costs | Incidents beside the work orders they raise; the cost report as a statement with coverage figures |
-| Compliance / Readiness | Prevent an unroadworthy dispatch | Expiry and overdue, soonest first | Summary cards, urgency-sorted table, timing in words, interval bars per basis |
+| Compliance / Readiness | Prevent an unroadworthy dispatch | Expiry and overdue, soonest first | Summary cards, then **Renewals** — a card of the papers inside the lead time, lapsed first, each with its timing in words and either who has taken it on (one line: person, date, what they are doing, when they expect it) or the plain statement that nobody has — then the urgency-sorted register with interval bars per basis. The renewals panel is two fields, because a reminder that does not say what is being done and when it is expected is not a record of anything (D-110) |
 | Settings | Supply the company's real rules | Nothing prefilled; what is still missing | "Rules to supply" read from the saved record, then one card per rule |
 | Audit | Prove who changed what | Chronology and the actor | Dense table: mono timestamps, action as a chip, record named, "showing 17 of 412" |
 | Command palette | Jump without the mouse | Destinations and their captions | Overlay, keyboard-first, permission-filtered, focus-trapped |
@@ -233,7 +233,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1003 passed, 28 skipped** across 86 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1035 passed, 28 skipped** across 88 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are

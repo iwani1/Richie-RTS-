@@ -28,7 +28,7 @@ export const KNOWN_COMMAND_TYPES = [
   "create_booking", "confirm_booking", "reject_booking", "cancel_booking",
   "create_incident", "update_incident", "advance_incident", "add_incident_cost", "remove_incident_cost",
   "create_work_order", "update_work_order", "advance_work_order", "add_work_order_cost", "remove_work_order_cost",
-  "create_document", "update_document",
+  "create_document", "update_document", "acknowledge_document_reminder",
   "record_odometer", "void_odometer",
   "create_user", "update_user", "reset_user_password",
   "issue_rental_invoice", "void_invoice",

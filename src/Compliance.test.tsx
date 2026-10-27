@@ -108,8 +108,10 @@ describe("Compliance documents end-to-end (jsdom)", () => {
     // With a 14-day lead time and today fixed by the system clock at seed time being
     // in the past relative to 2026-06-10, the document should show as expiring soon
     // once enough days have passed; here we assert the record exists and is editable.
-    expect(await screen.findByText("Insurance")).toBeTruthy();
-    expect(screen.getByText("GT 900-26")).toBeTruthy();
+    // The paper appears under Renewals as well (D-110), so the register is checked on its own.
+    const register = screen.getByText("Document register").closest("section") as HTMLElement;
+    expect(await within(register).findByText("Insurance")).toBeTruthy();
+    expect(within(register).getByText("GT 900-26")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /^Edit$/i }));
     const editDialog = screen.getByRole("dialog");
@@ -145,9 +147,11 @@ describe("Compliance documents end-to-end (jsdom)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /Record document/i }));
     await screen.findByText(/recorded\./i);
 
-    // Scope to the document's table row: "Expired" also appears as a stat label.
-    const docRow = (await screen.findByText("Roadworthy")).closest("tr") as HTMLElement;
+    // The paper now appears twice — once under Renewals (D-110) and once in the register — so the
+    // assertion is scoped to the register's own row.
+    const register = screen.getByText("Document register").closest("section") as HTMLElement;
+    const docRow = (await within(register).findByText("Roadworthy")).closest("tr") as HTMLElement;
     expect(within(docRow).getByText("Expired")).toBeTruthy();
-    expect(screen.getByText(/No reminder lead time is set/i)).toBeTruthy();
+    expect(screen.getAllByText(/No reminder lead time is set/i).length).toBeGreaterThan(0);
   }, 30000);
 });

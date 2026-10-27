@@ -748,6 +748,32 @@ export interface ComplianceDocument {
   updatedAt: string;
 }
 
+/**
+ * One person saying they have taken a paper's renewal on (FLT-03, D-110).
+ *
+ * A reminder in this program is a record, not a message: there is no mail or SMS provider
+ * (Phase 2), so a "reminder" that leaves the building cannot be built honestly. What can be
+ * recorded is the thing a reminder is for — somebody has seen the paper is running out, and
+ * somebody is doing something about it. Append-only: a second acknowledgement supersedes the
+ * first, so the record still shows who took it on and when they stopped.
+ *
+ * `expiryDate` is the date the person was looking at. If the paper is renewed the document's
+ * expiry date moves, and this acknowledgement lapses with it rather than silencing a reminder
+ * about a date nobody has dealt with.
+ */
+export interface DocumentReminder {
+  id: string;
+  documentId: string;
+  /** The expiry date this acknowledgement was given against. */
+  expiryDate: string;
+  /** What is being done about it, in the person's own words. */
+  note: string;
+  /** When they expect the new paper, if they said. */
+  expectedBy: string | null;
+  acknowledgedBy: string;
+  acknowledgedAt: string;
+}
+
 export interface OdometerReading {
   id: string;
   vehicleId: string;
@@ -1226,7 +1252,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 /**
  * Every schema version this build can still read.
@@ -1236,7 +1262,7 @@ export const SCHEMA_VERSION = 28;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1252,6 +1278,7 @@ export interface Database {
   incidents: Incident[];
   workOrders: WorkOrder[];
   documents: ComplianceDocument[];
+  documentReminders: DocumentReminder[];
   odometerReadings: OdometerReading[];
   invoices: Invoice[];
   creditNotes: CreditNote[];
@@ -1285,6 +1312,7 @@ export function emptyDatabase(): Database {
     incidents: [],
     workOrders: [],
     documents: [],
+    documentReminders: [],
     odometerReadings: [],
     invoices: [],
     creditNotes: [],
@@ -1435,6 +1463,9 @@ export function migrate(value: unknown): Database | null {
         }))
       : [],
     documents: Array.isArray(v.documents) ? (v.documents as ComplianceDocument[]) : [],
+    // Renewal acknowledgements arrived in schema 29. A backup written before them has nobody
+    // having taken any renewal on, which is exactly what the reminders should say.
+    documentReminders: Array.isArray(v.documentReminders) ? (v.documentReminders as DocumentReminder[]) : [],
     odometerReadings: Array.isArray(v.odometerReadings) ? (v.odometerReadings as OdometerReading[]) : [],
     invoices: Array.isArray(v.invoices)
       ? (v.invoices as Invoice[]).map((invoice) => ({

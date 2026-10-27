@@ -127,6 +127,21 @@ incident is `responding`; corrections are appended to the response log. `closed`
 added and removed until `closed`. `closed` is terminal. The vehicle cannot be set to `retired`
 here — that stays with the vehicle register.
 
+## Document reminder (derived, FLT-03, D-110)
+
+A paper has no reminder state of its own. It is **due** when its expiry is past or inside
+`settings.documentReminderLeadDays` (`documentStatus`), and the only thing stored is an
+acknowledgement — who took the renewal on, when, what they are doing, the date they expect the paper.
+The live acknowledgement is the newest one whose `expiryDate` matches the document's current date; a
+renewal that moves the date therefore re-raises the reminder, and nothing has to be cleared by hand.
+
+| From | To | Who | What changes |
+|---|---|---|---|
+| not due | due | — (derived) | The date approaches, or the lead time in Settings is widened |
+| due | taken on | `documents:update` | `acknowledge_document_reminder` appends a record; the dashboard stops counting it as untaken |
+| taken on | due again | — (derived) | The expiry date is corrected or the paper renewed into the lead window |
+| taken on | taken on (by somebody else) | `documents:update` | A second acknowledgement supersedes the first; neither is erased |
+
 ## Odometer reading (`fleet:*`, Phase 8)
 
 A reading is `current` or `void`. It becomes void only with a reason (`fleet:void`); voided

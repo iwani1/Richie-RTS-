@@ -188,7 +188,9 @@ A driver's `documents:read` is own-record: it returns documents for its own driv
 for vehicles assigned to it, and the driver portal renders them read-only. A driver can never
 write a document record. Finance cannot read licence or insurance documents at all: those are
 personal/compliance records and billing does not need them (brief section 6, D-60). Document
-types themselves are edited under `settings:update` (administrator only).
+types themselves are edited under `settings:update` (administrator only). Taking a paper's renewal on
+(FLT-03, D-110) is `documents:update`: it writes a record with the person's name on it, so it is the
+same right as correcting the paper, and a driver cannot do it.
 
 ## Fleet readiness and odometer (Phase 8)
 

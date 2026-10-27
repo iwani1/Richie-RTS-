@@ -302,6 +302,13 @@ nothing here deletes a file on the strength of a screen action. The receipts' fo
 D-100) is deliberately a different one: the two kinds of file are kept for different reasons and hold
 different names (`rcpt_…` and `vhcl_…`).
 
+`DocumentReminder` (schema 29, D-110) is a collection in the snapshot rather than a table, because
+nothing queries it: it is read beside the document it answers, and it is append-only — a second person
+taking the same renewal on adds a row and the newest for the current `expiryDate` is the live one. The
+`expiryDate` is copied onto the acknowledgement on purpose. An acknowledgement that hung off the
+document alone would survive a mistyped renewal, and silence the reminder it was meant to answer; with
+the date on the row, changing the date is what re-raises it.
+
 `Booking.history` is embedded on the booking rather than kept in a table of its own: it is written
 once with the change it describes, never edited, and read whole beside the booking (BKG-06).
 

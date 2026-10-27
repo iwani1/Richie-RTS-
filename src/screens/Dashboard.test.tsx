@@ -196,3 +196,74 @@ describe("operations board", () => {
     expect(screen.getByRole("heading", { name: /Today's departures/ })).toBeTruthy();
   });
 });
+
+// FLT-03, D-110: the papers that are running out reach the screen everybody opens, and the row says
+// whether anybody has taken them on — because a reminder that lives only on the compliance screen is
+// one nobody reads.
+describe("papers that need renewing, on the board", () => {
+  const day = (offset: number) => {
+    const base = new Date(`${today}T00:00:00Z`);
+    base.setUTCDate(base.getUTCDate() + offset);
+    return base.toISOString().slice(0, 10);
+  };
+
+  const document = (expiryDate: string) => ({
+    id: `doc-${expiryDate}`,
+    ownerType: "vehicle" as const,
+    ownerId: "v1",
+    documentTypeId: "t1",
+    documentNumber: "INS-1",
+    issuedDate: null,
+    expiryDate,
+    notes: "",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  const settings = { ...emptyDatabase().settings, companyName: "Richie", currencyCode: "GHS", documentReminderLeadDays: 30 };
+
+  it("names the papers nobody has taken on, with how long is left", () => {
+    renderBoard(
+      withData({
+        settings,
+        documents: [document(day(5)), document(day(-2))],
+        documentReminders: [],
+      }),
+    );
+    expect(screen.getByText(/2 papers need renewing/)).toBeTruthy();
+    expect(screen.getByText(/Nobody has taken one on yet/i)).toBeTruthy();
+  });
+
+  it("takes a paper off the list once somebody has taken it on", () => {
+    const paper = document(day(5));
+    renderBoard(
+      withData({
+        settings,
+        documents: [paper],
+        documentReminders: [
+          {
+            id: "r1",
+            documentId: paper.id,
+            expiryDate: paper.expiryDate,
+            note: "Chasing the insurer",
+            expectedBy: day(3),
+            acknowledgedBy: "Ama Mensah",
+            acknowledgedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+    expect(screen.queryByText(/papers? need/)).toBeNull();
+  });
+
+  it("is silent when every paper is in date, rather than listing a zero", () => {
+    renderBoard(withData({ settings, documents: [document(day(300))] }));
+    expect(screen.queryByText(/need renewing/)).toBeNull();
+  });
+
+  it("links to the compliance register", () => {
+    const navigate = renderBoard(withData({ settings, documents: [document(day(2))] }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Review/ })[0]);
+    expect(navigate).toHaveBeenCalledWith("compliance");
+  });
+});

@@ -1,3 +1,4 @@
+import { dueReminders, reminderCounts, reminderTiming } from "../tms/documentReminders";
 import { readinessReport } from "../tms/maintenance";
 import { setupProgress } from "../tms/setup";
 import { useTms } from "../tms/useTms";
@@ -80,6 +81,10 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
 
   // ---- exceptions ------------------------------------------------------------------------------
   const expiredLicences = db.drivers.filter((d) => d.status === "active" && d.licenceExpiry < today);
+  // FLT-03, D-110: the papers that are about to lapse, and the ones nobody has taken on. A reminder
+  // that lives only on the compliance screen is one nobody reads; this is the screen everybody opens.
+  const papers = dueReminders(db, db.settings.documentReminderLeadDays, today);
+  const paperCounts = reminderCounts(db, db.settings.documentReminderLeadDays, today);
   const readiness = readinessReport(db, today);
   const awaitingConfirmation = db.rentals.filter((r) => r.status === "draft" || r.status === "quoted");
   const activeRentals = db.rentals.filter((r) => r.status === "confirmed" || r.status === "in_progress");
@@ -121,6 +126,19 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
       count: expiredLicences.length,
       tone: "error",
       action: allowed("drivers:read") ? "drivers" : undefined,
+    });
+  }
+  if (allowed("documents:read") && paperCounts.untaken > 0) {
+    const soonest = papers.filter((entry) => entry.takenOn === null).slice(0, 3);
+    attention.push({
+      key: "papers",
+      label: `${paperCounts.untaken} paper${paperCounts.untaken === 1 ? "" : "s"} need${paperCounts.untaken === 1 ? "s" : ""} renewing${paperCounts.takenOn > 0 ? `, ${paperCounts.takenOn} taken on` : ""}`,
+      detail: `${soonest
+        .map((entry) => `${entry.document.expiryDate} (${reminderTiming(entry.days)})`)
+        .join(", ")}${papers.length > soonest.length ? `, and ${papers.length - soonest.length} more` : ""}. Nobody has taken one on yet.`,
+      count: paperCounts.untaken,
+      tone: paperCounts.expired > 0 ? "error" : "warning",
+      action: "compliance",
     });
   }
   if (allowed("fleet:read") && readiness.counts.overdue > 0) {

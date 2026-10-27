@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { CommandResult } from "../tms/service";
 import { daysUntil, documentStatus, type CreateDocumentInput, type DocumentStatus, type UpdateDocumentInput } from "../tms/compliance";
+import { dueReminders, reminderCounts, reminderLine, reminderTiming } from "../tms/documentReminders";
 import type { ComplianceDocument } from "../tms/types";
 import { useTms } from "../tms/useTms";
 import {
@@ -43,7 +44,12 @@ export function CompliancePage() {
   const leadDays = db.settings.documentReminderLeadDays;
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [panel, setPanel] = useState<{ mode: "create" } | { mode: "edit"; doc: ComplianceDocument } | null>(null);
+  const [panel, setPanel] = useState<
+    { mode: "create" } | { mode: "edit"; doc: ComplianceDocument } | { mode: "renew"; doc: ComplianceDocument } | null
+  >(null);
+  // FLT-03, D-110: the papers that are running out, soonest first, and who has taken each one on.
+  const renewals = dueReminders(db, leadDays, today);
+  const renewalCounts = reminderCounts(db, leadDays, today);
 
   const ownerName = (doc: ComplianceDocument) =>
     doc.ownerType === "vehicle" ? db.vehicles.find((v) => v.id === doc.ownerId)?.registration ?? "Unknown vehicle" : db.drivers.find((d) => d.id === doc.ownerId)?.fullName ?? "Unknown driver";
@@ -96,6 +102,84 @@ export function CompliancePage() {
         <Stat label="Valid" value={counts.valid} caption="as of today" />
         <Stat label="Total recorded" value={counts.total} caption="vehicle and driver documents" />
       </div>
+
+      {typesConfigured && (
+        <TableCard
+          title="Renewals"
+          summary={
+            renewals.length === 0
+              ? "Nothing is running out"
+              : `${renewalCounts.due} due · ${renewalCounts.expired} lapsed · ${renewalCounts.untaken} nobody has taken on`
+          }
+          actions={
+            leadDays === null ? (
+              <span className="rts-filter-bar-note">No lead time set: only lapsed papers appear here</span>
+            ) : (
+              <span className="rts-filter-bar-note">{`Within ${leadDays} day${leadDays === 1 ? "" : "s"}, as set in Settings`}</span>
+            )
+          }
+        >
+          {/* A reminder here is a record, not a message (D-110): nobody can email from this program,
+              so the register keeps what a reminder is for — who has seen it, and what they are doing. */}
+          <DataTable
+            rows={renewals}
+            rowKey={(entry) => entry.document.id}
+            emptyState={
+              <EmptyState
+                title={db.documents.length ? "Nothing is running out" : "No documents recorded"}
+                body={
+                  db.documents.length
+                    ? "Every paper on the register is either in date beyond the reminder lead time, or there is no lead time set and nothing has lapsed."
+                    : "Record a document and its expiry date; the papers that need renewing will appear here."
+                }
+              />
+            }
+            columns={[
+              {
+                key: "paper",
+                header: "Paper",
+                render: (entry) => (
+                  <span className="block">
+                    <span className="font-medium">{typeName(entry.document)}</span>
+                    <span className="block text-xs text-stone-600">{ownerName(entry.document)}</span>
+                  </span>
+                ),
+              },
+              {
+                key: "expiry",
+                header: "Expires",
+                render: (entry) => (
+                  <span className="block">
+                    <span className={entry.status === "expired" ? "text-red-700" : undefined}>{formatDate(entry.document.expiryDate)}</span>
+                    <span className="block text-xs text-stone-600">{reminderTiming(entry.days)}</span>
+                  </span>
+                ),
+              },
+              {
+                key: "taken",
+                header: "Taken on",
+                render: (entry) =>
+                  entry.takenOn ? (
+                    <span className="text-xs text-stone-600">{reminderLine(entry.takenOn)}</span>
+                  ) : (
+                    <span className="text-xs rts-unset">Nobody has taken it on</span>
+                  ),
+              },
+              {
+                key: "action",
+                header: "",
+                className: "text-right",
+                render: (entry) =>
+                  allowed("documents:update") ? (
+                    <Button variant={entry.takenOn ? "ghost" : "primary"} onClick={() => setPanel({ mode: "renew", doc: entry.document })}>
+                      {entry.takenOn ? "Update" : "Take it on"}
+                    </Button>
+                  ) : null,
+              },
+            ]}
+          />
+        </TableCard>
+      )}
 
       <TableCard
         title="Document register"
@@ -158,6 +242,16 @@ export function CompliancePage() {
       </TableCard>
 
       {panel?.mode === "create" && <CreateDocumentForm onClose={() => setPanel(null)} onSubmit={async (input) => dispatch({ type: "create_document", input })} notify={setFlash} onClosed={() => setPanel(null)} />}
+      {panel?.mode === "renew" && (
+        <TakeOnRenewalForm
+          doc={panel.doc}
+          paperName={typeName(panel.doc)}
+          ownerName={ownerName(panel.doc)}
+          onSubmit={async (input) => dispatch({ type: "acknowledge_document_reminder", input })}
+          notify={setFlash}
+          onClosed={() => setPanel(null)}
+        />
+      )}
       {panel?.mode === "edit" && (
         <EditDocumentForm
           doc={panel.doc}
@@ -311,6 +405,69 @@ function EditDocumentForm({
         <div className="flex justify-end gap-2 pt-2">
           <Button onClick={onClosed}>Cancel</Button>
           <Button type="submit" variant="primary">Save changes</Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+/**
+ * Somebody taking a paper's renewal on (FLT-03, D-110).
+ *
+ * Two fields, because a reminder is only worth recording if it says what is being done and when it
+ * is expected. Both are written into the audit log with the person's name, and the register shows the
+ * line beside the paper until the expiry date changes — a renewal that is recorded replaces it.
+ */
+function TakeOnRenewalForm({
+  doc,
+  paperName,
+  ownerName,
+  onSubmit,
+  notify,
+  onClosed,
+}: {
+  doc: ComplianceDocument;
+  paperName: string;
+  ownerName: string;
+  onSubmit: (input: { documentId: string; note: string; expectedBy: string }) => Promise<CommandResult>;
+  notify: ReturnType<typeof useTms>["setFlash"];
+  onClosed: () => void;
+}) {
+  const [note, setNote] = useState("");
+  const [expectedBy, setExpectedBy] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const result = await onSubmit({ documentId: doc.id, note, expectedBy });
+    notify({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) onClosed();
+    else setErrors(result.errors);
+  };
+
+  return (
+    <Panel
+      title={`Take on the renewal: ${paperName}`}
+      description={`${ownerName} — expires ${formatDate(doc.expiryDate)}. This program cannot send an email or a text message, so a reminder here is a record of who has seen the paper is running out and what they are doing about it.`}
+      onClose={onClosed}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="What is being done?" hint="Recorded with your name. " error={errors.note}>
+          <TextArea value={note} onChange={(e) => setNote(e.target.value)} invalid={!!errors.note} autoFocus />
+        </Field>
+        <Field
+          label="Expected by"
+          hint="Optional. The date you expect the new paper; the register shows it beside the paper."
+          error={errors.expectedBy}
+        >
+          <TextInput type="date" value={expectedBy} onChange={(e) => setExpectedBy(e.target.value)} invalid={!!errors.expectedBy} />
+        </Field>
+        {errors.documentId && <Notice tone="warning">{errors.documentId}</Notice>}
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClosed}>Cancel</Button>
+          <Button type="submit" variant="primary">
+            Take it on
+          </Button>
         </div>
       </form>
     </Panel>

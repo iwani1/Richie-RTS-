@@ -25,14 +25,14 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 
 | Phase | What it covers | Verdict |
 |---|---|---|
-| **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 13 fully met, 16 met but narrower than the brief, **0 unbuilt**. The fleet register became whole in Phases 57–59: what the bus runs on, whose it is, its usual driver, a photograph kept in a folder of its own, and the seven states the brief asks for — four typed by the office, three read from the runs |
+| **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 14 fully met, 15 met but narrower than the brief, **0 unbuilt**. The fleet register became whole in Phases 57–59: what the bus runs on, whose it is, its usual driver, a photograph kept in a folder of its own, and the seven states the brief asks for — four typed by the office, three read from the runs |
 | **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting, corporate agreements, a planning aid | **Built, with narrower registers than the brief.** 25 IDs: 15 met, 10 partial, **0 not built**. Contracts arrived in Phase 46 (a transcribed term, the lifecycle, renewals, a booking gate) and the planning aid in Phase 47 — ranked pairs that explain themselves, with no geometry because no stop has a position |
 | **1B** — a run that is late | A delay is reported while the run is out: minutes behind the timetable, why, who said it — on the dispatch sheet, the driver's screen, the client's portal and the rider's page (Phase 56, D-105) | **Built.** The newest report is the current one, a run can say it caught up (`0`), and nothing is edited afterwards. The transport report still measures lateness from the stop times afterwards; the two are different facts and both are shown |
 | **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, staff transport and financial reports | **Built.** 6 IDs: 3 met (finance dashboard, passenger portal, staff transport report), 3 partial, **0 not built**. The passenger portal arrived in Phase 48 — a rider's own journeys, seats and references, with the bus's position honestly absent because nothing records one. The staff transport report arrived in Phase 50 — runs worked, riders carried, no-shows, the gap nobody recorded, empty seats, delays where they were measured, and the seats people asked for |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
 | **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs: 2 met, 5 deferred. Met: expenses with a receipt number, whether the paper is held **and, since Phase 51, the scanned copy itself** (kept in a folder on the office machine for three years, open to finance and administrators only), and the **printed management report** (a document the browser prints or saves as PDF — no stored file, no email) |
 
-Totals across all 78 brief requirements: **33 met · 32 partial · 0 not built · 13 deferred.**
+Totals across all 78 brief requirements: **34 met · 31 partial · 0 not built · 13 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -157,6 +157,10 @@ send mail.
 
 These work, and the difference is worth knowing before relying on them:
 
+- **Compliance reminders** — papers that are running out are listed on their own card and on the
+  dashboard, and somebody can take a renewal on with a note and the date they expect the new paper,
+  recorded in the audit log. Nothing is emailed or texted: there is no provider (Phase 2), and the
+  screen says so. A reminder is a record of who is dealing with it, not a message.
 - **Driver register** — licence number, expiry, the classes printed on the licence and the
   certificates held, with dispatch refusing a driver whose class does not cover the vehicle once the
   office has said which classes a vehicle category needs. A qualification is **recorded, not
@@ -187,7 +191,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**1003 passed, 28 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**1035 passed, 28 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

@@ -2352,3 +2352,51 @@ that can only answer the first one sends a dispatcher to a bus that left an hour
   the record behind it and any overridden commitment, counts the fleet by state beside the search box,
   filters by state, and prints the rules; the change-status panel shows the state and the next
   commitment; `STATE_MACHINES.md` carries the table. 35 new tests (25 domain, 10 screen).
+
+## D-110 - A reminder is a record, not a message (FLT-03)
+
+The compliance register already knew an expiry date, already had a lead time the office sets, and
+already blocked a vehicle or a driver whose mandatory paper had lapsed (Q-16, D-76). What it could not
+do was tell anybody *before* that happened — and it could not, because sending an email or a text
+message needs a provider this program does not have (Phase 2, deferred). The brief asks for
+"configurable reminders", and answering "we cannot, there is no mail server" is not an answer.
+
+- **Decision 1: a reminder is a record of somebody taking the renewal on, not a message.** What a
+  reminder is actually for is that *somebody has noticed and somebody is dealing with it*. That is a
+  fact this program can hold: who said it, when, what they are doing, and the date they expect the new
+  paper. It is printed beside the paper and written into the audit log. When a provider arrives in
+  Phase 2 it can send the message; it cannot invent the record, which is why the record came first.
+- **Decision 2: due-ness is never typed.** A paper is due when its expiry is inside the configured lead
+  time or already past — the same `documentStatus` the register has used since Q-16. Nothing is marked
+  due by hand, so nothing can be marked due that is not, and moving the lead time in Settings moves the
+  whole list at once.
+- **Decision 3: an acknowledgement belongs to an expiry date, not to a document.** The record stores
+  the date the person was looking at. When the paper is renewed the expiry date moves, the old
+  acknowledgement lapses, and the reminder returns if the new date is still inside the lead time. The
+  alternative — an acknowledgement attached to the document — would let a mistyped renewal silence the
+  reminder it was meant to answer, which is the one failure this feature must not have.
+- **Decision 4: a paper nobody has to think about yet cannot be taken on.** Acknowledging something
+  three months away is a click, not a decision, and it would leave the really urgent paper looking
+  handled. The refusal says which date and which lead time it checked.
+- **Decision 5: "expected by" is optional but must be a real date, and not in the past.** "Somebody is
+  dealing with it" with no date is a sentence that can sit on a screen for a year. A date already gone
+  is not a date somebody expects something by.
+- **Decision 6: append-only, and the newest acknowledgement is the live one.** A second person taking
+  the paper on supersedes the first without erasing them; the audit summary names the acknowledgement
+  it replaced. Same rule as the delay reports (D-105) and the receipt scans (D-100): the question
+  afterwards is who said what, and a list that can only hold one answer cannot answer it.
+- **Decision 7: the reminder reaches the screen everybody opens.** The Dashboard's "needs attention"
+  list gains a row for the papers nobody has taken on, naming up to three with how long is left, and it
+  disappears when they are all taken on. A reminder that lives only on the compliance screen is one
+  nobody reads, which is the problem the feature exists to solve.
+- **Decision 8: nothing is deleted, and this is not a job runner.** No scheduled process exists, so
+  there is no nightly digest and nothing here fires at a time of day; the list is read when somebody
+  opens the program. That is an honest limit, printed on the screen, not a hidden one.
+- **Decision 9: schema 29, no SQL migration.** `documentReminders` is a collection in the snapshot;
+  `migrate()` fills it with an empty list, which reads as "nobody has taken any renewal on" — exactly
+  right for a backup written before this existed.
+- **Consequence.** `DocumentReminder` and `Database.documentReminders`; new module
+  `src/tms/documentReminders.ts` (`REMINDER_LIMITS`, `reminderFor`, `dueReminders`, `reminderCounts`,
+  `reminderTiming`, `reminderLine`); the `acknowledge_document_reminder` command under
+  `documents:update`; a **Renewals** card on the compliance screen with a two-field panel; a row on the
+  dashboard's attention list. 32 new tests (11 domain, 8 command, 13 screen).

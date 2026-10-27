@@ -9,9 +9,10 @@
 // exactly like the existing driver-licence check on the dashboard.
 
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
-import { DOCUMENT_OWNER_TYPES, type ComplianceDocument, type Database } from "./types";
+import { DOCUMENT_OWNER_TYPES, type ComplianceDocument, type Database, type DocumentReminder } from "./types";
+import { REMINDER_LIMITS, reminderFor } from "./documentReminders";
 
-export const COMPLIANCE_COMMAND_TYPES = ["create_document", "update_document"] as const;
+export const COMPLIANCE_COMMAND_TYPES = ["create_document", "update_document", "acknowledge_document_reminder"] as const;
 
 export interface CreateDocumentInput {
   ownerType: "vehicle" | "driver";
@@ -30,9 +31,22 @@ export interface UpdateDocumentInput {
   notes: string;
 }
 
+/**
+ * Somebody taking a lapsed-or-lapsing paper's renewal on (FLT-03, D-110).
+ *
+ * The date is what makes this a reminder rather than a shrug: "somebody is dealing with it" with no
+ * date is a sentence that can sit on a screen for a year.
+ */
+export interface AcknowledgeReminderInput {
+  documentId: string;
+  note: string;
+  expectedBy: string;
+}
+
 export type ComplianceCommand =
   | { type: "create_document"; input: CreateDocumentInput }
-  | { type: "update_document"; id: string; input: UpdateDocumentInput };
+  | { type: "update_document"; id: string; input: UpdateDocumentInput }
+  | { type: "acknowledge_document_reminder"; input: AcknowledgeReminderInput };
 
 export function isComplianceCommand(command: { type: string }): command is ComplianceCommand {
   return (COMPLIANCE_COMMAND_TYPES as readonly string[]).includes(command.type);
@@ -213,5 +227,75 @@ export function executeCompliance(
       }, now);
       return { ok: true, db: next, message: "Document updated." };
     }
+
+    case "acknowledge_document_reminder": {
+      const denied = authorise(actor, "documents:update");
+      if (denied) return denied;
+
+      const document = db.documents.find((d) => d.id === command.input.documentId);
+      if (!document) return fail("Document not found.");
+
+      const today = now.slice(0, 10);
+      const leadDays = db.settings.documentReminderLeadDays;
+      const status = documentStatus(document.expiryDate, leadDays, today);
+      // A paper nobody has to think about yet does not get taken on: an acknowledgement that can be
+      // given at any time is one that means "I clicked", and it would silence the reminder that
+      // matters when the date finally arrives.
+      if (status === "unknown")
+        return fail("The expiry date on this paper cannot be read, so there is nothing to take on. Correct the date first.");
+      if (status === "valid") {
+        return fail(
+          leadDays === null
+            ? `Nothing is due on this paper: no reminder lead time is set, and it has not expired (it expires ${document.expiryDate}).`
+            : `${docTypeName(db, document)} for ${ownerLabel(db, document)} is not due yet: it expires ${document.expiryDate}, outside the ${leadDays}-day lead time.`,
+          { documentId: "This paper is not due for renewal yet." },
+        );
+      }
+
+      const note = command.input.note.trim();
+      const expectedBy = command.input.expectedBy.trim();
+      const errors: Errors = {};
+      if (!note) errors.note = "Say what is being done about it — \"chasing the insurer\" is enough.";
+      else if (note.length > REMINDER_LIMITS.note) errors.note = `Keep it to ${REMINDER_LIMITS.note} characters.`;
+      if (expectedBy) {
+        if (!isValidDate(expectedBy)) errors.expectedBy = "Enter the date you expect the new paper, or leave it blank.";
+        else if (expectedBy < today) errors.expectedBy = "A date that has already passed is not when you expect the paper. Enter today or later.";
+      }
+      if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
+
+      const created: DocumentReminder = {
+        id: makeId(),
+        documentId: document.id,
+        // The date they were looking at. Renewing the paper moves it, and the reminder comes back.
+        expiryDate: document.expiryDate,
+        note,
+        expectedBy: expectedBy || null,
+        acknowledgedBy: actor?.fullName ?? "System",
+        acknowledgedAt: now,
+      };
+      const previous = reminderFor(db, document);
+      const next = audit({ ...db, documentReminders: [...db.documentReminders, created] }, actor, {
+        action: "documents:reminder",
+        entity: "document",
+        entityId: document.id,
+        summary:
+          `${docTypeName(db, document)} for ${ownerLabel(db, document)} (expires ${document.expiryDate}): ` +
+          `${previous ? `replaces the acknowledgement by ${previous.acknowledgedBy}; ` : ""}taken on — ${note}` +
+          `${created.expectedBy ? `, expected by ${created.expectedBy}` : ""}.`,
+      }, now);
+      return {
+        ok: true,
+        db: next,
+        message: `Renewal taken on.${created.expectedBy ? ` The register shows it expected by ${created.expectedBy}.` : ""}`,
+      };
+    }
   }
 }
+
+const docTypeName = (db: Database, document: ComplianceDocument): string =>
+  db.settings.documentTypes.find((type) => type.id === document.documentTypeId)?.name ?? "Document";
+
+const ownerLabel = (db: Database, document: ComplianceDocument): string =>
+  document.ownerType === "vehicle"
+    ? db.vehicles.find((vehicle) => vehicle.id === document.ownerId)?.registration ?? "unknown vehicle"
+    : db.drivers.find((driver) => driver.id === document.ownerId)?.fullName ?? "unknown driver";

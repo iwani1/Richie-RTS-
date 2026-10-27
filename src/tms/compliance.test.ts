@@ -358,3 +358,167 @@ describe("documents a company has made mandatory (Q-16, D-76)", () => {
     expect(requiredDocumentGaps(w.db, "vehicle", w.vehicleId, "2026-06-01")).toHaveLength(1);
   });
 });
+
+// FLT-03, D-110: a reminder is a record, not a message.
+describe("taking a paper's renewal on", () => {
+  const withLead = (w: World, leadDays: number | null) => {
+    const result = executeCommand(w.db, w.admin, {
+      type: "update_settings",
+      input: { ...w.db.settings, documentReminderLeadDays: leadDays },
+    }, NOW);
+    if (!result.ok) throw new Error(result.message);
+    w.db = result.db;
+  };
+
+  const record = (w: World, expiryDate: string) => {
+    // The issued date is left blank: a paper that lapsed in 2025 cannot have been issued in 2026.
+    const result = executeCommand(w.db, w.ops, { type: "create_document", input: insuranceInput(w, { expiryDate, issuedDate: "" }) }, NOW);
+    if (!result.ok) throw new Error(`${result.message} ${JSON.stringify(result.errors)}`);
+    w.db = result.db;
+    return w.db.documents[w.db.documents.length - 1];
+  };
+
+  const acknowledge = (w: World, actor: Actor, documentId: string, over: { note?: string; expectedBy?: string } = {}) =>
+    executeCommand(w.db, actor, {
+      type: "acknowledge_document_reminder",
+      input: { documentId, note: over.note ?? "Chasing the insurer", expectedBy: over.expectedBy ?? "" },
+    }, NOW);
+
+  it("records who took it on, what they are doing, and when they expect the paper", () => {
+    const w = world();
+    withLead(w, 30);
+    const doc = record(w, "2026-01-20");
+
+    const result = acknowledge(w, w.ops, doc.id, { expectedBy: "2026-01-15" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const reminder = result.db.documentReminders[0];
+    expect(reminder).toMatchObject({
+      documentId: doc.id,
+      expiryDate: "2026-01-20",
+      note: "Chasing the insurer",
+      expectedBy: "2026-01-15",
+      acknowledgedBy: "Ops",
+      acknowledgedAt: NOW,
+    });
+    expect(result.db.audit[0].action).toBe("documents:reminder");
+    expect(result.db.audit[0].summary).toContain("Insurance for GT 100-26");
+    expect(result.message).toMatch(/expected by 2026-01-15/);
+  });
+
+  it("takes on a paper that has already lapsed, and one inside the lead time", () => {
+    const w = world();
+    withLead(w, 30);
+    const lapsed = record(w, "2025-12-20");
+    const soon = record(w, "2026-01-20");
+    expect(lapsed.id).not.toBe(soon.id);
+    expect(acknowledge(w, w.ops, lapsed.id).ok).toBe(true);
+    expect(acknowledge(w, w.ops, soon.id).ok).toBe(true);
+  });
+
+  it("refuses a paper nobody has to think about yet, and names the date", () => {
+    const w = world();
+    withLead(w, 30);
+    const far = record(w, "2027-06-01");
+    const refused = acknowledge(w, w.ops, far.id);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.message).toContain("2027-06-01");
+      expect(refused.message).toContain("30-day lead time");
+    }
+  });
+
+  it("with no lead time set, refuses anything that has not expired — and says why", () => {
+    const w = world();
+    withLead(w, null);
+    const far = record(w, "2027-06-01");
+    const refused = acknowledge(w, w.ops, far.id);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.message).toMatch(/no reminder lead time is set/i);
+  });
+
+  it("needs a note, and a date that has not already passed", () => {
+    const w = world();
+    withLead(w, 30);
+    const doc = record(w, "2026-01-20");
+
+    const blank = acknowledge(w, w.ops, doc.id, { note: "   " });
+    expect(blank.ok).toBe(false);
+    if (!blank.ok) expect(blank.errors.note).toMatch(/Say what is being done/);
+
+    const tooLong = acknowledge(w, w.ops, doc.id, { note: "x".repeat(201) });
+    expect(tooLong.ok).toBe(false);
+    if (!tooLong.ok) expect(tooLong.errors.note).toMatch(/200 characters/);
+
+    const past = acknowledge(w, w.ops, doc.id, { expectedBy: "2025-12-31" });
+    expect(past.ok).toBe(false);
+    if (!past.ok) expect(past.errors.expectedBy).toMatch(/already passed/);
+
+    const nonsense = acknowledge(w, w.ops, doc.id, { expectedBy: "next tuesday" });
+    expect(nonsense.ok).toBe(false);
+    if (!nonsense.ok) expect(nonsense.errors.expectedBy).toMatch(/Enter the date/);
+  });
+
+  it("keeps the earlier acknowledgement when somebody else takes it on", () => {
+    const w = world();
+    withLead(w, 30);
+    const doc = record(w, "2026-01-20");
+
+    const first = acknowledge(w, w.ops, doc.id, { note: "Chasing the insurer" });
+    if (!first.ok) throw new Error(first.message);
+    w.db = first.db;
+
+    const second = executeCommand(w.db, w.admin, {
+      type: "acknowledge_document_reminder",
+      input: { documentId: doc.id, note: "Renewal paid, collecting the certificate", expectedBy: "" },
+    }, "2026-01-02T00:00:00.000Z");
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+
+    expect(second.db.documentReminders).toHaveLength(2);
+    expect(second.db.documentReminders.map((r) => r.note)).toEqual([
+      "Chasing the insurer",
+      "Renewal paid, collecting the certificate",
+    ]);
+    // The audit log says it replaced the first one rather than pretending it was the only one.
+    expect(second.db.audit[0].summary).toMatch(/replaces the acknowledgement by Ops/);
+  });
+
+  it("is documents:update — a driver cannot take a renewal on, and neither can a stranger's id", () => {
+    const w = world();
+    withLead(w, 30);
+    const doc = record(w, "2026-01-20");
+
+    const denied = acknowledge(w, w.driverUser, doc.id);
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) expect(denied.message).toMatch(/Not permitted/);
+
+    const missing = acknowledge(w, w.ops, "not-a-document");
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.message).toMatch(/Document not found/);
+  });
+
+  it("comes back when the paper is renewed to a new date that is still too close", () => {
+    const w = world();
+    withLead(w, 30);
+    const doc = record(w, "2026-01-20");
+    const taken = acknowledge(w, w.ops, doc.id);
+    if (!taken.ok) throw new Error(taken.message);
+    w.db = taken.db;
+
+    // The office corrects the expiry to a date that is still inside the lead time: the
+    // acknowledgement was given against the old date and cannot answer for the new one.
+    const corrected = executeCommand(w.db, w.ops, {
+      type: "update_document",
+      id: doc.id,
+      input: { documentNumber: doc.documentNumber, issuedDate: "", expiryDate: "2026-01-25", notes: "" },
+    }, NOW);
+    if (!corrected.ok) throw new Error(corrected.message);
+    w.db = corrected.db;
+
+    expect(w.db.documentReminders).toHaveLength(1);
+    // The reminder is due again, with nobody having taken the new date on.
+    expect(acknowledge(w, w.ops, doc.id).ok).toBe(true);
+  });
+});
