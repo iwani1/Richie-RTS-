@@ -19,6 +19,7 @@
 // same act as taking the deposit, and the deposit stays where it was (D-90's rule, one money rule).
 import { formatAmount } from "./money";
 import { quotationIsLive } from "./quotations";
+import { PRE_QUOTE_STATUSES } from "./rentalWorkflow";
 import type { Rental, RentalAcceptance } from "./types";
 
 /** How long a note on an acceptance may be. A sentence, not a paragraph. */
@@ -82,10 +83,16 @@ export interface AcceptanceProblems {
  */
 export function canAcceptQuotation(rental: Rental, now: string): AcceptanceProblems {
   const problems: AcceptanceProblems = {};
-  if (rental.status === "draft") {
+  if (PRE_QUOTE_STATUSES.includes(rental.status)) {
     problems.status = "No quotation has been issued yet, so there is nothing to accept.";
-  } else if (rental.status === "confirmed" || rental.status === "in_progress" || rental.status === "completed") {
-    problems.status = `This rental was already agreed and is ${rental.status === "in_progress" ? "under way" : rental.status}.`;
+  } else if (rental.status === "accepted") {
+    // Agreed and unpaid. The sentence names who agreed and when, because that is the thing the office
+    // is about to be asked about on the phone.
+    problems.acceptance = rental.acceptance
+      ? `This quotation was already accepted on ${ymd(rental.acceptance.at)} by ${rental.acceptance.byName}.`
+      : "The customer has already agreed to this quotation; the deposit is what confirms the hire.";
+  } else if (rental.status === "confirmed" || rental.status === "dispatched" || rental.status === "completed") {
+    problems.status = `This rental was already agreed and is ${rental.status === "dispatched" ? "under way" : rental.status}.`;
   } else if (rental.status === "declined" || rental.status === "cancelled") {
     problems.status = "A declined or cancelled rental cannot be accepted.";
   }

@@ -16,6 +16,7 @@
 //     build (TRP-01), and a stop has no map position, so the board cannot filter by service and cannot
 //     give a travel time. It says so rather than offering a filter that quietly does nothing.
 import { capacityOf, minutesToDeparture } from "./bookings";
+import { isActiveRental } from "./rentalWorkflow";
 import { toMinutes } from "./busing";
 import { delayLine, liveDelay } from "./delays";
 import { FLEET_STATE_LABELS, fleetStateOf, type FleetState } from "./fleetState";
@@ -123,7 +124,7 @@ function daysBetween(earlier: string, later: string): number {
 function hireOn(db: Database, date: string) {
   return db.rentals.filter(
     (rental) =>
-      (rental.status === "confirmed" || rental.status === "in_progress") && rental.startDate <= date && date <= rental.endDate,
+      isActiveRental(rental.status) && rental.startDate <= date && date <= rental.endDate,
   );
 }
 

@@ -1,4 +1,5 @@
 import { dueReminders, reminderCounts, reminderTiming } from "../tms/documentReminders";
+import { awaitingCustomer, isActiveRental } from "../tms/rentalWorkflow";
 import { readinessReport } from "../tms/maintenance";
 import { setupProgress } from "../tms/setup";
 import { useTms } from "../tms/useTms";
@@ -86,8 +87,10 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
   const papers = dueReminders(db, db.settings.documentReminderLeadDays, today);
   const paperCounts = reminderCounts(db, db.settings.documentReminderLeadDays, today);
   const readiness = readinessReport(db, today);
-  const awaitingConfirmation = db.rentals.filter((r) => r.status === "draft" || r.status === "quoted");
-  const activeRentals = db.rentals.filter((r) => r.status === "confirmed" || r.status === "in_progress");
+  // What the office can chase today: a price to answer, or a deposit now that the customer has said
+  // yes (D-120). Requests nobody has priced yet belong on the rentals screen, not on this list.
+  const awaitingConfirmation = db.rentals.filter((r) => awaitingCustomer(r.status));
+  const activeRentals = db.rentals.filter((r) => isActiveRental(r.status));
   // Added in whole pesewas: these two numbers sit side by side with the invoice figures, and float
   // addition can leave them a pesewa apart (audit D-04).
   const depositsHeld = sumAmounts(activeRentals.map((r) => r.deposit?.amount ?? 0));
@@ -165,7 +168,7 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
     attention.push({
       key: "rentals",
       label: `${awaitingConfirmation.length} rental${awaitingConfirmation.length === 1 ? "" : "s"} awaiting confirmation`,
-      detail: "Draft or quoted — no vehicle is held until confirmed.",
+      detail: "Quoted or agreed but not yet paid — no vehicle is held until the deposit is in.",
       count: awaitingConfirmation.length,
       tone: "info",
       action: "rentals",

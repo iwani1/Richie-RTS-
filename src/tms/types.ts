@@ -352,14 +352,42 @@ export function emptyMaintenanceSettings(): MaintenanceSettings {
   return { schedules: [], blockOnOverdueService: false };
 }
 
-export const RENTAL_STATUSES = ["draft", "quoted", "confirmed", "in_progress", "completed", "declined", "cancelled"] as const;
+/**
+ * The stages of a rental request (RNT-02, D-120), in the order work happens.
+ *
+ * The three triage states — submitted, under review, awaiting quotation — record that the office has
+ * taken a request on and is checking it. They are optional: a quotation can be issued from any of
+ * them, so a small request is never held up by a step nobody needed.
+ *
+ * `dispatched` is a hire that has left the yard, and it is the moment D-118 records as the departure.
+ * There is no separate "in progress": one fact, one name.
+ */
+export const RENTAL_STATUSES = [
+  "draft",
+  "submitted",
+  "under_review",
+  "awaiting_quotation",
+  "quoted",
+  "accepted",
+  "confirmed",
+  "dispatched",
+  "completed",
+  "declined",
+  "cancelled",
+] as const;
 export type RentalStatus = (typeof RENTAL_STATUSES)[number];
 
 export const RENTAL_STATUS_LABELS: Record<RentalStatus, string> = {
   draft: "Draft",
-  quoted: "Quoted",
+  submitted: "Submitted",
+  under_review: "Under review",
+  awaiting_quotation: "Awaiting quotation",
+  // What the customer is holding is a quotation that has been sent. The stored value keeps its old
+  // name (`quoted`) so nothing has to be rewritten; the screen says what the document is.
+  quoted: "Quotation sent",
+  accepted: "Accepted, deposit due",
   confirmed: "Confirmed",
-  in_progress: "In progress",
+  dispatched: "Dispatched",
   completed: "Completed",
   declined: "Declined",
   cancelled: "Cancelled",
@@ -1382,7 +1410,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 35;
 
 /**
  * Every schema version this build can still read.
@@ -1392,7 +1420,7 @@ export const SCHEMA_VERSION = 34;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1491,6 +1519,19 @@ function legacyQuote(quote: Quote): Quote {
     terms: typeof raw.terms === "string" ? raw.terms : "",
     driverIncluded: raw.driverIncluded === true,
   };
+}
+
+/**
+ * A stored rental status, as this build names it.
+ *
+ * Only one word changed: `in_progress` became `dispatched` in schema 35, because a hire that has left
+ * the yard is the same fact the trip board calls a dispatch. Anything unrecognised falls back to
+ * `draft`, which is where an unpriced request belongs — a status this build cannot read would
+ * otherwise let a hire with a vehicle against it disappear from every list.
+ */
+function rentalStatus(value: unknown): RentalStatus {
+  if (value === "in_progress") return "dispatched";
+  return (RENTAL_STATUSES as readonly unknown[]).includes(value) ? (value as RentalStatus) : "draft";
 }
 
 /**
@@ -1619,6 +1660,11 @@ export function migrate(value: unknown): Database | null {
           // no plan: its times, stops, luggage and origin were never recorded, and filling them with
           // blanks dressed up as facts would read as "the customer asked for none" (D-119).
           plan: readLegacyPlan(rental.plan),
+          // RNT-02 (D-120): a hire on the road was called "in progress" before schema 35. It is the
+          // same fact as a trip that has been dispatched, so it takes that word — and the run's own
+          // departure time is the moment it happened (D-118). No status is invented for a record that
+          // has not reached it: a request written before the triage states existed sits in `draft`.
+          status: rentalStatus(rental.status),
           acceptance:
             rental.acceptance && typeof rental.acceptance.at === "string" && typeof rental.acceptance.quotedAt === "string"
               ? rental.acceptance

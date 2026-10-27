@@ -121,7 +121,8 @@ function coversDay(rental: Rental, day: string): boolean {
 const WORKED_TRIP = (trip: Trip) => trip.status === "in_progress" || trip.status === "completed";
 const BOOKED_TRIP = (trip: Trip) => trip.status === "planned" || trip.status === "dispatched";
 const HELD_TRIP = (trip: Trip) => WORKED_TRIP(trip) || BOOKED_TRIP(trip);
-const WORKED_RENTAL = (rental: Rental) => rental.status === "in_progress" || rental.status === "completed";
+// A hire that has left the yard is `dispatched` (D-120); "worked" is the same idea the trips use.
+const WORKED_RENTAL = (rental: Rental) => rental.status === "dispatched" || rental.status === "completed";
 const BOOKED_RENTAL = (rental: Rental) => rental.status === "confirmed";
 const HELD_RENTAL = (rental: Rental) => WORKED_RENTAL(rental) || BOOKED_RENTAL(rental);
 

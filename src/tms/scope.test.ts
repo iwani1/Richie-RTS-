@@ -635,7 +635,7 @@ describe("write scoping in the service layer", () => {
     expect(mine.ok).toBe(true);
     if (!mine.ok) return;
     expect(mine.db.rentals[0].acceptance).toMatchObject({ channel: "client_portal", byName: "Client One", total: 2000, note: "Confirmed with the office" });
-    expect(mine.db.rentals[0].status).toBe("quoted");
+    expect(mine.db.rentals[0].status).toBe("accepted");
 
     // Another customer's: refused, and the refusal says nothing about whose it is.
     const theirs = executeCommand(db, w.clientOne, { type: "accept_quotation", id: beta.id, note: "" }, NOW);

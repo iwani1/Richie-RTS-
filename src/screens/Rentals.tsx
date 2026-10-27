@@ -5,6 +5,7 @@ import { balanceLine, damageLine, distanceLine, rentalBalance, runLine, toLocalI
 import { acceptanceLine, acceptanceStateOf, canAcceptQuotation } from "../tms/acceptance";
 import { quotationHeading, quotationIsNumbered, validityLine } from "../tms/quotations";
 import { MAX_STOPS, planLine, SOURCE_LABELS, sourceLabel, stopsLine, tripContactLine } from "../tms/request";
+import { awaitingPrice, canEditRequest, isActiveRental, nextTriageStep, TRIAGE_ACTIONS } from "../tms/rentalWorkflow";
 import { readinessReport } from "../tms/maintenance";
 import { useTms } from "../tms/useTms";
 import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, REQUEST_SOURCES, type Rental, type RentalStatus } from "../tms/types";
@@ -16,9 +17,15 @@ type Errors = Record<string, string>;
 
 const statusTone: Record<RentalStatus, "neutral" | "info" | "success" | "warning" | "error"> = {
   draft: "neutral",
+  submitted: "neutral",
+  under_review: "info",
+  awaiting_quotation: "info",
   quoted: "info",
+  // Agreed and unpaid: the office's next move is a phone call about money, so it reads as a warning
+  // rather than as success. Nothing is green until the deposit is in.
+  accepted: "warning",
   confirmed: "success",
-  in_progress: "warning",
+  dispatched: "warning",
   completed: "success",
   declined: "error",
   cancelled: "error",
@@ -125,7 +132,7 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
 
       <TableCard
         title="Rental requests"
-        summary={`${rows.length} of ${db.rentals.length} shown · ${db.rentals.filter((r) => r.status === "draft" || r.status === "quoted").length} awaiting confirmation`}
+        summary={`${rows.length} of ${db.rentals.length} shown · ${db.rentals.filter((r) => awaitingPrice(r.status)).length} to price`}
         toolbar={
           <>
             <SearchInput placeholder="Search reference, customer, category" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search rentals" />
@@ -134,7 +141,7 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
               {RENTAL_STATUSES.map((s) => <option key={s} value={s}>{RENTAL_STATUS_LABELS[s]}</option>)}
             </Select>
             <p className="rts-filter-bar-note" role="status">
-              {db.rentals.filter((r) => r.status === "in_progress").length} on the road · {db.rentals.filter((r) => r.status === "completed").length} completed
+              {db.rentals.filter((r) => r.status === "dispatched").length} on the road · {db.rentals.filter((r) => r.status === "completed").length} completed
             </p>
           </>
         }
@@ -203,11 +210,22 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
   };
 
   const actions: React.ReactNode[] = [];
-  if (rental.status === "draft") {
+  // A request is corrected, moved along and priced only while nobody has a price in front of the
+  // customer (D-120). The triage states are optional, so the quotation button is offered in all of
+  // them: a small request never waits for a step nobody needed.
+  if (canEditRequest(rental.status)) {
     if (allowed("rentals:update")) actions.push(<Button key="edit" onClick={() => setPanel("edit")}>Edit request</Button>);
+    const next = nextTriageStep(rental.status);
+    if (next && allowed("rentals:update")) {
+      actions.push(
+        <Button key="advance" onClick={() => run(dispatch({ type: "advance_rental", id: rental.id, to: next }))}>
+          {TRIAGE_ACTIONS[next] ?? RENTAL_STATUS_LABELS[next]}
+        </Button>,
+      );
+    }
     if (allowed("rentals:quote")) actions.push(<Button key="quote" variant="primary" onClick={() => setPanel("quote")}>Issue quotation</Button>);
   }
-  if (rental.status === "quoted") {
+  if (rental.status === "quoted" || rental.status === "accepted") {
     if (expired && db.settings.rental.requotePolicy === "revise_in_place" && allowed("rentals:quote"))
       actions.push(<Button key="requote" variant="primary" onClick={() => setPanel("requote")}>Renew quotation</Button>);
     // RNT-05, D-116: most customers agree on the phone, so the office can write the yes down. The
@@ -221,25 +239,28 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
   }
   if (rental.status === "confirmed") {
     if (allowed("rentals:dispatch")) actions.push(<Button key="assign" onClick={() => setPanel("assign")}>{rental.assignedVehicleId ? "Reassign" : "Assign resources"}</Button>);
-    if (allowed("rentals:dispatch")) actions.push(<Button key="start" variant="primary" disabled={!rental.assignedVehicleId || (needsDriver && !rental.assignedDriverId)} onClick={() => run(dispatch({ type: "start_rental", id: rental.id }))}>Start trip</Button>);
+    // Dispatch is the moment the vehicle leaves, which is also the departure D-118 records on the run.
+    if (allowed("rentals:dispatch")) actions.push(<Button key="start" variant="primary" disabled={!rental.assignedVehicleId || (needsDriver && !rental.assignedDriverId)} onClick={() => run(dispatch({ type: "start_rental", id: rental.id }))}>Dispatch vehicle</Button>);
   }
-  if (rental.status === "in_progress") {
+  if (rental.status === "dispatched") {
     if (allowed("rentals:dispatch")) actions.push(<Button key="assign" onClick={() => setPanel("assign")}>Reassign</Button>);
     if (allowed("rentals:complete")) actions.push(<Button key="complete" variant="primary" onClick={() => setPanel("complete")}>Complete & bill</Button>);
   }
-  if (allowed("rentals:cancel") && ["draft", "quoted", "confirmed", "in_progress"].includes(rental.status)) {
+  if (allowed("rentals:cancel") && ["draft", "submitted", "under_review", "awaiting_quotation", "quoted", "accepted", "confirmed", "dispatched"].includes(rental.status)) {
     actions.push(<Button key="cancel" variant="danger" onClick={() => setPanel("cancel")}>Cancel</Button>);
   }
 
-  const steps: { key: RentalStatus; label: string }[] = [
-    { key: "draft", label: "Request" },
-    { key: "quoted", label: "Quoted" },
-    { key: "confirmed", label: "Confirmed" },
-    { key: "in_progress", label: "In progress" },
-    { key: "completed", label: "Completed" },
+  // The strip follows the work, not the table: the triage states share one step, because to the office
+  // they are one thing ("we are working on it") until there is a price to send (D-120).
+  const steps: { key: string; label: string; statuses: RentalStatus[] }[] = [
+    { key: "request", label: "Request", statuses: ["draft", "submitted", "under_review", "awaiting_quotation"] },
+    { key: "quoted", label: "Quotation sent", statuses: ["quoted"] },
+    { key: "accepted", label: "Accepted", statuses: ["accepted"] },
+    { key: "confirmed", label: "Confirmed", statuses: ["confirmed"] },
+    { key: "dispatched", label: "Dispatched", statuses: ["dispatched"] },
+    { key: "completed", label: "Completed", statuses: ["completed"] },
   ];
-  const order = steps.map((s) => s.key);
-  const currentIndex = order.indexOf(rental.status);
+  const currentIndex = steps.findIndex((step) => step.statuses.includes(rental.status));
 
   return (
     <div>
@@ -268,10 +289,10 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
         </ol>
       )}
 
-      {rental.status === "draft" && quoteMissing.length > 0 && (
+      {canEditRequest(rental.status) && quoteMissing.length > 0 && (
         <Notice tone="warning" title="Quotation is blocked" className="mb-4">An administrator must set: {quoteMissing.join(", ")} (Settings &rarr; Bus rentals).</Notice>
       )}
-      {expired && rental.status === "quoted" && (
+      {expired && (rental.status === "quoted" || rental.status === "accepted") && (
         <Notice tone="warning" title="Quotation expired" className="mb-4">
           {db.settings.rental.requotePolicy === null
             ? "The validity date has passed. Management must set the expired-quotation policy in Settings before this request can be renewed."
@@ -379,7 +400,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
           </Card>
         )}
 
-        {(rental.assignedVehicleId || rental.status === "confirmed" || rental.status === "in_progress") && (
+        {(rental.assignedVehicleId || isActiveRental(rental.status)) && (
           <Card title="Assigned resources">
             <dl className="grid grid-cols-[130px_1fr] gap-y-2 text-sm">
               <dt className="text-stone-500">Vehicle</dt><dd className="text-stone-800">{vehicle ? `${vehicle.registration}` : <span className="text-stone-400">Not assigned</span>}</dd>
@@ -390,7 +411,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
 
         {/* D-118: what actually happened on the road, beside what it cost. The journey is not a
             field of the money, and a hire with nothing recorded says so rather than showing blanks. */}
-        {(rental.run || rental.status === "completed" || rental.status === "in_progress") && (
+        {(rental.run || rental.status === "completed" || rental.status === "dispatched") && (
           <Card title="What happened" className="lg:col-span-2">
             <p className="text-sm text-stone-800">{runLine(rental.run)}</p>
             <dl className="mt-3 grid grid-cols-[170px_1fr] gap-y-2 text-sm">

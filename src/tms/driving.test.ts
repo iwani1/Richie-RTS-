@@ -254,7 +254,7 @@ describe("what a driver is doing today (FLT-04)", () => {
         vehicleCategoryId: "cat-coach",
         driverRequired: true,
         notes: "",
-        status: "in_progress",
+        status: "dispatched",
         quote: null,
         quoteHistory: [],
   acceptance: null,

@@ -15,6 +15,7 @@
 // cannot see and plans on what is on file: capacity, category, availability, the pair's existing
 // commitments that day, papers, licence and service intervals.
 import { seatsHeld } from "./bookings";
+import { isActiveRental } from "./rentalWorkflow";
 import { assessResources, rosterCount, toMinutes, tripWindow } from "./busing";
 import { overdueServiceFor } from "./maintenance";
 import type { BusRoute, Database, Driver, Trip, Vehicle } from "./types";
@@ -90,7 +91,7 @@ function loadThatDay(db: Database, serviceDate: string, vehicleId: string, drive
   );
   const hires = db.rentals.filter(
     (rental) =>
-      (rental.status === "confirmed" || rental.status === "in_progress") &&
+      isActiveRental(rental.status) &&
       rental.startDate <= serviceDate &&
       serviceDate <= rental.endDate,
   );

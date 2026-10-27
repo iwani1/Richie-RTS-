@@ -4,6 +4,7 @@
 // enforces the trip state machine and writes an audit entry.
 
 import { manifestAtStop, manifestFor, seatsHeld } from "./bookings";
+import { isActiveRental } from "./rentalWorkflow";
 import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
 import { overdueServiceFor } from "./maintenance";
 import { audit, authorise, fail, isValidDate, makeId, norm, TIME_RE, type Actor, type CommandResult, type Errors } from "./service";
@@ -488,7 +489,7 @@ export function assessResources(db: Database, route: BusRoute, trip: Trip, vehic
   }
 
   for (const rental of db.rentals) {
-    if (rental.status !== "confirmed" && rental.status !== "in_progress") continue;
+    if (!isActiveRental(rental.status)) continue;
     if (trip.serviceDate < rental.startDate || trip.serviceDate > rental.endDate) continue;
     if (rental.assignedVehicleId === vehicleId) errors.vehicleId = `Vehicle is assigned to rental ${rental.reference} on this date.`;
     if (rental.assignedDriverId === driverId) errors.driverId = `Driver is assigned to rental ${rental.reference} on this date.`;

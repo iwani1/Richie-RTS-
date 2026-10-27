@@ -31,6 +31,11 @@ is no other company in the database.
   finance or an administrator), or by the customer itself in the portal on its own request. It records
   what was agreed and through which channel; it takes no money and confirms nothing. Agreeing to a
   price and paying the deposit are separate acts, and the second one still belongs to finance.
+- **Moving a request along** is one button that names the next stage: take it on, start the review,
+  ready to be priced. A request may be priced at any of those stages, so the steps are there for the
+  ones that need looking at, not as paperwork. Once a price exists the request cannot be edited; if the
+  customer agrees, it becomes **Accepted, deposit due** until finance records the deposit, and the
+  vehicle is only held from **Confirmed** onwards.
 - **Taking a request** records the journey the customer asks for, not only the dates: the times, the
   stops on the way, luggage, special needs, who to ring on the day, and how the enquiry arrived. A
   one-day hire whose return time is before its departure time is refused, because one of the two is a

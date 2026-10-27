@@ -129,7 +129,7 @@ export interface FleetStateReading {
 }
 
 const WORKING_TRIP_STATUSES: readonly Trip["status"][] = ["planned", "dispatched", "in_progress"];
-const WORKING_RENTAL_STATUSES: readonly Rental["status"][] = ["confirmed", "in_progress"];
+const WORKING_RENTAL_STATUSES: readonly Rental["status"][] = ["confirmed", "dispatched"];
 const ACTIVE_WORK_ORDER_STATUSES = ["open", "in_progress", "on_hold"] as const;
 
 const routeOf = (db: Database, trip: Trip): BusRoute | undefined => db.routes.find((route) => route.id === trip.routeId);
@@ -167,7 +167,7 @@ function commitmentOf(db: Database, vehicleId: string, onDate: string): { level:
         candidate.startDate <= onDate &&
         onDate <= candidate.endDate,
     )
-    .sort((a, b) => (a.status === "in_progress" ? -1 : b.status === "in_progress" ? 1 : 0))[0];
+    .sort((a, b) => (a.status === "dispatched" ? -1 : b.status === "dispatched" ? 1 : 0))[0];
 
   const group: { level: FleetState; text: string; reference: string }[] = trips.map((trip) => {
     if (trip.status === "in_progress")
@@ -186,8 +186,8 @@ function commitmentOf(db: Database, vehicleId: string, onDate: string): { level:
   if (rental) {
     const text = `${rental.reference} (${rental.customerName}, ${hireSpan(rental)})`;
     group.push({
-      level: rental.status === "in_progress" ? "on_trip" : rental.startDate < onDate || rental.startDate === onDate ? "assigned" : "reserved",
-      text: rental.status === "in_progress" ? `hire ${text} is under way` : rental.startDate === onDate ? `hire ${text} starts today` : `hire ${text}`,
+      level: rental.status === "dispatched" ? "on_trip" : rental.startDate < onDate || rental.startDate === onDate ? "assigned" : "reserved",
+      text: rental.status === "dispatched" ? `hire ${text} is under way` : rental.startDate === onDate ? `hire ${text} starts today` : `hire ${text}`,
       reference: rental.reference,
     });
   }

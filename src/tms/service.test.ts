@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { can, ROLE_PERMISSIONS } from "./permissions";
 import { executeCommand } from "./commands";
 import { execute, VEHICLE_TRANSITIONS, type Actor, type Credential } from "./service";
-import { emptyDatabase, SCHEMA_VERSION, type Database } from "./types";
+import { emptyDatabase, migrate, SCHEMA_VERSION, type Database } from "./types";
 import { balanceLine, rentalBalance } from "./run";
 
 const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
@@ -399,7 +399,7 @@ describe("rentals - full lifecycle", () => {
     const start = execute(db, admin, { type: "start_rental", id }, "2026-03-01T07:00:00.000Z");
     if (!start.ok) throw new Error(start.message);
     db = start.db;
-    expect(db.rentals[0].status).toBe("in_progress");
+    expect(db.rentals[0].status).toBe("dispatched");
 
     // It came back two days after it left; completing it before it started is a mistake, not a fact.
     const complete = execute(db, admin, {
@@ -914,8 +914,9 @@ describe("a customer accepting a quotation (RNT-05, D-116)", () => {
       note: "Agreed on the phone",
     });
     expect(acceptance?.quotedAt).toBe(result.db.rentals[0].quote?.quotedAt);
-    // Agreeing is not paying: the status moves only when the deposit is recorded.
-    expect(result.db.rentals[0].status).toBe("quoted");
+    // Agreeing is not paying: the hire is `accepted` — agreed, with the deposit still to come — and
+    // it is the deposit that confirms it (D-120).
+    expect(result.db.rentals[0].status).toBe("accepted");
     expect(result.message).toBe("RR-0001: the quotation of GHS 3000.00 is accepted.");
     // And it is in the audit trail, in the customer's own terms.
     // The audit log reads newest first.
@@ -974,7 +975,7 @@ describe("a customer accepting a quotation (RNT-05, D-116)", () => {
 
   it("leaves an older backup with no acceptance, rather than inventing one", () => {
     // Schema 31 is readable: a record written before acceptance existed loads with none.
-    expect(SCHEMA_VERSION).toBe(34);
+    expect(SCHEMA_VERSION).toBe(35);
   });
 });
 
@@ -1197,7 +1198,7 @@ describe("what actually happened on a hire (RNT-07, D-118)", () => {
     expect(twoAnswers.ok).toBe(false);
     if (!twoAnswers.ok) expect(twoAnswers.errors.distanceKm).toBe("The odometer readings give 184 km. Remove the typed distance, or correct a reading.");
     // Neither refusal moved the hire: it is still on the road.
-    expect(w.db.rentals[0].status).toBe("in_progress");
+    expect(w.db.rentals[0].status).toBe("dispatched");
   });
 
   it("shows what the hire cost and what is still owed against it", () => {
@@ -1316,5 +1317,145 @@ describe("the journey a customer asked for (RNT-01, D-119)", () => {
     if (!edited.ok) return;
     expect(edited.db.rentals[0].purpose).toBe("Board meeting");
     expect(edited.db.rentals[0].plan).toMatchObject({ stops: ["Achimota"], source: "walk_in" });
+  });
+});
+
+describe("the pipeline a request goes through (RNT-02, D-120)", () => {
+  const admin0 = (db: Database): Actor => ({ id: db.users[0].id, fullName: db.users[0].fullName, role: "administrator" });
+
+  /** A request, quoted, on a live quotation. */
+  function quoted() {
+    const base = rentalReady();
+    const created = execute(base.db, base.admin, requestInput(base.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const quote = execute(created.db, base.admin, { type: "quote_rental", id, input: { lines: [{ description: "3 days hire", quantity: "3", unitAmount: "1000" }] } }, NOW);
+    if (!quote.ok) throw new Error(quote.message);
+    return { ...base, db: quote.db, id };
+  }
+
+  it("walks a request through submitted, under review and awaiting quotation", () => {
+    const w = rentalReady();
+    const created = execute(w.db, w.admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    expect(created.db.rentals[0].status).toBe("draft");
+
+    let db = created.db;
+    for (const [to, message] of [
+      ["submitted", "RR-0001 is now submitted. Next: under review."],
+      ["under_review", "RR-0001 is now under review. Next: awaiting quotation."],
+      ["awaiting_quotation", "RR-0001 is now awaiting quotation."],
+    ] as const) {
+      const step = execute(db, admin0(db), { type: "advance_rental", id, to }, NOW);
+      expect(step.ok).toBe(true);
+      if (!step.ok) return;
+      expect(step.message).toBe(message);
+      expect(step.db.rentals[0].status).toBe(to);
+      db = step.db;
+    }
+    // Every step is in the audit trail, with the words the office saw.
+    expect(db.audit.filter((entry) => entry.action === "rentals:advance")).toHaveLength(3);
+    expect(db.audit[0].summary).toBe("RR-0001 moved to Awaiting quotation.");
+  });
+
+  it("refuses a skipped stage and a step backwards", () => {
+    const w = rentalReady();
+    const created = execute(w.db, w.admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+
+    const skipped = execute(created.db, w.admin, { type: "advance_rental", id, to: "awaiting_quotation" }, NOW);
+    expect(skipped.ok).toBe(false);
+    if (!skipped.ok) expect(skipped.message).toBe("A rental cannot move from Draft to Awaiting quotation.");
+    expect(created.db.rentals[0].status).toBe("draft");
+
+    const submitted = execute(created.db, w.admin, { type: "advance_rental", id, to: "submitted" }, NOW);
+    if (!submitted.ok) throw new Error(submitted.message);
+    const back = execute(submitted.db, w.admin, { type: "advance_rental", id, to: "draft" }, NOW);
+    expect(back.ok).toBe(false);
+    if (!back.ok) expect(back.message).toBe("That is not a step of the request pipeline.");
+  });
+
+  it("lets a small request be priced without walking the stages at all", () => {
+    const w = rentalReady();
+    const created = execute(w.db, w.admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const submitted = execute(created.db, w.admin, { type: "advance_rental", id, to: "submitted" }, NOW);
+    if (!submitted.ok) throw new Error(submitted.message);
+    // Straight from submitted to a quotation: the triage stages never block the work.
+    const quotedNow = execute(submitted.db, w.admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "500" }] } }, NOW);
+    expect(quotedNow.ok).toBe(true);
+    if (quotedNow.ok) expect(quotedNow.db.rentals[0].status).toBe("quoted");
+  });
+
+  it("allows a correction while a request is being looked at, and not after it is priced", () => {
+    const w = rentalReady();
+    const created = execute(w.db, w.admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const review = execute(created.db, w.admin, { type: "advance_rental", id, to: "submitted" }, NOW);
+    if (!review.ok) throw new Error(review.message);
+    const edited = execute(review.db, w.admin, { type: "update_rental", id, input: { ...requestInput(w.catId, "2026-03-01", "2026-03-03").input, purpose: "Board meeting" } }, NOW);
+    expect(edited.ok).toBe(true);
+    if (edited.ok) expect(edited.db.rentals[0].purpose).toBe("Board meeting");
+
+    const w2 = quoted();
+    const tooLate = execute(w2.db, w2.admin, { type: "update_rental", id: w2.id, input: requestInput(w2.catId, "2026-03-01", "2026-03-03").input }, NOW);
+    expect(tooLate.ok).toBe(false);
+    if (!tooLate.ok) expect(tooLate.message).toBe("Only a request that has not been priced yet can be edited. Changes after the quotation has gone out are not permitted.");
+  });
+
+  it("records the customer's yes as its own stage, and confirms from it", () => {
+    const w = quoted();
+    const accepted = execute(w.db, w.finance, { type: "accept_quotation", id: w.id, note: "Agreed on the phone" }, NOW);
+    if (!accepted.ok) throw new Error(accepted.message);
+    expect(accepted.db.rentals[0].status).toBe("accepted");
+
+    // The deposit is what confirms the hire, and it can be recorded straight from the agreed stage.
+    const confirmed = execute(accepted.db, w.finance, { type: "confirm_rental", id: w.id, input: { amount: "750", method: "Bank transfer", reference: "SLIP-1" } }, NOW);
+    expect(confirmed.ok).toBe(true);
+    if (confirmed.ok) expect(confirmed.db.rentals[0].status).toBe("confirmed");
+  });
+
+  it("returns an agreed hire to waiting when the price is renewed", () => {
+    const base = rentalReady();
+    const settings = execute(base.db, base.admin, { type: "update_settings", input: { ...base.db.settings, rental: { ...base.db.settings.rental, requotePolicy: "revise_in_place" } } }, NOW);
+    if (!settings.ok) throw new Error(settings.message);
+    const created = execute(settings.db, base.admin, requestInput(base.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const first = execute(created.db, base.admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "2", unitAmount: "500" }] } }, NOW);
+    if (!first.ok) throw new Error(first.message);
+    const accepted = execute(first.db, base.finance, { type: "accept_quotation", id, note: "" }, NOW);
+    if (!accepted.ok) throw new Error(accepted.message);
+    expect(accepted.db.rentals[0].status).toBe("accepted");
+
+    // Long after the price stopped holding, management renews it.
+    const renewed = execute(accepted.db, base.admin, { type: "requote_rental", id, input: { lines: [{ description: "Hire revised", quantity: "2", unitAmount: "700" }] } }, "2026-02-10T00:00:00.000Z");
+    expect(renewed.ok).toBe(true);
+    if (!renewed.ok) return;
+    // The new figure is not what the customer agreed to, so the hire waits on them again — and the
+    // acceptance stays on the record, referring to the old quotation.
+    expect(renewed.db.rentals[0].status).toBe("quoted");
+    expect(renewed.db.rentals[0].acceptance).not.toBeNull();
+    expect(renewed.db.rentals[0].quote?.revision).toBe(2);
+  });
+
+  it("keeps an older backup's on-the-road hire, under the word this build uses", () => {
+    const w = quoted();
+    const dispatched = execute(w.db, w.finance, { type: "confirm_rental", id: w.id, input: { amount: "750", method: "Bank transfer", reference: "" } }, NOW);
+    if (!dispatched.ok) throw new Error(dispatched.message);
+    // A backup written at schema 34 has the old word for the same fact.
+    const legacy = { ...dispatched.db, schemaVersion: 34, rentals: dispatched.db.rentals.map((rental) => ({ ...rental, status: "in_progress" })) };
+    const migrated = migrate(legacy);
+    expect(migrated).not.toBeNull();
+    expect(migrated!.rentals[0].status).toBe("dispatched");
+    expect(migrated!.schemaVersion).toBe(SCHEMA_VERSION);
+
+    // A status this build cannot read falls back to Draft rather than leaving a hire in no list at all.
+    const unknown = migrate({ ...legacy, rentals: dispatched.db.rentals.map((rental) => ({ ...rental, status: "ghosted" })) });
+    expect(unknown!.rentals[0].status).toBe("draft");
   });
 });

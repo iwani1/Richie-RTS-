@@ -52,9 +52,13 @@ const TRIP_TONE = {
 
 const RENTAL_TONE: Record<RentalStatus, "info" | "warning" | "success" | "neutral" | "error"> = {
   draft: "neutral",
+  submitted: "neutral",
+  under_review: "info",
+  awaiting_quotation: "info",
   quoted: "info",
+  accepted: "warning",
   confirmed: "success",
-  in_progress: "warning",
+  dispatched: "warning",
   completed: "success",
   declined: "error",
   cancelled: "error",

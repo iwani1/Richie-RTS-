@@ -253,11 +253,11 @@ describe("what a confirmed hire is doing with it", () => {
     expect(nextCommitmentOf(db, "v1", DAY)).toBe(null);
   });
 
-  it("is Assigned on the day the hire starts, and On trip once it is under way", () => {
+  it("is Assigned on the day the hire starts, and On trip once it is dispatched", () => {
     const starting = build({ rentals: [rental("1", { reference: "RR-0007" })] });
     expect(fleetStateOf(starting, "v1", DAY)?.state).toBe("assigned");
 
-    const underWay = build({ rentals: [rental("1", { reference: "RR-0007", status: "in_progress" })] });
+    const underWay = build({ rentals: [rental("1", { reference: "RR-0007", status: "dispatched" })] });
     expect(fleetStateOf(underWay, "v1", DAY)?.state).toBe("on_trip");
   });
 

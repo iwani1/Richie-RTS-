@@ -54,7 +54,7 @@ The owner approved a definition in Q-29 (D-78), so the figure is no longer "unkn
     utilisation = committed vehicle-days ÷ available vehicle-days
 
 - **Committed vehicle-days**: days in the period on which a vehicle was committed to work — a rental
-  that held it (confirmed, in progress or completed, with a vehicle assigned) or a scheduled staff run
+  that held it (confirmed, dispatched or completed, with a vehicle assigned) or a scheduled staff run
   that has not been cancelled (planned, dispatched, in progress or completed, with a vehicle assigned).
 - **Available vehicle-days**: the acting fleet (vehicles not `retired`) × days in the period.
 - **Consequence of the definition**: a day counts once per vehicle, so two rentals of the same vehicle
@@ -220,7 +220,7 @@ The period is inclusive of both dates, by calendar day (Africa/Accra, no dayligh
 |---|---|---|
 | Enquiries | count of rentals | `rental.created_at` inside the period. Every request counts, whatever its current status |
 | Quotations issued | count of rentals with a quotation | `rental.quote.quotedAt` inside the period; the latest quotation counts once, revisions do not inflate the count |
-| Accepted | quotations whose rental is `confirmed`, `in_progress` or `completed` | Quoted in the period |
+| Accepted | quotations whose rental is `accepted`, `confirmed`, `dispatched` or `completed` | Quoted in the period |
 | Declined | quotations whose rental is `declined` | Quoted in the period |
 | Cancelled | rentals cancelled in the period | `updatedAt` inside the period, status `cancelled` |
 | Acceptance rate | accepted ÷ quotations issued | Null when nothing was quoted. Shown as "Not available", never 0% |
@@ -228,7 +228,7 @@ The period is inclusive of both dates, by calendar day (Africa/Accra, no dayligh
 | Received | sum of `payment.amount` | Payments whose `paidOn` is in the period, whatever the invoice date |
 | Credited | sum of `creditNote.total` | Credit notes issued in the period, excluding `void` (D-86) |
 | Outstanding | sum of (invoice total − recorded payments − issued credit notes), floored at zero | Non-void invoices issued on or before the period end, including earlier periods, because money owed is a running balance. Same helper as the finance report |
-| Rental vehicle-days | count of days in the period on which a rental holds a vehicle | Rentals with status `confirmed`, `in_progress` or `completed` **and** an assigned vehicle, overlapping the day |
+| Rental vehicle-days | count of days in the period on which a rental holds a vehicle | Rentals with status `confirmed`, `dispatched` or `completed` **and** an assigned vehicle, overlapping the day |
 | Available vehicle-days | vehicles in the fleet excluding `retired` × days in the period | The acting fleet, not the fleet as it was on each day — a limitation stated on screen |
 | Utilisation | rental vehicle-days ÷ available vehicle-days | Null when the period has no days or no vehicles. Can be 0%. Does not include staff-busing trips, which have their own occupancy measure in the staff transport report (RPT-02) |
 | Reasons | count by `resolutionReason` | Cancelled and declined rentals in the period; a missing reason is reported as "No reason recorded", never dropped |

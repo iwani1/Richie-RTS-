@@ -13,6 +13,7 @@
 // recorded cannot be shown to hold the one required, so the assignment is refused with the fix
 // named. That is the difference between "we checked and it is fine" and "we cannot check".
 import type { Database, Driver } from "./types";
+import { isActiveRental } from "./rentalWorkflow";
 
 export const DRIVING_LIMITS = {
   /** Longest licence-class token accepted, e.g. "C1E". */
@@ -107,7 +108,7 @@ export function driverAvailabilityLine(db: Database, driverId: string, today: st
   const hire = db.rentals.find(
     (candidate) =>
       candidate.assignedDriverId === driverId &&
-      (candidate.status === "confirmed" || candidate.status === "in_progress") &&
+      isActiveRental(candidate.status) &&
       candidate.startDate <= today &&
       today <= candidate.endDate,
   );

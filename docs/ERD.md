@@ -347,7 +347,7 @@ ALTER TABLE rental ADD CONSTRAINT rental_vehicle_no_overlap
   EXCLUDE USING gist (
     vehicle_id WITH =,
     daterange(start_date, end_date, '[]') WITH &&
-  ) WHERE (status IN ('confirmed', 'in_progress') AND vehicle_id IS NOT NULL);
+  ) WHERE (status IN ('confirmed', 'dispatched') AND vehicle_id IS NOT NULL);
 ```
 
 Cross-module clashes (a vehicle on a rental and a trip on the same day) cannot be expressed as one constraint across two tables. The recommended design is a `resource_reservation` table (`resource_id`, `resource_type`, `during tsrange`, `source`) with one exclusion constraint per resource type. Both trips and rentals would write to it.

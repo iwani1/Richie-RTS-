@@ -293,7 +293,7 @@ async function main() {
   ok(byRental(db).assignedVehicleId === vehicleId, "vehicle assigned");
   // RNT-07, D-118: the odometer read out as it leaves, which is what makes the distance a measurement.
   db = await command("start_rental", { id: rentalId, odometerKm: "48000" });
-  ok(byRental(db).status === "in_progress", "rental started");
+  ok(byRental(db).status === "dispatched", "the hire is dispatched once the vehicle leaves");
   db = await command("complete_rental", {
     id: rentalId,
     input: {

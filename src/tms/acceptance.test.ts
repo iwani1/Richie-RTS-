@@ -103,7 +103,9 @@ describe("recording a customer's acceptance", () => {
     for (const status of ["confirmed", "completed", "declined", "cancelled"] as const) {
       expect(canAcceptQuotation(rental({ status }), TODAY).status).toBeTruthy();
     }
-    expect(canAcceptQuotation(rental({ status: "in_progress" }), TODAY).status).toMatch(/already agreed and is under way/);
+    expect(canAcceptQuotation(rental({ status: "dispatched" }), TODAY).status).toMatch(/already agreed and is under way/);
+    // A hire the customer has already agreed to waits on the deposit, not on another yes (D-120).
+    expect(canAcceptQuotation(rental({ status: "accepted" }), TODAY).acceptance).toMatch(/already agreed to this quotation/);
   });
 
   it("keeps a yes to the figure it was given to when the quotation is replaced", () => {

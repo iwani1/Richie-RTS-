@@ -39,7 +39,7 @@ One record per significant choice. Newest at the bottom.
 
 ## D-08 (Phase 1B) Rental state machine + double-booking prevention
 
-- **Decision.** One `Rental` aggregate carries the lifecycle `draft -> quoted -> confirmed -> in_progress -> completed`, with `declined`/`cancelled` branches. Transitions are a table (`RENTAL_TRANSITIONS`) enforced in the service, each guarded by a permission. Resource assignment checks vehicle category match, vehicle/driver availability, driver licence expiry vs rental end date, and **rejects assigning a vehicle or driver already booked on a confirmed/in-progress rental with overlapping dates** — the in-code equivalent of the btree_gist exclusion constraints named in Phase 0 section 5.1 (which cannot run here without PostgreSQL, D-01).
+- **Decision.** One `Rental` aggregate carries the lifecycle, with `declined`/`cancelled` branches. The shape at the time of this decision was `draft -> quoted -> confirmed -> in_progress -> completed`; **D-120 superseded the names and added the stages**, so read the pipeline from `src/tms/rentalWorkflow.ts`. Transitions are a table (`RENTAL_TRANSITIONS`) enforced in the service, each guarded by a permission. Resource assignment checks vehicle category match, vehicle/driver availability, driver licence expiry vs rental end date, and **rejects assigning a vehicle or driver already booked on a confirmed/in-progress rental with overlapping dates** — the in-code equivalent of the btree_gist exclusion constraints named in Phase 0 section 5.1 (which cannot run here without PostgreSQL, D-01).
 - **Note.** Editing is restricted to `draft`; re-quoting in place is not yet supported (cancel and re-raise). Logged for a later phase.
 
 ## D-09 (Phase 1B) Schema migration 1 -> 2
@@ -2821,3 +2821,61 @@ morning, are what that gap costs.
   request form and the matching rows on the request card, and 30 new tests — the suite moves from
   1,195 to 1,225. **Still open:** the customer's own portal form asks only for the basics, so a
   portal-raised request records `source: portal` and nothing else about its journey (RNT-09).
+
+## D-120 - A request has stages, and each stage is a fact somebody can act on (RNT-02)
+
+The request had one state before a price (`draft`) and one after it (`quoted`), so a desk with ten
+enquiries could not tell "nobody has looked at this" from "we are waiting on a vehicle check" from
+"this is priced and the customer has gone quiet". The brief asked for a longer pipeline: submitted,
+under review, awaiting quotation, quotation sent, awaiting the customer's confirmation, confirmed,
+dispatched, in progress.
+
+Adding nine words to a screen is easy. Adding nine *states* is only worth doing where each one changes
+what the office does next, and where the program can tell it is true rather than hoping somebody
+remembers to press a button. That is the test each stage had to pass.
+
+- **Decision 1: three triage stages, and skipping them is allowed.** `submitted` (we have taken the
+  request on), `under_review` (somebody is checking the vehicles, the driver's papers and the route)
+  and `awaiting_quotation` (checked, waiting for a price). One command, `advance_rental`, moves one
+  step forward; nothing can skip a stage or step back. **A quotation can still be issued from any of
+  them**, which is the honesty guard: a two-line request must never be held up by paperwork, and a
+  stage nobody needs is a stage nobody presses.
+- **Decision 2: "quotation sent" and "awaiting the customer's confirmation" are one state here.**
+  This program has no mail or SMS channel (RNT-05's standing limit), so a quotation cannot be "sent" at
+  one moment and "awaiting" at another: it is issued, and from then on the ball is with the customer.
+  The card shows whether they have answered, and D-116's acceptance record says who, when and to which
+  figure. Two states for one fact would have been a dashboard that lies.
+- **Decision 3: the customer's yes is a stage of its own.** `accepted` — agreed, deposit still to come
+  — is the state the business most wants to see at four in the afternoon, and until now it was
+  invisible: the hire sat in `quoted` with an acceptance buried in a card. Accepting a quotation moves
+  the request to `accepted`; the deposit still confirms it, and the deposit remains the only thing that
+  holds a vehicle.
+- **Decision 4: one fact, one name — `dispatched` replaces "in progress".** A hire that has left the
+  yard is dispatched, which is the word the trip board already uses for the same moment, and it is the
+  same instant the hire's run records as its departure (D-118). Keeping "in progress" beside it would
+  have meant two names for one fact, and two names is how records start disagreeing. Stored values were
+  rewritten rather than translated on the fly (migration `022`, schema **35**), so a query on the status
+  column cannot silently miss a hire that is out.
+- **Decision 5: a cancelled request is final.** `declined` (the customer said no) and `cancelled` (the
+  hire stopped after somebody took it on) have no moves out of them, and a cancellation still needs its
+  reason. A request that comes back to life is a new request with a new number.
+- **Decision 6: the table lives in one place.** `src/tms/rentalWorkflow.ts` holds the transitions, the
+  stages, and the two questions the screens ask — "does this hold a vehicle?" and "whose move is it?".
+  The service, the rentals screen, the dashboard and the client portal all read it, so the button a
+  screen offers is a move the service accepts.
+- **Decision 7: a correction is allowed until a price exists.** Editing was limited to `draft`, which
+  became wrong as soon as a request could sit in review for a day: corrections are most likely exactly
+  then. All four pre-quote states can be corrected; once a quotation is out, the price is a document.
+- **Decision 8: a renewed price puts the request back in the customer's hands.** If an agreed hire's
+  quotation is renewed, the hire returns to `quoted`: the acceptance on record refers to the old figure
+  and the screen says so (D-116). Carrying `accepted` across a price change would be an agreement
+  nobody gave to the new number.
+- **Consequence.** `src/tms/rentalWorkflow.ts`, eleven statuses in `RENTAL_STATUSES` with labels the
+  office reads (`quoted` prints as "Quotation sent", `accepted` as "Accepted, deposit due"),
+  `advance_rental` (permission `rentals:update`), `accept_quotation` writing `accepted`, `start_rental`
+  writing `dispatched`, schema **35** with `migrate()` and SQL migration `022` renaming the stored word,
+  the six-step progress strip and its one-button triage, the dashboard's "whose move is it" counts, and
+  19 new tests (`rentalWorkflow.test.ts`, the pipeline block in `service.test.ts`, the rentals flow in
+  `Rentals.test.tsx`) — the suite moves from 1,225 to 1,244. **Not built:** a "dispatched, not yet
+  started" state distinct from the hire itself, because the departure time already records that
+  moment; and nothing messages the customer at any stage — there is no channel to message them on.

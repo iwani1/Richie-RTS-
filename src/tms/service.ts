@@ -15,6 +15,10 @@ import { readVehicleDetail } from "./vehicles";
 import { buildAcceptance, canAcceptQuotation } from "./acceptance";
 import { QUOTATION_TERMS_LIMIT, quotationIsLive, validityEndsAt, validityProblem } from "./quotations";
 import { readRun, runLine } from "./run";
+import { ACTIVE_RENTAL_STATUSES, canEditRequest, canMoveRental, nextTriageStep, TRIAGE_STATUSES } from "./rentalWorkflow";
+
+// The pipeline lives in its own module so the screens and the service read one table (D-120).
+export { RENTAL_TRANSITIONS } from "./rentalWorkflow";
 import { readRequestDetails, type RentalPlanInput } from "./request";
 import { confinedClientId } from "./scope";
 import {
@@ -41,6 +45,7 @@ import {
   type Rental,
   type RentalRun,
   type RentalSettings,
+  RENTAL_STATUS_LABELS,
   type RentalStatus,
   type Role,
   ROLES,
@@ -211,6 +216,7 @@ export type Command =
   | { type: "create_rental"; input: RentalRequestInput }
   | { type: "submit_enquiry"; input: EnquiryInput }
   | { type: "update_rental"; id: string; input: RentalRequestInput }
+  | { type: "advance_rental"; id: string; to: RentalStatus }
   | { type: "quote_rental"; id: string; input: QuoteInput }
   | { type: "requote_rental"; id: string; input: QuoteInput }
   | { type: "accept_quotation"; id: string; note: string }
@@ -242,17 +248,6 @@ export const VEHICLE_TRANSITIONS: Record<VehicleStatus, readonly VehicleStatus[]
 };
 
 // Rental lifecycle: request -> quotation -> deposit/confirm -> assign -> trip -> final billing.
-export const RENTAL_TRANSITIONS: Record<RentalStatus, readonly RentalStatus[]> = {
-  draft: ["quoted", "cancelled"],
-  quoted: ["confirmed", "declined", "cancelled"],
-  confirmed: ["in_progress", "cancelled"],
-  in_progress: ["completed", "cancelled"],
-  completed: [],
-  declined: [],
-  cancelled: [],
-};
-
-const ACTIVE_RENTAL_STATUSES: readonly RentalStatus[] = ["confirmed", "in_progress"];
 
 const datesOverlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart <= bEnd && bStart <= aEnd;
 
@@ -1395,7 +1390,9 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (denied) return denied;
       const existing = db.rentals.find((r) => r.id === command.id);
       if (!existing) return fail("Rental not found.");
-      if (existing.status !== "draft") return fail("Only draft requests can be edited. Changes after quoting are not permitted in this phase.");
+      // A request may be corrected for as long as nobody has a price in front of the customer — which
+      // includes the triage states, where corrections are most likely (D-120).
+      if (!canEditRequest(existing.status)) return fail("Only a request that has not been priced yet can be edited. Changes after the quotation has gone out are not permitted.");
       const { errors, value } = validateRentalRequest(db, command.input, existing.id);
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
       const updated: Rental = { ...existing, ...value, updatedAt: now };
@@ -1408,12 +1405,41 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       return { ok: true, db: next, message: `Rental request ${updated.reference} updated.` };
     }
 
+    // The three states between "we have the request" and "we have a price for it" (D-120).
+    //
+    // One command moves one step forward, because the table is the thing being respected: nothing here
+    // can skip the middle or move a hire that has already been quoted back into triage. Issuing a
+    // quotation from any of these states stays possible, so a small request is never held up.
+    case "advance_rental": {
+      const denied = authorise(actor, "rentals:update");
+      if (denied) return denied;
+      const existing = db.rentals.find((r) => r.id === command.id);
+      if (!existing) return fail("Rental not found.");
+      if (!TRIAGE_STATUSES.includes(command.to)) return fail("That is not a step of the request pipeline.");
+      if (!canMoveRental(existing.status, command.to)) {
+        return fail(`A rental cannot move from ${RENTAL_STATUS_LABELS[existing.status]} to ${RENTAL_STATUS_LABELS[command.to]}.`);
+      }
+      const updated: Rental = { ...existing, status: command.to, updatedAt: now };
+      const next = audit({ ...db, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
+        action: "rentals:advance",
+        entity: "rental",
+        entityId: updated.id,
+        summary: `${updated.reference} moved to ${RENTAL_STATUS_LABELS[command.to]}.`,
+      }, now);
+      const following = nextTriageStep(command.to);
+      return {
+        ok: true,
+        db: next,
+        message: `${updated.reference} is now ${RENTAL_STATUS_LABELS[command.to].toLowerCase()}.${following ? ` Next: ${RENTAL_STATUS_LABELS[following].toLowerCase()}.` : ""}`,
+      };
+    }
+
     case "quote_rental": {
       const denied = authorise(actor, "rentals:quote");
       if (denied) return denied;
       const existing = db.rentals.find((r) => r.id === command.id);
       if (!existing) return fail("Rental not found.");
-      if (!RENTAL_TRANSITIONS[existing.status].includes("quoted")) return fail(`A quotation cannot be issued from status "${existing.status}".`);
+      if (!canMoveRental(existing.status, "quoted")) return fail(`A quotation cannot be issued from status "${RENTAL_STATUS_LABELS[existing.status]}".`);
       const built = buildQuote(db, actor!, command.input, now, existing, null);
       if (!built.ok) return built;
       const quote = built.quote;
@@ -1432,8 +1458,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (denied) return denied;
       const existing = db.rentals.find((r) => r.id === command.id);
       if (!existing) return fail("Rental not found.");
-      if (existing.status !== "quoted" || !existing.quote)
-        return fail("Only a quoted rental can be renewed. The request must remain in quoted status.");
+      if (!["quoted", "accepted"].includes(existing.status) || !existing.quote)
+        return fail("Only a request with a quotation out can be renewed.");
       if (quotationIsLive(existing.quote, now))
         return fail("This quotation has not expired yet. Renewal is available only after the validity date.");
       const policy = db.settings.rental.requotePolicy;
@@ -1450,6 +1476,10 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         ...existing,
         quoteHistory: [...(existing.quoteHistory ?? []), existing.quote],
         quote,
+        // A renewed price is a new document, so an accepted-but-unpaid hire goes back to waiting on
+        // the customer: the acceptance on the record still refers to the old figure and the screen
+        // says so (D-116's rule, now visible in the pipeline as well — D-120).
+        status: "quoted",
         updatedAt: now,
       };
       const currentRevision = quote.revision;
@@ -1466,8 +1496,9 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
     //
     // Two ways in, and the record says which: the customer's own contact pressing accept in the
     // portal, or the office writing down a yes that came by phone — the way most of this business
-    // actually agrees to a price. It is not the deposit: accepting a quotation changes no money and
-    // moves no status, so the rental stays `quoted` until somebody records the deposit.
+    // actually agrees to a price. It is not the deposit: accepting a quotation changes no money, and
+    // it moves the request to `accepted` — agreed, deposit still to come — where the office can see
+    // what is waiting on a payment rather than on a customer (D-120).
     case "accept_quotation": {
       const denied = authorise(actor, "rentals:accept");
       if (denied) return denied;
@@ -1490,7 +1521,9 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         command.note ?? "",
         now,
       );
-      const updated: Rental = { ...existing, acceptance, updatedAt: now };
+      // The customer's yes is a stage of its own (D-120): the price is agreed and the deposit is not
+      // in yet, which is exactly the hire somebody needs to chase this afternoon.
+      const updated: Rental = { ...existing, acceptance, status: "accepted", updatedAt: now };
       const next = audit({ ...db, rentals: db.rentals.map((rental) => (rental.id === updated.id ? updated : rental)) }, actor, {
         action: "rentals:accept",
         entity: "rental",
@@ -1511,7 +1544,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (denied) return denied;
       const existing = db.rentals.find((r) => r.id === command.id);
       if (!existing) return fail("Rental not found.");
-      if (!RENTAL_TRANSITIONS[existing.status].includes("confirmed")) return fail(`A rental cannot be confirmed from status "${existing.status}".`);
+      if (!canMoveRental(existing.status, "confirmed")) return fail(`A rental cannot be confirmed from status "${RENTAL_STATUS_LABELS[existing.status]}".`);
       if (!existing.quote) return fail("This rental has no quotation to confirm.");
       if (!quotationIsLive(existing.quote, now)) return fail("The quotation has expired. Issue a new quotation before confirming.");
       const errors: Errors = {};
@@ -1542,7 +1575,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (denied) return denied;
       const existing = db.rentals.find((r) => r.id === command.id);
       if (!existing) return fail("Rental not found.");
-      if (existing.status !== "confirmed" && existing.status !== "in_progress") return fail("Resources can only be assigned to confirmed or in-progress rentals.");
+      if (!ACTIVE_RENTAL_STATUSES.includes(existing.status)) return fail(`Resources can only be assigned to a confirmed or dispatched hire, and this one is ${RENTAL_STATUS_LABELS[existing.status].toLowerCase()}.`);
       const errors: Errors = {};
       const vehicle = db.vehicles.find((v) => v.id === command.input.vehicleId);
       if (!command.input.vehicleId) errors.vehicleId = "Select a vehicle.";
@@ -1626,7 +1659,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (denied) return denied;
       const existing = db.rentals.find((r) => r.id === command.id);
       if (!existing) return fail("Rental not found.");
-      if (!RENTAL_TRANSITIONS[existing.status].includes("in_progress")) return fail(`A rental cannot start from status "${existing.status}".`);
+      if (!canMoveRental(existing.status, "dispatched")) return fail(`A rental cannot be dispatched from status "${RENTAL_STATUS_LABELS[existing.status]}".`);
       if (!existing.assignedVehicleId) return fail("Assign a vehicle before starting the rental.");
       const needsDriver = existing.driverRequired || db.settings.rental.driversAlwaysIncluded === true;
       if (needsDriver && !existing.assignedDriverId) return fail("Assign a driver before starting the rental.");
@@ -1686,7 +1719,9 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
           createdBy: actor!.fullName,
         },
       ];
-      const updated: Rental = { ...existing, status: "in_progress", run, updatedAt: now };
+      // The hire is out: dispatched, the same fact the trip board records, with the departure time
+      // the run now carries (D-118, D-120).
+      const updated: Rental = { ...existing, status: "dispatched", run, updatedAt: now };
       const next = audit({ ...db, odometerReadings: readings, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
         action: "rentals:start",
         entity: "rental",
@@ -1701,7 +1736,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (denied) return denied;
       const existing = db.rentals.find((r) => r.id === command.id);
       if (!existing) return fail("Rental not found.");
-      if (!RENTAL_TRANSITIONS[existing.status].includes("completed")) return fail(`A rental cannot be completed from status "${existing.status}".`);
+      if (!canMoveRental(existing.status, "completed")) return fail(`A rental cannot be completed from status "${RENTAL_STATUS_LABELS[existing.status]}".`);
       const { errors, lines, subtotal } = validateQuoteLines(command.input);
       if (Object.keys(errors).length) return fail("Please correct the final invoice line items.", errors);
       const finalInvoice: FinalInvoice = {
@@ -1758,7 +1793,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (denied) return denied;
       const existing = db.rentals.find((r) => r.id === command.id);
       if (!existing) return fail("Rental not found.");
-      if (!RENTAL_TRANSITIONS[existing.status].includes(target)) return fail(`A rental cannot be ${target} from status "${existing.status}".`);
+      if (!canMoveRental(existing.status, target)) return fail(`A rental cannot be ${target} from status "${RENTAL_STATUS_LABELS[existing.status]}".`);
       if (!command.reason.trim()) return fail("A reason is required.", { reason: "Give a short reason." });
       const updated: Rental = { ...existing, status: target, resolutionReason: command.reason.trim(), updatedAt: now };
       const next = audit({ ...db, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {

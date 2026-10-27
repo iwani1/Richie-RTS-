@@ -75,9 +75,14 @@ export function daysInRange(from: string, to: string): string[] {
 }
 
 
+/** Hires that hold a vehicle: agreed and confirmed, out on the road, or already back. */
+const HELD_RENTAL_STATUSES: readonly Rental["status"][] = ["confirmed", "dispatched", "completed"];
+/** Hires the customer has agreed to, from the yes onwards (D-120). */
+const ACCEPTED_RENTAL_STATUSES: readonly Rental["status"][] = ["accepted", "confirmed", "dispatched", "completed"];
+
 /** Vehicle-days a rental commits inside the range. Only a committed rental occupies a vehicle. */
 function rentalVehicleDays(rental: Rental, days: string[]): number {
-  if (rental.status !== "confirmed" && rental.status !== "in_progress" && rental.status !== "completed") return 0;
+  if (!HELD_RENTAL_STATUSES.includes(rental.status)) return 0;
   if (!rental.assignedVehicleId) return 0;
   return days.filter((day) => day >= rental.startDate && day <= rental.endDate).length;
 }
@@ -89,7 +94,9 @@ export function rentalReport(db: Database, from: string, to: string): RentalRepo
   const requests = db.rentals.filter((rental) => inRange(ymd(rental.createdAt)));
   const quotations = db.rentals.filter((rental) => rental.quote !== null && inRange(ymd(rental.quote.quotedAt)));
   const replied = quotations.map((rental) => rental.status);
-  const accepted = replied.filter((status) => status === "confirmed" || status === "in_progress" || status === "completed").length;
+  // A hire the customer agreed to counts as accepted from the yes onwards, including while the
+  // deposit is still outstanding (D-120) — otherwise a busy week of agreements reads as no agreements.
+  const accepted = replied.filter((status) => ACCEPTED_RENTAL_STATUSES.includes(status)).length;
   const declined = replied.filter((status) => status === "declined").length;
   const cancelled = db.rentals.filter((rental) => rental.status === "cancelled" && inRange(ymd(rental.updatedAt))).length;
 
@@ -154,7 +161,7 @@ export function rentalReport(db: Database, from: string, to: string): RentalRepo
       rentalsInRange: requests.length,
       rentalsWithoutQuote: requests.filter((rental) => rental.quote === null).length,
       rentalsWithoutVehicle: db.rentals.filter(
-        (rental) => rental.status === "confirmed" || rental.status === "in_progress" || rental.status === "completed",
+        (rental) => HELD_RENTAL_STATUSES.includes(rental.status),
       ).filter((rental) => !rental.assignedVehicleId).length,
       invoicesWithoutCurrency: db.invoices.filter((invoice) => !invoice.currencyCode).length,
     },

@@ -230,7 +230,7 @@ describe("rental report (RPT-01)", () => {
   it("computes utilisation from committed rental vehicle-days and the acting fleet", () => {
     const db = world({
       rentals: [
-        rental({ id: "r1", status: "in_progress", quote: quoteAt("2026-06-02T10:00:00.000Z"), assignedVehicleId: "v1", startDate: "2026-06-02", endDate: "2026-06-04" }),
+        rental({ id: "r1", status: "dispatched", quote: quoteAt("2026-06-02T10:00:00.000Z"), assignedVehicleId: "v1", startDate: "2026-06-02", endDate: "2026-06-04" }),
         // A draft request reserves nothing, so it adds no vehicle-days.
         rental({ id: "r2", status: "draft", startDate: "2026-06-10", endDate: "2026-06-12" }),
       ],

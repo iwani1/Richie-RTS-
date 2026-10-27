@@ -91,6 +91,15 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     fireEvent.change(within(dialog).getByLabelText(/How did this request arrive/i), { target: { value: "phone" } });
     fireEvent.click(within(dialog).getByRole("button", { name: /Save request/i }));
 
+    // The request goes through the office's own stages before it is priced (RNT-02, D-120). Each
+    // button names the next step, and the strip on the record follows without anybody reloading.
+    fireEvent.click(await screen.findByRole("button", { name: /Take this request on/i }));
+    await screen.findByText(/is now submitted/i);
+    fireEvent.click(await screen.findByRole("button", { name: /Start the review/i }));
+    await screen.findByText(/is now under review/i);
+    fireEvent.click(await screen.findByRole("button", { name: /Ready to be priced/i }));
+    await screen.findByText(/is now awaiting quotation/i);
+
     // Detail view opens on RR-0001, and the journey is on it rather than only in the desk's head.
     await screen.findByText(/Rental RR-0001/i);
     expect(screen.getByText(/Leaves at 08:00/)).toBeTruthy();
@@ -126,7 +135,7 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     await screen.findByText(/Resources assigned/i);
 
     // Start then complete, recording the journey as well as the charges (RNT-07, D-118).
-    fireEvent.click(screen.getByRole("button", { name: /Start trip/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Dispatch vehicle/i }));
     fireEvent.click(await screen.findByRole("button", { name: /Complete & bill/i }));
     dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/Odometer at departure/i), { target: { value: "48000" } });

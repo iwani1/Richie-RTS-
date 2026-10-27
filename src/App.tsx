@@ -21,6 +21,7 @@ import { ClientPortalPage } from "./screens/ClientPortal";
 import { PassengerPortalPage } from "./screens/PassengerPortal";
 import { DriverPortalPage } from "./screens/DriverPortal";
 import { isRecordBound } from "./tms/permissions";
+import { awaitingPrice } from "./tms/rentalWorkflow";
 import { SettingsPage } from "./screens/Settings";
 import { UsersPage } from "./screens/Users";
 import { VehiclesPage } from "./screens/Vehicles";
@@ -248,7 +249,7 @@ function Shell() {
   const readiness = readinessReport(db, today);
   const setup = setupProgress(db.settings);
   const counts: Partial<Record<Route, number>> = {
-    rentals: db.rentals.filter((r) => r.status === "draft" || r.status === "quoted").length,
+    rentals: db.rentals.filter((r) => awaitingPrice(r.status)).length,
     busing: db.trips.filter((t) => t.serviceDate === today && t.status === "planned").length,
     // The badge is the day's outstanding problem, not a count of everything: runs still to leave with
     // no vehicle or no driver on them (DSP-01, D-115).

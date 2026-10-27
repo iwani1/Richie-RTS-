@@ -142,7 +142,7 @@ function world(overrides: Partial<Database> = {}): Database {
       trip("3", "2026-06-07", "b"),
       trip("4", "2026-06-02", "d"),
     ],
-    rentals: [rental("1", "a", "2026-06-04", "2026-06-05"), rental("2", "b", "2026-06-06", "2026-06-06", { status: "in_progress" })],
+    rentals: [rental("1", "a", "2026-06-04", "2026-06-05"), rental("2", "b", "2026-06-06", "2026-06-06", { status: "dispatched" })],
     workOrders: [
       workOrder("1", "a", { createdAt: "2026-06-08T09:00:00.000Z", releasedAt: "2026-06-11T09:00:00.000Z" }),
     ],
