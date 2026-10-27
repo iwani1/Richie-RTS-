@@ -53,6 +53,7 @@ const rental: Rental = {
   quote: null,
   quoteHistory: [],
   acceptance: null,
+      run: null,
   assignedVehicleId: null,
   assignedDriverId: null,
   deposit: null,

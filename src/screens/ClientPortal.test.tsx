@@ -134,6 +134,7 @@ const quotedRental = (clientId: string): Rental => ({
   },
   quoteHistory: [],
   acceptance: null,
+      run: null,
   assignedVehicleId: null,
   assignedDriverId: null,
   deposit: null,

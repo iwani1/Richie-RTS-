@@ -2728,3 +2728,50 @@ issued at 09:10 the same morning both ran out at the same moment. And it carried
   migration, SQL migration `021`, the terms field in Settings, the quotation card on Rentals and the
   number in the customer portal. 15 new tests (10 domain in `quotations.test.ts`, 5 service); the
   suite moves from 1,154 to 1,169. No new permission and no new dependency.
+
+## D-118 - A completed hire records the journey, not only the money (RNT-07)
+
+Completion has always produced the final invoice and nothing else. The record could say the hire was
+billed at GHS 3,000 and could not say when the bus left, when it came back, how far it went, whether it
+returned damaged, or what the customer said afterwards. Those are the facts the next price is built on
+and the ones a damage claim is argued from, and they were living in the office's memory.
+
+- **Decision 1: the run is its own record on the hire.** `Rental.run` (`RentalRun`) holds departure,
+  return, two odometer readings, the distance and where it came from, the damage note, the customer's
+  feedback and who recorded it. Not free text on the request, and not fields on the invoice: a hire
+  that is cancelled before it runs has no run, and an invoice is a money document that is frozen once
+  issued.
+- **Decision 2: the departure is recorded when it happens.** `start_rental` writes `departedAt` as it
+  records the hire going on the road, because the office will not remember the minute next week. The
+  completion form shows it and can correct it — a correction is a fact somebody typed, not a silent
+  overwrite.
+- **Decision 3: a distance is measured or typed, and says which.** Two odometer readings give a
+  distance the vehicle itself supports (`distanceSource: "odometer"`); a figure typed because nobody
+  read the dial is `"entered"` and prints as *"entered by the office, not from an odometer reading"*.
+  Both are useful; treating the second as the first would make a guess look like a measurement.
+- **Decision 4: two answers to one question is a refusal, not a choice.** A typed distance beside two
+  readings that give a different one is refused, and the refusal states what the odometer says. Picking
+  one behind the office's back is how a dispute starts.
+- **Decision 5: nothing is filled in that nobody stated.** No odometer is invented, no distance is
+  guessed, and a completion with no journey details records the times (which the system does know) and
+  leaves the rest blank. A hire recorded before this existed has `run: null` and the screen says so.
+- **Decision 6: an odometer reading is a reading of the vehicle.** When one is entered at the start or
+  the end of a hire it also joins the odometer register the service intervals are computed from, so the
+  same fact is not typed twice and the maintenance screens get the benefit. Reading it into the hire
+  alone would have made the two disagree.
+- **Decision 7: the balance is stated where the hire is, from the invoice.** The hire card shows what
+  was billed and what is still owed, taken from the invoice raised for this rental and the payments
+  against it through the one balance rule (D-86) — so it cannot disagree with the invoice the customer
+  is holding. A hire with no invoice says "no invoice has been raised yet" rather than showing zero:
+  nought owed and nothing billed are different sentences.
+- **Decision 8: damage is a record, not a work order.** The note states what came back wrong and does
+  not take the vehicle off the road or open a repair. `fleetStateOf` and the work orders remain the
+  things that stop a bus, and inventing a work order from a sentence would put a mechanic's job on the
+  strength of a remark.
+- **Consequence.** `src/tms/run.ts` (`readRun`, `readInstant`, `runDuration`, `distanceLine`, `runLine`,
+  `damageLine`, `rentalBalance`, `balanceLine`), `Rental.run`, schema **33** with a migration filling
+  `null` (no SQL migration: the rental row is a JSON document), `complete_rental` taking a
+  `CompleteRentalInput`, `start_rental` reading an optional odometer, the completion form and the
+  **What happened** card on the rentails detail, and 25 new tests (20 domain in `run.test.ts`, 4
+  service, 1 screen) — the suite moves from 1,169 to 1,195. **Still open:** an approval record for
+  additional charges (Q-12), which is a decision about who signs off an extra, not a field.

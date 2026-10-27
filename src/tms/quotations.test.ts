@@ -142,6 +142,7 @@ describe("older backups (schema 32)", () => {
       },
       quoteHistory: [],
       acceptance: null,
+    run: null,
       assignedVehicleId: null,
       assignedDriverId: null,
       deposit: null,

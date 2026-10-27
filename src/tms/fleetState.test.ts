@@ -144,6 +144,7 @@ const rental = (id: string, overrides: Partial<Rental> = {}): Rental => ({
   quote: null,
   quoteHistory: [],
   acceptance: null,
+    run: null,
   assignedVehicleId: "v1",
   assignedDriverId: "d1",
   deposit: null,

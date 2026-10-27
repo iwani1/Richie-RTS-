@@ -258,6 +258,7 @@ describe("what a driver is doing today (FLT-04)", () => {
         quote: null,
         quoteHistory: [],
   acceptance: null,
+    run: null,
         assignedVehicleId: null,
         assignedDriverId: "d1",
         deposit: null,

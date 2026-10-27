@@ -109,12 +109,21 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /Save assignment/i }));
     await screen.findByText(/Resources assigned/i);
 
-    // Start then complete.
+    // Start then complete, recording the journey as well as the charges (RNT-07, D-118).
     fireEvent.click(screen.getByRole("button", { name: /Start trip/i }));
     fireEvent.click(await screen.findByRole("button", { name: /Complete & bill/i }));
     dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/Odometer at departure/i), { target: { value: "48000" } });
+    fireEvent.change(within(dialog).getByLabelText(/Odometer at return/i), { target: { value: "48180" } });
+    fireEvent.change(within(dialog).getByLabelText(/Damage or anything wrong/i), { target: { value: "Rear tyre worn." } });
     fireEvent.click(within(dialog).getByRole("button", { name: /Complete rental/i }));
     await screen.findByText(/completed\./i);
     expect(screen.getByText(/Final invoice/i)).toBeTruthy();
+    // What happened is on the record, in the office's own reading of the facts.
+    expect(screen.getByText(/What happened/i)).toBeTruthy();
+    expect(screen.getByText(/180 km \(from the odometer\)/)).toBeTruthy();
+    expect(screen.getByText(/Rear tyre worn\./)).toBeTruthy();
+    // And the money: no invoice has been raised yet, which is not the same as nothing owed.
+    expect(screen.getByText(/No invoice has been raised for this hire yet/i)).toBeTruthy();
   }, 30000);
 });

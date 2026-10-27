@@ -31,6 +31,9 @@ is no other company in the database.
   finance or an administrator), or by the customer itself in the portal on its own request. It records
   what was agreed and through which channel; it takes no money and confirms nothing. Agreeing to a
   price and paying the deposit are separate acts, and the second one still belongs to finance.
+- **Completing a hire** records the final charges and, when somebody knows them, the times the vehicle
+  was out, its odometer readings, any damage and what the customer said. The journey is optional and
+  the screen says so: a hire completed without a reading has no distance rather than an invented one.
 - **Invoices** are issued, voided and paid through the finance role only. Operations completes a
   rental, which produces the line items to bill, and then stops.
 - **Settings** are administrator-only. This matters, because most blocks in the application exist

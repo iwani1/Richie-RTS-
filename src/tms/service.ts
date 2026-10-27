@@ -14,6 +14,7 @@ import { allocateReference } from "./references";
 import { readVehicleDetail } from "./vehicles";
 import { buildAcceptance, canAcceptQuotation } from "./acceptance";
 import { QUOTATION_TERMS_LIMIT, quotationIsLive, validityEndsAt, validityProblem } from "./quotations";
+import { readRun, runLine } from "./run";
 import { confinedClientId } from "./scope";
 import {
   CLIENT_STATUSES,
@@ -37,6 +38,7 @@ import {
   type QuoteLine,
   type ReferenceCounter,
   type Rental,
+  type RentalRun,
   type RentalSettings,
   type RentalStatus,
   type Role,
@@ -213,8 +215,8 @@ export type Command =
   | { type: "accept_quotation"; id: string; note: string }
   | { type: "confirm_rental"; id: string; input: DepositInput }
   | { type: "assign_rental"; id: string; input: AssignmentInput }
-  | { type: "start_rental"; id: string }
-  | { type: "complete_rental"; id: string; input: QuoteInput }
+  | { type: "start_rental"; id: string; odometerKm?: string }
+  | { type: "complete_rental"; id: string; input: CompleteRentalInput }
   | { type: "decline_rental"; id: string; reason: string }
   | { type: "cancel_rental"; id: string; reason: string }
   | { type: "import_backup"; database: Database }
@@ -931,6 +933,22 @@ export function validateQuoteLines(input: QuoteInput) {
 }
 
 /**
+ * What the office records when a hire comes back (RNT-07, D-118): the final charges, and — when
+ * somebody knows them — the times, the odometer readings, the distance, the damage and the customer's
+ * own words. Every one of those is optional, because a hire can be completed without them and an
+ * invented one is worse than none.
+ */
+export interface CompleteRentalInput extends QuoteInput {
+  departedAt?: string;
+  returnedAt?: string;
+  odometerStartKm?: string;
+  odometerEndKm?: string;
+  distanceKm?: string;
+  damageNotes?: string;
+  feedback?: string;
+}
+
+/**
  * The quotation to write (RNT-04, D-117).
  *
  * It draws its own number from the `quotation` series, records which revision it is, copies the
@@ -1291,6 +1309,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         quoteHistory: [],
         // Nobody has agreed to anything yet; an enquiry is not an order (D-116).
         acceptance: null,
+        // Nothing has happened on the road yet, and nothing is assumed about when it will (D-118).
+        run: null,
         assignedVehicleId: null,
         assignedDriverId: null,
         deposit: null,
@@ -1328,6 +1348,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         quoteHistory: [],
         // Nobody has agreed to anything yet; an enquiry is not an order (D-116).
         acceptance: null,
+        // Nothing has happened on the road yet, and nothing is assumed about when it will (D-118).
+        run: null,
         assignedVehicleId: null,
         assignedDriverId: null,
         deposit: null,
@@ -1614,12 +1636,43 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         return fail(`${existing.reference} is booked from ${existing.startDate}. It cannot be started before that date.`);
       if (today > existing.endDate)
         return fail(`${existing.reference} was due back on ${existing.endDate}. Cancel it or record a new booking instead.`);
-      const updated: Rental = { ...existing, status: "in_progress", updatedAt: now };
-      const next = audit({ ...db, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
+      // D-118: the moment the vehicle left is recorded as it happens, because the office will not
+      // remember it next week. The odometer is optional: a hire with no reading simply has none.
+      const known = readRun({ odometerStartKm: command.odometerKm }, { startedAt: null, odometerStartKm: null }, now);
+      if (Object.keys(known.problems).length) return fail("Please correct the odometer reading.", known.problems);
+      const startedOdometer = known.run?.odometerStartKm ?? null;
+      const run: RentalRun = {
+        departedAt: now,
+        returnedAt: null,
+        odometerStartKm: startedOdometer,
+        odometerEndKm: null,
+        distanceKm: null,
+        distanceSource: null,
+        damageNotes: "",
+        feedback: "",
+        recordedBy: actor!.fullName,
+        recordedAt: now,
+      };
+      const readings = startedOdometer === null ? db.odometerReadings : [
+        ...db.odometerReadings,
+        {
+          id: makeId(),
+          vehicleId: existing.assignedVehicleId!,
+          readingKm: startedOdometer,
+          readingDate: now.slice(0, 10),
+          note: `Read out at the start of hire ${existing.reference}.`,
+          status: "current" as const,
+          voidReason: null,
+          createdAt: now,
+          createdBy: actor!.fullName,
+        },
+      ];
+      const updated: Rental = { ...existing, status: "in_progress", run, updatedAt: now };
+      const next = audit({ ...db, odometerReadings: readings, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
         action: "rentals:start",
         entity: "rental",
         entityId: updated.id,
-        summary: `${updated.reference} started (in progress).`,
+        summary: `${updated.reference} started (in progress)${startedOdometer === null ? "" : `, odometer ${startedOdometer.toLocaleString("en-GB")} km`}.`,
       }, now);
       return { ok: true, db: next, message: `${updated.reference} is now in progress.${rentalServiceNotice(db, updated.assignedVehicleId, now)}` };
     }
@@ -1639,14 +1692,43 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         issuedAt: now,
         issuedBy: actor!.fullName,
       };
-      const updated: Rental = { ...existing, status: "completed", finalInvoice, updatedAt: now };
-      const next = audit({ ...db, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
+      // D-118: what happened on the road is recorded with the money, and nothing is filled in that
+      // nobody stated — an omitted field stays blank rather than becoming "now" or zero.
+      const recorded = readRun(
+        command.input,
+        { startedAt: existing.run?.departedAt ?? null, odometerStartKm: existing.run?.odometerStartKm ?? null },
+        now,
+      );
+      if (Object.keys(recorded.problems).length) return fail("Please correct the details of the hire.", recorded.problems);
+      const run = recorded.run ? { ...recorded.run, recordedBy: actor!.fullName } : existing.run;
+      // A closing odometer reading is a real reading of the vehicle, so it also joins the register
+      // that drives the service intervals — recorded once, read by the maintenance screens.
+      const closingReading = run?.odometerEndKm ?? null;
+      const alreadyRead = closingReading !== null && db.odometerReadings.some(
+        (reading) => reading.vehicleId === existing.assignedVehicleId && reading.readingKm === closingReading && reading.readingDate === now.slice(0, 10),
+      );
+      const readings = closingReading === null || alreadyRead || !existing.assignedVehicleId ? db.odometerReadings : [
+        ...db.odometerReadings,
+        {
+          id: makeId(),
+          vehicleId: existing.assignedVehicleId,
+          readingKm: closingReading,
+          readingDate: now.slice(0, 10),
+          note: `Read out at the end of hire ${existing.reference}.`,
+          status: "current" as const,
+          voidReason: null,
+          createdAt: now,
+          createdBy: actor!.fullName,
+        },
+      ];
+      const updated: Rental = { ...existing, status: "completed", finalInvoice, run, updatedAt: now };
+      const next = audit({ ...db, odometerReadings: readings, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
         action: "rentals:complete",
         entity: "rental",
         entityId: updated.id,
-        summary: `${updated.reference} completed; final invoice ${finalInvoice.currencyCode} ${finalInvoice.total.toFixed(2)}.`,
+        summary: `${updated.reference} completed; final invoice ${finalInvoice.currencyCode} ${finalInvoice.total.toFixed(2)}.${runLine(run)}${run && run.distanceKm !== null ? ` ${run.distanceKm.toLocaleString("en-GB")} km.` : ""}${run && run.damageNotes ? ` Damage reported: ${run.damageNotes}` : ""}`,
       }, now);
-      return { ok: true, db: next, message: `${updated.reference} completed.` };
+      return { ok: true, db: next, message: `${updated.reference} completed.${run && run.distanceKm !== null ? ` ${run.distanceKm.toLocaleString("en-GB")} km recorded.` : ""}` };
     }
 
     case "decline_rental":

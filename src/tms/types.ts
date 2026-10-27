@@ -440,6 +440,37 @@ export interface RentalAcceptance {
   note: string;
 }
 
+/**
+ * The hire as it actually happened (RNT-07, D-118).
+ *
+ * A completed rental used to carry the money and nothing about the run: the deposit said the office
+ * had been paid, and the record could not say when the bus left, when it came back, how far it went,
+ * whether it came back damaged or what the customer said afterwards. Those are the facts a repeat
+ * customer is priced on and a damage claim turns on, and none of them belongs in a free-text note on
+ * the request.
+ *
+ * Every field is nullable on purpose: an office that does not read an odometer must not have one
+ * invented for it, and a hire recorded before this existed has no run at all rather than a made-up one.
+ */
+export interface RentalRun {
+  /** When the vehicle actually left. Set when the hire starts; may be corrected at completion. */
+  departedAt: string | null;
+  /** When it actually came back. */
+  returnedAt: string | null;
+  /** Odometer read out at departure and at return, in whole kilometres, when somebody read it. */
+  odometerStartKm: number | null;
+  odometerEndKm: number | null;
+  /** How far it actually went, and whether that came from the odometer or was typed in. */
+  distanceKm: number | null;
+  distanceSource: "odometer" | "entered" | null;
+  /** What came back damaged, in the office's words. Blank when nothing was reported. */
+  damageNotes: string;
+  /** What the customer said afterwards, as the office wrote it down. */
+  feedback: string;
+  recordedBy: string;
+  recordedAt: string;
+}
+
 export interface Rental {
   id: string;
   reference: string; // RR-0001
@@ -462,6 +493,8 @@ export interface Rental {
   quoteHistory: Quote[];
   /** The customer's yes to a quotation, or null while nobody has given one (D-116). */
   acceptance: RentalAcceptance | null;
+  /** What actually happened on the road, or null while nothing has been recorded (D-118). */
+  run: RentalRun | null;
   assignedVehicleId: string | null;
   assignedDriverId: string | null;
   deposit: DepositPayment | null;
@@ -1314,7 +1347,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 /**
  * Every schema version this build can still read.
@@ -1324,7 +1357,7 @@ export const SCHEMA_VERSION = 32;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1519,6 +1552,10 @@ export function migrate(value: unknown): Database | null {
           // number: the screen says it is unnumbered rather than printing a reference nobody issued.
           quote: rental.quote ? legacyQuote(rental.quote) : null,
           quoteHistory: (rental.quoteHistory ?? []).map(legacyQuote),
+          // A hire written before the run was recorded (schema 33) has none. The office may well
+          // know when the bus left and came back, but nothing here recorded it, and a plausible
+          // timestamp would be a fact this program invented (D-118).
+          run: rental.run && typeof rental.run.recordedAt === "string" ? rental.run : null,
           acceptance:
             rental.acceptance && typeof rental.acceptance.at === "string" && typeof rental.acceptance.quotedAt === "string"
               ? rental.acceptance

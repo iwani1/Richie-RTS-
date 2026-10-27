@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 32; PostgreSQL keeps them in
+The app stores these as arrays inside one JSON document (schema version 33; PostgreSQL keeps them in
 typed tables, migration `020` being the latest). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
@@ -425,6 +425,35 @@ terms stood when it was issued.
 Unique `(rental_id, revision_number)` and unique `reference`; quote and line snapshots are immutable. The initial
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous
 snapshot, so the current quote count equals history length + 1.
+
+**The run a hire actually had (RNT-07, D-118).** In the browser schema this is one object on the
+rental, `rental.run`: departure and return instants, two odometer readings, the distance and its source
+(`odometer` or `entered`), the damage note, the customer's feedback, and who recorded it. Relationally
+it belongs on the rental as a one-to-one row, because a hire has one run:
+
+```mermaid
+erDiagram
+  RENTAL ||--o| RENTAL_RUN : "is worked by"
+  RENTAL_RUN {
+    uuid id PK
+    uuid rental_id FK
+    timestamptz departed_at
+    timestamptz returned_at
+    numeric odometer_start_km
+    numeric odometer_end_km
+    numeric distance_km
+    text distance_source
+    text damage_notes
+    text feedback
+    uuid recorded_by_user_id FK
+    timestamptz recorded_at
+  }
+```
+
+`CHECK (returned_at IS NULL OR departed_at IS NULL OR returned_at >= departed_at)` states the one rule
+the application also states, and `distance_source` is nullable because a hire with no distance has no
+source either. The balance is **not** stored here: it is computed from the invoice for the rental and
+the payments against it, so a stored copy could not disagree with the document the customer holds.
 
 **The customer's answer to a quotation (RNT-05, D-116).** In the browser schema this is one object on
 the rental, `rental.acceptance`, holding the person, the time, the channel (`client_portal` or `office`),

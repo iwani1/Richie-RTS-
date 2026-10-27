@@ -141,6 +141,7 @@ function rentalRow(id: string, vehicleId: string): Rental {
     quote: null,
     quoteHistory: [],
   acceptance: null,
+    run: null,
     assignedVehicleId: vehicleId,
     assignedDriverId: null,
     deposit: null,

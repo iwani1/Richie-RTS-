@@ -280,10 +280,23 @@ async function main() {
   // 9-11. Assignment, start and completion.
   db = await command("assign_rental", { id: rentalId, input: { vehicleId, driverId: "" } });
   ok(byRental(db).assignedVehicleId === vehicleId, "vehicle assigned");
-  db = await command("start_rental", { id: rentalId });
+  // RNT-07, D-118: the odometer read out as it leaves, which is what makes the distance a measurement.
+  db = await command("start_rental", { id: rentalId, odometerKm: "48000" });
   ok(byRental(db).status === "in_progress", "rental started");
-  db = await command("complete_rental", { id: rentalId, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } });
+  db = await command("complete_rental", {
+    id: rentalId,
+    input: {
+      lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }],
+      odometerEndKm: "48120",
+      damageNotes: "Nothing reported.",
+      feedback: "On time; the customer will book again.",
+    },
+  });
   ok(byRental(db).status === "completed", "rental completed");
+  ok(byRental(db).run?.distanceKm === 120, `the hire records ${byRental(db).run?.distanceKm} km from the odometer`);
+  ok(byRental(db).run?.distanceSource === "odometer", "the distance is marked as measured, not typed");
+  ok(byRental(db).run?.departedAt && byRental(db).run?.returnedAt, "the hire records when it left and came back");
+  ok(byRental(db).run?.feedback === "On time; the customer will book again.", "the customer's words are kept with the hire");
 
   // 12. Invoice: 3,000 plus 15% VAT = 3,450, due in 14 days.
   db = await command("issue_rental_invoice", {

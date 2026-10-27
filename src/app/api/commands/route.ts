@@ -36,6 +36,8 @@ const envelope = z.object({
   // A note the customer attached to an acceptance (D-116). Optional, and never required: a yes is a
   // yes with or without a sentence beside it.
   note: z.string().max(1000).optional(),
+  // The odometer read out when a hire starts (RNT-07, D-118). Optional: many hires have none.
+  odometerKm: z.string().max(20).optional(),
   to: z.string().max(40).optional(),
   routeId: z.string().max(64).optional(),
   fromDate: z.string().max(40).optional(),

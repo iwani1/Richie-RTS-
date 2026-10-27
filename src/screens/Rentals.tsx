@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { formatAmount, fromMinor, lineAmount, linesTotalFromText, percentOf, toMinor } from "../tms/money";
-import { rentalQuotingReady, type AssignmentInput, type DepositInput, type QuoteInput, type QuoteLineInput, type RentalRequestInput } from "../tms/service";
+import { rentalQuotingReady, type AssignmentInput, type CompleteRentalInput, type DepositInput, type QuoteInput, type QuoteLineInput, type RentalRequestInput } from "../tms/service";
+import { balanceLine, damageLine, distanceLine, rentalBalance, runLine, toLocalInput } from "../tms/run";
 import { acceptanceLine, acceptanceStateOf, canAcceptQuotation } from "../tms/acceptance";
 import { quotationHeading, quotationIsNumbered, validityLine } from "../tms/quotations";
 import { readinessReport } from "../tms/maintenance";
@@ -362,6 +363,32 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
           </Card>
         )}
 
+        {/* D-118: what actually happened on the road, beside what it cost. The journey is not a
+            field of the money, and a hire with nothing recorded says so rather than showing blanks. */}
+        {(rental.run || rental.status === "completed" || rental.status === "in_progress") && (
+          <Card title="What happened" className="lg:col-span-2">
+            <p className="text-sm text-stone-800">{runLine(rental.run)}</p>
+            <dl className="mt-3 grid grid-cols-[170px_1fr] gap-y-2 text-sm">
+              <dt className="text-stone-500">Distance</dt>
+              <dd className="text-stone-800">{rental.run ? distanceLine(rental.run) : null}{!rental.run?.distanceKm ? <span className="text-stone-400">Not recorded</span> : null}</dd>
+              <dt className="text-stone-500">Odometer</dt>
+              <dd className="text-stone-800">
+                {rental.run && (rental.run.odometerStartKm !== null || rental.run.odometerEndKm !== null) ? (
+                  `${rental.run.odometerStartKm !== null ? `${rental.run.odometerStartKm.toLocaleString("en-GB")} km` : "not read"} at departure · ${rental.run.odometerEndKm !== null ? `${rental.run.odometerEndKm.toLocaleString("en-GB")} km` : "not read"} at return`
+                ) : (
+                  <span className="text-stone-400">No odometer reading was taken</span>
+                )}
+              </dd>
+              <dt className="text-stone-500">Damage</dt>
+              <dd className={rental.run?.damageNotes ? "text-amber-800" : "text-stone-800"}>{damageLine(rental.run)}</dd>
+              {rental.run && rental.run.feedback && <><dt className="text-stone-500">What the customer said</dt><dd className="text-stone-800">{rental.run.feedback}</dd></>}
+              <dt className="text-stone-500">Money</dt>
+              <dd className="text-stone-800">{balanceLine(rentalBalance(db, rental)) ?? <span className="text-stone-400">No invoice has been raised for this hire yet</span>}</dd>
+              {rental.run && <><dt className="text-stone-500">Recorded by</dt><dd className="text-stone-800">{rental.run.recordedBy || "—"} · {formatDateTime(rental.run.recordedAt)}</dd></>}
+            </dl>
+          </Card>
+        )}
+
         {rental.finalInvoice && (
           <Card title="Final invoice" className="lg:col-span-2">
             <table className="w-full text-left text-sm">
@@ -381,7 +408,14 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
       {panel === "edit" && <RequestForm title={`Edit ${rental.reference}`} initial={toRequestInput(rental)} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "update_rental", id: rental.id, input }))} />}
       {panel === "quote" && <QuoteForm title={`Quote ${rental.reference}`} depositPercent={db.settings.rental.depositPercent} currency={db.settings.currencyCode} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "quote_rental", id: rental.id, input }))} />}
       {panel === "requote" && <QuoteForm title={`Renew quotation ${rental.reference}`} requoteMode depositPercent={db.settings.rental.depositPercent} currency={db.settings.currencyCode} initialLines={rental.quote?.lines.map((line) => ({ id: line.id, description: line.description, quantity: String(line.quantity), unitAmount: String(line.unitAmount) }))} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "requote_rental", id: rental.id, input }))} />}
-      {panel === "complete" && <QuoteForm title={`Final invoice ${rental.reference}`} completeMode initialLines={rental.quote?.lines.map((l) => ({ id: l.id, description: l.description, quantity: String(l.quantity), unitAmount: String(l.unitAmount) }))} currency={rental.quote?.currencyCode ?? db.settings.currencyCode} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "complete_rental", id: rental.id, input }))} />}
+      {panel === "complete" && (
+        <CompleteForm
+          rental={rental}
+          currency={rental.quote?.currencyCode ?? db.settings.currencyCode}
+          onClose={() => setPanel(null)}
+          onSubmit={(input) => run(dispatch({ type: "complete_rental", id: rental.id, input }))}
+        />
+      )}
       {panel === "accept" && (
         <Panel
           title={`Record acceptance of ${rental.reference}`}
@@ -497,17 +531,105 @@ function LineItemsEditor({ lines, setLines, errors, currency }: { lines: QuoteLi
   );
 }
 
-function QuoteForm({ title, depositPercent, currency, completeMode, requoteMode, initialLines, onClose, onSubmit }: { title: string; depositPercent?: number | null; currency: string | null; completeMode?: boolean; requoteMode?: boolean; initialLines?: QuoteLineInput[]; onClose: () => void; onSubmit: (input: QuoteInput) => Errors | Promise<Errors> }) {
+/**
+ * Completing a hire (RNT-07, D-118).
+ *
+ * The money and the journey are recorded together, because they are the same moment for the office:
+ * the bus is back, here are the charges, and here is the mileage it came back with. The journey fields
+ * are all optional and the form says so — nothing is pre-filled with a figure nobody measured, apart
+ * from the departure time already on the record and the return time, which is now.
+ */
+function CompleteForm({
+  rental,
+  currency,
+  onClose,
+  onSubmit,
+}: {
+  rental: Rental;
+  currency: string | null;
+  onClose: () => void;
+  onSubmit: (input: CompleteRentalInput) => Errors | Promise<Errors>;
+}) {
+  const [lines, setLines] = useState<QuoteLineInput[]>(
+    rental.quote?.lines.length
+      ? rental.quote.lines.map((l) => ({ id: l.id, description: l.description, quantity: String(l.quantity), unitAmount: String(l.unitAmount) }))
+      : [{ description: "", quantity: "1", unitAmount: "" }],
+  );
+  const [run, setRun] = useState({
+    departedAt: toLocalInput(rental.run?.departedAt ?? null),
+    returnedAt: toLocalInput(new Date().toISOString()),
+    odometerStartKm: rental.run && rental.run.odometerStartKm !== null ? String(rental.run.odometerStartKm) : "",
+    odometerEndKm: "",
+    distanceKm: "",
+    damageNotes: rental.run?.damageNotes ?? "",
+    feedback: rental.run?.feedback ?? "",
+  });
+  const [errors, setErrors] = useState<Errors>({});
+  const set = (field: keyof typeof run) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setRun({ ...run, [field]: event.target.value });
+
+  return (
+    <Panel
+      title={`Complete ${rental.reference}`}
+      description="Final charges and what happened on the road. The charges are pre-filled from the quotation; the journey is recorded only where somebody knows it."
+      onClose={onClose}
+    >
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setErrors((await onSubmit({ lines, ...run })) ?? {});
+        }}
+        className="space-y-4"
+      >
+        <LineItemsEditor lines={lines} setLines={setLines} errors={errors} currency={currency} />
+        <div className="border-t border-stone-200 pt-3">
+          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500">The journey</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Left the yard" error={errors.departedAt} hint="Recorded when the hire started; correct it if the vehicle left at another time.">
+              <TextInput type="datetime-local" value={run.departedAt} onChange={set("departedAt")} invalid={!!errors.departedAt} />
+            </Field>
+            <Field label="Came back" error={errors.returnedAt} hint="Defaults to now, which is when the office is recording it.">
+              <TextInput type="datetime-local" value={run.returnedAt} onChange={set("returnedAt")} invalid={!!errors.returnedAt} />
+            </Field>
+            <Field label="Odometer at departure (km)" error={errors.odometerStartKm} hint="Leave blank if nobody read it.">
+              <TextInput type="number" min={0} step="0.1" value={run.odometerStartKm} onChange={set("odometerStartKm")} invalid={!!errors.odometerStartKm} placeholder="Not read" />
+            </Field>
+            <Field label="Odometer at return (km)" error={errors.odometerEndKm} hint="With the reading at departure, this gives the distance the vehicle itself recorded.">
+              <TextInput type="number" min={0} step="0.1" value={run.odometerEndKm} onChange={set("odometerEndKm")} invalid={!!errors.odometerEndKm} placeholder="Not read" />
+            </Field>
+            <Field label="Distance travelled (km)" error={errors.distanceKm} hint="Only if no odometer readings: the figure is then marked as entered by the office, not measured.">
+              <TextInput type="number" min={0} step="0.1" value={run.distanceKm} onChange={set("distanceKm")} invalid={!!errors.distanceKm} placeholder="Not recorded" />
+            </Field>
+            <Field label="Customer's feedback (optional)" error={errors.feedback} hint="What they said afterwards, in their words or yours.">
+              <TextArea value={run.feedback} onChange={set("feedback")} invalid={!!errors.feedback} rows={2} />
+            </Field>
+          </div>
+          <div className="mt-3">
+            <Field label="Damage or anything wrong with the vehicle (optional)" error={errors.damageNotes} hint="Blank means nothing was reported. This is a record, not a work order.">
+              <TextArea value={run.damageNotes} onChange={set("damageNotes")} invalid={!!errors.damageNotes} rows={2} />
+            </Field>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary">Complete rental</Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+function QuoteForm({ title, depositPercent, currency, requoteMode, initialLines, onClose, onSubmit }: { title: string; depositPercent?: number | null; currency: string | null; requoteMode?: boolean; initialLines?: QuoteLineInput[]; onClose: () => void; onSubmit: (input: QuoteInput) => Errors | Promise<Errors> }) {
   const [lines, setLines] = useState<QuoteLineInput[]>(initialLines && initialLines.length ? initialLines : [{ description: "", quantity: "1", unitAmount: "" }]);
   const [errors, setErrors] = useState<Errors>({});
   const subtotal = linesTotalFromText(lines);
   return (
-    <Panel title={title} description={completeMode ? "Final charges for this rental. Pre-filled from the quotation; adjust for actuals." : requoteMode ? "Update the line items for a new validity period. The prior quotation will be retained in history." : "Enter the quotation line items. Rates are entered here, not assumed by the system."} onClose={onClose}>
+    <Panel title={title} description={requoteMode ? "Update the line items for a new validity period. The prior quotation will be retained in history." : "Enter the quotation line items. Rates are entered here, not assumed by the system."} onClose={onClose}>
       <form onSubmit={async (e) => { e.preventDefault(); setErrors((await onSubmit({ lines })) ?? {}); }} className="space-y-4">
         {requoteMode && <Notice tone="warning">This creates a new quotation revision; the prior amounts, deposit requirement and expiry date remain in the history.</Notice>}
         <LineItemsEditor lines={lines} setLines={setLines} errors={errors} currency={currency} />
-        {!completeMode && depositPercent !== null && depositPercent !== undefined && <Notice tone="info">Deposit at {depositPercent}% will be {money(percentOf(subtotal, depositPercent), currency)}.</Notice>}
-        <div className="flex justify-end gap-2 pt-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary">{completeMode ? "Complete rental" : requoteMode ? "Issue revised quotation" : "Issue quotation"}</Button></div>
+        {depositPercent !== null && depositPercent !== undefined && <Notice tone="info">Deposit at {depositPercent}% will be {money(percentOf(subtotal, depositPercent), currency)}.</Notice>}
+        <div className="flex justify-end gap-2 pt-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary">{requoteMode ? "Issue revised quotation" : "Issue quotation"}</Button></div>
       </form>
     </Panel>
   );

@@ -3,6 +3,7 @@ import { can, ROLE_PERMISSIONS } from "./permissions";
 import { executeCommand } from "./commands";
 import { execute, VEHICLE_TRANSITIONS, type Actor, type Credential } from "./service";
 import { emptyDatabase, SCHEMA_VERSION, type Database } from "./types";
+import { balanceLine, rentalBalance } from "./run";
 
 const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const NOW = "2026-01-01T00:00:00.000Z";
@@ -400,11 +401,22 @@ describe("rentals - full lifecycle", () => {
     db = start.db;
     expect(db.rentals[0].status).toBe("in_progress");
 
-    const complete = execute(db, admin, { type: "complete_rental", id, input: { lines: [{ description: "3 days hire", quantity: "3", unitAmount: "1000" }, { description: "Extra day", quantity: "1", unitAmount: "1000" }] } }, NOW);
+    // It came back two days after it left; completing it before it started is a mistake, not a fact.
+    const complete = execute(db, admin, {
+      type: "complete_rental",
+      id,
+      input: {
+        lines: [{ description: "3 days hire", quantity: "3", unitAmount: "1000" }, { description: "Extra day", quantity: "1", unitAmount: "1000" }],
+        returnedAt: "2026-03-03T18:00:00.000Z",
+      },
+    }, "2026-03-03T18:00:00.000Z");
     if (!complete.ok) throw new Error(complete.message);
     db = complete.db;
     expect(db.rentals[0].status).toBe("completed");
     expect(db.rentals[0].finalInvoice?.total).toBe(4000);
+    // D-118: the run keeps the moment the hire started, and the return it was given.
+    expect(db.rentals[0].run?.departedAt).toBe("2026-03-01T07:00:00.000Z");
+    expect(db.rentals[0].run?.returnedAt).toBe("2026-03-03T18:00:00.000Z");
     expect(db.audit.some((a) => a.action === "rentals:complete")).toBe(true);
   });
 
@@ -962,7 +974,7 @@ describe("a customer accepting a quotation (RNT-05, D-116)", () => {
 
   it("leaves an older backup with no acceptance, rather than inventing one", () => {
     // Schema 31 is readable: a record written before acceptance existed loads with none.
-    expect(SCHEMA_VERSION).toBe(32);
+    expect(SCHEMA_VERSION).toBe(33);
   });
 });
 
@@ -1064,5 +1076,154 @@ describe("a quotation as a document (RNT-04, D-117)", () => {
     const tooLate = execute(quoted.db, w.admin, { type: "accept_quotation", id, note: "" }, "2026-01-08T00:01:00.000Z");
     expect(tooLate.ok).toBe(false);
     if (!tooLate.ok) expect(tooLate.errors.quote).toBe("The quotation expired on 2026-01-08. Issue a new one before the customer accepts.");
+  });
+});
+
+describe("what actually happened on a hire (RNT-07, D-118)", () => {
+  /** A hire that started on 1 March 2026 at 07:00 and is on the road. */
+  function onTheRoad() {
+    const w = rentalReady();
+    const admin: Actor = w.admin;
+    let db = w.db;
+    const created = execute(db, admin, requestInput(w.catId, "2026-03-01", "2026-03-03", true), NOW);
+    if (!created.ok) throw new Error(created.message);
+    db = created.db;
+    const id = db.rentals[0].id;
+    const quoted = execute(db, w.finance, { type: "quote_rental", id, input: { lines: [{ description: "Three days hire", quantity: "3", unitAmount: "1000" }] } }, NOW);
+    if (!quoted.ok) throw new Error(quoted.message);
+    const confirmed = execute(quoted.db, w.finance, { type: "confirm_rental", id, input: { amount: "750", method: "Bank transfer", reference: "TX1" } }, NOW);
+    if (!confirmed.ok) throw new Error(confirmed.message);
+    const vehicle = addVehicle(confirmed.db, admin, w.catId, "GT 777-26");
+    const driver = execute(vehicle.db, admin, { type: "create_driver", input: { fullName: "Kojo Mensah", phone: "024", licenceNumber: "DL-9", licenceExpiry: "2030-01-01", status: "active" } }, NOW);
+    if (!driver.ok) throw new Error(driver.message);
+    const driverId = driver.db.drivers[0].id;
+    const assigned = execute(driver.db, admin, { type: "assign_rental", id, input: { vehicleId: vehicle.id, driverId } }, NOW);
+    if (!assigned.ok) throw new Error(assigned.message);
+    const started = execute(assigned.db, admin, { type: "start_rental", id, odometerKm: "82140" }, "2026-03-01T07:00:00.000Z");
+    if (!started.ok) throw new Error(started.message);
+    return { ...w, db: started.db, id, vehicleId: vehicle.id };
+  }
+
+  const finalLines = { lines: [{ description: "Three days hire", quantity: "3", unitAmount: "1000" }] };
+
+  it("records the moment the hire started, and the odometer it started from", () => {
+    const w = onTheRoad();
+    const run = w.db.rentals[0].run;
+    expect(run?.departedAt).toBe("2026-03-01T07:00:00.000Z");
+    expect(run?.returnedAt).toBeNull();
+    expect(run?.odometerStartKm).toBe(82140);
+    // The reading is a real reading of the vehicle, so it also joins the register the service
+    // intervals are worked out from — recorded once, not typed twice.
+    expect(w.db.odometerReadings).toHaveLength(1);
+    expect(w.db.odometerReadings[0]).toMatchObject({ vehicleId: w.vehicleId, readingKm: 82140, readingDate: "2026-03-01" });
+  });
+
+  it("records when it came back, how far it went, the damage and what the customer said", () => {
+    const w = onTheRoad();
+    const done = execute(w.db, w.admin, {
+      type: "complete_rental",
+      id: w.id,
+      input: {
+        ...finalLines,
+        returnedAt: "2026-03-03T18:20:00.000Z",
+        odometerEndKm: "82354",
+        damageNotes: "Cracked near-side mirror.",
+        feedback: "Punctual; they will book again.",
+      },
+    }, "2026-03-03T19:00:00.000Z");
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    const run = done.db.rentals[0].run;
+    expect(run).toMatchObject({
+      departedAt: "2026-03-01T07:00:00.000Z",
+      returnedAt: "2026-03-03T18:20:00.000Z",
+      odometerStartKm: 82140,
+      odometerEndKm: 82354,
+      distanceKm: 214,
+      distanceSource: "odometer",
+      damageNotes: "Cracked near-side mirror.",
+      feedback: "Punctual; they will book again.",
+      recordedBy: "Admin One",
+    });
+    // The closing reading joins the odometer register too.
+    expect(done.db.odometerReadings.map((reading) => reading.readingKm)).toEqual([82140, 82354]);
+    // And the money is still recorded in the same act.
+    expect(done.db.rentals[0].finalInvoice?.total).toBe(3000);
+    // The audit entry says what happened, not only what was billed.
+    const entry = done.db.audit[0];
+    expect(entry.summary).toContain("214 km");
+    expect(entry.summary).toContain("Damage reported: Cracked near-side mirror.");
+    expect(done.message).toBe("RR-0001 completed. 214 km recorded.");
+  });
+
+  it("takes a distance the office typed, and marks it as typed", () => {
+    const w = onTheRoad();
+    const done = execute(w.db, w.admin, {
+      type: "complete_rental",
+      id: w.id,
+      input: { ...finalLines, returnedAt: "2026-03-03T18:00:00.000Z", distanceKm: "180" },
+    }, "2026-03-03T18:00:00.000Z");
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    expect(done.db.rentals[0].run?.distanceKm).toBe(180);
+    expect(done.db.rentals[0].run?.distanceSource).toBe("entered");
+    // No odometer was read at the end, so no reading is invented for the register.
+    expect(done.db.odometerReadings).toHaveLength(1);
+  });
+
+  it("completes a hire with no journey details at all, and claims nothing", () => {
+    const w = onTheRoad();
+    const done = execute(w.db, w.admin, { type: "complete_rental", id: w.id, input: { ...finalLines, returnedAt: "2026-03-03T18:00:00.000Z" } }, "2026-03-03T18:00:00.000Z");
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    const run = done.db.rentals[0].run;
+    expect(run?.departedAt).toBe("2026-03-01T07:00:00.000Z");
+    expect(run?.returnedAt).toBe("2026-03-03T18:00:00.000Z");
+    expect(run?.distanceKm).toBeNull();
+    expect(run?.damageNotes).toBe("");
+  });
+
+  it("refuses a return before the departure, and refuses to guess between two distances", () => {
+    const w = onTheRoad();
+    const early = execute(w.db, w.admin, { type: "complete_rental", id: w.id, input: { ...finalLines, returnedAt: "2026-02-28T09:00:00.000Z" } }, "2026-03-03T18:00:00.000Z");
+    expect(early.ok).toBe(false);
+    if (!early.ok) expect(early.errors.returnedAt).toBe("The vehicle cannot come back before it left.");
+
+    const twoAnswers = execute(w.db, w.admin, {
+      type: "complete_rental",
+      id: w.id,
+      input: { ...finalLines, returnedAt: "2026-03-03T18:00:00.000Z", odometerEndKm: "82324", distanceKm: "200" },
+    }, "2026-03-03T18:00:00.000Z");
+    expect(twoAnswers.ok).toBe(false);
+    if (!twoAnswers.ok) expect(twoAnswers.errors.distanceKm).toBe("The odometer readings give 184 km. Remove the typed distance, or correct a reading.");
+    // Neither refusal moved the hire: it is still on the road.
+    expect(w.db.rentals[0].status).toBe("in_progress");
+  });
+
+  it("shows what the hire cost and what is still owed against it", () => {
+    const w = onTheRoad();
+    const done = execute(w.db, w.admin, { type: "complete_rental", id: w.id, input: { ...finalLines, returnedAt: "2026-03-03T18:00:00.000Z" } }, "2026-03-03T18:00:00.000Z");
+    if (!done.ok) throw new Error(done.message);
+    // An invoice and a part payment against this hire, through the ordinary commands.
+    // The company is not VAT registered and bills on 14-day terms; without both, an invoice is blocked.
+    const configured = execute(done.db, w.admin, {
+      type: "update_settings",
+      input: { ...done.db.settings, taxPosition: "not_registered", invoiceDueDays: 14 },
+    }, "2026-03-04T08:00:00.000Z");
+    if (!configured.ok) throw new Error(configured.message);
+    const issued = executeCommand(configured.db, w.finance, {
+      type: "issue_rental_invoice",
+      input: { rentalId: w.id, issuedOn: "2026-03-04", discountAmount: "", discountReason: "", notes: "" },
+    }, "2026-03-04T09:00:00.000Z");
+    if (!issued.ok) throw new Error(issued.message);
+    const invoice = issued.db.invoices.find((candidate) => candidate.rentalId === w.id)!;
+    const paid = executeCommand(issued.db, w.finance, {
+      type: "record_payment",
+      input: { invoiceId: invoice.id, amount: "1000", method: "Bank transfer", paidOn: "2026-03-05", externalReference: "", note: "" },
+    }, "2026-03-05T10:00:00.000Z");
+    if (!paid.ok) throw new Error(paid.message);
+    const balance = rentalBalance(paid.db, paid.db.rentals[0]);
+    expect(balance?.outstanding).toBe(2000);
+    expect(balanceLine(balance!)).toBe(`Invoice ${invoice.reference}: GHS 3000.00 billed, GHS 2000.00 still outstanding.`);
   });
 });
