@@ -2522,8 +2522,10 @@ deliberately not done.
   recording an expense should not have to think about it. Such **text** is prefixed with an
   apostrophe; **numbers are never touched**, because a negative amount is a number and must stay one.
 - **Decision 3: the export is the screen's own numbers, written out.** No figure is recomputed for the
-  file: `fleetReportCsv` formats the report object, `statementCsv` formats the statement, and
-  `financeHomeCsv` formats the finance home. A file that added up on its own would be a fourth place
+  file: `fleetReportCsv` formats the report object, `statementCsv` formats the statement,
+  `financeHomeCsv` formats the finance home, and the expenses export is handed the screen's own total,
+  counts and categories — which is why its rows are the whole period rather than the search box's
+  subset, since a filtered file would not add up to the total printed on the same page. A file that added up on its own would be a fourth place
   for the figures to disagree.
 - **Decision 4: a block with nothing in it says "none", rather than ending silently.** In the finance
   export, a reader cannot tell an omission from a zero. Every block keeps its heading.
@@ -2541,7 +2543,7 @@ deliberately not done.
   piece of work with its own problem — a filtered KPI is not the KPI any more, and needs its own
   stated definition — so the item stays **partial** and says so.
 - **Consequence.** `src/tms/csv.ts` (`csvCell`, `toCsv`), `src/ui/download.ts` (`downloadTextFile`,
-  `csvFileName`), `fleetReportCsv`, `statementCsv` and `financeHomeCsv`; Download CSV on the finance
-  home, the statement and the fleet dashboard; the Reports screen's two blob blocks replaced by the
-  shared helper. No schema change, no server change, no dependency. 20 new tests (7 on the writer,
-  3 on the download, 6 on the three builders, 4 on the buttons).
+  `csvFileName`), `fleetReportCsv`, `statementCsv`, `financeHomeCsv` and `expensesCsv`; Download CSV on the finance
+  home, the statement, the fleet dashboard and the expenses screen; the Reports screen's two blob blocks replaced by the
+  shared helper. No schema change, no server change, no dependency. 25 new tests (7 on the writer,
+  3 on the download, 9 on the four builders, 6 on the buttons).

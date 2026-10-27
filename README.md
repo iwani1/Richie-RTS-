@@ -101,7 +101,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Vehicle register that says what each bus runs on, who owns it and which driver normally takes it out | Works; a leased or hire-purchase vehicle must name its owner, an unrecorded ownership stays unrecorded, and the register counts the vehicles nobody has described |
 | Delays: minutes behind the timetable and why, reported while the run is out — seen by the dispatcher, the driver, the client's portal and the rider | Works; append-only, a run can report it caught up, and a finished run is measured from its stop times instead |
 | Staff transport report: runs promised and worked, riders carried, no-shows, the riders nobody recorded, empty seats, delays where a stop time was recorded, and the seats people asked for | Works; it says on the page which figures the records cannot supply, and the on-time figure is the same one the busing screen shows |
-| A spreadsheet copy of the figures, on the finance home, a customer's statement and the fleet dashboard | Works; one writer for every export, a cell a spreadsheet would treat as a formula is defused, and the file is built in the browser from records the signed-in role may read — nothing is uploaded or stored |
+| A spreadsheet copy of the figures, on the finance home, a customer's statement, the fleet dashboard and the expenses screen | Works; one writer for every export, a cell a spreadsheet would treat as a formula is defused, and the file is built in the browser from records the signed-in role may read — nothing is uploaded or stored |
 | Customer register with the office's own code, organisation or individual, company registration, billing address and tax number, named branches and a change history per customer | Works; the invoice prints the buyer's address and tax number **as they were when it was issued**, the row states which agreement is in force, and a detail nobody recorded reads "not recorded" rather than being guessed |
 | Stops that say where they are — a landmark, a Ghana Post GPS address and coordinates — shown to the driver on the next stop, with a maps link | Works; every field is optional, what is missing is counted on the routes screen, and a typo is refused rather than saved |
 | Driver register that holds the licence classes and certificates, and dispatch that refuses a driver whose licence does not cover the vehicle once the office has said which classes a vehicle type needs | Works; the class is read off the licence as the office types it, an unclassified vehicle type checks nothing, and availability is shown from the runs rather than a stored flag |
@@ -114,7 +114,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Management report as an A4 document, printed or saved as a PDF by the browser | Works; the figures are the report's own, a figure it cannot state is printed as withheld, and no file is stored or emailed |
 | Notifications (SMS or email), offline driver app, GPS tracking, card/mobile-money gateway, payroll | **Not built** — see `docs/PROGRESS.md` |
 
-1096 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+1101 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

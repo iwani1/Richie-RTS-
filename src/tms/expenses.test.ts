@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { executeCommand, type AnyCommand } from "./commands";
 import { costReport } from "./costs";
+import { expensesCsv, type ExpenseExport, type ExpenseExportRow } from "./expenses";
 import type { Actor, Credential, CommandResult } from "./service";
 import { emptyDatabase, emptyRentalSettings, type Database, type Expense, type User } from "./types";
 
@@ -221,5 +222,69 @@ describe("recording an expense (D-93)", () => {
     // A driver has no business reading the company's spending at all; the service refuses before it
     // can reach a collection the server would not even send them.
     expect(attempt(w, { type: "record_expense", input: expense() }, DRIVER).ok).toBe(false);
+  });
+});
+
+// The expenses screen, written out for a spreadsheet (RPT-04, D-113). The builder is handed the
+// screen's figures rather than recomputing them, so these tests pin the shape of the file: a heading
+// on every block, a voided entry present but counted in nothing, and the receipt facts printed as
+// they stand.
+describe("the expenses spreadsheet", () => {
+  const row = (overrides: Partial<ExpenseExportRow> = {}): ExpenseExportRow => ({
+    reference: "EXP-2026-0001",
+    incurredOn: "2026-06-05",
+    category: "Fuel",
+    description: "Diesel, Kumasi depot",
+    payee: "Total Filling Station",
+    method: "Cash",
+    amount: 320.5,
+    status: "Recorded",
+    receiptReference: "RCPT-0091",
+    receiptHeld: true,
+    hasScan: true,
+    ...overrides,
+  });
+
+  const view = (overrides: Partial<ExpenseExport> = {}): ExpenseExport => ({
+    from: "2026-06-01",
+    to: "2026-06-30",
+    currency: "GHS",
+    total: 320.5,
+    liveCount: 1,
+    noReceiptCount: 0,
+    noReceiptAmount: 0,
+    noScanCount: 0,
+    byCategory: [{ name: "Fuel", count: 1, amount: 320.5 }],
+    rows: [row()],
+    ...overrides,
+  });
+
+  it("writes the period's figures, the categories and every entry", () => {
+    const lines = expensesCsv(view()).split("\n");
+    expect(lines[0]).toBe("Expenses,2026-06-01 to 2026-06-30");
+    expect(lines).toContain("Currency,GHS");
+    expect(lines).toContain("Spent (live entries),320.50");
+    expect(lines).toContain("Entries with no receipt number,0");
+    expect(lines).toContain("Category,Entries,Amount");
+    expect(lines).toContain("Fuel,1,320.50");
+    // The description carries a comma, so the cell is quoted rather than breaking the row.
+    expect(lines).toContain('2026-06-05,EXP-2026-0001,Fuel,"Diesel, Kumasi depot",Total Filling Station,Cash,320.50,Recorded,RCPT-0091,yes,on file');
+  });
+
+  it("says none rather than ending a block silently, and keeps the weak receipt facts visible", () => {
+    const lines = expensesCsv(
+      view({
+        byCategory: [],
+        rows: [row({ category: "", receiptReference: "", receiptHeld: false, hasScan: false, status: "Void" })],
+      }),
+    ).split("\n");
+    expect(lines).toContain("none,,");
+    expect(lines).toContain("2026-06-05,EXP-2026-0001,Uncategorised,\"Diesel, Kumasi depot\",Total Filling Station,Cash,320.50,Void,,no,none");
+  });
+
+  it("exports nothing as none, rather than an empty file that looks like a quiet month", () => {
+    const lines = expensesCsv(view({ total: 0, liveCount: 0, byCategory: [], rows: [] })).split("\n");
+    expect(lines).toContain("Spent (live entries),0.00");
+    expect(lines[lines.length - 1]).toBe("none");
   });
 });

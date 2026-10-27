@@ -348,3 +348,34 @@ describe("copying a receipt number (D-111)", () => {
     expect(screen.getByText("no number")).toBeTruthy();
   });
 });
+
+describe("handing the expenses to a spreadsheet (RPT-04, D-113)", () => {
+  it("downloads the period's entries, named for the period, with an apostrophe on a formula", () => {
+    const created: Blob[] = [];
+    Object.defineProperty(URL, "createObjectURL", {
+      value: (blob: Blob) => {
+        created.push(blob);
+        return "blob:expenses";
+      },
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", { value: () => {}, configurable: true });
+    const clicked: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.download);
+    });
+
+    // A description typed as a formula is text, and the file must not hand it to Excel as one.
+    openJune(base([expense({ description: '=HYPERLINK("http://example.test")' })]));
+    fireEvent.click(screen.getByRole("button", { name: /Download CSV/i }));
+
+    expect(clicked).toEqual(["expenses-2026-06-01-to-2026-06-30.csv"]);
+    expect(created).toHaveLength(1);
+    click.mockRestore();
+  });
+
+  it("offers nothing to download for a period with no entries", () => {
+    openJune(base([]));
+    expect(screen.getByRole("button", { name: /Download CSV/i })).toHaveProperty("disabled", true);
+  });
+});

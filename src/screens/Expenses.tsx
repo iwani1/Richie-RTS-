@@ -19,6 +19,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { formatAmount, fromMinor, toMinor } from "../tms/money";
 import type { CommandResult } from "../tms/service";
+import { expensesCsv } from "../tms/expenses";
 import { RECEIPT_LIMITS, receiptFor } from "../tms/receipts";
 import type { Expense } from "../tms/types";
 import { EXPENSE_STATUS_LABELS } from "../tms/types";
@@ -42,6 +43,7 @@ import {
   todayYmd,
 } from "../ui/primitives";
 import { CopyButton } from "../ui/CopyButton";
+import { csvFileName, downloadTextFile } from "../ui/download";
 
 const money = (currency: string | null, amount: number) => (currency ? `${currency} ${formatAmount(amount)}` : "Not configured");
 const firstOfMonth = (today: string) => `${today.slice(0, 7)}-01`;
@@ -108,6 +110,41 @@ export function ExpensesPage() {
   const biggest = byCategory[0] ?? null;
   const categories = [...new Set([...db.settings.costCategories, ...inPeriod.map((expense) => expense.category).filter(Boolean)])];
 
+  // The file is the period, not the search box: the figures above it are the period's, and a file
+  // whose rows had been narrowed by a filter would not add up to the total on the same line (D-113).
+  const exportCsv = () => {
+    const rows = [...inPeriod]
+      .sort((a, b) => (a.incurredOn === b.incurredOn ? a.reference.localeCompare(b.reference) : a.incurredOn < b.incurredOn ? -1 : 1))
+      .map((expense) => ({
+        reference: expense.reference,
+        incurredOn: expense.incurredOn,
+        category: expense.category,
+        description: expense.description,
+        payee: expense.payee,
+        method: expense.method,
+        amount: expense.amount,
+        status: EXPENSE_STATUS_LABELS[expense.status],
+        receiptReference: expense.receiptReference,
+        receiptHeld: expense.receiptHeld,
+        hasScan: Boolean(receiptFor(db, expense.id)),
+      }));
+    downloadTextFile(
+      csvFileName("expenses", from, to),
+      expensesCsv({
+        from,
+        to,
+        currency,
+        total: fromMinor(totalMinor),
+        liveCount: live.length,
+        noReceiptCount: noReceipt.length,
+        noReceiptAmount: fromMinor(noReceiptMinor),
+        noScanCount: noScan.length,
+        byCategory,
+        rows,
+      }),
+    );
+  };
+
   const voidExpense = async (expense: Expense, reason: string) => {
     const result = await dispatch({ type: "void_expense", id: expense.id, reason });
     setFlash({ tone: result.ok ? "success" : "error", message: result.message });
@@ -122,11 +159,16 @@ export function ExpensesPage() {
         title="Expenses"
         description="Money spent that is not a repair: fuel, tolls, permits, rent, allowances. Entered from the receipt, counted in the money report, and never edited — a wrong one is voided with a reason."
         actions={
-          allowed("expenses:record") ? (
-            <Button variant="primary" onClick={() => setRecording(true)} disabled={!currency}>
-              Record an expense
+          <>
+            <Button variant="ghost" onClick={exportCsv} disabled={inPeriod.length === 0}>
+              Download CSV
             </Button>
-          ) : undefined
+            {allowed("expenses:record") && (
+              <Button variant="primary" onClick={() => setRecording(true)} disabled={!currency}>
+                Record an expense
+              </Button>
+            )}
+          </>
         }
       />
 

@@ -15,6 +15,7 @@
 //     types a late receipt;
 //   * it is never edited. A figure that was wrong when it was written is voided with a reason and
 //     entered again, so the number a report was built on stays on the record with its explanation.
+import { toCsv } from "./csv";
 import { formatAmount, parsePositiveAmount } from "./money";
 import { allocateReference } from "./references";
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
@@ -174,4 +175,82 @@ export function executeExpenses(
       return { ok: true, db: next, message: `${voided.reference} voided. It no longer counts in any report.` };
     }
   }
+}
+
+// The expenses screen, written out for a spreadsheet (RPT-04, D-113).
+//
+// The screen's own figures are handed in rather than recomputed, so a file can never disagree with
+// the page it came from. Voided entries are listed with their status and counted in nothing, which is
+// what voiding means (D-93). The receipt columns are printed as they stand, including the empty ones:
+// spending with no receipt number is a weaker fact and the file says so rather than leaving the cell
+// to be read as "fine".
+export interface ExpenseExportRow {
+  reference: string;
+  incurredOn: string;
+  category: string;
+  description: string;
+  payee: string;
+  method: string;
+  amount: number;
+  status: string;
+  receiptReference: string;
+  receiptHeld: boolean;
+  /** Whether a scan is on file for this entry (D-100). */
+  hasScan: boolean;
+}
+
+export interface ExpenseExport {
+  from: string;
+  to: string;
+  currency: string | null;
+  /** Live (not voided) spending in the period, added in whole pesewas. */
+  total: number;
+  liveCount: number;
+  noReceiptCount: number;
+  noReceiptAmount: number;
+  noScanCount: number;
+  byCategory: { name: string; count: number; amount: number }[];
+  /** The rows the screen is showing, in the order it shows them. */
+  rows: ExpenseExportRow[];
+}
+
+const UNCATEGORISED_EXPORT = "Uncategorised";
+
+export function expensesCsv(view: ExpenseExport): string {
+  const rows: (string | number)[][] = [
+    ["Expenses", `${view.from} to ${view.to}`],
+    [],
+    ["Metric", "Value"],
+    ["Currency", view.currency ?? "Not configured"],
+    ["Spent (live entries)", formatAmount(view.total)],
+    ["Entries in the period", view.liveCount],
+    ["Entries with no receipt number", view.noReceiptCount],
+    ["Amount with no receipt number", formatAmount(view.noReceiptAmount)],
+    ["Entries with no scan on file", view.noScanCount],
+    [],
+    ["By category"],
+    ["Category", "Entries", "Amount"],
+  ];
+  if (view.byCategory.length === 0) rows.push(["none", "", ""]);
+  for (const group of view.byCategory) rows.push([group.name, group.count, formatAmount(group.amount)]);
+  rows.push([]);
+  rows.push(["Entries"]);
+  rows.push(["Date", "Reference", "Category", "Description", "Payee", "Method", "Amount", "Status", "Receipt number", "Receipt held", "Scan"]);
+  if (view.rows.length === 0) rows.push(["none"]);
+  for (const row of view.rows) {
+    rows.push([
+      row.incurredOn,
+      row.reference,
+      row.category || UNCATEGORISED_EXPORT,
+      row.description,
+      row.payee,
+      row.method,
+      formatAmount(row.amount),
+      row.status,
+      row.receiptReference,
+      row.receiptHeld ? "yes" : "no",
+      row.hasScan ? "on file" : "none",
+    ]);
+  }
+  return toCsv(rows);
 }
