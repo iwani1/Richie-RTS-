@@ -1,5 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { RentalRequestInput } from "../tms/service";
+import { clientAccount, type ClientAdjustmentRow, type ClientInvoiceState, type ClientInvoiceRow, type ClientPaymentRow } from "../tms/clientAccount";
+import { formatAmount } from "../tms/money";
 import { scopedView } from "../tms/scope";
 import { contractStateOf } from "../tms/contracts";
 import { delayNote, liveDelay } from "../tms/delays";
@@ -27,6 +29,7 @@ import {
   PageHeader,
   Panel,
   Select,
+  Stat,
   TextArea,
   TextInput,
   formatDate,
@@ -54,6 +57,18 @@ const RENTAL_TONE: Record<RentalStatus, "info" | "warning" | "success" | "neutra
   cancelled: "error",
 };
 
+const money = (currency: string | null, amount: number) => (currency ? `${currency} ${formatAmount(amount)}` : formatAmount(amount));
+
+/** The colour is a second signal beside the words, never the only one. */
+const INVOICE_STATE_TONE: Record<ClientInvoiceState, "success" | "warning" | "error" | "info" | "neutral"> = {
+  "Awaiting payment": "warning",
+  "Part paid": "info",
+  Overdue: "error",
+  "Part paid, overdue": "error",
+  Settled: "success",
+  "Refund due": "info",
+};
+
 // Client portal. Own-record scope: everything here comes from scopedView(), which
 // confines this account to the one corporate client it is linked to.
 export function ClientPortalPage() {
@@ -73,12 +88,26 @@ export function ClientPortalPage() {
     });
   const stopName = (route: BusRoute, stopId: string | null) => route.stops.find((s) => s.id === stopId)?.name ?? "-";
 
+  // CLI-03, D-114: the account as at today, built from the **narrowed** payload the same way every
+  // other panel on this page is. The server has already removed what this account may not read; this
+  // second narrowing is what keeps the two views in step, and is why the figures below cannot include
+  // another customer's invoice even if one reached the browser. Nothing is recalculated here — the
+  // balances are the shared rule the printed statement uses.
+  const account = useMemo(
+    () =>
+      clientAccount(
+        { ...db, invoices: view.invoices, payments: view.payments, creditNotes: view.creditNotes, refunds: view.refunds },
+        today,
+      ),
+    [db, view, today],
+  );
+
   return (
     <div>
       <PageHeader
         eyebrow="Client"
         title={client?.name ?? currentUser?.fullName ?? "My account"}
-        description="Your contracted routes, the staff on them, and your rental requests."
+        description="What you owe, your contracted routes, the staff on them, and your rental requests."
       />
 
       {!client && (
@@ -90,6 +119,124 @@ export function ClientPortalPage() {
 
       {client && (
         <>
+          {/* CLI-03, D-114: what the customer owes. The agreement says what was promised; this says
+              what it has cost so far and what is still open, which is the question a client contact
+              is actually rung up to answer. */}
+          <div className="mt-5">
+            <Card
+              title="Your account"
+              description={`What you have been billed, what has been paid, and what is still owing as at ${formatDate(today)}.`}
+            >
+              {account.status === "no_invoices" && (
+                <EmptyState
+                  title="Nothing billed yet"
+                  body="Bills for your hired vehicles appear here once the office issues them. Until then there is no balance to state."
+                />
+              )}
+              {account.status === "mixed_currency" && (
+                <Notice tone="warning" title="These invoices are in more than one currency">
+                  {account.message}
+                </Notice>
+              )}
+              {account.totals && (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <Stat label="Billed" value={money(account.currencyCode, account.totals.billed)} caption="Invoices issued to you." />
+                    <Stat
+                      label="Paid"
+                      value={money(account.currencyCode, account.totals.received)}
+                      caption={account.totals.credited > 0 ? `${money(account.currencyCode, account.totals.credited)} has been credited off.` : "Money received against those bills."}
+                    />
+                    <Stat
+                      label="Balance due"
+                      value={money(account.currencyCode, account.totals.outstanding)}
+                      caption={account.totals.refunded > 0 ? `${money(account.currencyCode, account.totals.refunded)} has been paid back to you.` : "Billed less what came in and what was credited."}
+                    />
+                    <Stat
+                      label="Overdue"
+                      value={money(account.currencyCode, account.totals.overdue)}
+                      caption={
+                        account.totals.oldestDaysOverdue > 0
+                          ? `The oldest is ${account.totals.oldestDaysOverdue} days past its due date.`
+                          : "Nothing is past its due date."
+                      }
+                    />
+                  </div>
+                  {account.invoices.length > 0 && (
+                    <div className="mt-4">
+                      <DataTable
+                        rows={account.invoices}
+                        rowKey={(row: ClientInvoiceRow) => row.id}
+                        emptyState={<EmptyState title="No invoices" body="" />}
+                        columns={[
+                          { key: "ref", header: "Invoice", render: (row: ClientInvoiceRow) => <span className="font-mono text-xs">{row.reference}</span> },
+                          { key: "issued", header: "Issued", render: (row: ClientInvoiceRow) => <span className="text-xs">{formatDate(row.issuedOn)}</span> },
+                          { key: "due", header: "Due", render: (row: ClientInvoiceRow) => <span className="text-xs">{formatDate(row.dueOn)}</span> },
+                          { key: "total", header: "Billed", render: (row: ClientInvoiceRow) => money(row.currencyCode, row.total) },
+                          { key: "paid", header: "Paid", render: (row: ClientInvoiceRow) => money(row.currencyCode, row.paid) },
+                          { key: "credited", header: "Credited", render: (row: ClientInvoiceRow) => money(row.currencyCode, row.credited) },
+                          { key: "balance", header: "Balance due", render: (row: ClientInvoiceRow) => <span className="font-medium">{money(row.currencyCode, row.outstanding)}</span> },
+                          { key: "state", header: "State", render: (row: ClientInvoiceRow) => <Badge tone={INVOICE_STATE_TONE[row.state]}>{row.state}</Badge> },
+                        ]}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </Card>
+          </div>
+
+          <div className="mt-5">
+            <Card title="Payments received" description="Money the office has recorded against your invoices. A payment cancelled in error is not shown.">
+              {account.payments.length === 0 ? (
+                <EmptyState title="No payments recorded" body="When the office records money against your invoice, it appears here with its method and date." />
+              ) : (
+                <DataTable
+                  rows={account.payments}
+                  rowKey={(row: ClientPaymentRow) => row.id}
+                  emptyState={<EmptyState title="No payments recorded" body="" />}
+                  columns={[
+                    { key: "date", header: "Date", render: (row: ClientPaymentRow) => <span className="text-xs">{formatDate(row.paidOn)}</span> },
+                    { key: "ref", header: "Payment", render: (row: ClientPaymentRow) => <span className="font-mono text-xs">{row.reference}</span> },
+                    { key: "against", header: "Against", render: (row: ClientPaymentRow) => <span className="font-mono text-xs">{row.invoiceReference}</span> },
+                    { key: "method", header: "Method", render: (row: ClientPaymentRow) => row.method || <span className="text-stone-400">not recorded</span> },
+                    { key: "amount", header: "Amount", render: (row: ClientPaymentRow) => <span className="font-medium">{money(row.currencyCode, row.amount)}</span> },
+                  ]}
+                />
+              )}
+            </Card>
+          </div>
+
+          <div className="mt-5">
+            <Card title="Credited and paid back" description="Money taken off an invoice, and money returned to you, with the reason the office recorded.">
+              {account.adjustments.length === 0 ? (
+                <EmptyState title="Nothing credited" body="If part of a bill is not charged, or money is paid back to you, the credit note or refund appears here with its reason." />
+              ) : (
+                <DataTable
+                  rows={account.adjustments}
+                  rowKey={(row: ClientAdjustmentRow) => row.id}
+                  emptyState={<EmptyState title="Nothing credited" body="" />}
+                  columns={[
+                    { key: "date", header: "Date", render: (row: ClientAdjustmentRow) => <span className="text-xs">{formatDate(row.date)}</span> },
+                    {
+                      key: "kind",
+                      header: "Document",
+                      render: (row: ClientAdjustmentRow) => (
+                        <span>
+                          <span className="font-mono text-xs">{row.reference}</span>{" "}
+                          <span className="text-xs text-stone-600">{row.kind === "creditNote" ? "credit note" : "refund"}</span>
+                        </span>
+                      ),
+                    },
+                    { key: "against", header: "Against", render: (row: ClientAdjustmentRow) => <span className="font-mono text-xs">{row.invoiceReference}</span> },
+                    { key: "amount", header: "Amount", render: (row: ClientAdjustmentRow) => <span className="font-medium">{money(row.currencyCode, row.amount)}</span> },
+                    { key: "reason", header: "Why", render: (row: ClientAdjustmentRow) => row.reason },
+                  ]}
+                />
+              )}
+            </Card>
+          </div>
+
           {/* CLI-03, D-95: the agreement itself, stated plainly — term, service and state, so the
               answer to "what did we agree, and until when?" does not need a phone call. */}
           <Card title="Your agreement" description="What Richie Transport Services has agreed with your organisation.">

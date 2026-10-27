@@ -377,8 +377,38 @@ describe("credit notes inside the snapshot (D-86)", () => {
       createdAt: at,
       updatedAt: at,
     };
-    w.invoices = [invoice];
+    // A second customer's invoice, with its own credit note and refund: the rows a leak would show.
+    const otherInvoice = {
+      ...invoice,
+      id: "inv2",
+      reference: "INV-2026-0002",
+      clientId: "c2",
+      customerName: "Beta Ltd",
+      billableEvent: "rental:r2:final",
+    };
+    w.invoices = [invoice, otherInvoice];
     w.creditNotes = [
+      {
+        id: "cn2",
+        reference: "CN-2026-0002",
+        invoiceId: otherInvoice.id,
+        invoiceReference: otherInvoice.reference,
+        clientId: "c2",
+        customerName: "Beta Ltd",
+        currencyCode: "GHS",
+        lines: [],
+        taxLines: [],
+        subtotal: 50,
+        total: 50,
+        reason: "Issued in error on the other account",
+        issuedOn: "2026-06-05",
+        status: "issued" as const,
+        voidReason: null,
+        voidedAt: null,
+        createdBy: "Fin",
+        createdAt: at,
+        updatedAt: at,
+      },
       {
         id: "cn1",
         reference: "CN-2026-0001",
@@ -401,8 +431,47 @@ describe("credit notes inside the snapshot (D-86)", () => {
         updatedAt: at,
       },
     ];
+    // The money that came in against each invoice (D-114: a total without its payments reads as a debt).
+    const money = (id: string, invoiceId: string, amount: number) => ({
+      id,
+      reference: `PAY-2026-000${id.slice(-1)}`,
+      invoiceId,
+      amount,
+      currencyCode: "GHS",
+      method: "Bank transfer",
+      paidOn: "2026-06-03",
+      externalReference: "",
+      status: "recorded" as const,
+      note: "",
+      log: [],
+      recordedBy: "Fin",
+      recordedAt: at,
+      voidReason: null,
+      voidedAt: null,
+    });
+    w.payments = [money("p1", "inv1", 400), money("p2", "inv2", 600)];
     // A refund names a customer and an amount paid back to them (D-92). It travels with the invoice.
     w.refunds = [
+      {
+        id: "rf2",
+        reference: "REF-2026-0002",
+        invoiceId: otherInvoice.id,
+        invoiceReference: otherInvoice.reference,
+        clientId: "c2",
+        customerName: "Beta Ltd",
+        currencyCode: "GHS",
+        amount: 50,
+        method: "Bank transfer",
+        paidOn: "2026-06-07",
+        externalReference: "",
+        reason: "Issued in error on the other account",
+        status: "paid" as const,
+        voidReason: null,
+        voidedAt: null,
+        recordedBy: "Fin",
+        recordedAt: at,
+        updatedAt: at,
+      },
       {
         id: "rf1",
         reference: "REF-2026-0001",
@@ -427,20 +496,31 @@ describe("credit notes inside the snapshot (D-86)", () => {
     return w;
   }
 
-  it("never sends a credit note to a driver or a client contact", () => {
-    for (const who of [
-      actor("driver-user", "driver"),
-      actor("client-user", "client_contact"),
-    ]) {
-      const visible = scopeDatabase(withCreditNotes(), who)!;
-      expect(visible.creditNotes).toEqual([]);
-    }
+  it("sends a client contact the credit notes on its own invoices, and no other customer's (D-114)", () => {
+    // CLI-03: a balance without its credit notes reads as money the customer still owes. The note on
+    // the other account is the row that proves the narrowing, not the permission.
+    const visible = scopeDatabase(withCreditNotes(), actor("client-user", "client_contact"))!;
+    expect(visible.creditNotes.map((note) => note.reference)).toEqual(["CN-2026-0001"]);
+    expect(visible.invoices.map((invoice) => invoice.reference)).toEqual(["INV-2026-0001"]);
+  });
+
+  it("never sends a credit note to a driver", () => {
+    // The narrowed snapshot is a whitelist; a collection it forgets is handed over in full.
+    expect(scopeDatabase(withCreditNotes(), actor("driver-user", "driver"))!.creditNotes).toEqual([]);
+  });
+
+  it("sends a client contact the payments on its own invoices, and no other customer's", () => {
+    const visible = scopeDatabase(withCreditNotes(), actor("client-user", "client_contact"))!;
+    expect(visible.payments.map((payment) => payment.reference)).toEqual(["PAY-2026-0001"]);
+    // A driver is still sent none of it.
+    expect(scopeDatabase(withCreditNotes(), actor("driver-user", "driver"))!.payments).toEqual([]);
   });
 
   it("sends finance the credit notes that belong to the invoices it may read", () => {
     const visible = scopeDatabase(withCreditNotes(), actor("fin", "finance"))!;
-    expect(visible.creditNotes.map((note) => note.reference)).toEqual(["CN-2026-0001"]);
-    expect(visible.invoices.map((invoice) => invoice.reference)).toEqual(["INV-2026-0001"]);
+    // Finance reads every customer's billing: this is the office, not a portal.
+    expect(visible.creditNotes.map((note) => note.reference)).toEqual(["CN-2026-0002", "CN-2026-0001"]);
+    expect(visible.invoices.map((invoice) => invoice.reference)).toEqual(["INV-2026-0001", "INV-2026-0002"]);
   });
 
   it("sends operations nothing about billing, credit notes and refunds included", () => {
@@ -450,17 +530,19 @@ describe("credit notes inside the snapshot (D-86)", () => {
     expect(visible.invoices).toEqual([]);
   });
 
-  it("never sends a refund to a driver or a client contact", () => {
+  it("sends a client contact the refunds paid back on its own invoices, and no other customer's", () => {
+    const visible = scopeDatabase(withCreditNotes(), actor("client-user", "client_contact"))!;
+    expect(visible.refunds.map((refund) => refund.reference)).toEqual(["REF-2026-0001"]);
+  });
+
+  it("never sends a refund to a driver", () => {
     // The narrowed snapshot is a whitelist; an unlisted collection would be handed over in full.
-    for (const who of [actor("driver-user", "driver"), actor("client-user", "client_contact")]) {
-      const visible = scopeDatabase(withCreditNotes(), who)!;
-      expect(visible.refunds).toEqual([]);
-    }
+    expect(scopeDatabase(withCreditNotes(), actor("driver-user", "driver"))!.refunds).toEqual([]);
   });
 
   it("sends finance the refunds that belong to the invoices it may read", () => {
     const visible = scopeDatabase(withCreditNotes(), actor("fin", "finance"))!;
-    expect(visible.refunds.map((refund) => refund.reference)).toEqual(["REF-2026-0001"]);
+    expect(visible.refunds.map((refund) => refund.reference)).toEqual(["REF-2026-0002", "REF-2026-0001"]);
   });
 });
 

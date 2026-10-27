@@ -236,7 +236,11 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // confirm a seat, because capacity is the office's judgement (BKG-03, D-83).
   // contracts:read is own-record: a client's own contact sees the agreement the office runs for them,
   // which is what makes the portal answer "what did we agree?" without a phone call (CLI-03, D-95).
-  client_contact: ["routes:read", "passengers:read", "rentals:read", "rentals:create", "bookings:read", "bookings:create", "contracts:read"],
+  // invoices:read is own-record too (D-114): the invoice, the payments against it, what was credited
+  // off it and what was paid back, on this client's own invoices and nothing else. It is a read
+  // permission and nothing more — a client contact still cannot issue, void, credit or record a
+  // payment. What it is for is the question a customer actually rings up to ask: what do we owe you?
+  client_contact: ["routes:read", "passengers:read", "rentals:read", "rentals:create", "invoices:read", "bookings:read", "bookings:create", "contracts:read"],
   // Own-record scope: a passenger sees its own rider record, its route and the runs that carry it,
   // and the seats it holds (PAX-01, D-97). It may ask for a seat for **itself** and cancel one it
   // holds; it can never book for somebody else, confirm its own seat, or read another rider.
@@ -265,6 +269,7 @@ const OWN_SCOPED_FOR_BOUND_ROLES: readonly Permission[] = [
   "bookings:read",
   "bookings:create",
   "contracts:read",
+  "invoices:read",
 ];
 
 export function isOwnScoped(role: Role, permission: Permission): boolean {

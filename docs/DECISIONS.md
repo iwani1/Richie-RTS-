@@ -2547,3 +2547,50 @@ deliberately not done.
   home, the statement, the fleet dashboard and the expenses screen; the Reports screen's two blob blocks replaced by the
   shared helper. No schema change, no server change, no dependency. 25 new tests (7 on the writer,
   3 on the download, 9 on the four builders, 6 on the buttons).
+
+## D-114 - A client sees the billing on its own invoices, and nothing else (CLI-03)
+
+The corporate dashboard was built to be "limited to the client's own records" and it was — routes,
+roster, rental requests, agreements — with one conspicuous gap recorded honestly in the register: **no
+invoices or payment status**. The reason was a decision, not an oversight: D-86 and D-92 said a credit
+note and a refund are billing, so they travel with the invoice and never to a bound account. That rule
+was right for a *driver*, and for a client contact it produced a dashboard that could not answer the
+only question a customer opens it to ask.
+
+- **Decision 1: a client contact reads its own client's billing.** `invoices:read` is held by
+  `client_contact` and own-record scoped. The narrow form is the same shape the portal already uses for
+  routes and rentals: the invoices naming this client, or billing a rental that belongs to it, and
+  nothing else. It is a **read** permission: a client contact still cannot issue, void, credit, record a
+  payment or pay money back.
+- **Decision 2: the four collections move together.** The invoice, the payments against it, the credit
+  notes off it and any refund paid back are narrowed by one function (`clientBilling` in
+  `src/tms/scope.ts`) and sent together. An invoice with its total but not its payments reads as a debt
+  the customer has already paid; a balance without its credit notes reads as money still owed on a bill
+  the office already reduced. Sending one of the four would have been worse than sending none.
+- **Decision 3: the balance is the shared rule, not a second one.** The portal states every figure
+  through `invoiceBalance` (D-86), the same function behind the printed statement and the finance home,
+  so a cancelled payment never arrives and a credit note reduces what is owed wherever it is read. A
+  portal that subtracted on its own would be a fifth place for the same number to disagree.
+- **Decision 4: the client is matched on the client *or* the rental.** Invoices written before buyer
+  details were copied onto the document (CUS-01) carry only the rental. Matching on the client alone
+  would hide a customer's own older bill from them — a silent understatement of what they owe, which is
+  the worst direction for that mistake to run.
+- **Decision 5: narrowed twice, as everything else in the portal is.** The server removes what the
+  account may not read; the portal applies the same scope again to whatever it holds. The screen test
+  that proves it hands the browser the *whole* database and asserts the other customer's invoice is not
+  on the page — the second narrowing is the control being tested, not a formality.
+- **Decision 6: no figure is invented where none can be stated.** An account never billed says so. Two
+  currencies are never added together: the invoices are listed one by one and the page says why there is
+  no total. A void invoice is not stated at all — it never asked for money.
+- **Decision 7: nothing is downloadable from the portal yet.** A client contact can now read the
+  account, and there is no statement to save: the printable statement (D-90) is the office's document,
+  and sending a customer their own PDF raises the same unanswered question as sending an invoice (Q-51)
+  — nothing is emailed in this build. It stays on the open list rather than being half-built.
+- **Rejected:** keying the portal on the customer **name**, which is how the office statement groups
+  invoices. Two customers may share a name, and a browser-side grouping by name would then show one
+  company the other's bills. The portal keys on the client record.
+- **Consequence.** `clientBilling` in `src/tms/scope.ts`; the four collections in the bound-role branch
+  of `src/server/visibility.ts` (they were hard-coded empty); `invoices:read` for `client_contact`;
+  `src/tms/clientAccount.ts` (`clientAccount`); the account, payments and adjustments panels in
+  `src/screens/ClientPortal.tsx`. No schema change, no server route, no dependency. 19 new tests, and two payload
+  tests rewritten to assert the narrower rule that replaced them.

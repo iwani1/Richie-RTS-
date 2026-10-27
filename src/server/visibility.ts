@@ -10,7 +10,8 @@
 //   - internal roles (administrator, operations, finance) read company-wide, as before;
 //   - a driver reads their own driver record, the trips assigned to them and the vehicles those
 //     trips used;
-//   - a client contact reads their own client, its routes, roster and rental requests;
+//   - a client contact reads their own client, its routes, roster, rental requests, agreements and
+//     the billing on its own invoices (CLI-03, D-114);
 //   - a passenger reads its own rider record, its own journeys and the seats it holds (PAX-01, D-97);
 //   - a record-bound account with no linked record reads nothing. It does not fall back to
 //     company-wide access.
@@ -167,15 +168,15 @@ export function scopeDatabase(database: Database, actor: Actor | null): Database
       // the narrowed snapshot handed the whole bookings table to a client contact or a driver.
       bookings: view.bookings,
       odometerReadings: database.odometerReadings.filter((reading) => vehicleIds.has(reading.vehicleId)),
-      invoices: [],
-      payments: [],
-      // D-86: a credit note states what a customer was billed and why they were given money back.
-      // It is billing, so it stays with the invoice and the payment rows — never with a driver or a
-      // client contact. Adding the collection without this line would have sent the whole table.
-      creditNotes: [],
-      // D-92: a refund names a customer and an amount paid back to them. Billing, so it stays with
-      // the invoice rows and never travels to a driver or a client contact.
-      refunds: [],
+      // D-114 (CLI-03): a client contact now reads the billing on its **own** invoices — the invoice,
+      // the payments against it, what was credited off it and what was paid back. The four come from
+      // `clientBilling`, so another customer's invoice, payment, credit note or refund cannot travel;
+      // a driver and a rider receive none of them. Before this line they were hard-coded empty, which
+      // is why the client portal could say what was agreed but not what was owed.
+      invoices: view.invoices,
+      payments: view.payments,
+      creditNotes: view.creditNotes,
+      refunds: view.refunds,
       // D-93: an expense names a payee and what the business spent. It never travels to a driver or
       // a client contact.
       expenses: [],

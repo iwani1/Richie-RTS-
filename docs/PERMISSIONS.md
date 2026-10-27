@@ -47,6 +47,7 @@ where a row has no `passenger` column, the role does not hold that permission at
 | passengers:read | | x | only its client's roster (name and pickup stop are shown; contact details are not) |
 | rentals:read | | x | only its client's rental requests |
 | rentals:create | | x | client is forced to its own; the request cannot name another client |
+| invoices:read | | x | the invoice, the payments against it, the credit notes off it and any refund, on its own client's invoices only (CLI-03, D-114). Read only: a client contact cannot issue, void, credit or record money |
 
 Both roles are denied everything else, including all of staff logistics, fleet, users,
 settings and audit. An account whose linked record is missing sees **nothing** — scope is
@@ -75,7 +76,7 @@ D-60). Hiding a control is a convenience, never the control.
 | rentals:dispatch | x | x | | | |
 | rentals:complete | x | x | | | |
 | rentals:cancel | x | x | | | |
-| invoices:read | x | | x | | |
+| invoices:read | x | | x | | own |
 | invoices:issue / void | x | | x | | |
 | payments:record / advance / void | x | | x | | |
 | audit:read | x | x | | | |
@@ -116,7 +117,7 @@ company-wide report cannot be assembled from it.
 
 | Permission | administrator | operations | finance | driver | client_contact |
 |---|:-:|:-:|:-:|:-:|:-:|
-| invoices:read | x | | x | | |
+| invoices:read | x | | x | | own |
 | invoices:issue | x | | x | | |
 | invoices:void | x | | x | | |
 | payments:record | x | | x | | |
@@ -142,6 +143,13 @@ job. A driver and a client contact hold none of the three, because an expense na
 (`visibility.ts`, `SECTION_PERMISSIONS`). Recording requires the company currency, so a company that
 has not set one cannot enter spending at all.
 
+`invoices:read` is also held by a **client contact**, own-record scoped (CLI-03, D-114): the portal shows
+its own client's invoices with their payments, credit notes and refunds, which is what makes the balance
+on the page the balance on the customer's own invoice. It is a read permission and nothing more, and it
+is narrowed twice — by `clientBilling` in `src/tms/scope.ts` on the server, and again in the portal from
+the same scope — so another customer's invoice cannot be assembled from the payload. A driver and a
+rider receive no billing at all.
+
 `receipts:read` and `receipts:write` (Q-51, D-100) cover the **scanned copy** of a receipt: filing the
 image against an entry, opening it, and taking it off with a reason. They are separate from
 `expenses:read` on purpose. Operations reads the expense register — fuel and tolls are part of what its
@@ -154,8 +162,10 @@ acts by different people).
 
 Read scope: `invoices:read` also opens the invoice's payments, credit notes and refunds, because all
 three are part of the invoice — and it is the permission the **Statements** destination needs (D-90), because a
-statement is those same three collections read for one customer over a period. Record-bound roles receive none of the three collections, so a driver or client
-contact never sees a customer's billing (`visibility.ts`, `SECTION_PERMISSIONS`).
+statement is those same three collections read for one customer over a period. A driver and a rider receive none of the three collections, so a bound account never sees a
+customer's billing (`visibility.ts`, `SECTION_PERMISSIONS`). A client contact receives its **own**
+client's, and only since CLI-03 (D-114) — before that, the portal could say what was agreed and not what
+was owed.
 
 Separation of duties: operations completes a rental and therefore produces the line items that will
 be billed, but cannot issue the invoice or record money against it. Finance issues, records payments

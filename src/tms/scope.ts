@@ -3,8 +3,9 @@
 // Internal staff (administrator, operations, finance) work company-wide. Record-bound
 // roles work against the single record their account is linked to:
 //   driver        -> its driver record, and therefore the trips/vehicles assigned to it
-//   client_contact -> its corporate client, and therefore that client's routes, roster
-//                     and rental requests
+//   client_contact -> its corporate client, and therefore that client's routes, roster,
+//                     rental requests, agreements, and the billing on its own invoices
+//                     (CLI-03, D-114)
 //   passenger     -> its own rider record, the route it travels on and the runs that carry
 //                     it, and the seats it holds (PAX-01, D-97)
 //
@@ -23,10 +24,14 @@ import type {
   Client,
   ComplianceDocument,
   Contract,
+  CreditNote,
   Database,
   Driver,
   Incident,
+  Invoice,
   Passenger,
+  Payment,
+  Refund,
   Rental,
   Trip,
   User,
@@ -67,6 +72,32 @@ export function driverTripIds(db: Database, driverId: string): Set<string> {
 }
 
 /**
+ * The billing on one client's own invoices (CLI-03, D-114): the invoice, the money that came in
+ * against it, what was credited off it, and what was paid back.
+ *
+ * The four move together or not at all. A client shown an invoice total without its payments would
+ * read a paid bill as money owed; a client shown a balance without its credit notes would read a
+ * credited bill as money owed. So the payload carries all four, and the portal states the balance with
+ * `invoiceBalance` — the same rule the office's screens and the printed statement use.
+ *
+ * An invoice is matched on the client it names **or** on the rental it bills, because invoices written
+ * before the client was copied onto the document (CUS-01) carry only the rental.
+ */
+function clientBilling(db: Database, clientId: string) {
+  const rentalIds = new Set(db.rentals.filter((rental) => rental.clientId === clientId).map((rental) => rental.id));
+  const invoices = db.invoices.filter(
+    (invoice) => invoice.clientId === clientId || (invoice.rentalId !== null && rentalIds.has(invoice.rentalId)),
+  );
+  const invoiceIds = new Set(invoices.map((invoice) => invoice.id));
+  return {
+    invoices,
+    payments: db.payments.filter((payment) => invoiceIds.has(payment.invoiceId)),
+    creditNotes: db.creditNotes.filter((note) => invoiceIds.has(note.invoiceId)),
+    refunds: db.refunds.filter((refund) => invoiceIds.has(refund.invoiceId)),
+  };
+}
+
+/**
  * Returns only the records this actor may see. For internal roles this is the whole
  * database slice; for record-bound roles it is their own records and what hangs off them.
  */
@@ -86,6 +117,10 @@ export function scopedView(db: Database, actor: Actor | null) {
       documents: db.documents,
       bookings: db.bookings,
       contracts: db.contracts,
+      invoices: db.invoices,
+      payments: db.payments,
+      creditNotes: db.creditNotes,
+      refunds: db.refunds,
     };
   }
 
@@ -125,6 +160,12 @@ export function scopedView(db: Database, actor: Actor | null) {
       bookings: db.bookings.filter((booking) => tripIds.has(booking.tripId)),
       // A driver has no business reading what the company agreed to charge a client (D-95).
       contracts: [] as Contract[],
+      // D-114: nor what the client was billed. Billing is the customer's own, and the office's
+      // commercial terms with them.
+      invoices: [] as Invoice[],
+      payments: [] as Payment[],
+      creditNotes: [] as CreditNote[],
+      refunds: [] as Refund[],
     };
   }
 
@@ -155,6 +196,11 @@ export function scopedView(db: Database, actor: Actor | null) {
       documents: [] as ComplianceDocument[],
       bookings: myBookings,
       contracts: [] as Contract[],
+      // D-114: billing belongs to the customer who was billed, not to the rider on the bus.
+      invoices: [] as Invoice[],
+      payments: [] as Payment[],
+      creditNotes: [] as CreditNote[],
+      refunds: [] as Refund[],
     };
   }
 
@@ -178,6 +224,10 @@ export function scopedView(db: Database, actor: Actor | null) {
       // and which routes are in scope — which is what its dashboard is for (CLI-03). Nothing about
       // another client's contract can reach it.
       contracts: db.contracts.filter((contract) => contract.clientId === link.client!.id),
+      // D-114: its own invoices, and the payments, credit notes and refunds against them. Four
+      // collections that must travel together: a total without its payments reads as money owed, and
+      // a payment without the credit note beside it reads as a balance that never moved.
+      ...clientBilling(db, link.client.id),
     };
   }
 
@@ -195,6 +245,10 @@ export function scopedView(db: Database, actor: Actor | null) {
     documents: [] as ComplianceDocument[],
     bookings: [] as Booking[],
     contracts: [] as Contract[],
+    invoices: [] as Invoice[],
+    payments: [] as Payment[],
+    creditNotes: [] as CreditNote[],
+    refunds: [] as Refund[],
   };
 }
 

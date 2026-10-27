@@ -84,7 +84,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Staff busing: routes, rosters, trip generation, dispatch, progressive stop/boarding capture, seat bookings, on-time report | Works; a freed seat is offered to the waiting list, never auto-confirmed, and a booked seat is on the run's manifest |
 | Staff logistics: incidents, work orders, cost report | Works |
 | Fleet readiness: service intervals, odometer, readiness | Works |
-| Driver, client and passenger portals (own-record scope) | Works — a rider sees its own journeys, seats and references, and no live position, because none is recorded |
+| Driver, client and passenger portals (own-record scope) | Works — a client contact sees its own account: what was billed, what came in, what was credited and what is still owed, with the invoices behind it and no other customer's; a rider sees its own journeys, seats and references, and no live position, because none is recorded |
 | Invoices and manual payments: numbered, voided, part-paid, settled | Works; numbers are per year and per kind |
 | Credit notes: money taken off an issued invoice, with a refund stated when it goes below what was paid | Works; one balance rule behind the screen, both money reports and the finance home |
 | Cancelling a payment recorded in error, with a reason, one way, leaving the invoice owed again | Works; the money reports, the finance home and the printed sheet all ignore a cancelled payment |
@@ -114,7 +114,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Management report as an A4 document, printed or saved as a PDF by the browser | Works; the figures are the report's own, a figure it cannot state is printed as withheld, and no file is stored or emailed |
 | Notifications (SMS or email), offline driver app, GPS tracking, card/mobile-money gateway, payroll | **Not built** — see `docs/PROGRESS.md` |
 
-1101 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+1120 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

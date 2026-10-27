@@ -3,7 +3,7 @@ import { executeCommand, type AnyCommand } from "./commands";
 import { isOwnScoped, isRecordBound, ROLE_PERMISSIONS, can } from "./permissions";
 import { actorLink, confinedClientId, driverVehicleIds, mayReportOnVehicle, scopedView } from "./scope";
 import type { Actor, Credential } from "./service";
-import { emptyDatabase, emptyRentalSettings, type Database } from "./types";
+import { emptyDatabase, emptyRentalSettings, type CreditNote, type Database, type Invoice, type Payment, type Refund } from "./types";
 
 const cred: Credential = { passwordHash: "a".repeat(64), passwordSalt: "b".repeat(32) };
 const NOW = "2026-01-01T00:00:00.000Z";
@@ -104,6 +104,110 @@ function world(): World {
 }
 
 const attempt = (w: World, actor: Actor, command: AnyCommand) => executeCommand(w.db, actor, command, NOW);
+
+// Billing fixtures (CLI-03, D-114). Invoices are written straight onto the database because this file
+// is about what `scopedView` hands back, and issuing a real invoice would take a completed hire to get
+// here. The shapes are the ones `finance.ts` writes.
+const invoiceFor = (id: string, clientId: string, reference: string, overrides: Partial<Invoice> = {}): Invoice => ({
+  id,
+  reference,
+  kind: "rental",
+  rentalId: null,
+  clientId,
+  customerName: clientId === "CLIENT_ONE" ? "Alpha Ltd" : "Beta Ltd",
+  buyerAddress: "",
+  buyerTin: "",
+  currencyCode: "GHS",
+  lines: [],
+  taxLines: [],
+  subtotal: 1000,
+  total: 1000,
+  amountPaid: 0,
+  status: "issued",
+  billableEvent: `rental:${id}:final`,
+  issuedOn: "2026-01-05",
+  dueOn: "2026-01-19",
+  notes: "",
+  voidReason: null,
+  voidedAt: null,
+  createdAt: NOW,
+  updatedAt: NOW,
+  ...overrides,
+});
+
+const paymentFor = (id: string, invoiceId: string): Payment => ({
+  id,
+  reference: `PAY-2026-000${id.slice(-1)}`,
+  invoiceId,
+  amount: 400,
+  currencyCode: "GHS",
+  method: "Bank transfer",
+  paidOn: "2026-01-10",
+  externalReference: "",
+  status: "recorded",
+  note: "",
+  log: [],
+  recordedBy: "Fin",
+  recordedAt: NOW,
+  voidReason: null,
+  voidedAt: null,
+});
+
+const creditFor = (id: string, invoiceId: string, clientId: string): CreditNote => ({
+  id,
+  reference: `CN-2026-000${id.slice(-1)}`,
+  invoiceId,
+  invoiceReference: "INV",
+  clientId,
+  customerName: "Alpha Ltd",
+  currencyCode: "GHS",
+  lines: [],
+  taxLines: [],
+  subtotal: 100,
+  total: 100,
+  reason: "Service not delivered",
+  issuedOn: "2026-01-12",
+  status: "issued",
+  voidReason: null,
+  voidedAt: null,
+  createdBy: "Fin",
+  createdAt: NOW,
+  updatedAt: NOW,
+});
+
+const refundFor = (id: string, invoiceId: string, clientId: string): Refund => ({
+  id,
+  reference: `REF-2026-000${id.slice(-1)}`,
+  invoiceId,
+  invoiceReference: "INV",
+  clientId,
+  customerName: "Alpha Ltd",
+  currencyCode: "GHS",
+  amount: 100,
+  method: "Bank transfer",
+  paidOn: "2026-01-14",
+  externalReference: "",
+  reason: "Service not delivered",
+  status: "paid",
+  voidReason: null,
+  voidedAt: null,
+  recordedBy: "Fin",
+  recordedAt: NOW,
+  updatedAt: NOW,
+});
+
+/** Two clients, two invoices, and the money against each, so a leak is visible as a wrong row. */
+function billed(w: World): World {
+  const [alpha, beta] = w.db.clients.map((client) => client.id);
+  w.db = {
+    ...w.db,
+    invoices: [invoiceFor("inv1", alpha, "INV-2026-0001"), invoiceFor("inv2", beta, "INV-2026-0002")],
+    payments: [paymentFor("p1", "inv1"), paymentFor("p2", "inv2")],
+    creditNotes: [creditFor("cn1", "inv1", alpha), creditFor("cn2", "inv2", beta)],
+    refunds: [refundFor("rf1", "inv1", alpha), refundFor("rf2", "inv2", beta)],
+  };
+  return w;
+}
 
 describe("account-to-record links (validateUser)", () => {
   it("requires a driver record for a driver account and a client for a client contact", () => {
@@ -335,6 +439,66 @@ describe("scopedView", () => {
     expect(view.trips[0].id).toBe(w.tripOne);
     expect(view.vehicles).toHaveLength(0);
     expect(view.incidents).toHaveLength(0);
+  });
+
+  it("shows a client contact the billing on its own invoices and no other customer's (CLI-03, D-114)", () => {
+    const w = billed(world());
+    const view = scopedView(w.db, w.clientOne);
+    expect(view.invoices.map((invoice) => invoice.reference)).toEqual(["INV-2026-0001"]);
+    expect(view.payments.map((payment) => payment.reference)).toEqual(["PAY-2026-0001"]);
+    expect(view.creditNotes.map((note) => note.reference)).toEqual(["CN-2026-0001"]);
+    expect(view.refunds.map((refund) => refund.reference)).toEqual(["REF-2026-0001"]);
+  });
+
+  it("matches an invoice on the rental it bills when the document names no client", () => {
+    // Invoices written before the buyer was copied onto the document (CUS-01) carry only the rental,
+    // so the rental is the second way to know whose bill it is. One rental each, for two clients.
+    const w = billed(world());
+    const request = (name: string) => ({
+      clientId: null,
+      customerName: name,
+      customerPhone: "",
+      customerEmail: "",
+      purpose: "Staff shuttle",
+      pickupLocation: "Accra",
+      dropoffLocation: "Tema",
+      startDate: "2026-02-01",
+      endDate: "2026-02-02",
+      passengers: "4",
+      vehicleCategoryId: w.db.settings.vehicleCategories[0].id,
+      driverRequired: true,
+      notes: "",
+    });
+    for (const clientId of w.db.clients.map((client) => client.id)) {
+      const result = executeCommand(w.db, w.ops, { type: "create_rental", input: { ...request("Shuttle"), clientId } }, NOW);
+      expect(result.ok).toBe(true);
+      if (result.ok) w.db = result.db;
+    }
+    const [alphaRental, betaRental] = w.db.rentals;
+    expect(alphaRental.clientId).toBe(w.clientOneId);
+    w.db = {
+      ...w.db,
+      invoices: [
+        invoiceFor("inv9", "", "INV-2026-0009", { clientId: null, rentalId: alphaRental.id }),
+        invoiceFor("inv8", "", "INV-2026-0008", { clientId: null, rentalId: betaRental.id }),
+      ],
+      payments: [paymentFor("p9", "inv9"), paymentFor("p8", "inv8")],
+      creditNotes: [],
+      refunds: [],
+    };
+    const view = scopedView(w.db, w.clientOne);
+    expect(view.invoices.map((invoice) => invoice.reference)).toEqual(["INV-2026-0009"]);
+    expect(view.payments.map((payment) => payment.reference)).toEqual(["PAY-2026-0009"]);
+  });
+
+  it("gives a driver and a rider no billing at all", () => {
+    const w = billed(world());
+    for (const view of [scopedView(w.db, w.driverOne), scopedView(w.db, { id: w.db.users[0].id, fullName: "Admin", role: "passenger" })]) {
+      expect(view.invoices).toEqual([]);
+      expect(view.payments).toEqual([]);
+      expect(view.creditNotes).toEqual([]);
+      expect(view.refunds).toEqual([]);
+    }
   });
 
   it("shows nothing to a record-bound account with no linked record", () => {
