@@ -303,8 +303,8 @@ describe("staff transport tab (RPT-02)", () => {
       startDate: "2026-01-01",
       endDate: null,
       stops: [
-        { id: "s1", name: "Estate gate", scheduledTime: "06:00" },
-        { id: "s2", name: "Head office", scheduledTime: "06:30" },
+        { id: "s1", name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+        { id: "s2", name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
       ],
       status: "active" as const,
       createdAt: at,

@@ -554,5 +554,11 @@ Constraints and triggers:
   company's vehicles is declared per vehicle category in `app_settings`, not in the schema. Empty
   means "not recorded", and an assignment to a category that declares classes is refused while the
   driver's list is empty.
+- **Route stops (RTE-01, D-104).** A stop is not a table: it lives inside its route's `data` record,
+  as `{ id, name, scheduledTime, landmark, digitalAddress, latitude, longitude }`. The four direction
+  fields arrived in schema 25 and are optional; `migrate()` fills them for older routes. Nothing in
+  the database constrains them, and the shape of a Ghana Post GPS address is checked in
+  `src/tms/stops.ts` where the form and the command meet — the report is a sentence a person can act
+  on, which a check constraint cannot give.
 - `reference_counter` is written by the same transaction that writes the document, so two writers
   cannot allocate the same number.

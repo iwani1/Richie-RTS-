@@ -45,8 +45,8 @@ const route: BusRoute = {
   endDate: null,
   status: "active",
   stops: [
-    { id: "s1", name: "Estate gate", scheduledTime: "06:00" },
-    { id: "s2", name: "Head office", scheduledTime: "06:30" },
+    { id: "s1", name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+    { id: "s2", name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
   ],
   createdAt: at,
   updatedAt: at,

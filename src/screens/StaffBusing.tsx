@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { MAX_GENERATE_DAYS, type AdhocTripInput, type CompleteTripInput, type PassengerInput, type RouteInput, type TripAssignInput, type TripCorrectionInput } from "../tms/busing";
+import { stopDetailLine } from "../tms/stops";
 import { capacityOf, manifestFor, type BookingRequestInput, type ManifestRider } from "../tms/bookings";
 import { TripStopForm } from "./TripStopForm";
 import { onTimeReport } from "../tms/kpis";
@@ -132,11 +133,21 @@ function RoutesTab() {
           {
             key: "times",
             header: "Times",
-            render: (r) => (
-              <span className="whitespace-nowrap text-xs">
-                {r.stops[0]?.scheduledTime} - {r.stops[r.stops.length - 1]?.scheduledTime} ({r.stops.length} stops)
-              </span>
-            ),
+            render: (r) => {
+              // RTE-01: the count of stops nobody has described. A route of bare names only works
+              // for the driver who already knows it, so the gap is shown rather than assumed away.
+              const bare = r.stops.filter((stop) => stopDetailLine(stop) === "").length;
+              return (
+                <span className="whitespace-nowrap text-xs">
+                  {r.stops[0]?.scheduledTime} - {r.stops[r.stops.length - 1]?.scheduledTime} ({r.stops.length} stops)
+                  {bare > 0 && (
+                    <span className="block text-[11px] text-stone-600">
+                      {bare} of {r.stops.length} without directions
+                    </span>
+                  )}
+                </span>
+              );
+            },
           },
           { key: "vehicle", header: "Vehicle", render: (r) => categoryName(r.vehicleCategoryId) },
           {
@@ -181,7 +192,15 @@ function RouteForm({ route, onClose }: { route: BusRoute | null; onClose: () => 
           startDate: route.startDate,
           endDate: route.endDate ?? "",
           status: route.status,
-          stops: route.stops.map((s) => ({ id: s.id, name: s.name, scheduledTime: s.scheduledTime })),
+          stops: route.stops.map((s) => ({
+            id: s.id,
+            name: s.name,
+            scheduledTime: s.scheduledTime,
+            landmark: s.landmark ?? "",
+            digitalAddress: s.digitalAddress ?? "",
+            latitude: s.latitude ?? "",
+            longitude: s.longitude ?? "",
+          })),
         }
       : {
           name: "",
@@ -194,8 +213,8 @@ function RouteForm({ route, onClose }: { route: BusRoute | null; onClose: () => 
           endDate: "",
           status: "active",
           stops: [
-            { name: "", scheduledTime: "" },
-            { name: "", scheduledTime: "" },
+            { name: "", scheduledTime: "", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+            { name: "", scheduledTime: "", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
           ],
         },
   );
@@ -302,22 +321,45 @@ function RouteForm({ route, onClose }: { route: BusRoute | null; onClose: () => 
         <div>
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">Stops in order</span>
-            <Button disabled={locked} onClick={() => set({ stops: [...values.stops, { name: "", scheduledTime: "" }] })}>Add stop</Button>
+            <Button disabled={locked} onClick={() =>
+              set({
+                stops: [...values.stops, { name: "", scheduledTime: "", landmark: "", digitalAddress: "", latitude: "", longitude: "" }],
+              })
+            }>Add stop</Button>
           </div>
           {errors.stops && <Notice tone="error" className="mb-2">{errors.stops}</Notice>}
           <ol className="space-y-2">
             {values.stops.map((s, i) => (
-              <li key={s.id ?? `new-${i}`} className="grid gap-2 rounded-sm border border-[color:var(--rts-line)] bg-[var(--rts-paper-2)] p-2 sm:grid-cols-[1fr_120px_auto]">
-                <Field label={`Stop ${i + 1} name`} error={errors[`stops.${i}.name`]}>
-                  <TextInput value={s.name} onChange={(e) => setStop(i, { name: e.target.value })} disabled={locked} invalid={!!errors[`stops.${i}.name`]} />
-                </Field>
-                <Field label={`Stop ${i + 1} scheduled time`} error={errors[`stops.${i}.scheduledTime`]}>
-                  <TextInput type="time" value={s.scheduledTime} onChange={(e) => setStop(i, { scheduledTime: e.target.value })} disabled={locked} invalid={!!errors[`stops.${i}.scheduledTime`]} />
-                </Field>
-                <div className="flex items-end gap-1">
-                  <Button onClick={() => moveStop(i, -1)} disabled={locked || i === 0} aria-label={`Move stop ${i + 1} up`}>Up</Button>
-                  <Button onClick={() => moveStop(i, 1)} disabled={locked || i === values.stops.length - 1} aria-label={`Move stop ${i + 1} down`}>Down</Button>
-                  <Button variant="danger" disabled={locked || values.stops.length <= 2} onClick={() => set({ stops: values.stops.filter((_, j) => j !== i) })}>Remove</Button>
+              <li key={s.id ?? `new-${i}`} className="space-y-2 rounded-sm border border-[color:var(--rts-line)] bg-[var(--rts-paper-2)] p-2">
+                <div className="grid gap-2 sm:grid-cols-[1fr_120px_auto]">
+                  <Field label={`Stop ${i + 1} name`} error={errors[`stops.${i}.name`]}>
+                    <TextInput value={s.name} onChange={(e) => setStop(i, { name: e.target.value })} disabled={locked} invalid={!!errors[`stops.${i}.name`]} />
+                  </Field>
+                  <Field label={`Stop ${i + 1} scheduled time`} error={errors[`stops.${i}.scheduledTime`]}>
+                    <TextInput type="time" value={s.scheduledTime} onChange={(e) => setStop(i, { scheduledTime: e.target.value })} disabled={locked} invalid={!!errors[`stops.${i}.scheduledTime`]} />
+                  </Field>
+                  <div className="flex items-end gap-1">
+                    <Button onClick={() => moveStop(i, -1)} disabled={locked || i === 0} aria-label={`Move stop ${i + 1} up`}>Up</Button>
+                    <Button onClick={() => moveStop(i, 1)} disabled={locked || i === values.stops.length - 1} aria-label={`Move stop ${i + 1} down`}>Down</Button>
+                    <Button variant="danger" disabled={locked || values.stops.length <= 2} onClick={() => set({ stops: values.stops.filter((_, j) => j !== i) })}>Remove</Button>
+                  </div>
+                </div>
+                {/* RTE-01: how to find it. Never disabled by `locked` — a wrong landmark is a typo
+                    to correct, not a change to the route's identity, and a driver should not be left
+                    following it for the life of the route. */}
+                <div className="grid gap-2 sm:grid-cols-[1fr_1fr_110px_110px]">
+                  <Field label={`Stop ${i + 1} landmark`} hint="What the driver looks for: the fuel station, the blue wall." error={errors[`stops.${i}.landmark`]}>
+                    <TextInput value={s.landmark ?? ""} onChange={(e) => setStop(i, { landmark: e.target.value })} invalid={!!errors[`stops.${i}.landmark`]} />
+                  </Field>
+                  <Field label={`Stop ${i + 1} Ghana Post GPS`} hint="Such as GA-123-4567." error={errors[`stops.${i}.digitalAddress`]}>
+                    <TextInput value={s.digitalAddress ?? ""} onChange={(e) => setStop(i, { digitalAddress: e.target.value })} invalid={!!errors[`stops.${i}.digitalAddress`]} />
+                  </Field>
+                  <Field label={`Stop ${i + 1} latitude`} error={errors[`stops.${i}.latitude`]}>
+                    <TextInput value={s.latitude ?? ""} onChange={(e) => setStop(i, { latitude: e.target.value })} invalid={!!errors[`stops.${i}.latitude`]} inputMode="decimal" />
+                  </Field>
+                  <Field label={`Stop ${i + 1} longitude`} error={errors[`stops.${i}.longitude`]}>
+                    <TextInput value={s.longitude ?? ""} onChange={(e) => setStop(i, { longitude: e.target.value })} invalid={!!errors[`stops.${i}.longitude`]} inputMode="decimal" />
+                  </Field>
                 </div>
               </li>
             ))}

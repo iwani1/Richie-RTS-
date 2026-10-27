@@ -256,8 +256,8 @@ describe("importing a staff roster (EMP-02, D-81)", () => {
         endDate: "",
         status: "active",
         stops: [
-          { name: "Estate gate", scheduledTime: "06:00" },
-          { name: "Head office", scheduledTime: "06:30" },
+          { name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+          { name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
         ],
       },
     });

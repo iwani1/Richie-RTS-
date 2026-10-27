@@ -23,8 +23,8 @@ const route: BusRoute = {
   startDate: "2026-01-01",
   endDate: null,
   stops: [
-    { id: "s1", name: "Estate gate", scheduledTime: "06:00" },
-    { id: "s2", name: "Head office", scheduledTime: "06:30" },
+    { id: "s1", name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+    { id: "s2", name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
   ],
   status: "active",
   createdAt: at,
@@ -108,5 +108,50 @@ describe("the roster marker on the driver's stop form", () => {
     expect(screen.getByLabelText(/Ama Boateng/)).toBeTruthy();
     // The rider list is the roster and the booked seats as they are now, and the banner says so.
     expect(screen.getByText(/is the roster and the seats booked for this run, as they are now/i)).toBeTruthy();
+  });
+});
+
+describe("where the stop actually is (RTE-01)", () => {
+  /** The same run, with the first stop described the way a dispatcher would describe it. */
+  const detailedRoute: BusRoute = {
+    ...route,
+    stops: [
+      { id: "s1", name: "Estate gate", scheduledTime: "06:00", landmark: "Behind the Total filling station", digitalAddress: "GA-123-4567", latitude: "", longitude: "" },
+      { id: "s2", name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "5.603717", longitude: "-0.186964" },
+    ],
+  };
+
+  const renderDetailed = (t: Trip, stops = detailedRoute.stops) =>
+    render(
+      <TripStopForm
+        trip={t}
+        route={{ ...detailedRoute, stops }}
+        manifest={manifestOf()}
+        onClose={() => {}}
+        onSubmit={vi.fn(async () => ({}))}
+      />,
+    );
+
+  it("shows the landmark and the digital address of the stop being recorded", () => {
+    renderDetailed(trip());
+    expect(screen.getByText(/Behind the Total filling station · GA-123-4567/)).toBeTruthy();
+  });
+
+  it("offers a map link when the stop has a position", () => {
+    // The first stop is already recorded, so the form opens on the second, which has coordinates.
+    renderDetailed(trip({ stopLogs: [{ stopId: "s1", actualTime: "06:01" }] as never }));
+    const link = screen.getByRole("link", { name: /Open in maps/i });
+    expect(link.getAttribute("href")).toContain("5.603717%2C-0.186964");
+    // The link leaves the application rather than being followed inside it.
+    expect(link.getAttribute("target")).toBe("_blank");
+  });
+
+  it("says the directions are missing rather than leaving the panel empty", () => {
+    renderDetailed(trip(), [
+      { id: "s1", name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+      { id: "s2", name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+    ]);
+    expect(screen.getByText("no directions recorded")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /Open in maps/i })).toBeNull();
   });
 });

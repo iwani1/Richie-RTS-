@@ -65,7 +65,7 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 24` (the migration number and the snapshot version are counted separately: one phase shipped without a new migration), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–24) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 25` (the migration number and the snapshot version are counted separately: two phases shipped without a new migration — the second is RTE-01, whose new stop fields live inside each route's record), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–25) |
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `mayReportOnRun`, `confinedClientId`, `confinedPassengerId`. Confines `driver`, `client_contact` and `passenger` to their one linked record. Fails closed |

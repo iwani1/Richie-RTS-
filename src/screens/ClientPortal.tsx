@@ -12,6 +12,7 @@ import {
   type Rental,
   type RentalStatus,
 } from "../tms/types";
+import { stopDetailLine } from "../tms/stops";
 import { useTms } from "../tms/useTms";
 import {
   Badge,
@@ -119,7 +120,12 @@ export function ClientPortalPage() {
                       {route.stops.map((stop, index) => (
                         <li key={stop.id} className="flex items-baseline gap-2 text-sm">
                           <span className="w-5 text-right font-mono text-xs text-stone-400">{index + 1}.</span>
-                          <span className="flex-1">{stop.name}</span>
+                          <span className="flex-1">
+                            {stop.name}
+                            {/* RTE-01: the customer should recognise the place its staff are collected
+                                from. Only the directions travel; coordinates are the office's business. */}
+                            {stopDetailLine(stop) && <span className="block text-xs text-stone-600">{stopDetailLine(stop)}</span>}
+                          </span>
                           <span className="font-mono text-xs text-stone-500">{stop.scheduledTime}</span>
                         </li>
                       ))}

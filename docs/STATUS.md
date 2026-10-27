@@ -157,6 +157,9 @@ These work, and the difference is worth knowing before relying on them:
 - **Vehicle statuses** — four (available, maintenance, out of service, retired), not the brief's
   seven; "reserved" and "on trip" are derived from assignments rather than stored.
 - **Rental request** — dates, not departure and return times; no intermediate stops or luggage notes.
+- **Stops** — a name, a time, a landmark, a Ghana Post GPS address and decimal coordinates, with what
+  is missing counted on the routes screen. There is no map inside the program: the driver gets a
+  plain maps link when a stop has a position.
 - **Quotations** — line items, deposit and validity, but no quotation number, tax line or discount
   line (those live on the invoice).
 - **Customer register** — everything a document needs and a company's shape: the office's own customer
@@ -175,7 +178,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**846 passed, 28 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**865 passed, 28 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

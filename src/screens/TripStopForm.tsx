@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { ManifestRider } from "../tms/bookings";
 import type { ProgressiveStopInput } from "../tms/busing";
+import { stopDetailLine, stopMapLink } from "../tms/stops";
 import type { BoardingOutcome, BusRoute, Trip } from "../tms/types";
 import { Button, Field, Notice, Panel, Select, TextInput, formatDateTime } from "../ui/primitives";
 
@@ -65,6 +66,17 @@ export function TripStopForm({
       description={`${stop.name} · stop ${trip.stopLogs.length + 1} of ${route.stops.length}. Scheduled ${stop.scheduledTime}. Stops are recorded in route order.`}
       onClose={onClose}
     >
+      {/* RTE-01: what the driver should be looking at, and a link to it. The form is opened at the
+          stop, so this is a check that they are at the right one before anyone is marked as no-show. */}
+      <div className="mb-4 rounded-sm border border-[color:var(--rts-line)] bg-[var(--rts-paper-2)] px-3 py-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">This stop</p>
+        <p className="text-sm text-stone-800">{stopDetailLine(stop) || <em className="rts-unset">no directions recorded</em>}</p>
+        {stopMapLink(stop) && (
+          <a className="text-xs underline" href={stopMapLink(stop)!} target="_blank" rel="noreferrer">
+            Open in maps
+          </a>
+        )}
+      </div>
       {/* Q-48: nothing is pushed anywhere, so the run carries the marker. It sits above the stop
           fields because it changes who is expected at the stop being recorded right now. */}
       {trip.rosterChanges.length > 0 && (

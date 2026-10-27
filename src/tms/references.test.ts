@@ -263,7 +263,7 @@ describe("commands that mint references", () => {
           startDate: "2026-07-01",
           endDate: "2026-07-07",
           status: "active",
-          stops: [{ name: "Depot", scheduledTime: "07:00" }, { name: "Plant", scheduledTime: "07:40" }],
+          stops: [{ name: "Depot", scheduledTime: "07:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }, { name: "Plant", scheduledTime: "07:40", landmark: "", digitalAddress: "", latitude: "", longitude: "" }],
         },
       },
       NOW,

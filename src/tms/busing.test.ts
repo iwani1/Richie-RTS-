@@ -98,9 +98,9 @@ function routeInput(w: World, overrides: Partial<RouteInput> = {}): RouteInput {
     endDate: "",
     status: "active",
     stops: [
-      { name: "Estate gate", scheduledTime: "06:00" },
-      { name: "Mid", scheduledTime: "06:15" },
-      { name: "Head office", scheduledTime: "06:30" },
+      { name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+      { name: "Mid", scheduledTime: "06:15", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+      { name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
     ],
     ...overrides,
   };
@@ -158,7 +158,7 @@ describe("staff busing - routes", () => {
     const w = build();
     const bad = attempt(w, "ops", {
       type: "create_route",
-      input: routeInput(w, { stops: [{ name: "Only", scheduledTime: "06:00" }], weekdays: [], clientId: "nope" }),
+      input: routeInput(w, { stops: [{ name: "Only", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }], weekdays: [], clientId: "nope" }),
     });
     expect(bad.ok).toBe(false);
     expect(errorsOf(bad).stops).toBeDefined();
@@ -167,7 +167,7 @@ describe("staff busing - routes", () => {
 
     const backwards = attempt(w, "ops", {
       type: "create_route",
-      input: routeInput(w, { stops: [{ name: "A", scheduledTime: "07:00" }, { name: "B", scheduledTime: "06:00" }] }),
+      input: routeInput(w, { stops: [{ name: "A", scheduledTime: "07:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }, { name: "B", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }] }),
     });
     expect(errorsOf(backwards)["stops.1.scheduledTime"]).toMatch(/backwards/);
   });
@@ -244,9 +244,9 @@ describe("staff busing - passengers", () => {
 describe("staff busing - assignment and conflicts", () => {
   it("blocks overlapping runs for the same vehicle or driver, but allows back-to-back runs", () => {
     const w = build();
-    const a = createRoute(w, { name: "Route A", stops: [{ name: "A1", scheduledTime: "06:00" }, { name: "A2", scheduledTime: "06:30" }] });
-    const b = createRoute(w, { name: "Route B", stops: [{ name: "B1", scheduledTime: "06:15" }, { name: "B2", scheduledTime: "06:45" }] });
-    const c = createRoute(w, { name: "Route C", stops: [{ name: "C1", scheduledTime: "07:00" }, { name: "C2", scheduledTime: "07:30" }] });
+    const a = createRoute(w, { name: "Route A", stops: [{ name: "A1", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }, { name: "A2", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" }] });
+    const b = createRoute(w, { name: "Route B", stops: [{ name: "B1", scheduledTime: "06:15", landmark: "", digitalAddress: "", latitude: "", longitude: "" }, { name: "B2", scheduledTime: "06:45", landmark: "", digitalAddress: "", latitude: "", longitude: "" }] });
+    const c = createRoute(w, { name: "Route C", stops: [{ name: "C1", scheduledTime: "07:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }, { name: "C2", scheduledTime: "07:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" }] });
     const v1 = w.db.vehicles[0].id;
     const v2 = w.db.vehicles[1].id;
     const d1 = w.db.drivers[0].id;
@@ -296,9 +296,9 @@ describe("staff busing - progressive driver run", () => {
     const routeId = createRoute(w, {
       name: "Progressive run",
       stops: [
-        { name: "Estate gate", scheduledTime: "06:00" },
-        { name: "Market", scheduledTime: "06:15" },
-        { name: "Head office", scheduledTime: "06:30" },
+        { name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+        { name: "Market", scheduledTime: "06:15", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+        { name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
       ],
     });
     const route = w.db.routes.find((r) => r.id === routeId)!;
@@ -413,7 +413,7 @@ describe("staff busing - date and capacity guards (brief 5.1, 5.5)", () => {
     const catId = w.db.settings.vehicleCategories[0].id;
     step(w, "ops", { type: "create_vehicle", input: { registration: "GT 903-26", categoryId: catId, make: "Toyota", model: "Mini", seatCapacity: "3", notes: "" } });
     const small = w.db.vehicles.find((v) => v.registration === "GT 903-26")!;
-    const routeId = createRoute(w, { name: "Three seats", stops: [{ name: "A", scheduledTime: "06:00" }, { name: "B", scheduledTime: "06:20" }] });
+    const routeId = createRoute(w, { name: "Three seats", stops: [{ name: "A", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }, { name: "B", scheduledTime: "06:20", landmark: "", digitalAddress: "", latitude: "", longitude: "" }] });
     const route = w.db.routes.find((r) => r.id === routeId)!;
     for (let i = 1; i <= 2; i += 1) {
       step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: `Rider ${i}`, employeeRef: `R-${i}`, routeId, stopId: route.stops[0].id }) });
@@ -435,9 +435,9 @@ describe("staff busing - mid-trip passenger changes", () => {
     const routeId = createRoute(w, {
       name: "Mid-trip run",
       stops: [
-        { name: "Estate gate", scheduledTime: "06:00" },
-        { name: "Market", scheduledTime: "06:15" },
-        { name: "Head office", scheduledTime: "06:30" },
+        { name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+        { name: "Market", scheduledTime: "06:15", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+        { name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
       ],
     });
     const route = w.db.routes.find((r) => r.id === routeId)!;
@@ -471,7 +471,7 @@ describe("staff busing - mid-trip passenger changes", () => {
     const catId = w.db.settings.vehicleCategories[0].id;
     step(w, "ops", { type: "create_vehicle", input: { registration: "GT 904-26", categoryId: catId, make: "Toyota", model: "Mini", seatCapacity: "3", notes: "" } });
     const small = w.db.vehicles.find((v) => v.registration === "GT 904-26")!;
-    const routeId = createRoute(w, { name: "Three seats", stops: [{ name: "A", scheduledTime: "06:00" }, { name: "B", scheduledTime: "06:20" }] });
+    const routeId = createRoute(w, { name: "Three seats", stops: [{ name: "A", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }, { name: "B", scheduledTime: "06:20", landmark: "", digitalAddress: "", latitude: "", longitude: "" }] });
     const route = w.db.routes.find((r) => r.id === routeId)!;
     for (let i = 1; i <= 2; i += 1) {
       step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: `Rider ${i}`, employeeRef: `C-${i}`, routeId, stopId: route.stops[0].id }) });
@@ -626,7 +626,7 @@ describe("staff busing - completion and on-time", () => {
   });
 
   it("judges on-time per stop with early arrivals counted as on time", () => {
-    const route = { stops: [{ id: "a", name: "A", scheduledTime: "06:00" }, { id: "b", name: "B", scheduledTime: "06:30" }] } as BusRoute;
+    const route = { stops: [{ id: "a", name: "A", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }, { id: "b", name: "B", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" }] } as BusRoute;
     const trip = { stopLogs: [{ stopId: "a", actualTime: "05:58" }, { stopId: "b", actualTime: "06:35" }] } as Trip;
     expect(tripOnTime(trip, route, 5)).toBe(true);
     expect(tripOnTime(trip, route, 4)).toBe(false);
@@ -1153,7 +1153,7 @@ describe("mandatory documents gate a run (Q-16, D-76)", () => {
 describe("the driver is marked when the roster changes mid-run (Q-48, D-79)", () => {
   /** A route with two stops and one rider, with the run under way. */
   function running(w: World) {
-    const routeId = createRoute(w, { stops: [{ name: "Estate gate", scheduledTime: "06:00" }, { name: "Head office", scheduledTime: "06:30" }] });
+    const routeId = createRoute(w, { stops: [{ name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" }, { name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" }] });
     const route = w.db.routes.find((r) => r.id === routeId)!;
     step(w, "ops", { type: "create_passenger", input: passengerInput(w, { fullName: "Ama", employeeRef: "P-A", routeId, stopId: route.stops[0].id }) });
     const tripId = generate(w, routeId, "2026-06-01");

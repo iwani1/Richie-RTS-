@@ -100,8 +100,8 @@ function seed(options: { overdue?: boolean } = {}): { vehicleId: string; driverI
       endDate: "",
       status: "active",
       stops: [
-        { name: "Estate gate", scheduledTime: "06:00" },
-        { name: "Head office", scheduledTime: "06:30" },
+        { name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+        { name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
       ],
     },
   });
@@ -225,6 +225,17 @@ describe("Staff busing end-to-end (jsdom)", () => {
     const db = api.db();
     expect(db.trips[0].boardings).toHaveLength(2);
     expect(db.audit.some((entry) => entry.summary.includes("Mid-trip addition"))).toBe(true);
+  }, 30000);
+});
+
+describe("the directions on a route, on the routes screen (RTE-01)", () => {
+  it("counts the stops nobody has described rather than calling the route complete", async () => {
+    seed();
+    await renderApp();
+    fireEvent.click(screen.getByRole("button", { name: /Staff busing/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Routes$/ }));
+    // The seeded route has two stops and neither has a landmark, a digital address or coordinates.
+    expect(await screen.findByText("2 of 2 without directions")).toBeTruthy();
   }, 30000);
 });
 

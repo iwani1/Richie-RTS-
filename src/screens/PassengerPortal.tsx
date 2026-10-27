@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { scopedView } from "../tms/scope";
+import { stopDetailLine } from "../tms/stops";
 import { useTms } from "../tms/useTms";
 import {
   cancellationProblem,
@@ -107,6 +108,10 @@ export function PassengerPortalPage() {
                 <div>
                   <p className="text-xs text-stone-500">Your stop</p>
                   <p className="font-medium text-stone-800">{next.pickupStop?.name ?? "not recorded"}</p>
+                  {/* RTE-01: where to wait, in the rider's own words — not the office's coordinates. */}
+                  {next.pickupStop && stopDetailLine(next.pickupStop) && (
+                    <p className="text-xs text-stone-600">{stopDetailLine(next.pickupStop)}</p>
+                  )}
                   <p className="text-xs text-stone-500">{next.route.name}</p>
                 </div>
                 <div>

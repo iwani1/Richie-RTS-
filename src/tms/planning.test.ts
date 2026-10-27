@@ -25,16 +25,16 @@ const route: BusRoute = {
   endDate: null,
   status: "active",
   stops: [
-    { id: "s1", name: "Airport junction", scheduledTime: "06:00" },
-    { id: "s2", name: "Ridge offices", scheduledTime: "06:40" },
+    { id: "s1", name: "Airport junction", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+    { id: "s2", name: "Ridge offices", scheduledTime: "06:40", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
   ],
   createdAt: at,
   updatedAt: at,
 };
 
 const otherRoute: BusRoute = { ...route, id: "route2", reference: "RT-002", name: "Tema run", stops: [
-  { id: "s3", name: "Tema community 1", scheduledTime: "06:10" },
-  { id: "s4", name: "Ridge offices", scheduledTime: "07:00" },
+  { id: "s3", name: "Tema community 1", scheduledTime: "06:10", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+  { id: "s4", name: "Ridge offices", scheduledTime: "07:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
 ] };
 
 const vehicle = (id: string, registration: string, seatCapacity: number, overrides: Partial<Vehicle> = {}): Vehicle => ({

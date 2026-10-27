@@ -2093,3 +2093,44 @@ wrong thing to be silent about.
   category; the driver register gains class, qualifications, a today line and a count of drivers
   with no class recorded; the drivers CSV gains two optional columns; migration **020**, schema
   version **24**; 27 new tests (20 domain, 1 planning, 5 screen, 1 import).
+
+## D-104 - A stop carries directions, and half a position is refused (RTE-01)
+
+A stop was a name and a time. For the driver who works the same estate every morning, that is enough.
+For a relief driver on their first morning it is not, and it is not something anybody can type into a
+phone. The brief asked for a landmark, a Ghana digital address and coordinates.
+
+- **Decision 1: every field is optional, and nothing is invented.** A stop with no landmark is a fact
+  about the office's records, not a failure of the form. The screens say *no directions recorded* and
+  the routes list counts the stops that have none, so the gap is visible rather than papered over.
+- **Decision 2: an address, once typed, must be real-shaped.** `GA-123-4567`, region letters then
+  three or four district digits then four more. Only the shape is checked — whether the point exists
+  is not something a form can know — but a mistyped code is refused, because a driver follows it
+  somewhere else and the mistake looks like a fact.
+- **Decision 3: coordinates come in pairs or not at all.** Half a position is a pin in the Gulf of
+  Guinea that a driver would believe. Six decimal places is about eleven centimetres, which is closer
+  than a bus stops; anything finer is noise that invites false precision.
+- **Decision 4: the map link is a plain search, not an embedded map.** `stopMapLink` builds an
+  ordinary maps search URL from the coordinates. **Rejected:** an embedded map, a tile provider, or
+  any stored location data of our own — it would add an API key, a bill and an internet dependency to
+  a program that runs on one office machine (Q-01, D-100).
+- **Decision 5: the directions are not the stop's identity.** Trips lock the stop list so a recorded
+  run keeps pointing at a stop that exists, and that lock stays on the name, the time, the order and
+  the id. The directions are deliberately outside it: a wrong landmark is a typo to correct, and
+  refusing the correction would leave a driver following the wrong wall for the life of the route.
+- **Decision 6: what a customer and a rider see is the landmark, not the coordinates.** A customer
+  is entitled to see that its staff are collected from "the blue wall after the bridge"; the
+  decimal position exists to build a map link for the driver, and never travels to the portals.
+- **Decision 7: no new permission and no new screen.** Stops belong to the route, which operations
+  already maintains through `routes:update`. The directions sit on the route form beside the name and
+  the time, because a second screen for the same record is a second place for it to be out of date.
+- **Decision 8: no new table.** A stop lives inside its route's record, and has since the route was
+  built. Splitting stops into their own table now would be a migration and a join for fields that are
+  read only with the route. Schema version **25**, no new SQL migration — the second phase to ship
+  without one, for the same reason as the first.
+- **Consequence.** `RouteStop` gains `landmark`, `digitalAddress`, `latitude` and `longitude`; new
+  module `src/tms/stops.ts` (`readStopDetail`, `stopDetailLine`, `stopMapLink`, `migrateStop`,
+  `stopsWithoutDirections`, `STOP_DETAIL_LIMITS`, `GHANA_POST_GPS_RE`); the route form gains four
+  fields per stop; the driver's run row and stop form show the directions and a map link; the client
+  and rider portals show the landmark; the routes list counts undescribed stops; `migrate()` fills the
+  new fields for older routes; 19 new tests (15 domain, 3 stop form, 1 screen).

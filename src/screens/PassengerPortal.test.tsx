@@ -78,8 +78,8 @@ function seed(): { userId: string; riderId: string; colleagueId: string; evening
     endDate: "",
     status: "active" as const,
     stops: [
-      { name: first, scheduledTime: firstTime },
-      { name: second, scheduledTime: secondTime },
+      { name: first, scheduledTime: firstTime, landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+      { name: second, scheduledTime: secondTime, landmark: "", digitalAddress: "", latitude: "", longitude: "" },
     ],
   });
   run(ops, { type: "create_route", input: route("Alpha morning", "Alpha gate", "06:00", "Alpha office", "06:30") });

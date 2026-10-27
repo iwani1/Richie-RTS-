@@ -387,6 +387,15 @@ export interface RouteStop {
   id: string;
   name: string;
   scheduledTime: string; // HH:MM pickup time at this stop
+  /**
+   * How to find it (RTE-01): a landmark, a Ghana Post GPS address, and decimal coordinates.
+   * All optional — blank means nobody has described this stop, which the screens say plainly
+   * rather than filling with a guess.
+   */
+  landmark: string;
+  digitalAddress: string;
+  latitude: string;
+  longitude: string;
 }
 
 export interface BusRoute {
@@ -1144,7 +1153,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 25;
 
 /**
  * Every schema version this build can still read.
@@ -1154,7 +1163,7 @@ export const SCHEMA_VERSION = 24;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1293,7 +1302,20 @@ export function migrate(value: unknown): Database | null {
         }))
       : [],
     rentals: Array.isArray(v.rentals) ? (v.rentals as Rental[]).map((rental) => ({ ...rental, quoteHistory: rental.quoteHistory ?? [] })) : [],
-    routes: Array.isArray(v.routes) ? (v.routes as BusRoute[]) : [],
+    routes: Array.isArray(v.routes)
+      ? (v.routes as BusRoute[]).map((route) => ({
+          ...route,
+          // RTE-01 arrived in schema 25. A stop written before it has no directions; the screen
+          // says "no directions recorded" rather than inventing a landmark.
+          stops: (route.stops ?? []).map((stop) => ({
+            ...stop,
+            landmark: typeof stop.landmark === "string" ? stop.landmark : "",
+            digitalAddress: typeof stop.digitalAddress === "string" ? stop.digitalAddress : "",
+            latitude: typeof stop.latitude === "string" ? stop.latitude : "",
+            longitude: typeof stop.longitude === "string" ? stop.longitude : "",
+          })),
+        }))
+      : [],
     passengers: Array.isArray(v.passengers) ? (v.passengers as Passenger[]) : [],
     trips: Array.isArray(v.trips)
       ? (v.trips as Trip[]).map((trip) => ({

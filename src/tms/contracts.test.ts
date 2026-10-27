@@ -95,8 +95,8 @@ function build(): World {
       endDate: "",
       status: "active",
       stops: [
-        { name: "Estate gate", scheduledTime: "06:00" },
-        { name: "Head office", scheduledTime: "06:30" },
+        { name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+        { name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
       ],
     },
   });
@@ -113,8 +113,8 @@ function build(): World {
       endDate: "",
       status: "active",
       stops: [
-        { name: "Gate", scheduledTime: "07:00" },
-        { name: "Factory", scheduledTime: "07:40" },
+        { name: "Gate", scheduledTime: "07:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+        { name: "Factory", scheduledTime: "07:40", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
       ],
     },
   });

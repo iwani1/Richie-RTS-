@@ -8,6 +8,7 @@ import { describeDocumentGaps, requiredDocumentGaps } from "./compliance";
 import { overdueServiceFor } from "./maintenance";
 import { audit, authorise, fail, isValidDate, makeId, norm, TIME_RE, type Actor, type CommandResult, type Errors } from "./service";
 import { licenceClassProblem } from "./driving";
+import { readStopDetail, type StopDetailInput } from "./stops";
 import { allocateReference } from "./references";
 import { mayActOnTrip } from "./scope";
 import {
@@ -45,7 +46,7 @@ export const BUSING_COMMAND_TYPES = [
   "correct_trip_record",
 ] as const;
 
-export interface StopInput {
+export interface StopInput extends StopDetailInput {
   id?: string;
   name: string;
   scheduledTime: string;
@@ -200,7 +201,13 @@ export function validateRoute(db: Database, input: RouteInput, excludeId?: strin
 
   if (!ROUTE_STATUSES.includes(input.status)) errors.status = "Invalid status.";
 
-  const stops = input.stops.map((s) => ({ id: s.id || makeId(), name: s.name.trim(), scheduledTime: s.scheduledTime.trim() }));
+  const stops = input.stops.map((s, i) => {
+    // Directions are checked beside the name and time (RTE-01), and their errors are keyed to the
+    // stop so the form can point at the one that needs fixing.
+    const detail = readStopDetail(s, i);
+    Object.assign(errors, detail.errors);
+    return { id: s.id || makeId(), name: s.name.trim(), scheduledTime: s.scheduledTime.trim(), ...detail.value };
+  });
   if (stops.length < 2) errors.stops = "A route needs at least two stops (a start and a destination).";
   const seen = new Set<string>();
   stops.forEach((s, i) => {
@@ -213,7 +220,10 @@ export function validateRoute(db: Database, input: RouteInput, excludeId?: strin
   });
 
   // Once trips exist, the stop list, client and vehicle category are locked so completed
-  // trip records always point at stops that still exist.
+  // trip records always point at stops that still exist. The *directions* are deliberately not part
+  // of that lock (RTE-01): a wrong landmark is a typo to be corrected, and refusing it would leave
+  // a driver following a wrong one for the life of the route. The identity of a stop is its name,
+  // its time and its id — those are what a recorded trip points at.
   if (excludeId && db.trips.some((t) => t.routeId === excludeId)) {
     const existing = db.routes.find((r) => r.id === excludeId);
     const sameStops =

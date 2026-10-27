@@ -67,8 +67,8 @@ function seed(): { driverUserId: string; clientUserId: string; driverVehicleId: 
     endDate: "",
     status: "active" as const,
     stops: [
-      { name: a, scheduledTime: "06:00" },
-      { name: b, scheduledTime: "06:30" },
+      { name: a, scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+      { name: b, scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
     ],
   });
   run(ops, { type: "create_route", input: route("Alpha run", alphaId, "Alpha gate", "Alpha office") });

@@ -101,8 +101,8 @@ function build(options: { seats?: string; rosterSize?: number } = {}): World {
     endDate: "",
     status: "active",
     stops: [
-      { name: "Estate gate", scheduledTime: "06:00" },
-      { name: "Head office", scheduledTime: "06:30" },
+      { name: "Estate gate", scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+      { name: "Head office", scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
     ],
   });
   db = run(db, ops, { type: "create_route", input: routeInput("Estate run", clientId) });

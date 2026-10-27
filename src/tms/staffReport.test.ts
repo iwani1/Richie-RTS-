@@ -78,8 +78,8 @@ function build(): World {
     endDate: "",
     status: "active" as const,
     stops: [
-      { name: first, scheduledTime: firstTime },
-      { name: second, scheduledTime: secondTime },
+      { name: first, scheduledTime: firstTime, landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+      { name: second, scheduledTime: secondTime, landmark: "", digitalAddress: "", latitude: "", longitude: "" },
     ],
   });
   db = run(db, ops, { type: "create_route", input: route("Estate run", "Estate gate", "06:00", "Head office", "06:30") });

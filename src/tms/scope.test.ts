@@ -68,8 +68,8 @@ function world(): World {
     endDate: "",
     status: "active" as const,
     stops: [
-      { name: start, scheduledTime: "06:00" },
-      { name: end, scheduledTime: "06:30" },
+      { name: start, scheduledTime: "06:00", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
+      { name: end, scheduledTime: "06:30", landmark: "", digitalAddress: "", latitude: "", longitude: "" },
     ],
   });
   run(ops, { type: "create_route", input: routeInput("Alpha run", clientOneId, "Alpha gate", "Alpha office") });

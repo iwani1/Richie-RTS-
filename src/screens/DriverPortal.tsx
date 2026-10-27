@@ -3,6 +3,7 @@ import { documentStatus } from "../tms/compliance";
 import type { IncidentInput } from "../tms/logistics";
 import { TripStopForm } from "./TripStopForm";
 import { manifestFor } from "../tms/bookings";
+import { stopDetailLine, stopMapLink } from "../tms/stops";
 import { scopedView } from "../tms/scope";
 import {
   INCIDENT_SEVERITIES,
@@ -121,6 +122,25 @@ export function DriverPortalPage() {
                     return (
                       <>
                         {route ? `${t.stopLogs.length} / ${route.stops.length} stops` : "-"}
+                        {/* RTE-01: where the next stop actually is. A driver on the way to a stop
+                            should not have to open anything else to know what to look for. */}
+                        {route && t.status === "in_progress" && (() => {
+                          const next = route.stops[t.stopLogs.length];
+                          if (!next) return null;
+                          const directions = stopDetailLine(next);
+                          const map = stopMapLink(next);
+                          return (
+                            <span className="mt-1 block text-xs text-stone-600">
+                              Next: {next.name} · {next.scheduledTime}
+                              {directions ? <span className="block">{directions}</span> : <span className="block rts-unset">no directions recorded</span>}
+                              {map && (
+                                <a className="underline" href={map} target="_blank" rel="noreferrer">
+                                  Open in maps
+                                </a>
+                              )}
+                            </span>
+                          );
+                        })()}
                         {/* The roster marker lives on the run, so it is visible before the stop form
                             is even opened (Q-48). */}
                         {t.rosterChanges.length > 0 && (
