@@ -190,7 +190,8 @@ suite("workflow C and concurrency, against PostgreSQL", () => {
     const rentalId = await confirmedRental(adminId, "2026-06-01", "2026-06-03");
     await step("assign_rental", { id: rentalId, input: { vehicleId, driverId: "" } } as never, adminId, TODAY);
     await step("start_rental", { id: rentalId } as never, adminId, "2026-06-01T09:00:00.000Z");
-    await step("complete_rental", { id: rentalId, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } } as never, adminId, TODAY);
+    // The return has to be after the departure now that a hire records its run (D-118).
+    await step("complete_rental", { id: rentalId, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } } as never, adminId, "2026-06-01T17:00:00.000Z");
     const first = await step("issue_rental_invoice", { input: { rentalId, issuedOn: TODAY.slice(0, 10), discountAmount: "", discountReason: "", notes: "" } } as never, adminId, TODAY);
 
     // A direct insert that the service layer would never attempt: the partial unique index on
