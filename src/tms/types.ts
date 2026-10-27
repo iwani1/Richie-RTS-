@@ -507,6 +507,29 @@ export const TRIP_ORIGIN_LABELS: Record<TripOrigin, string> = {
   adhoc: "Ad hoc",
 };
 
+/**
+ * A run that is late, said out loud while it is happening (DSP-04, D-105).
+ *
+ * The stop times already measure lateness after the fact; this is the different fact the office
+ * needs at 07:20 — *this* run is *this* far behind, for *this* reason — so a dispatcher can answer
+ * the phone without inventing a number, and the customer's own portal can say it.
+ *
+ * Append-only. A second entry is the delay getting worse, or the run recovering (`minutes: 0`);
+ * nothing is edited in place, because the question a client asks afterwards is "what did you know,
+ * and when", not "what is true now".
+ */
+export interface TripDelay {
+  id: string;
+  /** When it was recorded, ISO. */
+  at: string;
+  /** Minutes behind the timetable as reported. `0` means the run is back on time. */
+  minutes: number;
+  /** Why, in the words of whoever was there. Never empty. */
+  reason: string;
+  /** Who recorded it. A name, because the office has to be able to ring them back. */
+  reportedBy: string;
+}
+
 export interface Trip {
   id: string;
   reference: string; // TR-0001
@@ -533,6 +556,8 @@ export interface Trip {
   onTimeThresholdMinutes: number | null; // snapshot of the setting taken at completion
   /** Append-only: every entry is a correction that was applied, oldest first (D-74). */
   corrections: TripCorrection[];
+  /** Append-only: delays reported while the run was out, oldest first (D-105). */
+  delays: TripDelay[];
   /** Roster changes that happened while this run was in progress, oldest first (Q-48). */
   rosterChanges: RosterChange[];
   createdAt: string;
@@ -1153,7 +1178,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 25;
+export const SCHEMA_VERSION = 26;
 
 /**
  * Every schema version this build can still read.
@@ -1163,7 +1188,7 @@ export const SCHEMA_VERSION = 25;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1324,6 +1349,8 @@ export function migrate(value: unknown): Database | null {
           // Records written before corrections existed simply have none.
           corrections: Array.isArray(trip.corrections) ? trip.corrections : [],
           rosterChanges: Array.isArray(trip.rosterChanges) ? trip.rosterChanges : [],
+          // Delays arrived in schema 26; a run written before it simply has none.
+          delays: Array.isArray(trip.delays) ? trip.delays : [],
           origin: trip.origin === "adhoc" ? ("adhoc" as const) : ("schedule" as const),
           originReason: typeof trip.originReason === "string" && trip.originReason !== "" ? trip.originReason : null,
           // Likewise for a run stopped mid-way: older records only carry the reason.

@@ -1486,3 +1486,128 @@ describe("a run outside the schedule (DSP-03, D-82)", () => {
     expect(runs.map((t) => t.origin).sort()).toEqual(["adhoc", "schedule"]);
   });
 });
+
+// DSP-04, D-105: a run that is late, recorded while it is still out.
+//
+// The stop times measure lateness after the fact. This is the other fact: what the office knows at
+// 07:20, so a dispatcher can answer the client's phone call with a number, and the client's own
+// portal can say it first.
+describe("a run that is late (DSP-04)", () => {
+  const out = (w: World, date = "2026-06-01"): string => {
+    const tripId = generate(w, createRoute(w), date);
+    step(w, "ops", { type: "assign_trip", id: tripId, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[0].id } });
+    step(w, "ops", { type: "dispatch_trip", id: tripId });
+    return tripId;
+  };
+  const tripOf = (w: World, id: string) => w.db.trips.find((t) => t.id === id)!;
+
+  it("records minutes and a reason against the run, with the reporter's name", () => {
+    const w = build();
+    const tripId = out(w);
+    const result = step(w, "ops", { type: "record_trip_delay", id: tripId, input: { minutes: "20", reason: "Traffic at the Spintex junction" } });
+
+    const trip = tripOf(w, tripId);
+    expect(trip.delays).toHaveLength(1);
+    expect(trip.delays[0].minutes).toBe(20);
+    expect(trip.delays[0].reason).toBe("Traffic at the Spintex junction");
+    expect(trip.delays[0].reportedBy).toBe("Ops");
+    expect(trip.delays[0].at).toBe(NOW);
+    expect(result.message).toMatch(/20 minutes late/);
+    // The audit log says it happened, without repeating personal data.
+    expect(w.db.audit[0].action).toBe("trips:delay");
+    expect(w.db.audit[0].summary).toMatch(/delay reported — 20 minutes late — Traffic at the Spintex junction/);
+  });
+
+  it("is append-only: a second report is kept beside the first, and the newest is what counts", () => {
+    const w = build();
+    const tripId = out(w);
+    step(w, "ops", { type: "record_trip_delay", id: tripId, input: { minutes: "20", reason: "Traffic" } });
+    step(w, "ops", { type: "record_trip_delay", id: tripId, input: { minutes: "45", reason: "One lane closed" } });
+    step(w, "ops", { type: "record_trip_delay", id: tripId, input: { minutes: "0", reason: "The road reopened" } });
+
+    const trip = tripOf(w, tripId);
+    expect(trip.delays.map((d) => d.minutes)).toEqual([20, 45, 0]);
+    // Nothing was edited: the first answer is still the first answer.
+    expect(trip.delays[0].reason).toBe("Traffic");
+  });
+
+  it("refuses '0' until something has been reported late, so a run cannot be born on time twice", () => {
+    const w = build();
+    const tripId = out(w);
+    const cleared = attempt(w, "ops", { type: "record_trip_delay", id: tripId, input: { minutes: "0", reason: "Never late" } });
+    expect(cleared.ok).toBe(false);
+    expect(errorsOf(cleared).minutes).toMatch(/back on time/);
+  });
+
+  it("reports both fields at once when the report is incomplete", () => {
+    const w = build();
+    const tripId = out(w);
+    const blank = attempt(w, "ops", { type: "record_trip_delay", id: tripId, input: { minutes: "", reason: "  " } });
+    expect(blank.ok).toBe(false);
+    expect(Object.keys(errorsOf(blank)).sort()).toEqual(["minutes", "reason"]);
+    expect(tripOf(w, tripId).delays).toHaveLength(0);
+  });
+
+  it("refuses a run that has not left, and one that has finished", () => {
+    const w = build();
+    // A run later in the week is planned, not out: nothing is late before it leaves.
+    const planned = generate(w, createRoute(w, { name: "Later run" }), "2026-06-05");
+    const notYet = attempt(w, "ops", { type: "record_trip_delay", id: planned, input: { minutes: "10", reason: "Traffic" } });
+    expect(notYet.ok).toBe(false);
+    if (!notYet.ok) expect(notYet.message).toMatch(/while a run is out/);
+
+    // A dispatched run is completed in one pass, which is how a late run without progressive
+    // records is closed: the stop times say how late it actually was.
+    const tripId = out(w);
+    const route = w.db.routes.find((r) => r.id === tripOf(w, tripId).routeId)!;
+    step(w, "ops", {
+      type: "complete_trip",
+      id: tripId,
+      input: { stopTimes: route.stops.map((s) => ({ stopId: s.id, actualTime: s.scheduledTime })), boardings: [] },
+    });
+    const finished = attempt(w, "ops", { type: "record_trip_delay", id: tripId, input: { minutes: "10", reason: "Traffic" } });
+    expect(finished.ok).toBe(false);
+    if (!finished.ok) expect(finished.message).toMatch(/this trip is completed/);
+  });
+
+  it("lets the driver report the delay on their own run, and nobody else's", () => {
+    const w = build();
+    const tripId = out(w);
+    step(w, "driver", { type: "start_trip", id: tripId });
+    step(w, "driver", { type: "record_trip_delay", id: tripId, input: { minutes: "15", reason: "Flooding at the junction" } });
+    expect(tripOf(w, tripId).delays[0].reportedBy).toBe("Kojo");
+
+    const otherTrip = generate(w, createRoute(w, { name: "Other run" }), "2026-06-02");
+    step(w, "ops", { type: "assign_trip", id: otherTrip, input: { vehicleId: w.db.vehicles[0].id, driverId: w.db.drivers[1].id } });
+    step(w, "ops", { type: "dispatch_trip", id: otherTrip });
+    const driver = actorOf(w.db, "driver");
+    const trespass = attemptActor(w, driver, { type: "record_trip_delay", id: otherTrip, input: { minutes: "15", reason: "Traffic" } });
+    expect(trespass.ok).toBe(false);
+    if (!trespass.ok) expect(trespass.message).toMatch(/assigned to you/);
+  });
+
+  it("is recording work, so finance cannot do it", () => {
+    const w = build();
+    const tripId = out(w);
+    const denied = attempt(w, "finance", { type: "record_trip_delay", id: tripId, input: { minutes: "15", reason: "Traffic" } });
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) expect(denied.message).toMatch(/Not permitted/);
+  });
+
+  it("survives completion: the history stays on the finished run", () => {
+    const w = build();
+    const tripId = out(w);
+    step(w, "ops", { type: "record_trip_delay", id: tripId, input: { minutes: "25", reason: "Traffic" } });
+    const route = w.db.routes.find((r) => r.id === tripOf(w, tripId).routeId)!;
+    step(w, "ops", {
+      type: "complete_trip",
+      id: tripId,
+      input: { stopTimes: route.stops.map((s, i) => ({ stopId: s.id, actualTime: i === 0 ? "06:25" : s.scheduledTime })), boardings: [] },
+    });
+    const trip = tripOf(w, tripId);
+    expect(trip.status).toBe("completed");
+    expect(trip.delays).toHaveLength(1);
+    // The run is no longer late *now* — its lateness is in its stop times, which the report measures.
+    expect(trip.stopLogs[0].actualTime).toBe("06:25");
+  });
+});

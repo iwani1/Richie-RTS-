@@ -2134,3 +2134,49 @@ phone. The brief asked for a landmark, a Ghana digital address and coordinates.
   fields per stop; the driver's run row and stop form show the directions and a map link; the client
   and rider portals show the landmark; the routes list counts undescribed stops; `migrate()` fills the
   new fields for older routes; 19 new tests (15 domain, 3 stop form, 1 screen).
+
+## D-105 - A delay is a statement made while the run is out (DSP-04)
+
+The brief asks for no-shows and delays to be recorded, and trips to be cancelled or interrupted.
+No-shows and cancellation were built long ago. What was missing is the fact a dispatcher needs at
+07:20, when a client rings to ask where the bus has got to: *this* run, *this* far behind, *for this*
+reason. The transport report already measures lateness from the recorded stop times — but only after
+the run finishes, which is the one moment nobody is ringing.
+
+- **Decision 1: one new record on the run, not a new table and not a new screen.** `Trip.delays` is a
+  list of `{ id, at, minutes, reason, reportedBy }` inside the run's own record. `delayLine` reads it
+  for the desk and the driver; `delayNote` writes the full sentence for the client and the rider.
+- **Decision 2: append-only, and the newest statement is the current one.** A second report is the
+  delay getting worse (`40` after `20`) or the run catching up (`0`). Nothing is edited, because the
+  question asked afterwards is what was known at the time — the same rule as corrections (D-74) and
+  ad hoc reasons (D-82).
+- **Decision 3: `0` is allowed only once something has been reported late.** "Back on time" answers an
+  earlier statement; it is not a way to record a run that was never late, which would fill the history
+  with noise and make the desk's count meaningless.
+- **Decision 4: a reason is compulsory, minutes are whole numbers and 600 is the ceiling.** A number
+  without a reason is a rumour the office will repeat to a client. One hundredths of a minute is
+  false precision on a road. Beyond ten hours it is not a delay, it is a run that did not happen, and
+  the screen says so.
+- **Decision 5: only while the run is out — `dispatched` or `in_progress`.** A planned run is not late
+  yet. A finished run is not late *now*: its lateness lives in its stop times, which is what
+  `staffReport.ts` measures, and a live "running late" count must not include yesterday.
+- **Decision 6: no new permission.** It is `trips:record`, the permission that already means "record
+  what is happening on this run", and a driver is confined to their own run by `mayActOnTrip` like
+  every other action on a trip. **Rejected:** a separate `trips:delay` permission, which would have
+  meant a role that can record a stop but not that the stop is late.
+- **Decision 7: it travels to the people who would otherwise ring.** The client portal gained a
+  "Today's runs" card, and the rider's journey state carries the sentence after its own news (a
+  cancelled booking is still not a cancelled bus). Neither shows the reporter's name or anything the
+  office has not checked.
+- **Decision 8: an interruption that resumes is a delay; one that ends the run is a cancellation.**
+  The brief's "cancel or interrupt" is already covered: `cancel_trip` stops a running trip, keeps the
+  stops and outcomes already recorded, and must name the incident that caused it when there is one
+  (D-75). A run held up and then continuing is what a delay report and its stop times describe.
+- **Decision 9: schema 26, no SQL migration.** The new list lives inside the run's record; `migrate()`
+  fills an empty list for runs written before it. The third phase in a row to need no migration, for
+  the same reason: the database stores records, not their shape.
+- **Consequence.** `TripDelay` and `Trip.delays` in `types.ts`; new module `src/tms/delays.ts`
+  (`readDelayInput`, `liveDelay`, `latestDelay`, `delayLine`, `delayNote`, `delaySummary`,
+  `runningLate`, `minutesLabel`, `DELAY_LIMITS`); `record_trip_delay` in `busing.ts` and the command
+  catalogue; a shared `TripDelayForm` used by the dispatch sheet and the driver's portal; the run row
+  and the dispatch desk show what is behind schedule; 33 new tests.

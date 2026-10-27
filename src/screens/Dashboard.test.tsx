@@ -162,6 +162,7 @@ describe("operations board", () => {
       boardings: [],
       onTimeThresholdMinutes: null,
       corrections: [],
+      delays: [],
     rosterChanges: [],
     origin: "schedule",
     originReason: null,

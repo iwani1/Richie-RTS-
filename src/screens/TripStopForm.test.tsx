@@ -50,6 +50,7 @@ const trip = (overrides: Partial<Trip> = {}): Trip => ({
   boardings: [],
   onTimeThresholdMinutes: 5,
   corrections: [],
+  delays: [],
   rosterChanges: [],
   origin: "schedule",
   originReason: null,

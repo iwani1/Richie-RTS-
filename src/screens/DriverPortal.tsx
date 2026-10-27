@@ -1,7 +1,9 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { documentStatus } from "../tms/compliance";
 import type { IncidentInput } from "../tms/logistics";
+import { TripDelayForm } from "./TripDelayForm";
 import { TripStopForm } from "./TripStopForm";
+import { delayLine, liveDelay } from "../tms/delays";
 import { manifestFor } from "../tms/bookings";
 import { stopDetailLine, stopMapLink } from "../tms/stops";
 import { scopedView } from "../tms/scope";
@@ -48,6 +50,7 @@ export function DriverPortalPage() {
   const view = useMemo(() => scopedView(db, actor), [db, actor]);
   const [reporting, setReporting] = useState(false);
   const [recordingStop, setRecordingStop] = useState<Trip | null>(null);
+  const [reportingDelay, setReportingDelay] = useState<Trip | null>(null);
   const [dateFilter, setDateFilter] = useState<"today" | "all">("today");
 
   const driver = view.link.driver;
@@ -141,6 +144,16 @@ export function DriverPortalPage() {
                             </span>
                           );
                         })()}
+                        {/* D-105: the driver is the person who knows. The sentence is shown back to
+                            them so they can see it was heard, and it is the same one the office reads. */}
+                        {liveDelay(t) && <span className="rts-run-late" style={{ display: "block" }}>{delayLine(liveDelay(t)!)}</span>}
+                        {/* The control sits with the sentence it produces, so a driver reporting a
+                            delay does not have to hunt for it beside the run's main action. */}
+                        {(t.status === "dispatched" || t.status === "in_progress") && allowed("trips:record") && (
+                          <Button variant="ghost" onClick={() => setReportingDelay(t)}>
+                            {liveDelay(t) ? "Update delay" : "Running late"}
+                          </Button>
+                        )}
                         {/* The roster marker lives on the run, so it is visible before the stop form
                             is even opened (Q-48). */}
                         {t.rosterChanges.length > 0 && (
@@ -251,6 +264,19 @@ export function DriverPortalPage() {
             const result = await dispatch({ type: "record_trip_stop", id: recordingStop.id, input });
             setFlash({ tone: result.ok ? "success" : "error", message: result.message });
             if (result.ok) setRecordingStop(null);
+            return result.ok ? {} : result.errors;
+          }}
+        />
+      )}
+
+      {reportingDelay && (
+        <TripDelayForm
+          trip={reportingDelay}
+          onClose={() => setReportingDelay(null)}
+          onSubmit={async (input) => {
+            const result = await dispatch({ type: "record_trip_delay", id: reportingDelay.id, input });
+            setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+            if (result.ok) setReportingDelay(null);
             return result.ok ? {} : result.errors;
           }}
         />

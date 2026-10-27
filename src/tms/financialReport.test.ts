@@ -135,6 +135,7 @@ function trip(overrides: Partial<Trip> = {}): Trip {
     ],
     onTimeThresholdMinutes: 5,
     corrections: [],
+    delays: [],
     rosterChanges: [],
     origin: "schedule",
     originReason: null,

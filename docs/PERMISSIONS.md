@@ -38,7 +38,7 @@ where a row has no `passenger` column, the role does not hold that permission at
 |---|:-:|:-:|---|
 | trips:read | x | | only trips assigned to its linked driver record |
 | trips:start | x | | only its own dispatched run |
-| trips:record | x | | only the next unrecorded stop on its own in-progress run |
+| trips:record | x | | only the next unrecorded stop on its own out run, and a delay report on that same run (D-105) |
 | trips:complete | x | | only its own run; completion requires every stop and boarding outcome |
 | trips:correct | | | **not held by either bound role.** Recording a fact at the door and correcting it afterwards are different acts, and the correction is attributed (D-74). Operations and the administrator hold it |
 | incidents:read | x | | only incidents on its own runs or vehicles |

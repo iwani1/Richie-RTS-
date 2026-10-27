@@ -28,7 +28,7 @@ function saved(): Database {
 
 // Two clients and two routes, with a driver account and a client contact account each
 // linked to the first pair. Anything belonging to the second pair must stay invisible.
-function seed(): { driverUserId: string; clientUserId: string; driverVehicleId: string; otherVehicleId: string } {
+function seed(options: { delay?: { minutes: string; reason: string } } = {}): { driverUserId: string; clientUserId: string; driverVehicleId: string; otherVehicleId: string } {
   let db: Database = emptyDatabase();
   const run = (actor: Actor | null, command: AnyCommand) => {
     const r = executeCommand(db, actor, command, NOW);
@@ -81,6 +81,8 @@ function seed(): { driverUserId: string; clientUserId: string; driverVehicleId: 
   run(ops, { type: "assign_trip", id: db.trips[1].id, input: { vehicleId: otherVehicleId, driverId: db.drivers[1].id } });
   // Operations dispatches the first run, so the driver has something to execute.
   run(ops, { type: "dispatch_trip", id: db.trips[0].id });
+  // DSP-04: a delay reported by the office before the client or the driver looks at the page.
+  if (options.delay) run(ops, { type: "record_trip_delay", id: db.trips[0].id, input: options.delay });
 
   run(admin, {
     type: "create_user",
@@ -205,5 +207,38 @@ describe("Client portal (jsdom)", () => {
     const db = saved();
     expect(db.rentals).toHaveLength(1);
     expect(db.rentals[0].purpose).toBe("Staff shuttle");
+  }, 30000);
+});
+
+// DSP-04, D-105: the point of recording a delay is that the two people who would otherwise ring the
+// office can read it for themselves.
+describe("a reported delay, in the portals (DSP-04)", () => {
+  it("tells the client which of its runs is late, and why", async () => {
+    const { clientUserId } = seed({ delay: { minutes: "20", reason: "Traffic at the Spintex junction" } });
+    signInAs(clientUserId);
+    await renderApp();
+
+    expect(await screen.findByText("Today's runs")).toBeTruthy();
+    expect(
+      screen.getByText("This run is reported 20 minutes behind its timetable — Traffic at the Spintex junction."),
+    ).toBeTruthy();
+    // Its own run only: the other client's run is not in this payload at all.
+    expect(screen.queryAllByText("Beta run")).toHaveLength(0);
+  }, 30000);
+
+  it("lets the driver report one from their own screen, and shows it back to them", async () => {
+    const { driverUserId } = seed();
+    signInAs(driverUserId);
+    await renderApp();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Running late/i }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/minutes behind the timetable/i), { target: { value: "15" } });
+    fireEvent.change(within(dialog).getByLabelText(/what is holding the run up/i), { target: { value: "Flooding at the junction" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /record the delay/i }));
+
+    expect(await screen.findByText(/15 minutes late — Flooding at the junction/)).toBeTruthy();
+    expect(saved().trips[0].delays).toHaveLength(1);
+    expect(saved().trips[0].delays[0].reportedBy).toBe("Kojo Mensah");
   }, 30000);
 });

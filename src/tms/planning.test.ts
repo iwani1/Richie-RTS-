@@ -84,6 +84,7 @@ const trip = (id: string, reference: string, overrides: Partial<Trip> = {}): Tri
   boardings: [],
   onTimeThresholdMinutes: 5,
   corrections: [],
+  delays: [],
   rosterChanges: [],
   origin: "schedule",
   originReason: null,

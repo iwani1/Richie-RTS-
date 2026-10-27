@@ -10,6 +10,7 @@ import { audit, authorise, fail, isValidDate, makeId, norm, TIME_RE, type Actor,
 import { licenceClassProblem } from "./driving";
 import { readStopDetail, type StopDetailInput } from "./stops";
 import { allocateReference } from "./references";
+import { delayLine, minutesLabel, readDelayInput } from "./delays";
 import { mayActOnTrip } from "./scope";
 import {
   DIRECTIONS,
@@ -28,6 +29,7 @@ import {
   type Trip,
   type TripCorrection,
   type TripCorrectionField,
+  type TripDelay,
 } from "./types";
 
 export const BUSING_COMMAND_TYPES = [
@@ -44,6 +46,7 @@ export const BUSING_COMMAND_TYPES = [
   "complete_trip",
   "cancel_trip",
   "correct_trip_record",
+  "record_trip_delay",
 ] as const;
 
 export interface StopInput extends StopDetailInput {
@@ -119,6 +122,19 @@ export interface TripCorrectionInput {
   reason: string;
 }
 
+/**
+ * A run that is late, reported while it is still out (DSP-04, D-105).
+ *
+ * Not a correction: the run is not finished, and nothing already recorded is being changed. It is a
+ * statement about the road, made by the person who can see it, so the office can answer the phone
+ * with a number instead of a guess.
+ */
+export interface TripDelayInput {
+  /** Minutes behind. Arrives as a string from a number input; `readDelayInput` decides. */
+  minutes: number | string;
+  reason: string;
+}
+
 export type BusingCommand =
   | { type: "create_route"; input: RouteInput }
   | { type: "update_route"; id: string; input: RouteInput }
@@ -132,7 +148,8 @@ export type BusingCommand =
   | { type: "record_trip_stop"; id: string; input: ProgressiveStopInput }
   | { type: "complete_trip"; id: string; input?: CompleteTripInput }
   | { type: "cancel_trip"; id: string; reason: string; incidentId?: string }
-  | { type: "correct_trip_record"; id: string; input: TripCorrectionInput };
+  | { type: "correct_trip_record"; id: string; input: TripCorrectionInput }
+  | { type: "record_trip_delay"; id: string; input: TripDelayInput };
 
 export const MAX_GENERATE_DAYS = 62;
 
@@ -662,6 +679,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
           boardings: [],
           onTimeThresholdMinutes: null,
           corrections: [],
+          delays: [],
           rosterChanges: [],
           origin: "schedule",
           originReason: null,
@@ -740,6 +758,7 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         boardings: [],
         onTimeThresholdMinutes: null,
         corrections: [],
+        delays: [],
         rosterChanges: [],
         createdAt: now,
         updatedAt: now,
@@ -1103,6 +1122,49 @@ export function executeBusing(db: Database, actor: Actor | null, command: Busing
         ok: true,
         db: next,
         message: `${updated.reference}: ${what} corrected to ${correction.newValue}. ${updated.corrections.length} correction(s) now recorded on this run.`,
+      };
+    }
+
+    case "record_trip_delay": {
+      const denied = authorise(actor, "trips:record");
+      if (denied) return denied;
+      const existing = db.trips.find((t) => t.id === command.id);
+      if (!existing) return fail("Trip not found.");
+      // Own-record scope first, as on every other run action: a driver reports the delay on their
+      // own run, and cannot learn another run's state by probing its id (D-25).
+      if (!mayActOnTrip(db, actor, existing.id)) return fail("You can only report a delay on a run assigned to you.");
+      // Out, and only out. A planned run is not late yet, and a finished one is not late *now* —
+      // its lateness lives in its stop times, which is what the transport report measures (D-105).
+      if (existing.status !== "dispatched" && existing.status !== "in_progress")
+        return fail(`A delay can only be reported while a run is out (this trip is ${existing.status}).`);
+
+      // Zero is allowed only once a delay exists: "back on time" answers an earlier report. It is
+      // not a way to record a run that was never late.
+      const { errors, value, reason } = readDelayInput(command.input, existing.delays.length > 0);
+      if (Object.keys(errors).length || value === null)
+        return fail("This delay report is incomplete. See the highlighted fields.", errors);
+
+      const delay: TripDelay = {
+        id: makeId(),
+        at: now,
+        minutes: value,
+        reason,
+        reportedBy: actor?.fullName ?? "System",
+      };
+      const updated: Trip = { ...existing, delays: [...existing.delays, delay], updatedAt: now };
+      const next = audit({ ...db, trips: db.trips.map((t) => (t.id === updated.id ? updated : t)) }, actor, {
+        action: "trips:delay",
+        entity: "trip",
+        entityId: updated.id,
+        summary: `${updated.reference}: delay reported — ${delayLine(delay)}`,
+      }, now);
+      return {
+        ok: true,
+        db: next,
+        message:
+          value === 0
+            ? `${updated.reference}: recorded as back on time — ${reason}`
+            : `${updated.reference}: recorded as ${minutesLabel(value)} late. The dispatch desk, the driver and the client now show it.`,
       };
     }
 

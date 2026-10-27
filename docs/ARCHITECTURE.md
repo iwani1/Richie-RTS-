@@ -65,13 +65,15 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 25` (the migration number and the snapshot version are counted separately: two phases shipped without a new migration — the second is RTE-01, whose new stop fields live inside each route's record), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–25) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 26` (the migration number and the snapshot version are counted separately: three phases shipped without a new migration — the newest is DSP-04, whose delay reports live inside each run's record), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–26) |
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `mayReportOnRun`, `confinedClientId`, `confinedPassengerId`. Confines `driver`, `client_contact` and `passenger` to their one linked record. Fails closed |
 | `src/tms/service.ts` | Core commands: setup, users, settings, vehicles, drivers, clients, rentals, backup import |
 | `src/tms/logistics.ts` | Staff logistics commands: incidents, work orders, cost entries, response and maintenance state machines |
 | `src/tms/busing.ts` | Staff busing commands: routes, passengers, trip generation, assignment, dispatch, progressive start/stop/boarding, completion, cancellation, conflict checks and on-time judgement |
+| `src/tms/stops.ts` | Where a stop actually is (RTE-01, D-104): the landmark, Ghana Post GPS address and coordinate rules, `stopDetailLine` / `stopMapLink` for the screens and the manifest, and the count of stops nobody has described |
+| `src/tms/delays.ts` | A run that is late while it is still out (DSP-04, D-105): what a usable report is (`readDelayInput`), which statement is current (`liveDelay`), and how it reads on a desk, a driver's screen, a client's portal and a rider's page |
 | `src/tms/bookings.ts` | Seat bookings: one named rider's seat on one run, capacity as roster + bookings, request/confirm/waitlist/reject/cancel, cut-offs, offers that are never auto-confirmed, and the run's manifest (`manifestFor`: roster plus every seat that still holds one) |
 | `src/tms/compliance.ts` | Vehicle/driver compliance documents, expiry status and reminder lead time |
 | `src/tms/maintenance.ts` | Odometer readings, last completed service anchor and fleet readiness evaluation per configured basis |

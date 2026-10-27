@@ -2,11 +2,13 @@ import { useMemo, useState, type FormEvent } from "react";
 import type { RentalRequestInput } from "../tms/service";
 import { scopedView } from "../tms/scope";
 import { contractStateOf } from "../tms/contracts";
+import { delayNote, liveDelay } from "../tms/delays";
 import {
   CONTRACT_SERVICE_LABELS,
   CONTRACT_STATUS_LABELS,
   DIRECTION_LABELS,
   RENTAL_STATUS_LABELS,
+  TRIP_STATUS_LABELS,
   type BusRoute,
   type Passenger,
   type Rental,
@@ -34,6 +36,14 @@ import {
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const dayList = (days: number[]) => [...days].sort((a, b) => a - b).map((d) => DAY_LABELS[d]).join(" ");
 
+const TRIP_TONE = {
+  planned: "info",
+  dispatched: "warning",
+  in_progress: "warning",
+  completed: "success",
+  cancelled: "error",
+} as const;
+
 const RENTAL_TONE: Record<RentalStatus, "info" | "warning" | "success" | "neutral" | "error"> = {
   draft: "neutral",
   quoted: "info",
@@ -52,6 +62,15 @@ export function ClientPortalPage() {
   const [requesting, setRequesting] = useState(false);
 
   const client = view.link.client;
+  // D-105: the day's runs are the reason a client opens this page at 07:30 — and the reason it rings
+  // the office when one of them is late. Sorted by the time the run leaves, not by reference.
+  const today = todayYmd();
+  const todayTrips = view.trips
+    .filter((trip) => trip.serviceDate === today)
+    .sort((a, b) => {
+      const first = (id: string) => view.routes.find((route) => route.id === id)?.stops[0]?.scheduledTime ?? "";
+      return first(a.routeId) === first(b.routeId) ? a.reference.localeCompare(b.reference) : first(a.routeId) < first(b.routeId) ? -1 : 1;
+    });
   const stopName = (route: BusRoute, stopId: string | null) => route.stops.find((s) => s.id === stopId)?.name ?? "-";
 
   return (
@@ -100,6 +119,40 @@ export function ClientPortalPage() {
               </ul>
             )}
           </Card>
+
+          {/* D-105: what is happening today, including a delay the office has reported. The point of
+              recording a delay is that the client reads it here instead of ringing to ask. */}
+          <div className="mt-5">
+            <Card title="Today's runs" description="The runs scheduled for your routes today, and any delay the office has reported on them.">
+              {todayTrips.length === 0 ? (
+                <EmptyState
+                  title="Nothing scheduled for today"
+                  body="Runs appear here on the day they are scheduled. If you expected one, ask your account manager whether the route operates today."
+                />
+              ) : (
+                <ul className="space-y-2">
+                  {todayTrips.map((trip) => {
+                    const route = view.routes.find((candidate) => candidate.id === trip.routeId);
+                    const late = liveDelay(trip);
+                    return (
+                      <li key={trip.id} className="rounded-sm border border-stone-200 px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs font-semibold">{trip.reference}</span>
+                          <span className="text-sm font-medium">{route?.name ?? "Route"}</span>
+                          <span className="text-xs text-stone-500">leaves {route?.stops[0]?.scheduledTime ?? "—"}</span>
+                          <Badge tone={TRIP_TONE[trip.status]}>{TRIP_STATUS_LABELS[trip.status]}</Badge>
+                        </div>
+                        {late && <p className="mt-1 text-sm text-stone-700">{delayNote(late)}</p>}
+                        {trip.status === "cancelled" && trip.cancelReason && (
+                          <p className="mt-1 text-sm text-stone-700">Cancelled: {trip.cancelReason}.</p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
+          </div>
 
           <div className="mt-5">
           <Card title="Contracted routes" description="Routes Richie Transport Services runs for your organisation.">

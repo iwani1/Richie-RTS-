@@ -291,6 +291,12 @@ their own: both are append-only notes about one run (a corrected fact; a rider a
 moved while that run was under way), read with the run and never queried across runs. Each entry
 carries its own id, timestamp and author, so the record explains itself without a join (D-73, D-79).
 
+`Trip.delays` is embedded for the same reason (DSP-04, D-105): each entry is one statement — how many
+minutes behind the timetable the run is, why, when it was said and by whom — and the list is
+append-only. A later entry is the delay getting worse or the run catching up, never an edit of the
+earlier one, because the question a client asks afterwards is what was known at the time. Schema 26;
+`migrate()` fills an empty list for runs written before it, and no SQL migration was needed.
+
 ## Exclusion constraints (no-double-booking)
 
 These need the `btree_gist` extension. They are the database form of the overlap rules that the service enforces in code today. Neither is enforced by the current browser build.

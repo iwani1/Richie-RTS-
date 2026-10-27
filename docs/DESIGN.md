@@ -228,7 +228,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **865 passed, 28 skipped** across 78 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **899 passed, 28 skipped** across 80 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are

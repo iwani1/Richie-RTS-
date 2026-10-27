@@ -92,6 +92,12 @@ carried on, not the day a record was typed, so a seat booked on Friday for Monda
 | Seats not held now | requested + waiting list + refused + cancelled | The complement of held: seats somebody asked for that are not on a manifest today |
 | Why seats were lost | count by the reason typed on refusal or cancellation | Most frequent first; a missing reason is reported as "No reason recorded" |
 
+**A reported delay is a different figure, and is not in this report.** Since Phase 56 (D-105) a run
+can carry delay reports — minutes behind the timetable, and why — entered while it was out. Those are
+what the dispatch desk and the client's portal show *during* the run. The figures above are measured
+from the stop times *after* it, and the two are deliberately not mixed: a report is somebody's
+statement on the road, a stop time is a record of when the bus arrived.
+
 **Per route and per client.** The same counts grouped by the run's route and by the route's client,
 plus booked seats per client. A route whose runs were all cancelled still appears, with zero worked:
 that is the thing worth seeing, and a route that vanished would read as one that never existed.

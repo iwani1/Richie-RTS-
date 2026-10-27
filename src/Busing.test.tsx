@@ -325,3 +325,35 @@ describe("a run outside the schedule, from the dispatch screen (DSP-03)", () => 
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });
+
+// DSP-04, D-105: a run that is late, recorded from the dispatch screen while it is still out.
+describe("a run that is behind schedule, on the dispatch screen (DSP-04)", () => {
+  it("records minutes and a reason, and shows the sentence to the dispatcher", async () => {
+    const { vehicleId, driverId } = seed();
+    await renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: /Staff busing/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Trips$/ }));
+    expect(await screen.findByText("TR-0001")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Assign$/ }));
+    let dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/^Vehicle/), { target: { value: vehicleId } });
+    fireEvent.change(within(dialog).getByLabelText(/^Driver/), { target: { value: driverId } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Save assignment/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Dispatch$/ }));
+
+    // A dispatched run is out, so the delay is a fact about the road, not a prediction.
+    fireEvent.click(await screen.findByRole("button", { name: /^Report delay$/ }));
+    dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/minutes behind the timetable/i), { target: { value: "18" } });
+    fireEvent.change(within(dialog).getByLabelText(/what is holding the run up/i), { target: { value: "Traffic at the Spintex junction" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /record the delay/i }));
+
+    expect(await screen.findByText(/18 minutes late — Traffic at the Spintex junction/)).toBeTruthy();
+    // The desk's own count, because "how many are behind" is the supervisor's question at 07:30.
+    expect(await screen.findByText(/1 run behind schedule/)).toBeTruthy();
+    // The button now offers to update the same report rather than start another.
+    expect(screen.getByRole("button", { name: /Update delay/i })).toBeTruthy();
+  });
+});

@@ -23,6 +23,7 @@ export const KNOWN_COMMAND_TYPES = [
   "assign_rental", "start_rental", "complete_rental", "decline_rental", "cancel_rental",
   "create_route", "update_route", "generate_trips", "dispatch_trip", "assign_trip",
   "start_trip", "complete_trip", "cancel_trip", "record_trip_stop", "correct_trip_record",
+  "record_trip_delay",
   "create_passenger", "update_passenger",
   "create_booking", "confirm_booking", "reject_booking", "cancel_booking",
   "create_incident", "update_incident", "advance_incident", "add_incident_cost", "remove_incident_cost",

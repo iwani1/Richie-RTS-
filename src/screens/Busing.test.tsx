@@ -84,6 +84,7 @@ const trip: Trip = {
   boardings: [{ passengerId: "p1", stopId: "s1", outcome: "no_show" }],
   onTimeThresholdMinutes: 5,
   corrections: [],
+  delays: [],
   rosterChanges: [],
   origin: "schedule",
   originReason: null,

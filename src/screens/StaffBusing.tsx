@@ -1,7 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { MAX_GENERATE_DAYS, type AdhocTripInput, type CompleteTripInput, type PassengerInput, type RouteInput, type TripAssignInput, type TripCorrectionInput } from "../tms/busing";
+import { MAX_GENERATE_DAYS, type AdhocTripInput, type CompleteTripInput, type PassengerInput, type RouteInput, type TripAssignInput, type TripCorrectionInput, type TripDelayInput } from "../tms/busing";
+import { delayLine, liveDelay, runningLate } from "../tms/delays";
 import { stopDetailLine } from "../tms/stops";
 import { capacityOf, manifestFor, type BookingRequestInput, type ManifestRider } from "../tms/bookings";
+import { TripDelayForm } from "./TripDelayForm";
 import { TripStopForm } from "./TripStopForm";
 import { onTimeReport } from "../tms/kpis";
 import type { Permission } from "../tms/permissions";
@@ -595,7 +597,7 @@ function PassengerForm({ passenger, onClose }: { passenger: Passenger | null; on
 function TripsTab() {
   const { db, allowed, dispatch, setFlash } = useTms();
   const [date, setDate] = useState(todayYmd());
-  const [panel, setPanel] = useState<{ mode: "assign" | "complete" | "stop" | "cancel" | "correct"; trip: Trip } | null>(null);
+  const [panel, setPanel] = useState<{ mode: "assign" | "complete" | "stop" | "cancel" | "correct" | "delay"; trip: Trip } | null>(null);
   const [creating, setCreating] = useState(false);
 
   const trips = db.trips.filter((t) => t.serviceDate === date).sort((a, b) => a.reference.localeCompare(b.reference));
@@ -625,6 +627,14 @@ function TripsTab() {
       out.push(<Button key="stop" variant="ghost" onClick={() => setPanel({ mode: "stop", trip: t })}>Record next stop</Button>);
     if (t.status === "in_progress" && route && t.stopLogs.length === route.stops.length && allowed("trips:complete"))
       out.push(<Button key="complete" variant="primary" onClick={() => void report(dispatch({ type: "complete_trip", id: t.id }))}>Complete run</Button>);
+    // DSP-04, D-105: a run that is out and behind can say so, with a reason, while the client is
+    // still on the phone. Offered wherever a delay can exist, not only once somebody complains.
+    if ((t.status === "dispatched" || t.status === "in_progress") && allowed("trips:record"))
+      out.push(
+        <Button key="delay" variant="ghost" onClick={() => setPanel({ mode: "delay", trip: t })}>
+          {liveDelay(t) ? "Update delay" : "Report delay"}
+        </Button>,
+      );
     // A run that has started can still be stopped (Q-47): a breakdown or an ill driver must have a
     // recorded way out, or the dispatcher is left with a run that can never be closed.
     if ((t.status === "planned" || t.status === "dispatched" || t.status === "in_progress") && allowed("trips:cancel"))
@@ -724,6 +734,8 @@ function TripsTab() {
                         <span>{t.vehicleId ? vehicleReg(t.vehicleId) : <em className="rts-unset">no vehicle</em>}</span>
                         <span>{t.driverId ? driverName(t.driverId) : <em className="rts-unset">no driver</em>}</span>
                       </p>
+                      {/* D-105: the sentence, not a badge. A dispatcher reads it out to the client. */}
+                      {liveDelay(t) && <p className="rts-run-late">{delayLine(liveDelay(t)!)}</p>}
                     </div>
                     <div className="rts-run-state">
                       <span className={`rts-flag rts-flag--${t.status}`}>{TRIP_STATUS_LABELS[t.status]}</span>
@@ -761,6 +773,15 @@ function TripsTab() {
               <span>finished</span>
             </span>
           </div>
+
+          {/* D-105: the desk's own count, because "how many are running late" is the question a
+              supervisor asks at 07:30, not something to answer by reading every row. */}
+          {runningLate(trips).length > 0 && (
+            <p className="rts-desk-late">
+              {runningLate(trips).length} run{runningLate(trips).length === 1 ? "" : "s"} behind schedule
+              <span>{runningLate(trips).map((t) => t.reference).join(" · ")}</span>
+            </p>
+          )}
 
           <p className="rts-desk-head">Waiting on a crew</p>
           {unassigned.length === 0 ? (
@@ -877,6 +898,18 @@ function TripsTab() {
               // Show the day the run was made for, so the dispatcher sees the thing they just created.
               setDate(input.serviceDate);
             }
+            return result.ok ? {} : result.errors;
+          }}
+        />
+      )}
+      {panel && panel.mode === "delay" && (
+        <TripDelayForm
+          trip={panel.trip}
+          onClose={() => setPanel(null)}
+          onSubmit={async (input: TripDelayInput) => {
+            const result = await dispatch({ type: "record_trip_delay", id: panel.trip.id, input });
+            report(result);
+            if (result.ok) setPanel(null);
             return result.ok ? {} : result.errors;
           }}
         />

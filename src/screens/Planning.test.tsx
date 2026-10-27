@@ -110,6 +110,7 @@ const trip: Trip = {
   boardings: [],
   onTimeThresholdMinutes: 5,
   corrections: [],
+  delays: [],
   rosterChanges: [],
   origin: "schedule",
   originReason: null,

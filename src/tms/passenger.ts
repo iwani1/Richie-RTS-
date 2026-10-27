@@ -14,6 +14,7 @@
 // The distinction the brief asks for — requested, confirmed, assigned to trip, picked up, completed,
 // cancelled — is kept exactly, and each one is derived from a record rather than inferred.
 import { bookingContractProblem } from "./contracts";
+import { delayNote, liveDelay } from "./delays";
 import { capacityOf, minutesToDeparture, seatErrors, LIVE_BOOKING_STATUSES } from "./bookings";
 import { toMinutes } from "./busing";
 import type { Booking, BusRoute, Database, Passenger, RouteStop, Trip } from "./types";
@@ -73,7 +74,7 @@ export interface Journey {
  */
 export const PASSENGER_LIMITS: readonly string[] = [
   "The bus's live position is not tracked, so no map and no arrival countdown are shown.",
-  "A delay is not recorded anywhere, so the portal cannot tell you the bus is late — ring the office.",
+  "A delay shows only when the driver or the office has reported one. A late bus with no report says nothing here, so ring the office rather than wait on the strength of this page.",
   "Times are the timetable's, not a measurement of the road.",
   "Your seat is confirmed by the office, never automatically, because a seat promised to somebody who stopped waiting is worse than no seat at all.",
 ];
@@ -114,6 +115,15 @@ function boardingOf(trip: Trip, passengerId: string): "boarded" | "no_show" | nu
  * is the fact, even where a booking still says "confirmed".
  */
 export function journeyStateOf(trip: Trip, booking: Booking | null, passengerId: string): JourneyPhaseView {
+  const state = phaseOf(trip, booking, passengerId);
+  // D-105: what the office knows about the road, appended to what the record says about the seat.
+  // The seat's story comes first — a cancelled booking is not a cancelled bus — but a rider reading
+  // "under way" needs the delay in the same breath, not on another screen.
+  const late = liveDelay(trip);
+  return late ? { ...state, detail: `${state.detail} ${delayNote(late)}` } : state;
+}
+
+function phaseOf(trip: Trip, booking: Booking | null, passengerId: string): JourneyPhaseView {
   if (booking) {
     switch (booking.status) {
       case "requested":

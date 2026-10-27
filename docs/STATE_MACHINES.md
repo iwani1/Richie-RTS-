@@ -232,9 +232,12 @@ order, and never in the other direction.
 | Travelled / not recorded aboard | run `completed`, boarding `boarded` / `no_show` | what the driver recorded at the stop |
 | Run cancelled | run `cancelled` | with the reason the office typed when it cancelled |
 
-**Delayed is not in this list, and that is a decision rather than an omission** (D-97): a delay is not
-recorded anywhere in this build, so inferring one from the timetable would state a fact nobody entered.
-The portal says a delay cannot be told from these records.
+**Delayed is not a phase in this list, and that is still a decision** (D-97, D-105): the list names what
+happened to the seat and the run, and a delay is neither. Since Phase 56 a delay *is* recorded — by the
+driver or the office, while the run is out — and `journeyStateOf()` appends it to whatever phase the
+run is in, so "under way" can read "under way. This run is reported 20 minutes behind its timetable —
+traffic at the junction." A run nobody reported stays silent, which is why the portal prints its limit
+in the rider's own words rather than leaving the silence to be read as punctuality.
 
 ## Contract (`Contract.status`, CLI-02, D-95)
 

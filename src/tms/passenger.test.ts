@@ -345,7 +345,9 @@ describe("passenger accounts - the brief's statuses, one by one", () => {
     expect(running.label).toBe("Under way");
     expect(running.detail).toMatch(/position is not tracked/i);
     expect(PASSENGER_LIMITS.join(" ")).toMatch(/live position is not tracked/i);
-    expect(PASSENGER_LIMITS.join(" ")).toMatch(/delay is not recorded/i);
+    // D-105 changed the honest answer: a delay *is* recorded now — but only when somebody reported
+    // one, so an unreported late bus still says nothing and the rider is told to ring.
+    expect(PASSENGER_LIMITS.join(" ")).toMatch(/delay shows only when the driver or the office has reported one/i);
   });
 
   it("reports the boarding recorded at the door: picked up, then travelled", () => {
@@ -451,5 +453,48 @@ describe("passenger accounts - feedback is a report about a journey (PAX-01)", (
     const afterView = scopedView(opsReported, w.passengerUser);
     expect(afterView.incidents).toHaveLength(1);
     expect(afterView.incidents[0].description).toMatch(/overcrowded/);
+  });
+});
+
+// DSP-04, D-105: the office reported a delay, so the rider is told about it in the same breath as
+// the run's own state — not on another screen, and not only by a colour.
+describe("a reported delay reaches the rider", () => {
+  const delayEntry = (minutes: number, reason: string) => ({
+    id: "dl-1",
+    at: "2026-06-01T07:20:00.000Z",
+    minutes,
+    reason,
+    reportedBy: "Ops",
+  });
+
+  it("adds the delay to what the run says, keeping the run's own story first", () => {
+    const w = build();
+    const running = { ...tripOf(w.db, w.tripId), status: "in_progress" as const };
+    const late = journeyStateOf({ ...running, delays: [delayEntry(20, "Traffic at the junction")] }, null, w.riderId);
+    expect(late.label).toBe("Under way");
+    expect(late.detail).toMatch(/position is not tracked/i);
+    expect(late.detail).toMatch(/20 minutes behind its timetable — Traffic at the junction\./);
+    // The phase is unchanged: a delay is not a different kind of journey.
+    expect(late.phase).toBe("under_way");
+  });
+
+  it("goes quiet once the run catches up: there is nothing left to act on", () => {
+    const w = build();
+    const running = { ...tripOf(w.db, w.tripId), status: "in_progress" as const };
+    const normal = journeyStateOf(running, null, w.riderId);
+    const cleared = journeyStateOf(
+      { ...running, delays: [delayEntry(20, "Traffic"), delayEntry(0, "The road reopened")] },
+      null,
+      w.riderId,
+    );
+    // The history stays on the run for the office to explain afterwards; the rider is not made to
+    // read a warning about something that is no longer true.
+    expect(cleared.detail).toBe(normal.detail);
+  });
+
+  it("stays quiet on a finished run: its lateness is in the stop times, not a live claim", () => {
+    const w = build();
+    const done = { ...tripOf(w.db, w.tripId), status: "completed" as const, delays: [delayEntry(20, "Traffic")] };
+    expect(journeyStateOf(done, null, w.riderId).detail).not.toMatch(/behind its timetable/);
   });
 });
