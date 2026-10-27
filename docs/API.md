@@ -20,6 +20,10 @@ from the company's own website (WEB-01, below).
 | `GET` | `/api/enquiry` | none | The vehicle types the public form offers, and a signed time-trap token (WEB-01) |
 | `POST` | `/api/enquiry` | none, throttled | Record a public enquiry as a draft request; answers with a reference and nothing else (WEB-01) |
 | `GET` | `/api/health` | none | Database reachability and migration state, for a monitor |
+| `POST` | `/api/receipts` | cookie, `receipts:write` | File a scanned expense receipt: sniff, save, then index (D-100) |
+| `GET` | `/api/receipts/[id]` | cookie, `receipts:read` | The scan itself, as bytes |
+| `POST` | `/api/vehicle-photo` | cookie, `vehicles:update` | File or replace a vehicle's photograph: sniff, save, then index (D-108) |
+| `GET` | `/api/vehicle-photo/[id]` | cookie, `vehicles:read` | The photograph itself, as bytes |
 
 Responses are JSON and always `no-store`. The shape of a failure is the same everywhere:
 
@@ -228,6 +232,30 @@ In production the `database` field is only `"reachable"` or `"not reachable"`: t
 extension list are useful at the terminal and mildly useful to a stranger (audit F-17). A failing
 database returns `503`, which is what a monitor should alert on. Used by
 `SETUP_AND_DEPLOYMENT.md` §10.
+
+## The two file routes (D-100, D-108)
+
+Everything else in this catalogue exchanges JSON. A file cannot be sent that way, so there are exactly
+two pairs of routes that carry bytes, and they follow one order:
+
+| | Receipts | Vehicle photographs |
+|---|---|---|
+| Accept | `POST /api/receipts`, multipart (`expenseId`, `file`) | `POST /api/vehicle-photo`, multipart (`vehicleId`, `file`) |
+| Before reading the file | same-origin, session, role | same-origin, session, role |
+| What is accepted | decided by the **bytes**, never the browser's `Content-Type` | the same sniffing code, JPEG/PNG/WebP only |
+| Name on disk | `rcpt_<36 hex>.<ext>`, generated here | `vhcl_<36 hex>.<ext>`, generated here |
+| Order | save the file, then write the index | the same |
+| A refused row | the file is deleted again | the same |
+| Open | `GET /api/receipts/[id]` | `GET /api/vehicle-photo/[id]` |
+| Response headers | `no-store`, `nosniff`, inline name stripped of quotes and control characters | the same |
+| Folder | `RECEIPT_DIR` (`data/receipts`) | `VEHICLE_PHOTO_DIR` (`data/vehicle-photos`) |
+
+Both `POST`s answer with the same envelope a command answers with (`ok`, `message`, `errors`,
+`database`), so a screen handles a file and a command the same way. Neither writing command
+(`attach_receipt`, `attach_vehicle_photo`) is accepted by `/api/commands`: a rule that can be reached
+from the browser is a rule the browser can break, and the row may only be written once the bytes are
+on the disk. A `GET` answers `404` in words when the index names a file the folder does not have — that
+is a restore that has not been done, not an image that failed to load.
 
 ## What is deliberately absent
 
