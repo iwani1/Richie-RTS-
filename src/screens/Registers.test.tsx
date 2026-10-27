@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClientsPage, DriversPage } from "./Registers";
 import { VehiclesPage } from "./Vehicles";
 import { TmsContext, type Tms } from "../tms/useTms";
-import { emptyDatabase, type Client, type ClientLocation, type Contract, type Database, type Driver, type User, type Vehicle } from "../tms/types";
+import { emptyDatabase, type BusRoute, type Client, type ClientLocation, type Contract, type Database, type Driver, type Trip, type User, type Vehicle, type WorkOrder } from "../tms/types";
 
 afterEach(cleanup);
 
@@ -733,5 +733,262 @@ describe("the photograph of a vehicle (FLT-01, D-108)", () => {
 
     await waitFor(() => expect(tms.dispatch).toHaveBeenCalled());
     expect(tms.dispatch).toHaveBeenCalledWith({ type: "remove_vehicle_photo", vehicleId: "v1", reason: "Sold to Ama Transport" });
+  });
+});
+
+// The seven states a vehicle can be in (FLT-02, D-109). The register used to show only the office's
+// own four words; the brief's workflow needs the other three, and they are read from the runs, the
+// hires and the work orders rather than typed in.
+describe("what state a vehicle is in today (FLT-02)", () => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const vehicleRecord = (overrides: Partial<Vehicle> = {}): Vehicle => ({
+    id: "v1",
+    registration: "GT 100-26",
+    categoryId: "cat",
+    make: "Toyota",
+    model: "Coaster",
+    seatCapacity: 30,
+    status: "available",
+    fuelType: "Diesel",
+    ownership: "owned",
+    ownerName: "",
+    usualDriverId: null,
+    photo: null,
+    notes: "",
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  });
+
+  const tripRecord = (overrides: Partial<Trip> = {}): Trip => ({
+    id: "t1",
+    reference: "TR-0001",
+    routeId: "r1",
+    serviceDate: today,
+    status: "planned",
+    origin: "schedule",
+    originReason: null,
+    vehicleId: "v1",
+    driverId: "d1",
+    dispatchedAt: null,
+    startedAt: null,
+    completedAt: null,
+    cancelReason: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    incidentId: null,
+    stopLogs: [],
+    boardings: [],
+    onTimeThresholdMinutes: null,
+    corrections: [],
+    delays: [],
+    rosterChanges: [],
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  });
+
+  const workOrderRecord = (overrides: Partial<WorkOrder> = {}): WorkOrder => ({
+    id: "w1",
+    reference: "WO-0003",
+    vehicleId: "v1",
+    title: "Brakes",
+    workType: "Repair",
+    workshop: "Ama Motors",
+    description: "",
+    reportedOdometer: null,
+    plannedDate: null,
+    incidentId: null,
+    status: "open",
+    holdReason: null,
+    completedAt: null,
+    resetsServiceInterval: false,
+    costEntries: [],
+    costsConfirmedComplete: false,
+    completionNote: null,
+    releasedBy: null,
+    releasedAt: null,
+    log: [],
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  });
+
+  const routeRecord: BusRoute = {
+    id: "r1",
+    reference: "RT-001",
+    name: "Northstar morning",
+    clientId: "c1",
+    direction: "to_work",
+    shiftId: null,
+    vehicleCategoryId: "cat",
+    weekdays: [1],
+    startDate: "2026-01-01",
+    endDate: null,
+    stops: [],
+    status: "active",
+    createdAt: at,
+    updatedAt: at,
+  };
+
+  const driverRecord: Driver = {
+    id: "d1",
+    fullName: "Kofi Mensah",
+    phone: "0244000000",
+    licenceNumber: "DL-001",
+    licenceExpiry: "2031-05-01",
+    licenceClasses: ["D"],
+    qualifications: [],
+    status: "active",
+    createdAt: at,
+    updatedAt: at,
+  };
+
+  function renderFleet(db: Database) {
+    const tms = {
+      db: { ...db, routes: db.routes.length ? db.routes : [routeRecord], drivers: db.drivers.length ? db.drivers : [driverRecord] },
+      actor: { id: admin.id, fullName: admin.fullName, role: admin.role },
+      currentUser: admin,
+      status: "ready",
+      connectionError: null,
+      auditTotal: 0,
+      setupRequired: false,
+      flash: null,
+      setFlash: vi.fn(),
+      allowed: () => true,
+      dispatch: vi.fn(async () => ({ ok: true, message: "" })),
+      signIn: vi.fn(async () => null),
+      signOut: vi.fn(async () => {}),
+      setupAdministrator: vi.fn(async () => ({ ok: true, message: "" })),
+      exportBackup: vi.fn(async () => null),
+      refresh: vi.fn(async () => {}),
+    } as unknown as Tms;
+    render(
+      <TmsContext.Provider value={tms}>
+        <VehiclesPage navigate={() => {}} />
+      </TmsContext.Provider>,
+    );
+    return tms;
+  }
+
+  it("shows Available for a bus nothing is holding", () => {
+    renderFleet({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()] });
+    expect(within(rowFor("GT 100-26")).getByText("Available")).toBeTruthy();
+  });
+
+  it("shows Reserved for a planned run, with the run's reference", () => {
+    renderFleet({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()], trips: [tripRecord()] });
+    const row = rowFor("GT 100-26");
+    expect(within(row).getByText("Reserved")).toBeTruthy();
+    expect(row.textContent).toContain("TR-0001");
+  });
+
+  it("shows Assigned once the run is dispatched, and On trip once it has started", () => {
+    const { unmount } = render(
+      <TmsContext.Provider
+        value={
+          {
+            db: { ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()], trips: [tripRecord({ status: "dispatched", dispatchedAt: at })], routes: [routeRecord], drivers: [driverRecord] },
+            actor: { id: admin.id, fullName: admin.fullName, role: admin.role },
+            currentUser: admin,
+            allowed: () => true,
+            dispatch: vi.fn(),
+            setFlash: () => {},
+            flash: null,
+          } as unknown as Tms
+        }
+      >
+        <VehiclesPage navigate={() => {}} />
+      </TmsContext.Provider>,
+    );
+    expect(within(rowFor("GT 100-26")).getByText("Assigned")).toBeTruthy();
+    unmount();
+
+    renderFleet({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()], trips: [tripRecord({ status: "in_progress", startedAt: at })] });
+    expect(within(rowFor("GT 100-26")).getByText("On trip")).toBeTruthy();
+  });
+
+  it("shows Pending inspection when a repair is finished and nobody has released it, and says what the register still believes", () => {
+    renderFleet({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord({ status: "maintenance" })],
+      workOrders: [workOrderRecord({ status: "completed", completedAt: at })],
+    });
+    const row = rowFor("GT 100-26");
+    expect(within(row).getByText("Pending inspection")).toBeTruthy();
+    expect(row.textContent).toContain("WO-0003");
+    expect(row.textContent).toContain("register: under maintenance");
+  });
+
+  it("shows Under maintenance while the work is going on", () => {
+    renderFleet({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord({ status: "maintenance" })],
+      workOrders: [workOrderRecord({ status: "in_progress" })],
+    });
+    expect(within(rowFor("GT 100-26")).getByText("Under maintenance")).toBeTruthy();
+  });
+
+  it("warns when a bus in the workshop is still on today's run sheet", () => {
+    renderFleet({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord({ status: "out_of_service" })],
+      trips: [tripRecord({ status: "dispatched", dispatchedAt: at })],
+    });
+    const row = rowFor("GT 100-26");
+    expect(within(row).getByText("Out of service")).toBeTruthy();
+    expect(row.textContent).toContain("still committed to TR-0001");
+  });
+
+  it("counts the fleet by state rather than only by the office's word", () => {
+    renderFleet({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord(), vehicleRecord({ id: "v2", registration: "GT 200-26" }), vehicleRecord({ id: "v3", registration: "GT 300-26", status: "maintenance" })],
+      trips: [tripRecord({ status: "in_progress", startedAt: at })],
+      workOrders: [workOrderRecord({ vehicleId: "v3", status: "completed", completedAt: at })],
+    });
+    // One line, in the brief's order, so a fleet can be read at a glance.
+    expect(screen.getByText(/^1 available · 1 on trip · 1 pending inspection of 3$/)).toBeTruthy();
+  });
+
+  it("filters by the state the records give, not only by the stored word", () => {
+    renderFleet({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord(), vehicleRecord({ id: "v2", registration: "GT 200-26", status: "maintenance" })],
+      workOrders: [workOrderRecord({ vehicleId: "v2", status: "completed", completedAt: at })],
+    });
+    fireEvent.change(screen.getByLabelText("Filter by state"), { target: { value: "pending_inspection" } });
+    expect(screen.queryByText("GT 100-26")).toBe(null);
+    expect(screen.getByText("GT 200-26")).toBeTruthy();
+  });
+
+  it("prints the rule behind each state, so the desk can read why", () => {
+    renderFleet({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()] });
+    const disclosure = screen.getByText("How each state is decided");
+    expect(disclosure).toBeTruthy();
+    // Every one of the seven the brief names, plus the office's own two, is described.
+    for (const label of ["Reserved", "Assigned", "On trip", "Pending inspection", "Under maintenance", "Out of service", "Retired"]) {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("explains the difference between the two vocabularies when changing the office's word", () => {
+    renderFleet({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord({ status: "maintenance" })],
+      workOrders: [workOrderRecord({ status: "completed", completedAt: at })],
+    });
+    fireEvent.click(within(rowFor("GT 100-26")).getByRole("button", { name: /Change status/ }));
+    const panel = screen.getByRole("dialog");
+    expect(panel.textContent).toContain("Today: Pending inspection");
+    expect(panel.textContent).toContain("waiting to be released");
+    expect(panel.textContent).toContain("read from the runs, the hires and the work orders");
   });
 });

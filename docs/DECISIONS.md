@@ -2289,3 +2289,66 @@ open it, and what happens when it is removed.
 - **Corrected during the build.** The panel block that renders the add/edit form keyed off
   "not transition and not import", so opening the photograph panel also opened an "Add vehicle" form
   behind it. Caught by the screen test, not by eye; the block now names the two modes it serves.
+
+## D-109 - Seven states for a vehicle, and four of them are read rather than typed (FLT-02)
+
+The brief names seven vehicle states: Available, Reserved, Assigned, On Trip, Under Maintenance, Out of
+Service, Pending Inspection. The register held four statuses — available, maintenance, out_of_service,
+retired — and they answered a different question from the one the brief is asking. "Is anything wrong
+with this bus?" and "can I put it on a run this afternoon?" are not the same question, and a register
+that can only answer the first one sends a dispatcher to a bus that left an hour ago.
+
+- **Decision 1: the stored status is the vehicle's condition; three of the brief's states are read.**
+  Available, Under maintenance, Out of service and Retired stay as they are: words the office types,
+  each change audited with a reason. Reserved, Assigned and On Trip are facts about what the day's runs
+  and hires are doing with the bus, and storing them would create a second copy of a fact the trips
+  already hold. The two copies would disagree the first time a run was cancelled in a hurry — the fault
+  this codebase has refused before (D-103, where a driver's availability is read from the runs rather
+  than kept as a flag). So the working states are derived in `src/tms/fleetState.ts`.
+- **Decision 2: Pending Inspection is the state the register never had, and it is the useful one.** A
+  work order that has reached `completed` is a repair that is finished and a vehicle that nobody has
+  signed back into service: the bus is not being worked on, and it may not carry people. Folding that
+  into "Under maintenance" hides the difference between "the mechanic is still working" and "the
+  mechanic has finished and is waiting for the person who may release it" — and it is the second one
+  that gets dispatched by mistake, because the work looks done. It is derived from the work order, not
+  added as a fifth stored word, for the same reason as Decision 1: a stored `pending_inspection` would
+  need its own transition and could sit on a vehicle whose order had already been released.
+- **Decision 3: precedence is by what physically stops the bus.** Retired first (it is not in the
+  fleet), then out of service (the office has taken it off the road), then maintenance, then pending
+  inspection, then on trip, assigned and reserved. Work in the workshop outranks work on the road
+  because a bus with its wheels off cannot be driving; a finished repair waiting for a signature
+  outranks a commitment because nobody may carry passengers until somebody signs the bus back.
+- **Decision 4: a blocking state still names the commitment it is overriding.** A bus in the workshop
+  that is still on today's run sheet reads "Under maintenance. It is still committed to TR-0001
+  (Northstar morning), dispatched with Kofi Mensah." The two facts are both true and the second one is
+  a plan that has already gone wrong; printing only the state would leave the dispatcher to discover it
+  at the gate. The same applies to a retired bus with a hire still attached to it.
+- **Decision 5: Reserved means "held today", not "booked eventually".** A hire that starts on Friday
+  does not make a bus unavailable on Tuesday, and counting it would make almost every vehicle
+  permanently Reserved, which is the same as having no word at all. The register therefore answers
+  "what is it doing today", and the *next* question — "when do I lose it?" — is answered separately by
+  `nextCommitmentOf`, printed in the status panel for a vehicle that is free.
+- **Decision 6: the filter speaks the seven states, and the row still shows the office's word when it
+  disagrees.** "Show me everything in the workshop" must include the bus waiting for a release, so the
+  filter reads the derived states. Where the derived state differs from what the register says — the
+  common case being Pending inspection on a vehicle still marked Under maintenance — the row prints
+  "register: under maintenance" beneath the badge, so nobody has to guess which to believe, and the
+  change-status panel says which of the two vocabularies it is changing.
+- **Decision 7: the rule for each state is printed on the screen, not only in this file.** The brief
+  asks for the rule behind each state. `FLEET_STATE_RULES` holds them and the register shows them in a
+  disclosure under the table: a rule that lives only in a markdown file is a rule nobody at the desk
+  has read.
+- **Decision 8: the states decide nothing.** What stops a vehicle being assigned is still
+  `assessResources`, reading the stored condition, the mandatory papers and the service interval. The
+  derived state is a reading of the records, not a gate, and it cannot block work by itself. That
+  separation is what keeps the derived states honest: if they were enforced, a disagreement between
+  them and the runs would stop the office working.
+- **Decision 9: schema 28 unchanged, no migration and no new field.** Every input to the states already
+  exists in the database. There is nothing to migrate, and a stored copy is exactly what this entry
+  argues against.
+- **Consequence.** New module `src/tms/fleetState.ts` (`FLEET_STATES`, `FLEET_STATE_LABELS`,
+  `FLEET_STATE_ORDER`, `FLEET_STATE_RULES`, `fleetStateOf`, `fleetStateLine`, `fleetStateCounts`,
+  `vehiclesInState`, `nextCommitmentOf`); the vehicles register shows a **Today** column with the state,
+  the record behind it and any overridden commitment, counts the fleet by state beside the search box,
+  filters by state, and prints the rules; the change-status panel shows the state and the next
+  commitment; `STATE_MACHINES.md` carries the table. 35 new tests (25 domain, 10 screen).

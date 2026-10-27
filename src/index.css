@@ -2644,3 +2644,37 @@ select.rts-input option { background: var(--card); color: var(--ink); }
   .rts-sheet-section-title { break-after: avoid; }
   .rts-sheet-figures { break-inside: avoid; }
 }
+
+/* ---------- the seven vehicle states (FLT-02, D-109) --------------------------------------------------------------- */
+
+.rts-state-ref {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.rts-state-rules {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.rts-state-rules summary {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rts-state-rules dl {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.55;
+}
+.rts-state-rules dt {
+  margin-top: 8px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.rts-state-rules dd {
+  margin: 2px 0 0;
+  color: var(--muted);
+}

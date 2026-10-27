@@ -11,7 +11,35 @@ Encoded and enforced in `src/tms/service.ts`. Each transition is authorised by a
 | out_of_service | available, maintenance, retired | vehicles:transition | reason required |
 | retired | (none) | - | terminal |
 
-`in_service` is intentionally not a manual status; it is reserved for system-driven trip assignment in a later phase.
+Those four are the **condition** of a vehicle — the office's own judgement, and the only part a person
+types. The brief's seven states (FLT-02, D-109) are the condition *plus* what the day's records are
+doing with the bus. The other four are derived in `src/tms/fleetState.ts` and never stored, because a
+stored copy would disagree with the runs the first time a run was cancelled in a hurry (the same
+reasoning as D-103, where a driver's availability is read from the runs).
+
+| State | What makes it | What leaves it |
+|---|---|---|
+| **Available** | Nothing is wrong with it and nothing on the day is holding it: no run planned, dispatched or running, no confirmed hire covering the day. | Office books it (Reserved), sends a run out (Assigned), or takes it off the road. |
+| **Reserved** | A run on the day is `planned` with this vehicle, or a confirmed hire's dates cover the day but it has not started. | The run is dispatched (Assigned) or the hire starts (On trip); cancelling frees it. |
+| **Assigned** | A run on the day is `dispatched` with this vehicle and a crew, or a confirmed hire covering the day has reached its start date. | The crew starts the run (On trip), or the run is cancelled or completed. |
+| **On trip** | A run on the day is `in_progress`, or a hire with this vehicle is `in_progress`. | The run completes or is cancelled. The run's own end frees the vehicle, not a clock. |
+| **Pending inspection** | A work order on the vehicle is `completed` and nobody has released it (`closed`, `maintenance:release`). The repair is done; the signature is missing. | The work order is released. |
+| **Under maintenance** | A work order is `open`, `in_progress` or `on_hold`, or the office has set the vehicle to `maintenance` with no work order open. | The work is finished, or the office sets it back to Available. |
+| **Out of service** | The office took it off the road — a safety defect from an incident, or a decision with a reason. | The office sets it back to Available or Maintenance, with a reason. |
+| **Retired** | It has left the fleet. | Nothing. A retired vehicle does not come back. |
+
+Precedence, highest first: **retired → out of service → maintenance → pending inspection → on trip →
+assigned → reserved → available.** Work in the workshop outranks work on the road (a bus with its
+wheels off cannot be driving), and a finished repair waiting for a signature outranks a commitment
+(nobody may carry passengers until somebody signs the bus back).
+
+A blocking state does not hide a commitment, it names it: a bus in the workshop that is still on
+today's run sheet reads "Under maintenance … It is still committed to TR-0001". That is a plan that has
+already gone wrong, and the register says so rather than leaving the dispatcher to find out at the gate.
+
+The states decide nothing. What stops a vehicle being assigned is `assessResources` (`busing.ts`),
+which reads the stored condition — the only thing a person can change — and the mandatory-paper and
+service-interval rules beside it.
 
 ## Rental (`RENTAL_TRANSITIONS`)
 

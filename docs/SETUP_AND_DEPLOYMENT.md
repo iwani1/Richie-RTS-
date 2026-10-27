@@ -341,7 +341,7 @@ a repair.
 ```bash
 npm run typecheck        # tsc --noEmit
 npm run lint             # eslint
-npm test                 # 968 unit and component tests
+npm test                 # 1003 unit and component tests
 npm run test:integration # against a real database; needs TEST_DATABASE_URL (14 tests, 4 files)
 npm run build            # production build
 ```

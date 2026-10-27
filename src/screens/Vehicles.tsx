@@ -2,16 +2,24 @@ import { useMemo, useState, type FormEvent } from "react";
 import { VEHICLE_TRANSITIONS, type VehicleInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { fleetDetailGaps, isThirdParty, usualDriverOf, vehicleDetailLine } from "../tms/vehicles";
+import {
+  FLEET_STATE_LABELS,
+  FLEET_STATE_ORDER,
+  FLEET_STATE_RULES,
+  fleetStateCounts,
+  fleetStateOf,
+  nextCommitmentOf,
+  type FleetState,
+} from "../tms/fleetState";
 import { VEHICLE_PHOTO_LIMITS, vehiclePhotoLine, vehiclesWithoutPhoto } from "../tms/vehiclePhoto";
 import {
   VEHICLE_OWNERSHIPS,
   VEHICLE_OWNERSHIP_LABELS,
   VEHICLE_STATUS_LABELS,
-  VEHICLE_STATUSES,
   type Vehicle,
   type VehicleStatus,
 } from "../tms/types";
-import { Badge, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDateTime } from "../ui/primitives";
+import { Badge, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDateTime, todayYmd } from "../ui/primitives";
 import { ImportPanel } from "../ui/ImportPanel";
 import type { Route } from "../routes";
 
@@ -23,12 +31,25 @@ type PanelState =
   | { mode: "import" }
   | null;
 
-const statusTone: Record<VehicleStatus, "success" | "warning" | "error" | "neutral"> = {
+/**
+ * The tone of each state's badge (FLT-02, D-109).
+ *
+ * Colour is never the only carrier — the badge always prints its own word, and the register prints
+ * the reference beside it — so this only has to make a fleet readable at a glance.
+ */
+const stateTone: Record<FleetState, "success" | "warning" | "error" | "neutral"> = {
   available: "success",
+  reserved: "neutral",
+  assigned: "neutral",
+  on_trip: "success",
+  pending_inspection: "warning",
   maintenance: "warning",
   out_of_service: "error",
   retired: "neutral",
 };
+
+/** The stored words a derived state can disagree with, and the ones worth printing when it does. */
+const BLOCKING_STATES: readonly FleetState[] = ["pending_inspection", "maintenance", "out_of_service"];
 
 const emptyInput = (): VehicleInput => ({
   registration: "",
@@ -59,7 +80,10 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
   const { db, allowed, dispatch, setFlash } = useTms();
   const [panel, setPanel] = useState<PanelState>(null);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | VehicleStatus>("all");
+  // The filter speaks the brief's vocabulary — the seven states (D-109), not only the four stored
+  // words — because "show me everything in the workshop" has to include a bus waiting for release.
+  const [stateFilter, setStateFilter] = useState<"all" | FleetState>("all");
+  const today = todayYmd();
 
   const categories = db.settings.vehicleCategories;
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Unknown";
@@ -68,18 +92,18 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return db.vehicles
-      .filter((v) => statusFilter === "all" || v.status === statusFilter)
+      .filter((v) => stateFilter === "all" || fleetStateOf(db, v.id, today)?.state === stateFilter)
       .filter((v) => !q || `${v.registration} ${v.make} ${v.model} ${categoryName(v.categoryId)} ${v.fuelType} ${v.ownerName}`.toLowerCase().includes(q))
       .sort((a, b) => a.registration.localeCompare(b.registration));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db.vehicles, query, statusFilter, categories]);
+  }, [db.vehicles, query, stateFilter, categories, db.trips, db.rentals, db.workOrders, db.routes, db.drivers, today]);
 
   return (
     <div>
       <PageHeader
         eyebrow="Master data"
         title="Vehicles"
-        description="Fleet register. Status changes follow the vehicle state machine and are written to the audit log."
+        description="Fleet register. Each bus shows what it is doing today, read from the runs, the hires and the work orders; the office's own status — available, in the workshop, off the road — is what a person changes, and every change is written to the audit log."
         actions={
           allowed("vehicles:create") ? (
             <div className="flex flex-wrap gap-2">
@@ -100,19 +124,31 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
 
       <TableCard
         title="Fleet register"
-        summary={`${rows.length} of ${db.vehicles.length} shown · ${db.vehicles.filter((v) => v.status === "available").length} available`}
+        summary={`${rows.length} of ${db.vehicles.length} shown · ${fleetStateCounts(db, today).available} available today`}
         toolbar={
           <>
             <SearchInput placeholder="Search registration, make, model, category" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search vehicles" />
-            <Select className="max-w-[190px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | VehicleStatus)} aria-label="Filter by status">
-              <option value="all">All statuses</option>
-              {VEHICLE_STATUSES.map((s) => (
-                <option key={s} value={s}>{VEHICLE_STATUS_LABELS[s]}</option>
+            <Select className="max-w-[190px]" value={stateFilter} onChange={(e) => setStateFilter(e.target.value as "all" | FleetState)} aria-label="Filter by state">
+              <option value="all">All states</option>
+              {FLEET_STATE_ORDER.map((state) => (
+                <option key={state} value={state}>{FLEET_STATE_LABELS[state]}</option>
               ))}
             </Select>
-            <p className="rts-filter-bar-note" role="status">
-              {db.vehicles.filter((v) => v.status === "maintenance").length} in maintenance · {db.vehicles.filter((v) => v.status === "out_of_service").length} off road
-            </p>
+            {/* FLT-02, D-109: the fleet counted by what it is doing, not only by what the office has
+                typed. A bus waiting for a release is neither "available" nor "in the workshop" in any
+                useful sense, and it is the one most likely to be dispatched by mistake. */}
+            {(() => {
+              const counts = fleetStateCounts(db, today);
+              const parts = FLEET_STATE_ORDER.filter((state) => state !== "retired" && counts[state] > 0).map(
+                (state) => `${counts[state]} ${FLEET_STATE_LABELS[state].toLowerCase()}`,
+              );
+              if (counts.retired > 0) parts.push(`${counts.retired} retired`);
+              return (
+                <p className="rts-filter-bar-note" role="status">
+                  {parts.length > 0 ? `${parts.join(" · ")} of ${counts.total}` : "No vehicles registered"}
+                </p>
+              );
+            })()}
             {/* FLT-01, D-106: what the register still cannot say, counted rather than glossed over.
                 A fleet that looks complete but cannot be told from the one it leases is a problem
                 the office should see on the screen, not discover at audit time. */}
@@ -190,7 +226,29 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
             },
           },
           { key: "seats", header: "Seats", className: "rts-num", render: (v) => v.seatCapacity },
-          { key: "status", header: "Status", render: (v) => <Badge tone={statusTone[v.status]}>{VEHICLE_STATUS_LABELS[v.status]}</Badge> },
+          {
+            key: "state",
+            header: "Today",
+            // The state, then the record behind it, then — only when the office's own word disagrees
+            // with what the records show — that word, so nobody has to guess which one to believe.
+            render: (v) => {
+              const reading = fleetStateOf(db, v.id, today);
+              if (!reading) return <span className="text-xs rts-unset">not on the register</span>;
+              const storedWord = BLOCKING_STATES.includes(reading.state) && reading.state !== v.status;
+              return (
+                <span className="block">
+                  <span className="flex items-center gap-2">
+                    <Badge tone={stateTone[reading.state]}>{reading.label}</Badge>
+                    {reading.reference && <span className="rts-state-ref">{reading.reference}</span>}
+                  </span>
+                  {storedWord && (
+                    <span className="mt-1 block text-xs rts-unset">register: {VEHICLE_STATUS_LABELS[v.status].toLowerCase()}</span>
+                  )}
+                  {reading.conflict && <span className="mt-1 block text-xs text-amber-800">{reading.conflict}</span>}
+                </span>
+              );
+            },
+          },
           { key: "upd", header: "Updated", render: (v) => <span className="text-xs text-stone-500">{formatDateTime(v.updatedAt)}</span> },
           {
             key: "actions",
@@ -215,6 +273,23 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
         ]}
         />
       </TableCard>
+
+      {/* The brief asks for the rule behind each state, not only the label (FLT-02). A rule that lives
+          only in the documentation is a rule nobody at the desk has read. */}
+      <details className="rts-state-rules">
+        <summary>How each state is decided</summary>
+        <dl>
+          {FLEET_STATE_RULES.map((entry) => (
+            <div key={entry.state}>
+              <dt>{FLEET_STATE_LABELS[entry.state]}</dt>
+              <dd>{entry.rule}</dd>
+              <dd>
+                <strong>Leaves it:</strong> {entry.leaves}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </details>
 
       {panel && panel.mode === "import" && <ImportPanel kind="vehicles" onClose={() => setPanel(null)} />}
 
@@ -344,12 +419,29 @@ function VehicleForm({ initial, title, onClose, onSubmit }: { initial: VehicleIn
 }
 
 function TransitionForm({ vehicle, onClose, onSubmit }: { vehicle: Vehicle; onClose: () => void; onSubmit: (to: VehicleStatus, reason: string) => Record<string, string> | Promise<Record<string, string>> }) {
+  const { db } = useTms();
   const options = VEHICLE_TRANSITIONS[vehicle.status];
   const [to, setTo] = useState<VehicleStatus>(options[0]);
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const today = todayYmd();
+  const reading = fleetStateOf(db, vehicle.id, today);
+  const next = nextCommitmentOf(db, vehicle.id, today);
   return (
-    <Panel title={`Change status: ${vehicle.registration}`} description={`Current status: ${VEHICLE_STATUS_LABELS[vehicle.status]}`} onClose={onClose}>
+    <Panel title={`Change status: ${vehicle.registration}`} description={`The office's word for this bus: ${VEHICLE_STATUS_LABELS[vehicle.status].toLowerCase()}.`} onClose={onClose}>
+      {reading && (
+        <Notice tone={BLOCKING_STATES.includes(reading.state) ? "warning" : "info"} title={`Today: ${reading.label}`}>
+          {reading.sentence}
+          {next && reading.state === "available" && (
+            <> Next spoken for on {next.onDate}: {next.text}.</>
+          )}
+        </Notice>
+      )}
+      <p className="mt-3 text-xs text-stone-600">
+        Available, in the workshop, off the road and retired are this register's own words, and this panel is where they change.
+        On trip, assigned, reserved and pending inspection are read from the runs, the hires and the work orders — they change when
+        those records do, never by a status change here.
+      </p>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
