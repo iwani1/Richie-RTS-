@@ -35,6 +35,7 @@
 // A retired vehicle is left out of every day of the period, because the program does not record the
 // date it left the fleet — and saying so is better than pretending it worked until an arbitrary
 // date. `coverage` carries that and the other gaps.
+import { toCsv } from "./csv";
 import { fromMinor, toMinor } from "./money";
 import { daysInRange } from "./rentalReport";
 import { fleetStateCounts, type FleetStateCounts } from "./fleetState";
@@ -390,4 +391,49 @@ export function previousPeriod(from: string, to: string): { from: string; to: st
   const length = daysInRange(from, to).length;
   if (length === 0) return null;
   return { from: addDays(from, -length), to: addDays(from, -1) };
+}
+
+/**
+ * The dashboard as CSV, for the owner who checks figures in a spreadsheet.
+ *
+ * The figures come first, then one row per vehicle, so the file opens as a small report rather than a
+ * bare list. Every value is the report's own number, formatted here and never re-added.
+ */
+export function fleetReportCsv(report: FleetReport): string {
+  const percentText = (value: number | null) => (value === null ? "not available" : `${(value * 100).toFixed(1)}%`);
+  const money = (value: number) => (report.idleCost.currencyCode ? `${report.idleCost.currencyCode} ${value.toFixed(2)}` : "currency not set");
+  const serviceable = report.vehicleDays.inFleet - report.vehicleDays.workshop;
+  const rows: (string | number)[][] = [
+    ["Metric", "Value", "Note"],
+    ["Period from", report.from, ""],
+    ["Period to", report.to, ""],
+    ["Days in the period", report.dayCount, report.truncated ? "the range was longer than two years and was cut short" : ""],
+    ["Vehicles on the register", report.totals.vehicles, `${report.totals.inService} in service, ${report.totals.retired} retired`],
+    ["Available today", report.availableToday, "nothing wrong with it and nothing holding it"],
+    ["Working today", report.workingToday, "assigned to a run, or on one"],
+    ["Committed vehicle-days", report.committedVehicleDays, "a run or hire held the vehicle that day"],
+    ["Available vehicle-days", report.availableVehicleDays, "fleet in service × days in the period"],
+    ["Utilisation", percentText(report.utilisation), "committed / available (Q-29, D-78)"],
+    ["Worked vehicle-days", report.vehicleDays.worked, "a run started or finished, or a hire was under way"],
+    ["Days worked", percentText(report.workedShare), `worked / ${serviceable} serviceable vehicle-days`],
+    ["Booked, never ran", report.vehicleDays.booked, "a run planned or dispatched, or a hire confirmed, with no start"],
+    ["Workshop vehicle-days", report.vehicleDays.workshop, "downtime, dated from the work orders"],
+    ["Idle vehicle-days", report.vehicleDays.idle, "in the fleet, out of the workshop, holding nothing"],
+    ["Standing cost per vehicle-day", report.idleCost.perDay === null ? "not set" : money(report.idleCost.perDay), "set in Settings → Fleet"],
+    ["Cost of idle days", report.idleCost.total === null ? "not priced" : money(report.idleCost.total), "idle days × the standing cost"],
+    [],
+    ["Vehicle", "Category", "Days in fleet", "Committed", "Worked", "Booked", "Workshop", "Idle", "Last worked"],
+    ...report.byVehicle.map((row) => [
+      row.registration,
+      row.categoryName,
+      row.inFleetDays,
+      row.committedDays,
+      row.workedDays,
+      row.bookedDays,
+      row.workshopDays,
+      row.idleDays,
+      row.lastWorkedOn ?? "not in this period",
+    ]),
+  ];
+  return toCsv(rows);
 }

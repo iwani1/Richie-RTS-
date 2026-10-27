@@ -6,7 +6,7 @@
 // is measured **as at the day it is read**, not inside the chosen period, because a deadline does not
 // move when somebody changes a date filter.
 import { describe, expect, it } from "vitest";
-import { financeHome } from "./financeHome";
+import { financeHome, financeHomeCsv } from "./financeHome";
 import { financialReport } from "./financialReport";
 import { emptyDatabase, emptyRentalSettings, type Client, type CostEntry, type CreditNote, type Database, type Invoice, type Payment, type Refund, type Rental } from "./types";
 
@@ -503,5 +503,23 @@ describe("money paid back on the finance home (D-92)", () => {
     const july = financeHome(db, "2026-07-01", "2026-07-31", "2026-07-31");
     expect(july.figures.refundedTotal).toBe(200);
     expect(july.movement?.difference).toBe(-200);
+  });
+});
+
+describe("the finance home as a spreadsheet (RPT-04, D-113)", () => {
+  it("writes each block with its heading, and says none rather than leaving an empty block", () => {
+    const csv = financeHomeCsv(financeHome(build(), JUNE.from, JUNE.to, "2026-06-25"));
+    expect(csv).toContain("Invoiced,GHS 2000.00,1 invoices issued in the period");
+    expect(csv).toContain("Money received,GHS 500.00,");
+    expect(csv).toContain("Debt by age (as at 2026-06-25),Amount,Note");
+    expect(csv).toContain("Invoice late,Customer,Issued,Due,Days late,Outstanding");
+    // Nothing is unbilled in this fixture, and the block says so instead of ending silently.
+    expect(csv).toContain("Completed hire not billed,Customer,Completed on,Final total\nnone,,");
+  });
+
+  it("says why the margin is withheld instead of leaving the row blank", () => {
+    const csv = financeHomeCsv(financeHome(build({ settings: settings({ currencyCode: null }) }), JUNE.from, JUNE.to, "2026-06-25"));
+    expect(csv).toMatch(/Withheld,not available,/);
+    expect(csv).toContain("Not stated,not available,a currency is not configured");
   });
 });

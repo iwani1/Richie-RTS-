@@ -181,7 +181,7 @@ These work, and the difference is worth knowing before relying on them:
   agreement in force stated on the row. Still not credit terms, a credit limit or a separate billing
   contact per branch: an invoice prints one billing address, the customer's own.
 - **Work orders** — five statuses, no parts list or inspection record; the release step is complete.
-- **Rental report** — eight figures with CSV; other reports do not yet share its filters and export.
+- **Reports and exports** — every report has a date range and a CSV, and the finance home, a customer's statement and the fleet dashboard now export too; what is still missing is one bar that narrows a report by client, route, driver or vehicle, because a filtered figure is not the company figure and needs its own definition.
 - **Credit notes** — one line each, typed before tax (the tax follows from the invoice). A note cannot
   carry several lines from the screen yet, and a refund that is actually paid out is recorded as an
   ordinary expense, because there is no cash book.
@@ -191,7 +191,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**1076 passed, 28 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**1096 passed, 28 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

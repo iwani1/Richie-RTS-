@@ -10,7 +10,8 @@
 // says so, because changing the date filter must not make a deadline disappear.
 import { useMemo, useState } from "react";
 import { AGE_BUCKETS, AGE_BUCKET_LABELS } from "../tms/customerStatement";
-import { financeHome } from "../tms/financeHome";
+import { financeHome, financeHomeCsv } from "../tms/financeHome";
+import { csvFileName, downloadTextFile } from "../ui/download";
 import { formatAmount } from "../tms/money";
 import { useTms } from "../tms/useTms";
 import { PAYMENT_STATUS_LABELS } from "../tms/types";
@@ -38,11 +39,19 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
         title="Finance"
         description="Money in, money out, who is late and what is waiting on a decision. Every figure is counted from the invoice, payment and cost records; nothing is estimated."
         actions={
-          allowed("invoices:read") ? (
-            <Button variant="primary" onClick={() => navigate("invoices")}>
-              Open invoices
+          <>
+            <Button
+              onClick={() => downloadTextFile(csvFileName("finance", home.from, home.to), financeHomeCsv(home))}
+              disabled={reversed}
+            >
+              Download CSV
             </Button>
-          ) : undefined
+            {allowed("invoices:read") && (
+              <Button variant="primary" onClick={() => navigate("invoices")}>
+                Open invoices
+              </Button>
+            )}
+          </>
         }
       />
 

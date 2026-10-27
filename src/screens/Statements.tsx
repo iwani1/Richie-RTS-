@@ -14,11 +14,13 @@
 import { useMemo, useState } from "react";
 import {
   customerStatement,
+  statementCsv,
   statementCustomers,
   type CustomerStatement,
   type StatementRowKind,
 } from "../tms/customerStatement";
 import { formatAmount } from "../tms/money";
+import { csvFileName, downloadTextFile } from "../ui/download";
 import { useTms } from "../tms/useTms";
 import { PrintPreview, StatementSheet } from "./Documents";
 import {
@@ -87,9 +89,23 @@ export function StatementsPage() {
         title="Statements"
         description="One customer's whole account: what was charged, what came in, what was credited, and how old the money still owed is."
         actions={
-          <Button variant="primary" onClick={() => setPrinting(true)} disabled={!ready}>
-            Print statement
-          </Button>
+          <>
+            {/* The sheet is what a customer receives; the CSV is the same rows for whoever
+                reconciles the account in a spreadsheet (D-113). */}
+            <Button
+              onClick={() => {
+                if (!statement) return;
+                const slug = statement.customerName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                downloadTextFile(csvFileName(`statement-${slug}`, statement.from, statement.to), statementCsv(statement));
+              }}
+              disabled={!ready}
+            >
+              Download CSV
+            </Button>
+            <Button variant="primary" onClick={() => setPrinting(true)} disabled={!ready}>
+              Print statement
+            </Button>
+          </>
         }
       />
 

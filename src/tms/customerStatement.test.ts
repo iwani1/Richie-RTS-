@@ -6,7 +6,7 @@
 // counted twice, or a credit note left out shows up as a difference between them, which is exactly the
 // class of mistake a statement mailed to a customer makes public.
 import { describe, expect, it } from "vitest";
-import { ageBucketFor, customerStatement, debtAgeing, statementCustomers } from "./customerStatement";
+import { ageBucketFor, customerStatement, debtAgeing, statementCsv, statementCustomers } from "./customerStatement";
 import { invoiceBalance } from "./creditNotes";
 import { emptyDatabase, type CreditNote, type Database, type Invoice, type Payment, type Refund } from "./types";
 
@@ -457,5 +457,28 @@ describe("money paid back on a statement (D-92)", () => {
     // Everything happened in June, so July opens and closes settled.
     expect(statement.openingBalance).toBe(0);
     expect(statement.closingBalance).toBe(0);
+  });
+});
+
+describe("the statement as a spreadsheet (RPT-04, D-113)", () => {
+  it("writes the same rows the sheet prints, in the same order, with the balance after each", () => {
+    const db: Database = { ...emptyDatabase(), invoices: [invoice()], payments: [payment()] };
+    const statement = customerStatement(db, "Acme Ltd", "2026-06-01", "2026-06-30");
+    const csv = statementCsv(statement);
+    const lines = csv.split("\n");
+
+    expect(lines[0]).toBe("Statement for,Acme Ltd,");
+    expect(csv).toContain("Opening balance,GHS 0.00,what they owed when the period began; negative means in credit");
+    // One invoice of 4,600 then a payment of 1,000: the running balance follows the sheet.
+    expect(csv).toContain("2026-06-01,invoice,INV-2026-0001,Invoice issued,GHS 4600.00,,GHS 4600.00");
+    expect(csv).toContain("2026-06-10,payment,PAY-2026-0001,Payment received — Bank transfer,,GHS 1000.00,GHS 3600.00");
+    // The ageing block closes the file, so a reader can tie the balance to the bands.
+    expect(csv).toContain("Total owed,GHS 3600.00");
+  });
+
+  it("quotes a customer name with a comma rather than breaking the row", () => {
+    const db: Database = { ...emptyDatabase(), invoices: [invoice({ customerName: "Acme, Ltd" })] };
+    const csv = statementCsv(customerStatement(db, "Acme, Ltd", "2026-06-01", "2026-06-30"));
+    expect(csv.split("\n")[0]).toBe('Statement for,"Acme, Ltd",');
   });
 });

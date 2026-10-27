@@ -112,6 +112,8 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 | `src/screens/Documents.tsx` | The paper a customer keeps (D-87): `InvoiceSheet` and `CreditNoteSheet`, plus `PrintPreview`, which portals a sheet to `document.body`, sets the page title (the suggested file name) and hands printing to the browser |
 | `src/ui/useDialogFocus.ts` | The keyboard contract every overlay shares: focus in, Tab trapped, Escape closes, focus restored. Used by `Panel` and the print preview |
 | `src/pages/*` | Screens. `StaffBusing.tsx` holds Routes, Passengers, Trips, Bookings and Performance tabs |
+| `src/tms/csv.ts` | The one CSV writer (RPT-04, D-113): quoting, line breaks, and defusing text a spreadsheet would run as a formula (`=`, `+`, `-`, `@`) while leaving numbers alone. Every export in the program goes through it |
+| `src/ui/download.ts` | Handing a generated file to the browser: object URL, a named anchor, the URL released. Built in the browser from the already-narrowed payload, so nothing is uploaded or stored |
 | `src/ui/primitives.tsx` | Shared form, table, panel and notice components |
 | `src/ui/CopyButton.tsx` | Copies a reference to the clipboard and says so in words (D-111): the Clipboard API, a selected-textarea fallback, and an honest failure line. Used by invoices, rentals, run cards and expense rows |
 | `src/docs/BriefDesk.tsx` | Read-only viewer for the source brief (kept per Integrity rule 6) |

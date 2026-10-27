@@ -27,6 +27,7 @@
 // period), and contract performance (a run does not record which agreement it was worked under). Those
 // are named in `STAFF_REPORT_LIMITS` rather than approximated.
 import { manifestFor } from "./bookings";
+import { toCsv } from "./csv";
 import { toMinutes } from "./busing";
 import { onTimeReport } from "./kpis";
 import type { BookingStatus, Database, Trip } from "./types";
@@ -381,7 +382,6 @@ export function staffReport(db: Database, from: string, to: string): StaffReport
 
 /** The report as CSV: the same figures, for the person who checks them in a spreadsheet. */
 export function staffReportCsv(report: StaffReport): string {
-  const cell = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
   const pct = (value: number | null) => (value === null ? "not available" : `${(value * 100).toFixed(1)}%`);
   const rows: string[][] = [
     ["Metric", "Value", "Note"],
@@ -428,5 +428,5 @@ export function staffReportCsv(report: StaffReport): string {
     ["Stops recorded", String(report.coverage.stopsRecorded), `of ${report.coverage.stopsExpected} expected`],
     ["Roster riders with no pickup stop", String(report.coverage.runsFromRosterWithoutStop), "their pickup cannot be printed on a manifest"],
   ];
-  return rows.map((row) => row.map(cell).join(",")).join("\n");
+  return toCsv(rows);
 }

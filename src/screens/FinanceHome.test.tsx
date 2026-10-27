@@ -277,3 +277,21 @@ describe("money paid back on the finance home (D-92)", () => {
     expect(screen.getByText(/No refund was recorded in this period/)).toBeTruthy();
   });
 });
+
+describe("the finance home as a spreadsheet (RPT-04, D-113)", () => {
+  it("downloads the figures, the debt bands and the open work, named for the period", () => {
+    Object.defineProperty(URL, "createObjectURL", { value: () => "blob:finance", configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: () => {}, configurable: true });
+    const clicked: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.download);
+    });
+
+    open(world());
+    fireEvent.click(screen.getByRole("button", { name: /Download CSV/i }));
+
+    expect(clicked).toHaveLength(1);
+    expect(clicked[0]).toMatch(/^finance-\d{4}-\d{2}-\d{2}-to-\d{4}-\d{2}-\d{2}\.csv$/);
+    click.mockRestore();
+  });
+});

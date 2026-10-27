@@ -19,6 +19,7 @@
 // the company currency is not set, because a total without a currency is a guess.
 
 import { costReport } from "./costs";
+import { toCsv } from "./csv";
 import { creditedTotal, invoiceBalance, isLivePayment, liveRefunds } from "./creditNotes";
 import { fromMinor, sumAmounts, toMinor } from "./money";
 import type { Database, Invoice, Payment } from "./types";
@@ -298,5 +299,5 @@ export function financialReportCsv(report: FinancialReport): string {
     ["Uncategorised cost lines", String(report.coverage.uncategorisedExpenseLines), "coverage — configure cost categories in Settings"],
     ["Completed runs with no vehicle recorded", String(report.coverage.completedTripsWithoutVehicle), "coverage — should be zero"],
   ];
-  return rows.map((row) => row.map((cell) => (/[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell)).join(",")).join("\n");
+  return toCsv(rows);
 }

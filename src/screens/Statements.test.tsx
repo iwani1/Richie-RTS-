@@ -289,3 +289,25 @@ describe("the statements screen", () => {
     expect(screen.getByText(/An invoice has to be issued before a customer has an account to state/)).toBeTruthy();
   });
 });
+
+describe("the statement as a spreadsheet (RPT-04, D-113)", () => {
+  it("downloads the same rows the sheet prints, named for the customer and the period", () => {
+    Object.defineProperty(URL, "createObjectURL", { value: () => "blob:statement", configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: () => {}, configurable: true });
+    const clicked: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.download);
+    });
+
+    renderStatements();
+    // Before a customer is chosen there is nothing to export, and the button says so.
+    expect(screen.getByRole("button", { name: /Download CSV/i })).toHaveProperty("disabled", true);
+
+    openJuneStatement(/Acme Ltd/);
+    expect(screen.getByRole("button", { name: /Download CSV/i })).toHaveProperty("disabled", false);
+    fireEvent.click(screen.getByRole("button", { name: /Download CSV/i }));
+
+    expect(clicked).toEqual(["statement-acme-ltd-2026-06-01-to-2026-06-30.csv"]);
+    click.mockRestore();
+  });
+});

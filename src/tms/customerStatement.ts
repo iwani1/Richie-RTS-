@@ -25,6 +25,7 @@
 // Every amount is added in whole pesewas and converted once (audit D-04): floats show a pesewa of
 // balance that nobody can find.
 import { invoiceBalance, liveCreditNotes, livePayments, liveRefunds } from "./creditNotes";
+import { toCsv } from "./csv";
 import { formatAmount, fromMinor, toMinor } from "./money";
 import type { Database, Invoice } from "./types";
 
@@ -555,4 +556,57 @@ export function debtAgeing(db: Database, asAt: string): DebtAgeing {
     status: "ok",
     message,
   };
+}
+
+/**
+ * A customer's statement as CSV (RPT-04, D-113).
+ *
+ * The statement is a document first — it prints as an A4 sheet (D-90) — but an accountant reconciling
+ * an account wants the rows, not a picture of them. The export is the same rows the sheet prints, in
+ * the same order, with the opening and closing balances and the ageing beneath, so the two cannot say
+ * different things.
+ */
+export function statementCsv(statement: CustomerStatement): string {
+  const money = (value: number) =>
+    statement.currencyCode ? `${statement.currencyCode} ${formatAmount(value)}` : formatAmount(value);
+  const rows: (string | number)[][] = [
+    ["Statement for", statement.customerName, ""],
+    ["Period from", statement.from, ""],
+    ["Period to", statement.to, ""],
+    ["Opening balance", money(statement.openingBalance), "what they owed when the period began; negative means in credit"],
+    ["Invoiced", money(statement.invoiced), "invoices issued in the period"],
+    ["Received", money(statement.received), "payments received in the period"],
+    ["Credited", money(statement.credited), "credit notes issued in the period"],
+    ["Refunded", money(statement.refunded), "money paid back in the period"],
+    ["Closing balance", money(statement.closingBalance), "negative means the office owes them"],
+    [],
+    ["Date", "Document", "Reference", "Description", "Debit", "Credit", "Balance"],
+    ...statement.rows.map((row) => [
+      row.date,
+      row.kind,
+      row.reference,
+      row.description,
+      row.debit ? money(row.debit) : "",
+      row.credit ? money(row.credit) : "",
+      money(row.balance),
+    ]),
+    [],
+    ["Invoice still owing", "Issued", "Due", "Outstanding", "Days overdue", "Age"],
+    ...statement.openInvoices.map((invoice) => [
+      invoice.reference,
+      invoice.issuedOn,
+      invoice.dueOn,
+      money(invoice.outstanding),
+      invoice.daysOverdue,
+      AGE_BUCKET_LABELS[invoice.bucket],
+    ]),
+    [],
+    ["Ageing", "Amount"],
+    ["Not yet due", money(statement.ageing.notYetDue)],
+    ["1 to 30 days", money(statement.ageing.days1to30)],
+    ["31 to 60 days", money(statement.ageing.days31to60)],
+    ["Over 60 days", money(statement.ageing.days61plus)],
+    ["Total owed", money(statement.ageing.total)],
+  ];
+  return toCsv(rows);
 }

@@ -13,6 +13,7 @@ import { ReportPrintPreview } from "./PrintableReport";
 import { StaffTransportReport } from "./StaffTransportReport";
 import { rentalReport, rentalReportCsv } from "../tms/rentalReport";
 import { useTms } from "../tms/useTms";
+import { csvFileName, downloadTextFile } from "../ui/download";
 import {
   Button,
   DataTable,
@@ -94,24 +95,11 @@ function HireReport() {
   );
   const reversed = from > to;
   const downloadMoney = () => {
-    const blob = new Blob([financialReportCsv(moneyReport)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `financial-report-${moneyReport.from}-to-${moneyReport.to}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    downloadTextFile(csvFileName("financial-report", moneyReport.from, moneyReport.to), financialReportCsv(moneyReport));
   };
 
   const download = () => {
-    const csv = rentalReportCsv(report);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `rental-report-${report.from}-to-${report.to}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    downloadTextFile(csvFileName("rental-report", report.from, report.to), rentalReportCsv(report));
   };
 
   return (

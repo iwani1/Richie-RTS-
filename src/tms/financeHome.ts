@@ -26,6 +26,7 @@
 // company currency is not configured, because a total without a currency is a guess.
 
 import { isLivePayment } from "./creditNotes";
+import { toCsv } from "./csv";
 import { debtAgeing, type DebtAgeing } from "./customerStatement";
 import { billableEventFor, outstanding } from "./finance";
 import { financialReport, type ExpensesByCategory, type FinancialReport, type RevenueByCustomer } from "./financialReport";
@@ -314,4 +315,95 @@ export function financeHome(db: Database, from: string, to: string, asAt: string
           ? `Nothing is overdue as at the ${asAt}.`
           : `${overdue.length} invoice${overdue.length === 1 ? "" : "s"} overdue as at the ${asAt}.`,
   };
+}
+
+/**
+ * The finance home as CSV (RPT-04, D-113).
+ *
+ * Seven blocks, each one thing a finance officer can act on: the period's figures, the margin and
+ * whether it may be stated, cash in and out, who owes what by age, the invoices that are late, the
+ * work completed and not billed, payments waiting to be checked, and money paid back. A block with
+ * nothing in it keeps its heading and says "none", so a reader cannot mistake an omission for a zero.
+ */
+export function financeHomeCsv(home: FinanceHome): string {
+  const money = (value: number | null) => (value === null ? "not available" : home.currencyCode ? `${home.currencyCode} ${value.toFixed(2)}` : value.toFixed(2));
+  const percentText = (value: number | null) => (value === null ? "not available" : `${(value * 100).toFixed(1)}%`);
+  const none = ["none", "", ""];
+  const rows: (string | number)[][] = [
+    ["Finance home", home.from, `to ${home.to}, measured as at ${home.asAt}`],
+    ["Currency", home.currencyCode ?? "not set", ""],
+    [],
+    ["Figure", "Value", "Note"],
+    ["Invoiced", money(home.figures.invoicedTotal), `${home.figures.invoiceCount} invoices issued in the period`],
+    ["Received", money(home.figures.receivedTotal), `${home.figures.paymentCount} payments received in the period`],
+    ["Credited", money(home.figures.creditedTotal), `${home.figures.creditNoteCount} credit notes issued in the period`],
+    ["Refunded", money(home.figures.refundedTotal), `${home.figures.refundCount} refunds paid back in the period`],
+    ["Outstanding", money(home.figures.outstandingTotal), `${home.figures.outstandingCount} invoices not fully paid`],
+    ["Costs recorded", money(home.figures.expensesTotal), `${home.figures.expenseLineCount} cost lines`],
+    ["Completed runs", home.figures.completedTrips, "scheduled runs completed in the period"],
+    ["Passengers boarded", home.figures.passengersBoarded, ""],
+    ["Cost per trip", money(home.figures.costPerTrip), "recorded costs / completed runs"],
+    ["Cost per passenger", money(home.figures.costPerPassenger), "recorded costs / riders boarded"],
+    [],
+    ["Margin", "Value", "Note"],
+    home.margin.available
+      ? ["Earned", money(home.margin.amount), `${percentText(home.margin.percent)} of ${money(home.margin.revenue)} billed, less ${money(home.margin.costs)} recorded`]
+      : ["Withheld", "not available", home.margin.reason],
+    [],
+    ["Cash in and out", "Value", "Note"],
+    ...(home.movement
+      ? [
+          ["Money received", money(home.movement.received), ""],
+          ["Money spent", money(home.movement.expenses), "recorded costs"],
+          ["Paid back to customers", money(home.movement.refunds), "a refund is not a cost of running the business"],
+          ["Difference", money(home.movement.difference), "received less spending less refunds"],
+        ]
+      : [["Not stated", "not available", "a currency is not configured"]]),
+    [],
+    ["Debt by age (as at " + home.ageing.asAt + ")", "Amount", "Note"],
+    ["Not yet due", money(home.ageing.notYetDue), ""],
+    ["1 to 30 days late", money(home.ageing.days1to30), ""],
+    ["31 to 60 days late", money(home.ageing.days31to60), ""],
+    ["Over 60 days late", money(home.ageing.days61plus), ""],
+    ["Total owed", money(home.ageing.total), `${home.ageing.openInvoices} open invoices`],
+    ["Of which late", money(home.ageing.overdueTotal), ""],
+    [],
+    ["Customer", "Not yet due", "1–30", "31–60", "Over 60", "Total", "Oldest (days)", "Open invoices"],
+    ...home.ageing.customers.map((row) => [
+      row.customerName,
+      money(row.notYetDue),
+      money(row.days1to30),
+      money(row.days31to60),
+      money(row.days61plus),
+      money(row.total),
+      row.oldestDaysOverdue,
+      row.openInvoices,
+    ]),
+    [],
+    ["Invoice late", "Customer", "Issued", "Due", "Days late", "Outstanding"],
+    ...(home.overdue.length
+      ? home.overdue.map((row) => [row.reference, row.customerName, row.issuedOn, row.dueOn, row.daysOverdue, money(row.outstanding)])
+      : [none]),
+    [],
+    ["Completed hire not billed", "Customer", "Completed on", "Final total"],
+    ...(home.unbilled.length
+      ? home.unbilled.map((row) => [row.reference, row.customerName, row.completedOn, money(row.finalTotal)])
+      : [none]),
+    [],
+    ["Payment waiting", "Invoice", "Customer", "Amount", "Paid on", "Status", "Next step"],
+    ...(home.awaitingPayments.length
+      ? home.awaitingPayments.map((row) => [row.reference, row.invoiceReference, row.customerName, money(row.amount), row.paidOn, row.status, row.nextStep])
+      : [none]),
+    [],
+    ["Refund paid", "Invoice", "Customer", "Amount", "Paid on", "Method", "Reason"],
+    ...(home.refunds.length
+      ? home.refunds.map((row) => [row.reference, row.invoiceReference, row.customerName, money(row.amount), row.paidOn, row.method, row.reason])
+      : [none]),
+    [],
+    ["Coverage", "Count", "Note"],
+    ["Invoices with no customer name", home.coverage.invoicesWithoutCustomer, ""],
+    ["Uncategorised cost lines", home.coverage.uncategorisedExpenseLines, "configure cost categories in Settings"],
+    ["Completed runs with no vehicle", home.coverage.completedTripsWithoutVehicle, "should be zero"],
+  ];
+  return toCsv(rows);
 }

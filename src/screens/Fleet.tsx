@@ -10,10 +10,11 @@
 // dashboard is the person who has to explain it.
 import { useMemo, useState } from "react";
 import { FLEET_STATE_LABELS, FLEET_STATE_ORDER, type FleetState } from "../tms/fleetState";
-import { FLEET_BUCKETS, currentMonthToDate, fleetReport, previousPeriod } from "../tms/fleetReport";
+import { FLEET_BUCKETS, currentMonthToDate, fleetReport, fleetReportCsv, previousPeriod } from "../tms/fleetReport";
+import { csvFileName, downloadTextFile } from "../ui/download";
 import { formatAmount } from "../tms/money";
 import { useTms } from "../tms/useTms";
-import { Badge, Band, DataTable, EmptyState, Field, Notice, PageHeader, Stat, TableCard, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Stat, TableCard, TextInput, formatDate, todayYmd } from "../ui/primitives";
 
 const STATE_TONE: Record<FleetState, "success" | "info" | "warning" | "error" | "neutral"> = {
   available: "success",
@@ -50,6 +51,16 @@ export function FleetPage() {
         eyebrow="Fleet"
         title="Fleet dashboard"
         description="What the fleet had, what it did with its days, and what standing still cost. Every figure is counted from the records on this machine."
+        actions={
+          // The export is the figures on this screen, written out: it cannot contain a vehicle the
+          // signed-in role could not see, because the payload arrived already narrowed on the server.
+          <Button
+            onClick={() => report && downloadTextFile(csvFileName("fleet-dashboard", report.from, report.to), fleetReportCsv(report))}
+            disabled={!report || report.status === "empty"}
+          >
+            Download CSV
+          </Button>
+        }
       />
 
       <div className="space-y-5">

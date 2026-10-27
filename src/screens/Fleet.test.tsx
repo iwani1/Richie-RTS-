@@ -275,3 +275,28 @@ describe("the fleet dashboard", () => {
     expect(screen.queryByText("By vehicle")).toBeNull();
   });
 });
+
+describe("handing the dashboard to a spreadsheet (RPT-04, D-113)", () => {
+  it("downloads the figures and the per-vehicle rows, named for the period", () => {
+    const created: Blob[] = [];
+    Object.defineProperty(URL, "createObjectURL", { value: (blob: Blob) => { created.push(blob); return "blob:fleet"; }, configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: () => {}, configurable: true });
+    const clicked: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.download);
+    });
+
+    renderFleet(world());
+    setPeriod("2026-06-01", "2026-06-10");
+    fireEvent.click(screen.getByRole("button", { name: /Download CSV/i }));
+
+    expect(clicked).toEqual(["fleet-dashboard-2026-06-01-to-2026-06-10.csv"]);
+    expect(created).toHaveLength(1);
+    click.mockRestore();
+  });
+
+  it("offers nothing to download when there is no fleet", () => {
+    renderFleet(emptyDatabase());
+    expect(screen.getByRole("button", { name: /Download CSV/i })).toHaveProperty("disabled", true);
+  });
+});

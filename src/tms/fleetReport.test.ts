@@ -6,7 +6,7 @@
 // went into the workshop the same day, a repair finished but never released, a retired bus, a
 // vehicle registered halfway through the month, and a day that was booked and never ran.
 import { describe, expect, it } from "vitest";
-import { currentMonthToDate, fleetDayBucket, fleetReport, previousPeriod, FLEET_BUCKETS } from "./fleetReport";
+import { currentMonthToDate, fleetDayBucket, fleetReport, fleetReportCsv, previousPeriod, FLEET_BUCKETS } from "./fleetReport";
 import { emptyDatabase, migrate, SCHEMA_VERSION, type Database, type Rental, type Trip, type Vehicle, type WorkOrder } from "./types";
 
 const at = "2026-01-01T06:00:00.000Z";
@@ -323,5 +323,28 @@ describe("a backup written before the dashboard existed", () => {
       settings: { ...old.settings, fleetStandingCostPerDay: 300 } as typeof old.settings,
     });
     expect(migrated?.settings.fleetStandingCostPerDay).toBe(300);
+  });
+});
+
+describe("handing the dashboard to a spreadsheet (RPT-04, D-113)", () => {
+  it("writes the figures and then one row per vehicle", () => {
+    const csv = fleetReportCsv(fleetReport(world(), FROM, TO));
+    const lines = csv.split("\n");
+    expect(lines[0]).toBe("Metric,Value,Note");
+    expect(csv).toContain("Committed vehicle-days,7,a run or hire held the vehicle that day");
+    expect(csv).toContain('Utilisation,17.5%,"committed / available (Q-29, D-78)"');
+    expect(csv).toContain("Cost of idle days,not priced,idle days × the standing cost");
+    // The per-vehicle block: idle days first, as on the screen.
+    const header = lines.findIndex((line) => line.startsWith("Vehicle,Category,Days in fleet"));
+    expect(header).toBeGreaterThan(0);
+    expect(lines[header + 1]).toBe("GT 5,Coach,10,0,0,0,0,10,not in this period");
+    expect(lines).toHaveLength(header + 5);
+  });
+
+  it("writes the money once somebody has supplied the standing cost", () => {
+    const db = world();
+    const csv = fleetReportCsv(fleetReport({ ...db, settings: { ...db.settings, fleetStandingCostPerDay: 450.05 } }, FROM, TO));
+    expect(csv).toContain("Standing cost per vehicle-day,GHS 450.05,set in Settings → Fleet");
+    expect(csv).toContain("Cost of idle days,GHS 11251.25,idle days × the standing cost");
   });
 });

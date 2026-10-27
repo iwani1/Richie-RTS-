@@ -9,6 +9,7 @@
 // Formulas are documented in docs/KPIS.md. Changing one here without changing it there is a defect.
 
 import { invoiceBalance, isLivePayment } from "./creditNotes";
+import { toCsv } from "./csv";
 import { sumAmounts, toMinor } from "./money";
 import type { Database, Rental } from "./types";
 
@@ -206,10 +207,5 @@ export function rentalReportCsv(report: RentalReport): string {
     ["Cancellation or decline reason", "Count", ""],
     ...report.cancellationReasons.map((reason) => [reason.reason, String(reason.count), ""]),
   ];
-  return rows.map((row) => row.map(csvCell).join(",")).join("\n");
-}
-
-function csvCell(value: string): string {
-  const text = value ?? "";
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  return toCsv(rows);
 }

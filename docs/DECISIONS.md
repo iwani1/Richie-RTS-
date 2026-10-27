@@ -2504,3 +2504,44 @@ dashboard in hours would need a figure nobody has supplied, which is exactly wha
   `fleet:read` route; `settings.fleetStandingCostPerDay` with validation in `update_settings` and a
   field under Settings → Fleet; schema 30. 31 new tests (21 in `fleetReport.test.ts`, two of them
   migration cases; 1 settings command; 8 screen; 1 settings screen).
+
+## D-113 - Every screen that totals something can hand it to a spreadsheet (RPT-04)
+
+The brief asks for filters and CSV export on the reports. The rental, financial and staff transport
+reports had both; three screens that total money or days had neither — the **finance home**, a
+customer's **statement** and the new **fleet dashboard** — and three separate copies of the same CSV
+writer had grown in the reports, each a little different. This note records what was done and what was
+deliberately not done.
+
+- **Decision 1: one writer, in `src/tms/csv.ts`.** Quoting, line breaks and the trailing-newline
+  question are answered once. The three reports were moved onto it and their own copies deleted; the
+  tests that pinned their output still pass, which is how the refactor was proved rather than claimed.
+- **Decision 2: a spreadsheet formula is defused, because half the text is typed by people.** A cell
+  beginning `=`, `+`, `-` or `@` is executed by Excel, LibreOffice and Google Sheets. A description
+  entered as `=HYPERLINK("http://…")` is a real attack on whoever opens the file, and the person
+  recording an expense should not have to think about it. Such **text** is prefixed with an
+  apostrophe; **numbers are never touched**, because a negative amount is a number and must stay one.
+- **Decision 3: the export is the screen's own numbers, written out.** No figure is recomputed for the
+  file: `fleetReportCsv` formats the report object, `statementCsv` formats the statement, and
+  `financeHomeCsv` formats the finance home. A file that added up on its own would be a fourth place
+  for the figures to disagree.
+- **Decision 4: a block with nothing in it says "none", rather than ending silently.** In the finance
+  export, a reader cannot tell an omission from a zero. Every block keeps its heading.
+- **Decision 5: the statement gets a CSV as well as its sheet.** D-90 called the statement a document
+  rather than a data export, and it still is — the printed sheet is what a customer receives. The CSV
+  is the same rows for whoever reconciles the account, and it does not change the document.
+- **Decision 6: nothing is uploaded and nothing is stored.** `src/ui/download.ts` builds the file in
+  the browser from the payload the server has already narrowed to the signed-in role, so an export
+  cannot contain a row the person could not see. There is no server route for exports, no file kept
+  on the machine and no email.
+- **Decision 7: the filters half of RPT-04 is not finished, and is not pretended to be.** The brief
+  also names filters by service, client, customer, route, driver, vehicle and status. Those screens
+  have their own filters (period, category, search, status) and the reports have a date range, but
+  there is still no bar that narrows a report by client, route, driver or vehicle. That is a separate
+  piece of work with its own problem — a filtered KPI is not the KPI any more, and needs its own
+  stated definition — so the item stays **partial** and says so.
+- **Consequence.** `src/tms/csv.ts` (`csvCell`, `toCsv`), `src/ui/download.ts` (`downloadTextFile`,
+  `csvFileName`), `fleetReportCsv`, `statementCsv` and `financeHomeCsv`; Download CSV on the finance
+  home, the statement and the fleet dashboard; the Reports screen's two blob blocks replaced by the
+  shared helper. No schema change, no server change, no dependency. 20 new tests (7 on the writer,
+  3 on the download, 6 on the three builders, 4 on the buttons).
