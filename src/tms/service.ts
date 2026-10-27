@@ -9,7 +9,7 @@ import { overdueServiceFor } from "./maintenance";
 import { can, type Permission } from "./permissions";
 import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
-import { formatAmount, isPercentWithTwoDecimals, linesTotal, parseAmount, parseQuantity, percentOf, toMinor } from "./money";
+import { MAX_AMOUNT, formatAmount, isPercentWithTwoDecimals, linesTotal, parseAmount, parseQuantity, percentOf, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { readVehicleDetail } from "./vehicles";
 import { confinedClientId } from "./scope";
@@ -674,6 +674,18 @@ export function validateSettings(db: Database, input: Settings) {
   if (invoiceDueDays !== null && (!Number.isInteger(invoiceDueDays) || invoiceDueDays < 0))
     errors.invoiceDueDays = "Enter a whole number of days (0 or more).";
 
+  // FLT-05 (D-112). A money figure in the billing currency, per vehicle per day, to at most two
+  // decimals. Blank stays blank: the dashboard then counts idle days and puts no money on them.
+  const fleetStandingCostPerDay = input.fleetStandingCostPerDay ?? null;
+  if (
+    fleetStandingCostPerDay !== null &&
+    (!Number.isFinite(fleetStandingCostPerDay) ||
+      fleetStandingCostPerDay < 0 ||
+      fleetStandingCostPerDay > MAX_AMOUNT ||
+      Math.abs(fleetStandingCostPerDay * 100 - Math.round(fleetStandingCostPerDay * 100)) > 1e-9)
+  )
+    errors.fleetStandingCostPerDay = "Enter an amount of 0 or more, with at most two decimal places.";
+
   const workTypes = validateNameList(input.workTypes ?? [], "workTypes", errors, 40);
   const costCategories = validateNameList(input.costCategories ?? [], "costCategories", errors, 40);
 
@@ -736,6 +748,7 @@ export function validateSettings(db: Database, input: Settings) {
       taxPosition,
       taxLines,
       invoiceDueDays,
+      fleetStandingCostPerDay,
       workTypes,
       costCategories,
       maintenance,

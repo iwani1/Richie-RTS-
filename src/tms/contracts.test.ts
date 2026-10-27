@@ -70,6 +70,7 @@ function build(): World {
       taxPosition: null,
       taxLines: [],
       invoiceDueDays: null,
+      fleetStandingCostPerDay: null,
       workTypes: ["Service"],
       costCategories: [],
       maintenance: { schedules: [], blockOnOverdueService: false },

@@ -2438,3 +2438,69 @@ lines with no dependency: a quiet **Copy** button beside a reference.
   detail header, the run cards on the busing bookings tab, and the receipt column of the expenses
   table. 10 new tests (5 on the button itself, including both failure routes; 5 proving each of the
   four places is wired to the value on screen).
+
+## D-112 - The fleet dashboard counts days, and prices only what the company has priced (FLT-05)
+
+The owner asked a fleet dashboard for "totals, availability, assigned, on trip, under maintenance,
+pending inspection, expiring, utilisation and idle cost". The first six already existed on the
+register and the compliance screen. What did not exist was the period: how much of the fleet worked
+over a stretch of days, how many days were downtime, and what standing still cost. This note records
+how those three are measured, because a number an owner will make decisions with has to be defensible
+line by line.
+
+**The unit is the vehicle-day** — one vehicle on one calendar day. Not hours. Nothing in this program
+records an hour of a vehicle's time: a run has stop times, not a duration, and a hire has dates. A
+dashboard in hours would need a figure nobody has supplied, which is exactly what Q-29 left open.
+
+- **Decision 1: the headline utilisation is the figure management already approved, unchanged.**
+  After Phase 28 the owner approved `utilisation = committed vehicle-days ÷ available vehicle-days`,
+  with available = the fleet in service × the days in the period (D-78, `docs/KPIS.md`). A second,
+  prettier definition on a new screen would mean two answers to one question. So the dashboard prints
+  the approved figure, and says in its caption what the two numbers are.
+- **Decision 2: the stricter measure is printed beside it, under its own name.** Committed is not
+  worked: a run that was planned or a hire that was confirmed holds the vehicle and counts in the
+  approved utilisation, but it may never have moved. So the screen also prints **days worked** — runs
+  that started or finished, hires that were under way — over the days a vehicle was ours and not in
+  the workshop. Two labelled figures that answer two questions are better than one figure that quietly
+  blurs them.
+- **Decision 3: every vehicle-day lands in exactly one of four buckets, in this order** — worked,
+  in the workshop, booked and never ran, idle. Work comes first, deliberately: a bus that carried
+  passengers and went into the workshop the same afternoon worked that day, and a report that called
+  it downtime would hide the work. The workshop comes before "booked", so a hire confirmed for a day
+  the bus was in pieces shows as downtime; the double booking itself is already named on the vehicle
+  register (D-109), which is where somebody can act on it.
+- **Decision 4: downtime is dated from the work order, not from the office's word.** A vehicle is out
+  of service from the day its work order was raised to the day somebody released it. An order that is
+  finished but unreleased still holds the bus — that is the brief's "pending inspection" — so an
+  unreleased order runs to the end of the period rather than ending at `completedAt`. A vehicle the
+  register calls "in the workshop" with no work order has nothing to date the days by: it is counted
+  as idle and the screen says why, instead of guessing.
+- **Decision 5: idle cost is a company figure, in a setting, with no default.** "What does a standing
+  bus cost us a day?" is finance, insurance, licensing and a retainer — facts only the company holds.
+  It is stored as `settings.fleetStandingCostPerDay` (schema 30, no SQL migration: settings live in
+  the snapshot) and entered under Settings → Fleet. Until it is set, the dashboard counts the idle
+  days and states plainly that they carry no money. Multiplying by an assumed figure would put a
+  confident number on the screen that nobody could trace.
+- **Decision 6: a retired vehicle is out of every day of the period, and the screen says so.** The
+  program knows a vehicle is retired, not the date it left, so there is no honest way to count its
+  earlier days. The count of excluded vehicles is printed rather than buried.
+- **Decision 7: the approved denominator is not prorated, and the difference is explained.** A vehicle
+  registered halfway through the month still contributes its full days to the approved denominator,
+  which understates utilisation slightly; the buckets, by contrast, count a vehicle only from the day
+  it was registered. Rather than silently choosing one, the screen says both things in the card that
+  lists what the records cannot say.
+- **Decision 8: today's states come from the register's own function.** The dashboard's "where is the
+  fleet today" band reads `fleetStateCounts`, the same call the vehicles register makes, so the two
+  screens cannot disagree about a bus.
+- **Decision 9: a period longer than two years is cut short and flagged, never silently measured.**
+  `fleetReport` walks at most 732 days and sets `truncated`, which the screen prints. Reporting a
+  different period from the one somebody typed is the quiet kind of lie this codebase refuses.
+- **Decision 10: the screen spends its space on what cannot be known.** Below the per-vehicle table it
+  names the gaps: retired vehicles, workshop days with no work order, undated out-of-service records,
+  booked days that never ran, and the fact that hours are not measured at all. A dashboard that only
+  prints what it knows teaches its reader to trust the silence.
+- **Consequence.** New module `src/tms/fleetReport.ts` (`fleetReport`, `fleetDayBucket`,
+  `FLEET_BUCKETS`, `currentMonthToDate`, `previousPeriod`); new screen `src/screens/Fleet.tsx` on a
+  `fleet:read` route; `settings.fleetStandingCostPerDay` with validation in `update_settings` and a
+  field under Settings → Fleet; schema 30. 31 new tests (21 in `fleetReport.test.ts`, two of them
+  migration cases; 1 settings command; 8 screen; 1 settings screen).

@@ -47,7 +47,7 @@ Every KPI on screen shows its reporting period, numerator, denominator and data 
 - Whether early arrivals should count as on time (Q-25).
 - Whether scheduled times should come from shift definitions (Q-27).
 
-## Fleet utilisation (definition agreed, not yet surfaced on its own screen)
+## Fleet utilisation (implemented on the fleet dashboard, Phase 62)
 
 The owner approved a definition in Q-29 (D-78), so the figure is no longer "unknown":
 
@@ -60,9 +60,26 @@ The owner approved a definition in Q-29 (D-78), so the figure is no longer "unkn
 - **Consequence of the definition**: a day counts once per vehicle, so two rentals of the same vehicle
   on the same day are one vehicle-day, not two.
 
-The rental report already prints the rental-only half of this number under the label "Utilisation",
-and it says on screen that staff runs are not included. The fleet-wide figure still has no screen of
-its own; the definition is settled, so what remains is presentation. The staff transport report
+The rental report prints the rental-only half of this number under the label "Utilisation", and it
+says on screen that staff runs are not included. The fleet-wide figure is on the **Fleet dashboard**
+(`src/tms/fleetReport.ts`, screen `src/screens/Fleet.tsx`, Phase 62, D-112), with both numbers in the
+caption so the figure can be checked without opening this document.
+
+Two further figures sit beside it on the same screen, and neither is a redefinition of the KPI:
+
+- **Days actually worked** = worked vehicle-days ÷ (vehicle-days in the fleet − vehicle-days in the
+  workshop). A *worked* day is one on which a run started or finished, or a hire was under way or
+  finished; the denominator leaves out downtime, because a bus in pieces was never available to work.
+  This is the stricter reading of the same records, useful when a fleet looks allocated but idle.
+- **Idle cost** = idle vehicle-days × `settings.fleetStandingCostPerDay`. An *idle* day is one the
+  vehicle was in the fleet, out of the workshop and holding nothing. The daily cost is a company
+  figure with no default; until it is set the screen prices nothing and says so.
+
+**The buckets are exclusive and ordered**: worked, then in the workshop, then booked-and-never-ran,
+then idle. Work outranks downtime so a bus that carried passengers is never reported as idle; a hire
+inside a workshop stay is downtime, and the double booking is named on the vehicle register (D-109).
+
+The staff transport report
 (RPT-02, below) does **not** use this figure: it measures occupancy per worked run — riders carried
 over the seats the bus on that run actually offered — because a client asking "was my bus full?" is
 asking a different question from "was the fleet busy?".

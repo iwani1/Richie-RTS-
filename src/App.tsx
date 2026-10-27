@@ -15,6 +15,7 @@ import { StaffBusingPage } from "./screens/StaffBusing";
 import { StaffLogisticsPage } from "./screens/StaffLogistics";
 import { CompliancePage } from "./screens/Compliance";
 import { FleetReadinessPage } from "./screens/FleetReadiness";
+import { FleetPage } from "./screens/Fleet";
 import { ClientPortalPage } from "./screens/ClientPortal";
 import { PassengerPortalPage } from "./screens/PassengerPortal";
 import { DriverPortalPage } from "./screens/DriverPortal";
@@ -37,7 +38,7 @@ import { cn } from "./utils/cn";
 const NAV_GROUPS: { label: string; routes: Route[] }[] = [
   { label: "My desk", routes: ["driver_portal", "client_portal", "passenger_portal"] },
   { label: "Service desk", routes: ["dashboard", "finance", "rentals", "invoices", "statements", "expenses", "busing", "logistics", "fleetReadiness"] },
-  { label: "Fleet & clients", routes: ["compliance", "vehicles", "drivers", "clients", "contracts"] },
+  { label: "Fleet & clients", routes: ["fleet", "compliance", "vehicles", "drivers", "clients", "contracts"] },
   { label: "Analysis", routes: ["reports"] },
   { label: "Administration", routes: ["users", "settings", "audit", "profile"] },
 ];
@@ -52,6 +53,7 @@ const ROUTE_ICONS: Record<Route, IconName> = {
   reports: "reports",
   busing: "busing",
   logistics: "logistics",
+  fleet: "readiness",
   fleetReadiness: "readiness",
   compliance: "compliance",
   vehicles: "vehicle",
@@ -209,6 +211,7 @@ function Shell() {
       case "reports": return <ReportsPage />;
       case "busing": return <StaffBusingPage />;
       case "logistics": return <StaffLogisticsPage />;
+      case "fleet": return <FleetPage />;
       case "fleetReadiness": return <FleetReadinessPage />;
       case "compliance": return <CompliancePage />;
       case "driver_portal": return <DriverPortalPage />;

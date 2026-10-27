@@ -272,6 +272,13 @@ export interface Settings {
   taxLines: TaxLineSetting[];
   // Payment terms in days from issue; no default, because "30 days" would be an invented term.
   invoiceDueDays: number | null;
+  /**
+   * What one vehicle costs the company on a day it does not work (FLT-05, D-112): finance,
+   * insurance, licensing, the driver on retainer. In the billing currency, per vehicle per day. No
+   * default, because it is a business fact — until it is set the fleet dashboard counts idle days
+   * and puts no money on them.
+   */
+  fleetStandingCostPerDay: number | null;
   // Days before expiry a document counts as "expiring soon". No default (Q-16): until
   // set, compliance reporting shows only already-expired documents, exactly like the
   // existing driver-licence check on the dashboard.
@@ -1252,7 +1259,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 /**
  * Every schema version this build can still read.
@@ -1262,7 +1269,7 @@ export const SCHEMA_VERSION = 29;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1335,6 +1342,7 @@ export function emptyDatabase(): Database {
       taxPosition: null,
       taxLines: [],
       invoiceDueDays: null,
+      fleetStandingCostPerDay: null,
       workTypes: [...DEFAULT_WORK_TYPES],
       costCategories: [],
       maintenance: emptyMaintenanceSettings(),
@@ -1543,6 +1551,8 @@ export function migrate(value: unknown): Database | null {
       taxPosition: (settings.taxPosition as TaxPosition | null) ?? null,
       taxLines: (settings.taxLines as TaxLineSetting[]) ?? [],
       invoiceDueDays: (settings.invoiceDueDays as number | null) ?? null,
+      // A backup written before FLT-05 has no standing cost, and therefore prices no idle day.
+      fleetStandingCostPerDay: (settings.fleetStandingCostPerDay as number | null) ?? null,
       // Records written before the list existed keep the approved six rather than an empty list.
       workTypes: Array.isArray(settings.workTypes) ? (settings.workTypes as string[]) : [...DEFAULT_WORK_TYPES],
       costCategories: Array.isArray(settings.costCategories) ? (settings.costCategories as string[]) : [],

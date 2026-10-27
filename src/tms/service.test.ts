@@ -94,6 +94,26 @@ describe("settings", () => {
     }
   });
 
+  it("keeps a standing cost per vehicle-day as a money figure, or keeps it blank (FLT-05)", () => {
+    const { db, admin } = seeded();
+    expect(db.settings.fleetStandingCostPerDay).toBeNull();
+
+    const set = execute(db, admin, { type: "update_settings", input: { ...db.settings, fleetStandingCostPerDay: 450.05 } }, NOW);
+    expect(set.ok).toBe(true);
+    if (set.ok) expect(set.db.settings.fleetStandingCostPerDay).toBe(450.05);
+
+    const blank = execute(db, admin, { type: "update_settings", input: { ...db.settings, fleetStandingCostPerDay: null } }, NOW);
+    expect(blank.ok).toBe(true);
+    if (blank.ok) expect(blank.db.settings.fleetStandingCostPerDay).toBeNull();
+
+    // A negative, a third decimal place and an absurd figure are refused rather than rounded.
+    for (const value of [-1, 10.005, 1_000_000_001]) {
+      const bad = execute(db, admin, { type: "update_settings", input: { ...db.settings, fleetStandingCostPerDay: value } }, NOW);
+      expect(bad.ok).toBe(false);
+      if (!bad.ok) expect(bad.errors.fleetStandingCostPerDay).toMatch(/two decimal places/);
+    }
+  });
+
   it("refuses to remove a category in use", () => {
     const { admin } = seeded();
     let db = withCategory(seeded().db, admin);

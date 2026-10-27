@@ -566,6 +566,30 @@ export function SettingsPage() {
       </Band>
 
       <Band
+        label="Fleet"
+        note="What a vehicle costs the company on a day it does not work: finance, insurance, licensing, the driver on retainer. It prices the idle days on the fleet dashboard. There is no default — until it is set, that screen counts the idle days and puts no money on them (FLT-05, D-112)."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Standing cost per vehicle per day"
+            hint={`In ${draft.currencyCode ? `${draft.currencyCode}, ` : "the company's currency, "}to at most two decimals. Blank means the cost of an idle day is not known.`}
+            error={errors.fleetStandingCostPerDay}
+          >
+            <TextInput
+              type="number"
+              min={0}
+              step="0.01"
+              value={draft.fleetStandingCostPerDay ?? ""}
+              onChange={(e) => update({ fleetStandingCostPerDay: e.target.value === "" ? null : Number(e.target.value) })}
+              disabled={!editable}
+              placeholder="Not set"
+              invalid={!!errors.fleetStandingCostPerDay}
+            />
+          </Field>
+        </div>
+      </Band>
+
+      <Band
         label="Seat bookings"
         note="How late a seat can still be requested, and how late it can be cancelled, counted in minutes before the run's first stop departs. Both are blank until management sets them: with no cut-off, a booking is accepted right up to departure and nothing is refused for a deadline nobody chose (BKG-02, BKG-05, D-83)."
       >

@@ -51,6 +51,7 @@ function seed(options: { overdue?: boolean } = {}): { vehicleId: string; driverI
       taxPosition: null,
       taxLines: [],
       invoiceDueDays: null,
+      fleetStandingCostPerDay: null,
       workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
       costCategories: ["Parts", "Labour", "Tyres"],
       maintenance: { schedules: [], blockOnOverdueService: false },

@@ -69,6 +69,7 @@ const settings = () => ({
   taxPosition: "registered" as const,
   taxLines: [{ id: "", name: "VAT", ratePercent: 15 }],
   invoiceDueDays: 14,
+  fleetStandingCostPerDay: null,
   workTypes: ["Service"],
   costCategories: ["Fuel"],
   maintenance: { schedules: [], blockOnOverdueService: false },

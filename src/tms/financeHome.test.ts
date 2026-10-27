@@ -25,6 +25,7 @@ const settings = (overrides: Partial<Database["settings"]> = {}): Database["sett
   taxPosition: "registered",
   taxLines: [],
   invoiceDueDays: 14,
+  fleetStandingCostPerDay: null,
   workTypes: ["Service"],
   costCategories: ["Parts", "Labour"],
   maintenance: { schedules: [], blockOnOverdueService: false },

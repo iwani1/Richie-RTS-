@@ -47,6 +47,7 @@ const settings = (overrides: Record<string, unknown> = {}) => ({
     { id: "", name: "NHIL", ratePercent: 2.5 },
   ],
   invoiceDueDays: 14,
+  fleetStandingCostPerDay: null,
   workTypes: ["Service", "Repair", "Tyres", "Bodywork", "Inspection", "Other"],
   costCategories: ["Parts", "Labour", "Tyres"],
   maintenance: { schedules: [], blockOnOverdueService: false },

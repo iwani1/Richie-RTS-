@@ -73,6 +73,7 @@ function build(options: { cancellationCutoff?: number | null; requestCutoff?: nu
       taxPosition: null,
       taxLines: [],
       invoiceDueDays: null,
+      fleetStandingCostPerDay: null,
       workTypes: [],
       costCategories: [],
       maintenance: { schedules: [], blockOnOverdueService: false },

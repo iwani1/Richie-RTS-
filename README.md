@@ -107,12 +107,13 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Scanned receipts, filed against an expense | Works; the image is kept in a folder on the office machine for three years and copied with the nightly backup, and only finance and administrators can open it |
 | Papers that are about to lapse, listed before they do, with who has taken each renewal on and when they expect the new one | Works; the lead time is a setting, the list reaches the dashboard, and the acknowledgement lapses if the renewal date is corrected. **Nothing is emailed or texted** — there is no mail provider, so a reminder here is a record, and the screen says so |
 | Seven states for every vehicle — available, reserved, assigned, on trip, pending inspection, under maintenance, out of service, retired — with the rule for each printed on the register | Works; four are the office's own words and audited transitions, three are read from the runs and hires rather than stored, and **pending inspection** is the repair that is finished and waiting for a release. A bus in the workshop that is still on today's run sheet says so |
+| Fleet dashboard: what the fleet had, how much of it worked over a period, and what standing still cost | Works; every figure is counted in vehicle-days from records, the utilisation is the definition management approved, downtime comes from the work orders, and idle cost is only priced once management states what a standing vehicle costs a day. What the records cannot say is printed on the page |
 | A reference you can copy instead of typing — invoice, rental, run and receipt numbers | Works; one quiet button beside the number, a word of confirmation, and an honest "Not copied" when the browser refuses. Nothing is sent anywhere and no new dependency was added |
 | A photograph of each vehicle, plus what it runs on, whose it is and its usual driver | Works; one picture per vehicle in a folder of its own, added or replaced from the register, removed with a reason that is recorded, and counted when nobody has filed one. The folder is copied with the nightly backup |
 | Management report as an A4 document, printed or saved as a PDF by the browser | Works; the figures are the report's own, a figure it cannot state is printed as withheld, and no file is stored or emailed |
 | Notifications (SMS or email), offline driver app, GPS tracking, card/mobile-money gateway, payroll | **Not built** — see `docs/PROGRESS.md` |
 
-1045 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+1076 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

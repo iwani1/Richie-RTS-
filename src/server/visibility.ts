@@ -111,6 +111,7 @@ function journeySettings(settings: Database["settings"]): Database["settings"] {
     taxPosition: null,
     taxLines: [],
     invoiceDueDays: null,
+    fleetStandingCostPerDay: null,
     documentReminderLeadDays: null,
     workTypes: [],
     costCategories: [],

@@ -11,6 +11,7 @@ export type Route =
   | "reports"
   | "busing"
   | "logistics"
+  | "fleet"
   | "fleetReadiness"
   | "vehicles"
   | "drivers"
@@ -58,6 +59,10 @@ export const NAV_ITEMS: NavItem[] = [
   { route: "reports", label: "Reports", caption: "Rentals, revenue, utilisation", permission: "kpis:read" },
   { route: "busing", label: "Staff busing", caption: "Routes, rosters, trips", permission: "routes:read" },
   { route: "logistics", label: "Staff logistics", caption: "Breakdowns, maintenance, costs", permission: "incidents:read" },
+  // What the fleet had and did with its days, and what standing still cost (FLT-05, D-112). Read on
+  // the fleet permission: it is vehicles, runs, hires and work orders, and holds no money of its own
+  // beyond the standing cost management sets.
+  { route: "fleet", label: "Fleet dashboard", caption: "Utilisation and idle days", permission: "fleet:read" },
   { route: "fleetReadiness", label: "Fleet readiness", caption: "Service intervals, odometer", permission: "fleet:read" },
   { route: "compliance", label: "Compliance", caption: "Vehicle & driver documents", permission: "documents:read" },
   { route: "vehicles", label: "Vehicles", caption: "Fleet register", permission: "vehicles:read" },

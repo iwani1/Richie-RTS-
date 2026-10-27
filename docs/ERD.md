@@ -1,7 +1,7 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 20; PostgreSQL keeps them in
-typed tables, migration `017` being the latest). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
+The app stores these as arrays inside one JSON document (schema version 30; PostgreSQL keeps them in
+typed tables, migration `020` being the latest). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
 erDiagram

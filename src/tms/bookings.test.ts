@@ -75,6 +75,7 @@ function build(options: { seats?: string; rosterSize?: number } = {}): World {
       taxPosition: null,
       taxLines: [],
       invoiceDueDays: null,
+      fleetStandingCostPerDay: null,
       workTypes: ["Service"],
       costCategories: ["Parts"],
       maintenance: { schedules: [], blockOnOverdueService: false },

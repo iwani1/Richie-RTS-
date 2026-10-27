@@ -212,3 +212,26 @@ describe("the seat-booking cut-offs (BKG-02, BKG-05, D-83)", () => {
     expect(command.input.booking).toEqual({ requestCutoffMinutes: 120, cancellationCutoffMinutes: 60 });
   });
 });
+
+describe("the standing cost of an idle vehicle (FLT-05, D-112)", () => {
+  it("is blank until management supplies it, then saves as the amount typed", async () => {
+    const db = emptyDatabase();
+    const tms = makeTms({ ...db, users: [admin], settings: { ...db.settings, currencyCode: "GHS" } });
+    render(
+      <TmsContext.Provider value={tms}>
+        <SettingsPage />
+      </TmsContext.Provider>,
+    );
+
+    const field = screen.getByRole("spinbutton", { name: /Standing cost per vehicle per day/i }) as HTMLInputElement;
+    // No figure is assumed: the dashboard cannot price an idle day until one is stored.
+    expect(field.value).toBe("");
+
+    fireEvent.change(field, { target: { value: "450.05" } });
+    save();
+
+    await vi.waitFor(() => expect(tms.dispatch).toHaveBeenCalled());
+    const command = (tms.dispatch as unknown as { mock: { calls: [{ input: { fleetStandingCostPerDay: number } }][] } }).mock.calls[0][0];
+    expect(command.input.fleetStandingCostPerDay).toBe(450.05);
+  });
+});
