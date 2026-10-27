@@ -114,7 +114,9 @@ async function main() {
         ...settings.rental,
         pricingBasis: "per_day",
         depositPercent: 20,
-        quotationValidityDays: 14,
+        // RNT-04, D-117: the price holds for a fortnight, and the company writes its own terms.
+        quotationValidityHours: 336,
+        quotationTerms: "Prices are firm for the validity period.",
         paymentMethods,
       },
       taxPosition: "registered",
@@ -262,6 +264,14 @@ async function main() {
   db = await command("quote_rental", { id: rentalId, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } });
   ok(byRental(db).quote?.subtotal === 3000, "quotation subtotal is GHS 3,000");
   ok(byRental(db).quote?.depositRequired === 600, "deposit required is 20% (GHS 600)");
+  // RNT-04, D-117: the quotation is a numbered document with its own terms and an hour it stops holding.
+  ok(/^QUO-\d{4,}$/.test(byRental(db).quote?.number ?? ""), `quotation numbered ${byRental(db).quote?.number}`);
+  ok(byRental(db).quote?.revision === 1, "first issue is revision 1");
+  ok(byRental(db).quote?.terms === "Prices are firm for the validity period.", "the company's terms are on the quotation");
+  ok(
+    byRental(db).quote?.validUntil === new Date(new Date(byRental(db).quote.quotedAt).getTime() + 336 * 3_600_000).toISOString(),
+    "the price holds for exactly 336 hours from the minute it was quoted",
+  );
 
   // 8. The deposit is taken and the rental confirmed.
   db = await command("confirm_rental", { id: rentalId, input: { amount: "600", method: "Cash", reference: "DEP-1" } });
