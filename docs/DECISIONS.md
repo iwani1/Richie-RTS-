@@ -2224,4 +2224,4 @@ photograph is a file and is dealt with next (D-108).
   (`readVehicleDetail`, `normaliseOwnership`, `ownershipLine`, `vehicleDetailLine`, `usualDriverOf`,
   `fleetDetailGaps`, `isThirdParty`, `VEHICLE_DETAIL_LIMITS`); the vehicle form gained a "The vehicle
   itself" section; the register prints the facts, the usual driver and the gap count; the CSV importer
-  gained `fuel`, `ownership` and `owner`; 20 new tests.
+  gained `fuel`, `ownership` and `owner`; 28 new tests.

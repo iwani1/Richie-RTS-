@@ -1397,7 +1397,7 @@ same driver keeps reporting the same fault. `docs/DECISIONS.md` D-107 records th
 | The form asks for them | Done (verified) | A "The vehicle itself" section; the owner box appears only once the vehicle is not ours, and the whole section may be left blank ("offers fuel, ownership and the usual driver when adding a vehicle, and sends them") |
 | A spreadsheet carries them | Done (verified) | CSV columns `fuel`, `ownership`, `owner`; "Lease" is read as leased; an unreadable ownership and a lease with no owner are row errors naming the line ("carries fuel, ownership and the owner from the file", "names the line whose ownership nobody can read") |
 | Old records | Done (verified) | Schema 27. A vehicle written before this phase gains blanks and a null ownership ("gains blanks and a null ownership rather than claiming the fleet is ours") |
-| Tests | Done (verified) | 16 domain (`vehicles.test.ts`), 7 register screen (`Registers.test.tsx`), 4 importer (`import.test.ts`) — 20 new, and the service and importer suites unchanged and green |
+| Tests | Done (verified) | 17 domain (`vehicles.test.ts`), 7 register screen (`Registers.test.tsx`), 4 importer (`import.test.ts`) — 28 new, and every existing suite unchanged and green |
 
 **Not yet built: the vehicle's photograph.** A photo is a file, and every other file in this program
 goes through a store that sniffs the bytes, generates the name on disk and pairs the row with the
