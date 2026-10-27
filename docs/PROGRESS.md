@@ -66,7 +66,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | BKG-06 | 1B | History of important booking changes. | Met | `Booking.history` keeps one entry per change (who, when, action, note) beside the audit log; shown as **Last change** on the Bookings tab. Test "keeps the whole history of what happened to the booking". |
 | TRP-01 | 1B | Trip records: reference, service type, related booking or rental, client or customer, route, ordered stops, planned and actual times, manifest,… | Partial | Reference, route, date, planned/actual stop times, manifest, driver, vehicle, status (5), completion. **No service type, rental link, delayed/interrupted states, notification or incident reference.** |
 | TRP-02 | 1B | Passenger manifests. | Met | Per-trip manifest with boarding outcomes: the route roster **plus** the seats booked on that run (`manifestFor`, Phase 35, D-85), each rider marked roster or booked with the seat reference and pickup stop, on the office screen and the driver portal alike. |
-| DSP-01 | 1B | Daily dispatch board (table or calendar): today's trips, upcoming departures, active, completed, delayed, cancelled, unassigned bookings, available… | Partial | Today's departures on the dashboard plus a filterable trip table. **No calendar, no unassigned list, no capacity-warning panel, no maintenance-block view.** |
+| DSP-01 | 1B | Daily dispatch board (table or calendar): today's trips, upcoming departures, active, completed, delayed, cancelled, unassigned bookings, available… | Partial | A **Dispatch board** screen (Phase 65, D-115): one date, every run in departure order with its company, vehicle (and the vehicle's state today), driver, seats and any delay; the day's counts by status; the runs waiting on a crew, over the seats on the bus, or blocked by a bus in the workshop or a lapsed licence; the vehicles and drivers free that day, each with a sentence; filters for date, status, company, route, driver and vehicle; and the limits printed on the page. It is a table rather than a calendar, which the brief permits, and it changes nothing — crewing and releasing stay on Staff busing. **One filter is missing because the record is: a run carries no service type (TRP-01)**, so the board cannot filter by service and says so. |
 | DSP-02 | 1B | Assign and reassign vehicle and driver, validating availability, qualifications, vehicle condition, capacity and conflicts. Overrides need permission… | Partial | Validation of category, status, roster capacity, licence expiry, time overlaps, rental clashes, vehicle/driver double-booking. **No permission-and-reason override.** |
 | DSP-03 | 1B | Emergency trip creation. | Met | `create_adhoc_trip` (Phase 32, D-82): a run outside the schedule for any date from today, with a written reason and its own TR number; migration 006 narrows the one-per-day index to scheduled runs so a replacement can stand beside the cancelled one. Created from **Add an ad hoc run** on the Trips tab, marked "ad hoc" with its reason on the run sheet, and checked exactly as a planned run is. |
 | DSP-04 | 1B | Record no-shows and delays; cancel or interrupt trips. | Met | No-show per rider at each stop and on completion; **a delay is reported while the run is out** — minutes behind the timetable, why, by whom, append-only, and `0` to say it caught up (D-105, Phase 56) — shown on the dispatch sheet, the driver's own run, the client's portal and the rider's page. A run that stops mid-way is cancelled with its reason, keeping the stops and outcomes already recorded, and where the cause is a breakdown or safety incident the two records are linked (D-75). Tests: 8 service (`busing.test.ts`), 16 domain (`delays.test.ts`), 4 form, 2 portals, 1 dispatch screen, 3 rider states |
@@ -1590,3 +1590,34 @@ nothing else. The portal states the figures and lists the documents behind them.
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **1120 passed, 28 skipped** (91 files
 passed, 5 skipped), coverage 85.08 % statements / 88.77 % lines, `build` succeeds.
+
+## Phase 65 - The day on one screen, and what is wrong with it (DSP-01, D-115)
+
+The busing screen has carried a run sheet for a long time: the next action on each run, in departure
+order. It does not answer the other question a supervisor asks at half past six — *what is wrong with
+today?* — because it is organised around what to do next to one run, not around the state of the whole
+day. Runs with nobody on them, a bus that went into the workshop overnight, a roster that no longer fits
+the bus, and which drivers are still free were all discoverable, but only by reading every row.
+
+This phase adds a board for that, and deliberately adds nothing else: it reads, it changes nothing, and
+every action stays where the commands are.
+
+| Item | Status | Evidence |
+|---|---|---|
+| One date, every run, in departure order | Done (verified) | `dispatchBoard` in `src/tms/dispatchBoard.ts`; the timetable window, company, vehicle and its state, driver, seats and delay ("counts the day's runs by status, in departure order") |
+| Upcoming departures, active, completed, delayed, cancelled | Done (verified) | The next run still to leave with the minutes to it, the status counts, and every delay in the dispatcher's own words ("reports a run that is behind, in the dispatcher's words", "points at the next run still to leave, and skips one already gone") |
+| Runs waiting on a crew | Done (verified) | `no_vehicle` and `no_driver` are kept as blockers rather than strings, so the count and the sentence can never disagree ("names a run with no crew, and counts it once however much is missing") |
+| Capacity warnings | Done (verified) | Roster plus booked seats against the seats on the bus is a **blocker**, not a statistic: it is a safety limit ("counts riders over the seats as a safety problem, roster and booked seats together") |
+| Maintenance blocks | Done (verified) | The vehicle's state comes from `fleetStateOf`, the same reading the vehicles register and the fleet dashboard use, so a bus in the workshop cannot be "available" on one screen and blocked on another ("treats a bus in the workshop as a bus that cannot take the run") |
+| A lapsed licence blocks the run | Done (verified) | "blocks a run whose driver's licence has lapsed, and says the date" |
+| Available drivers and vehicles | Done (verified) | Free means no run and no hire that day; a bus that cannot move is listed last with the reason, and a driver whose licence has lapsed is a name to ring, not a driver to send ("lists who is free, and puts a bus that cannot move at the bottom with its reason") |
+| Alerts | Done (verified) | The day's problems in sentences, safety first, then the runs that cannot leave, then what is late ("leaves a cancelled run out of the trouble counts, and states what it cannot answer") |
+| Filters: date, status, company, route, driver, vehicle | Done (verified) | "narrows the list without shrinking the day", and the screen test that drives the selects ("narrows the list with a filter without pretending the rest of the day is gone") |
+| The list and the day are not the same thing | Done (verified) | Filters narrow the list only; `dayRuns` travels with the board and the screen prints it, so a filtered list of one is never read as a quiet day |
+| No map, and no invented times | Done (verified) | Every time is the timetable's; the limits are printed on the page ("prints what it cannot answer, instead of leaving it to be discovered") |
+| The service filter | **Not built, and said so** | A run carries no service type in this build (TRP-01), so the board cannot filter by one. The limit is the first line on the page rather than a filter that quietly does nothing |
+| The nav badge | Done (verified) | Runs still to leave today with no vehicle or no driver — the day's outstanding problem, not a count of everything |
+| Tests | Done (verified) | 11 domain (`dispatchBoard.test.ts`) and 4 screen (`DispatchBoard.test.tsx`) — 15 new, every existing suite green |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **1135 passed, 28 skipped** (93 files
+passed, 5 skipped), coverage 85.24 % statements / 88.9 % lines, `build` succeeds.

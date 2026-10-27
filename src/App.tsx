@@ -12,6 +12,7 @@ import { ProfilePage } from "./screens/Profile";
 import { ReportsPage } from "./screens/Reports";
 import { FinanceHomePage } from "./screens/FinanceHome";
 import { StaffBusingPage } from "./screens/StaffBusing";
+import { DispatchBoardPage } from "./screens/DispatchBoard";
 import { StaffLogisticsPage } from "./screens/StaffLogistics";
 import { CompliancePage } from "./screens/Compliance";
 import { FleetReadinessPage } from "./screens/FleetReadiness";
@@ -37,7 +38,7 @@ import { cn } from "./utils/cn";
 
 const NAV_GROUPS: { label: string; routes: Route[] }[] = [
   { label: "My desk", routes: ["driver_portal", "client_portal", "passenger_portal"] },
-  { label: "Service desk", routes: ["dashboard", "finance", "rentals", "invoices", "statements", "expenses", "busing", "logistics", "fleetReadiness"] },
+  { label: "Service desk", routes: ["dashboard", "finance", "rentals", "invoices", "statements", "expenses", "dispatch", "busing", "logistics", "fleetReadiness"] },
   { label: "Fleet & clients", routes: ["fleet", "compliance", "vehicles", "drivers", "clients", "contracts"] },
   { label: "Analysis", routes: ["reports"] },
   { label: "Administration", routes: ["users", "settings", "audit", "profile"] },
@@ -52,6 +53,7 @@ const ROUTE_ICONS: Record<Route, IconName> = {
   expenses: "money",
   reports: "reports",
   busing: "busing",
+  dispatch: "busing",
   logistics: "logistics",
   fleet: "readiness",
   fleetReadiness: "readiness",
@@ -209,6 +211,7 @@ function Shell() {
       case "expenses": return <ExpensesPage />;
       case "finance": return <FinanceHomePage navigate={navigate} />;
       case "reports": return <ReportsPage />;
+      case "dispatch": return <DispatchBoardPage navigate={navigate} />;
       case "busing": return <StaffBusingPage />;
       case "logistics": return <StaffLogisticsPage />;
       case "fleet": return <FleetPage />;
@@ -247,6 +250,11 @@ function Shell() {
   const counts: Partial<Record<Route, number>> = {
     rentals: db.rentals.filter((r) => r.status === "draft" || r.status === "quoted").length,
     busing: db.trips.filter((t) => t.serviceDate === today && t.status === "planned").length,
+    // The badge is the day's outstanding problem, not a count of everything: runs still to leave with
+    // no vehicle or no driver on them (DSP-01, D-115).
+    dispatch: db.trips.filter(
+      (t) => t.serviceDate === today && (t.status === "planned" || t.status === "dispatched") && (!t.vehicleId || !t.driverId),
+    ).length,
     fleetReadiness: readiness.status === "not_configured" ? 0 : readiness.counts.overdue,
     logistics: db.incidents.filter((i) => i.status !== "closed" && i.status !== "resolved").length,
     compliance: db.documents.filter((doc) => {

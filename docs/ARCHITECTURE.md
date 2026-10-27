@@ -69,6 +69,7 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `mayReportOnRun`, `confinedClientId`, `confinedPassengerId`. Confines `driver`, `client_contact` and `passenger` to their one linked record. Fails closed |
+| `src/tms/dispatchBoard.ts` | The day on one screen (DSP-01, D-115): the runs in departure order with their crew, seats, vehicle state and delays; the runs that cannot leave and why; the vehicles and drivers free; the filters. Reads only — every command stays on the busing screen |
 | `src/tms/clientAccount.ts` | A client's own account (CLI-03, D-114): what was billed, received, credited and paid back, with each invoice's balance and state. Built from the narrowed payload and stated through `invoiceBalance`, so the portal cannot disagree with the invoice the customer holds |
 | `src/tms/service.ts` | Core commands: setup, users, settings, vehicles, drivers, clients, rentals, backup import |
 | `src/tms/logistics.ts` | Staff logistics commands: incidents, work orders, cost entries, response and maintenance state machines |

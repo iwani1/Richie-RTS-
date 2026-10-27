@@ -2594,3 +2594,46 @@ only question a customer opens it to ask.
   `src/tms/clientAccount.ts` (`clientAccount`); the account, payments and adjustments panels in
   `src/screens/ClientPortal.tsx`. No schema change, no server route, no dependency. 19 new tests, and two payload
   tests rewritten to assert the narrower rule that replaced them.
+
+## D-115 - The dispatch board reads the day; the run sheet works it (DSP-01)
+
+The brief asks for a daily dispatch board and the build already had most of the material: a run sheet in
+departure order, unassigned runs, a planning aid, delays. What it did not have was a screen organised
+around the question a supervisor asks before anything else in the morning — *what is wrong with today?*
+Answering that from the run sheet meant reading every row and holding the day in your head.
+
+- **Decision 1: a separate board, which reads and changes nothing.** The run sheet is organised around
+  what to do next to one run; the board is organised around the state of the whole day. Putting the
+  board's panels onto the busing screen would have made one very long page with two competing purposes.
+  Putting the *actions* on the board would have made two places to press the same button, and two ways to
+  get the same thing wrong. Every command stays on Staff busing, and the board links to it.
+- **Decision 2: a table, not a calendar.** The brief allows either. A calendar's value is seeing a week;
+  a dispatch board's value is seeing **one day in order**, with the state of each run beside it. The
+  existing date control gives the week when it is wanted, one day at a time, without a component that
+  has to be maintained for the other four days of the week it is not showing.
+- **Decision 3: a capacity warning blocks, it does not shade a cell.** Roster plus booked seats against
+  the seats on the bus is a safety limit, not a fullness indicator. The brief calls it a warning; treating
+  it as a background colour would have made the most serious fact on the page the quietest.
+- **Decision 4: one definition of a blocked vehicle.** The board asks `fleetStateOf`, the same function
+  the vehicles register and the fleet dashboard use. A second rule written for this screen ("status is
+  maintenance") would have missed the work order that put the bus in the workshop without changing the
+  register — the exact case the board exists to catch.
+- **Decision 5: blockers are structured, sentences are derived.** Each run carries `blockers`
+  (`no_vehicle`, `no_driver`, `vehicle_unusable`, `driver_unusable`, `over_capacity`) **and** the
+  sentences for the screen. The counts read the structured facts, so a count can never disagree with the
+  words beside it because somebody reworded a sentence.
+- **Decision 6: filters narrow the list, never the day.** A supervisor filtering to one route still
+  wants to know that two runs elsewhere have no driver. The figures and the warning stay the whole day's,
+  `dayRuns` travels with them, and the screen says so in the card description.
+- **Decision 7: free means nothing on it that day.** Free takes account of hires that cover the date,
+  not only runs; a vehicle with nobody on it but a work order open is listed *last* with the reason, and
+  a driver whose licence has lapsed is a name to ring rather than a driver to send. Nothing records hours
+  on duty, so "free" never claims a driver has rested — the limit is printed.
+- **Decision 8: the missing filter is stated, not faked.** The brief lists a service filter; a run carries
+  no service type in this build (TRP-01). Rather than a control that filters on the route's client and
+  calls it service, the board prints the limit as its first line.
+- **Decision 9: the nav badge is the day's outstanding problem.** Runs still to leave with no vehicle or
+  no driver — not a count of all runs, which would be a badge that is never zero and therefore never read.
+- **Consequence.** `src/tms/dispatchBoard.ts` (`dispatchBoard`, `BOARD_LIMITS`, `licenceDaysLeft`),
+  `src/screens/DispatchBoard.tsx`, the `dispatch` route and nav entry (gated on `trips:read`), and its
+  badge in `App.tsx`. No schema change, no server route, no new permission, no dependency. 15 new tests.

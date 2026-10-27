@@ -10,6 +10,7 @@ export type Route =
   | "expenses"
   | "reports"
   | "busing"
+  | "dispatch"
   | "logistics"
   | "fleet"
   | "fleetReadiness"
@@ -58,6 +59,10 @@ export const NAV_ITEMS: NavItem[] = [
   { route: "expenses", label: "Expenses", caption: "Fuel, tolls, receipts", permission: "expenses:read" },
   { route: "reports", label: "Reports", caption: "Rentals, revenue, utilisation", permission: "kpis:read" },
   { route: "busing", label: "Staff busing", caption: "Routes, rosters, trips", permission: "routes:read" },
+  // One day read whole: what is leaving, what has no crew, what is over its seats, and who is free
+  // (DSP-01, D-115). Gated on trips:read, which is the record it is made of; it changes nothing, so it
+  // needs no write permission of its own.
+  { route: "dispatch", label: "Dispatch board", caption: "The day, and what is wrong", permission: "trips:read" },
   { route: "logistics", label: "Staff logistics", caption: "Breakdowns, maintenance, costs", permission: "incidents:read" },
   // What the fleet had and did with its days, and what standing still cost (FLT-05, D-112). Read on
   // the fleet permission: it is vehicles, runs, hires and work orders, and holds no money of its own
