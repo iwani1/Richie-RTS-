@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–58** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the queued policy answers, then the requirement IDs one at a time — and so on | **All 59 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–66** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the queued policy answers, then the requirement IDs one at a time — and so on | **All 65 phase headings closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -25,14 +25,18 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 
 | Phase | What it covers | Verdict |
 |---|---|---|
-| **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 15 fully met, 14 met but narrower than the brief, **0 unbuilt**. The fleet dashboard arrived in Phase 62 — totals and the state of every bus today, utilisation over a period in vehicle-days, downtime from the work orders, and idle days priced only at the standing cost management sets. The fleet register became whole in Phases 57–59: what the bus runs on, whose it is, its usual driver, a photograph kept in a folder of its own, and the seven states the brief asks for — four typed by the office, three read from the runs |
+| **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 24 requirement IDs: 13 fully met, 11 met but narrower than the brief, **0 unbuilt**. The fleet dashboard arrived in Phase 62 — totals and the state of every bus today, utilisation over a period in vehicle-days, downtime from the work orders, and idle days priced only at the standing cost management sets. The fleet register became whole in Phases 57–59: what the bus runs on, whose it is, its usual driver, a photograph kept in a folder of its own, and the seven states the brief asks for — four typed by the office, three read from the runs |
 | **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting, corporate agreements, a planning aid | **Built, with narrower registers than the brief.** 25 IDs: 16 met, 9 partial, **0 not built**. The client dashboard became whole in Phase 64 (D-114): a corporate contact now reads its own invoices and what is still owed on them. Contracts arrived in Phase 46 (a transcribed term, the lifecycle, renewals, a booking gate) and the planning aid in Phase 47 — ranked pairs that explain themselves, with no geometry because no stop has a position — and the dispatch board in Phase 65, which reads a whole day and changes nothing |
 | **1B** — a run that is late | A delay is reported while the run is out: minutes behind the timetable, why, who said it — on the dispatch sheet, the driver's screen, the client's portal and the rider's page (Phase 56, D-105) | **Built.** The newest report is the current one, a run can say it caught up (`0`), and nothing is edited afterwards. The transport report still measures lateness from the stop times afterwards; the two are different facts and both are shown |
-| **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, staff transport and financial reports | **Built.** 6 IDs: 4 met (finance dashboard, passenger portal, staff transport report, customer portal), 2 partial, **0 not built**. The passenger portal arrived in Phase 48 — a rider's own journeys, seats and references, with the bus's position honestly absent because nothing records one. The staff transport report arrived in Phase 50 — runs worked, riders carried, no-shows, the gap nobody recorded, empty seats, delays where they were measured, and the seats people asked for |
-| **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
+| **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, staff transport and financial reports | **Built.** 6 IDs: 3 met (finance dashboard, passenger portal, staff transport report), 3 partial (the customer portal, the financial report's service column, its filters), **0 not built**. The passenger portal arrived in Phase 48 — a rider's own journeys, seats and references, with the bus's position honestly absent because nothing records one. The staff transport report arrived in Phase 50 — runs worked, riders carried, no-shows, the gap nobody recorded, empty seats, delays where they were measured, and the seats people asked for |
+| **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 10 IDs: 7 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
 | **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs: 2 met, 5 deferred. Met: expenses with a receipt number, whether the paper is held **and, since Phase 51, the scanned copy itself** (kept in a folder on the office machine for three years, open to finance and administrators only), and the **printed management report** (a document the browser prints or saves as PDF — no stored file, no email) |
 
-Totals across all 78 brief requirements: **35 met · 30 partial · 0 not built · 13 deferred.**
+Totals across all 72 brief requirements: **34 met · 26 partial · 0 not built · 12 deferred.**
+
+The register counts its own rows. The brief carried 78 requirement IDs when the register was opened
+and 72 after later IDs were merged into their neighbours; the total follows the table in
+`docs/PROGRESS.md` rather than the older number.
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -55,9 +59,12 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
 - CSV import for vehicles, drivers, clients and staff rosters: preview first, every rejected row
   named by line number, nothing merged or silently dropped; a rider who looks like someone already
   on the roster is flagged **Check** rather than refused.
-- Bus rentals: request → quotation (with revisions) → deposit → vehicle and driver assignment →
-  start → completion → invoice → payments. **A vehicle cannot be booked twice** — the database
-  itself refuses, and six simultaneous attempts give one winner and five refusals.
+- Bus rentals: request → quotation (with revisions) → **the customer's own yes, recorded once and
+  against that quotation** → deposit → vehicle and driver assignment → start → completion → invoice →
+  payments. Agreeing is not paying: the deposit is still what confirms the hire, and nothing here
+  sends the customer a message, because there is no mail channel. **A vehicle cannot be booked
+  twice** — the database itself refuses, and six simultaneous attempts give one winner and five
+  refusals.
 - Invoices numbered per year, with your tax lines, discounts, due dates, voiding, part payments and
   exact settlement. Money is computed in whole pesewas with one rounding rule.
 - **A refund record**: money actually paid back to a customer is its own numbered document with a
@@ -194,7 +201,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**1135 passed, 28 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**1154 passed, 28 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a

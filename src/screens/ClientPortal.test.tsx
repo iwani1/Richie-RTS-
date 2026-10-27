@@ -10,14 +10,14 @@
 // The fixtures are written onto the fake server's database rather than raised through the whole hire →
 // complete → invoice → payment path, because the snapshot takes whatever the server holds and this is
 // about what survives that narrowing.
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { webcrypto } from "node:crypto";
 import App from "../App";
 import { installFakeServer } from "../test/fakeServer";
 import { executeCommand, type AnyCommand } from "../tms/commands";
 import type { Actor } from "../tms/service";
-import { emptyDatabase, emptyRentalSettings, type CreditNote, type Database, type Invoice, type Payment } from "../tms/types";
+import { emptyDatabase, emptyRentalSettings, type CreditNote, type Database, type Invoice, type Payment, type Rental } from "../tms/types";
 
 
 const NOW = new Date().toISOString();
@@ -99,11 +99,51 @@ const credit = (id: string, invoiceId: string, clientId: string): CreditNote => 
   updatedAt: NOW,
 });
 
+/** A quoted request on Alpha's account, valid today, waiting for the customer's answer (RNT-05). */
+const quotedRental = (clientId: string): Rental => ({
+  id: "rr1",
+  reference: "RR-0001",
+  clientId,
+  customerName: "Alpha Ltd",
+  customerPhone: "",
+  customerEmail: "",
+  purpose: "Board meeting shuttle",
+  pickupLocation: "Accra",
+  dropoffLocation: "Tema",
+  startDate: TODAY,
+  endDate: TODAY,
+  passengers: 12,
+  vehicleCategoryId: "cat1",
+  driverRequired: true,
+  notes: "",
+  status: "quoted",
+  quote: {
+    currencyCode: "GHS",
+    pricingBasis: "per_day",
+    lines: [{ id: "ql1", description: "Two days hire", quantity: 2, unitAmount: 2000 }],
+    subtotal: 4000,
+    depositPercent: 25,
+    depositRequired: 1000,
+    validUntil: TODAY,
+    quotedAt: `${TODAY}T08:00:00.000Z`,
+    quotedBy: "Admin",
+  },
+  quoteHistory: [],
+  acceptance: null,
+  assignedVehicleId: null,
+  assignedDriverId: null,
+  deposit: null,
+  finalInvoice: null,
+  resolutionReason: null,
+  createdAt: NOW,
+  updatedAt: NOW,
+});
+
 /**
  * One company with two customers, a contact for the first, and billing on both accounts — so "no other
  * customer's invoice" is a real assertion rather than an empty one.
  */
-function seed(options: { bills?: boolean } = {}): { userId: string; alphaId: string } {
+function seed(options: { bills?: boolean; quote?: boolean } = {}): { userId: string; alphaId: string } {
   let db: Database = emptyDatabase();
   const run = (actor: Actor | null, command: AnyCommand) => {
     const result = executeCommand(db, actor, command, NOW);
@@ -140,6 +180,8 @@ function seed(options: { bills?: boolean } = {}): { userId: string; alphaId: str
       refunds: [],
     };
   }
+
+  if (options.quote) db = { ...db, rentals: [quotedRental(alphaId)] };
 
   installFakeServer(db, userId);
   return { userId, alphaId };
@@ -201,5 +243,30 @@ describe("Client portal (jsdom)", () => {
     expect(screen.getByText("Nothing credited")).toBeTruthy();
     // No figure is invented for an account with no invoice.
     expect(screen.queryByText("Balance due")).toBeNull();
+  }, 30000);
+
+  it("lets the customer accept the quotation on screen, and says so afterwards (RNT-05)", async () => {
+    seed({ quote: true });
+    await renderPortal();
+
+    // The price and its deposit are on the row before anything is clicked.
+    expect(screen.getByText("GHS 4000.00")).toBeTruthy();
+    expect(screen.getByText(/Deposit GHS 1000.00/)).toBeTruthy();
+    // Nothing is claimed before the answer is given.
+    expect(screen.queryByText(/accepted the quotation/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept quotation" }));
+    // The panel repeats the figure, the deposit and how long the price holds.
+    await screen.findByRole("heading", { name: /Accept the quotation for RR-0001/ });
+    expect(screen.getByText(/GHS 1000.00 \(25%\)/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Anything to add\?/), { target: { value: "Pick up at 8am" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept this quotation" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: /Accept the quotation for RR-0001/ })).toBeNull());
+    // The sentence says who answered and that it came through the portal — not just a badge.
+    expect(screen.getByText(/Alpha Contact accepted the quotation of GHS 4000.00/)).toBeTruthy();
+    expect(screen.getByText(/in the customer portal/)).toBeTruthy();
+    // And the button is gone: one yes per quotation.
+    expect(screen.queryByRole("button", { name: "Accept quotation" })).toBeNull();
   }, 30000);
 });

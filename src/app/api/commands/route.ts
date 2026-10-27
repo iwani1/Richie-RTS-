@@ -33,6 +33,9 @@ const envelope = z.object({
   input: z.record(z.string(), z.unknown()).optional(),
   id: z.string().min(1).max(64).optional(),
   reason: z.string().max(2000).optional(),
+  // A note the customer attached to an acceptance (D-116). Optional, and never required: a yes is a
+  // yes with or without a sentence beside it.
+  note: z.string().max(1000).optional(),
   to: z.string().max(40).optional(),
   routeId: z.string().max(64).optional(),
   fromDate: z.string().max(40).optional(),

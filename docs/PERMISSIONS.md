@@ -47,6 +47,7 @@ where a row has no `passenger` column, the role does not hold that permission at
 | passengers:read | | x | only its client's roster (name and pickup stop are shown; contact details are not) |
 | rentals:read | | x | only its client's rental requests |
 | rentals:create | | x | client is forced to its own; the request cannot name another client |
+| rentals:accept | | x | only its client's rental requests, and only while the quotation is live and unanswered (RNT-05, D-116). It records the customer's agreement to the figure; it cannot issue a quotation, record a deposit or confirm the hire |
 | invoices:read | | x | the invoice, the payments against it, the credit notes off it and any refund, on its own client's invoices only (CLI-03, D-114). Read only: a client contact cannot issue, void, credit or record money |
 
 Both roles are denied everything else, including all of staff logistics, fleet, users,
@@ -73,6 +74,7 @@ D-60). Hiding a control is a convenience, never the control.
 | rentals:create / update | x | x | | | |
 | rentals:quote | x | x | x | | |
 | rentals:confirm | x | | x | | |
+| rentals:accept | x | x | x | | own |
 | rentals:dispatch | x | x | | | |
 | rentals:complete | x | x | | | |
 | rentals:cancel | x | x | | | |
@@ -82,7 +84,7 @@ D-60). Hiding a control is a convenience, never the control.
 | audit:read | x | x | | | |
 | backup:export / import | x | | | | |
 
-Rental separation of duties: operations runs the request/dispatch/completion steps; finance issues quotations and records deposits (confirm). Administrators can do everything.
+Rental separation of duties: operations runs the request/dispatch/completion steps; finance issues quotations and records deposits (confirm). `rentals:accept` is deliberately wide — the three office roles that talk to a customer about a quotation all need it, and a client contact holds it narrowed to its own account — because recording that somebody said yes is not a decision about money. Issuing the quotation and recording the deposit stay where they were. Administrators can do everything.
 
 **The vehicle's photograph (FLT-01, D-108).** No new permission: filing, replacing and removing a
 photograph are `vehicles:update`, and opening one is `vehicles:read` — so a driver, a client contact and

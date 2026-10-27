@@ -210,7 +210,7 @@ word beneath when the two disagree, and any commitment a blocking state is overr
 one cell that answers "what is this bus doing, and what does the register believe". The fleet is counted
 by state in one line beside the search box, and the rule behind each state sits in a disclosure under
 the table rather than only in the documentation. The photograph panel shows the picture at up to 320 px tall, contained rather than cropped, with its file name, its size and who filed it in one line of small print; removal asks for a reason in the same panel, because a picture taken off the register is a decision and not housekeeping (D-108) |
-| Rentals | Move a request through its states | The state machine of the selected record | Request list in a register card; then a five-step strip, request and quote side by side, actions for that state |
+| Rentals | Move a request through its states | The state machine of the selected record | Request list in a register card; then a five-step strip, request and quote side by side, actions for that state. The quotation card ends with **what the customer answered**, in a sentence rather than a badge — who, when, which channel, and whether that answer still refers to the figure on record (RNT-05, D-116) |
 | Busing | Run the day | Today's runs and the next action on each | Tabs, run sheet (departure in the gutter, route and crew in the middle, next action at the right), dispatch desk beside it. The planning aid sits inside the assign panel as one line of conclusion over three ranked pairs, each with its reason, and collapses what it cannot see behind a disclosure (D-96) |
 | Logistics | Close the response to a breakdown | What is open and what it costs | Incidents beside the work orders they raise; the cost report as a statement with coverage figures |
 | Compliance / Readiness | Prevent an unroadworthy dispatch | Expiry and overdue, soonest first | Summary cards, then **Renewals** — a card of the papers inside the lead time, lapsed first, each with its timing in words and either who has taken it on (one line: person, date, what they are doing, when they expect it) or the plain statement that nobody has — then the urgency-sorted register with interval bars per basis. The renewals panel is two fields, because a reminder that does not say what is being done and when it is expected is not a record of anything (D-110) |
@@ -238,7 +238,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1135 passed, 28 skipped** across 98 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1154 passed, 28 skipped** across 99 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are
@@ -288,9 +288,15 @@ screen scale, so what is approved on screen is what goes on the paper.
    distinguish a held seat with no bus from a bus that has not left, and colour is never the carrier
    (D-97). Its absent map is stated on the page rather than left blank, so silence is not read as a
    fault.
-9. **The portals were re-skinned, not restructured.** Their tasks (one run, one account) are already
+9. **An agreement is a sentence, not a tick.** The customer's answer is printed in full — *"Ama
+   Boateng accepted the quotation of GHS 4000.00 on 2026-06-09 (in the customer portal)"* — and a
+   "superseded" answer says so in words, because "accepted" beside a figure the customer never saw is
+   the single most misleading thing this screen could print (D-116). The panel that asks for the yes
+   prints the total, the deposit and the date the price holds before the button, so nobody agrees to a
+   number they have to go back a screen to read.
+10. **The portals were re-skinned, not restructured.** Their tasks (one run, one account) are already
    single-purpose; they inherit the system and keep their body layout.
-10. **Settings is one card per rule**, so on the longest form the page is taller than a two-column
+11. **Settings is one card per rule**, so on the longest form the page is taller than a two-column
    form would be. That is a trade of vertical space for a readable measure.
-11. **The sidebar shows at most six counts.** Groups without an outstanding number stay silent; if
+12. **The sidebar shows at most six counts.** Groups without an outstanding number stay silent; if
    more destinations gain counts, the sidebar needs a "see all" treatment rather than a wall of pills.

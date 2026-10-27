@@ -585,6 +585,64 @@ describe("write scoping in the service layer", () => {
     }
   });
 
+  it("lets a client contact answer its own quotation and not another customer's (RNT-05, D-116)", () => {
+    const w = world();
+    // One rental per client, each quoted, through the ordinary commands.
+    let db = w.db;
+    const settings = executeCommand(db, w.admin, {
+      type: "update_settings",
+      input: {
+        ...db.settings,
+        currencyCode: "GHS",
+        rental: { pricingBasis: "per_day", depositPercent: 25, quotationValidityDays: 7, driversAlwaysIncluded: null, paymentMethods: ["Cash", "Bank transfer"], requotePolicy: null },
+      },
+    }, NOW);
+    if (!settings.ok) throw new Error(settings.message);
+
+    db = settings.db;
+    const category = db.settings.vehicleCategories[0].id;
+    const request = (clientId: string) => ({
+      clientId,
+      customerName: clientId === w.clientOneId ? "Alpha Ltd" : "Beta Ltd",
+      customerPhone: "",
+      customerEmail: "",
+      purpose: "Shuttle",
+      pickupLocation: "Accra",
+      dropoffLocation: "Tema",
+      startDate: "2026-02-01",
+      endDate: "2026-02-02",
+      passengers: "4",
+      vehicleCategoryId: category,
+      driverRequired: false,
+      notes: "",
+    });
+    for (const clientId of db.clients.map((client) => client.id)) {
+      const created = executeCommand(db, w.ops, { type: "create_rental", input: request(clientId) }, NOW);
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+      db = created.db;
+    }
+    for (const rental of db.rentals) {
+      const quoted = executeCommand(db, w.ops, { type: "quote_rental", id: rental.id, input: { lines: [{ description: "Two days", quantity: "2", unitAmount: "1000" }] } }, NOW);
+      expect(quoted.ok).toBe(true);
+      if (!quoted.ok) return;
+      db = quoted.db;
+    }
+    const [alpha, beta] = db.rentals;
+
+    // Its own quotation: accepted, and the record says it came from the portal.
+    const mine = executeCommand(db, w.clientOne, { type: "accept_quotation", id: alpha.id, note: "Confirmed with the office" }, NOW);
+    expect(mine.ok).toBe(true);
+    if (!mine.ok) return;
+    expect(mine.db.rentals[0].acceptance).toMatchObject({ channel: "client_portal", byName: "Client One", total: 2000, note: "Confirmed with the office" });
+    expect(mine.db.rentals[0].status).toBe("quoted");
+
+    // Another customer's: refused, and the refusal says nothing about whose it is.
+    const theirs = executeCommand(db, w.clientOne, { type: "accept_quotation", id: beta.id, note: "" }, NOW);
+    expect(theirs.ok).toBe(false);
+    if (!theirs.ok) expect(theirs.message).toBe("This request is not on your account.");
+  });
+
   it("blocks a driver from internal and client actions", () => {
     const w = world();
     const settings = attempt(w, w.driverOne, { type: "update_settings", input: w.db.settings });

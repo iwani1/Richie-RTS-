@@ -44,6 +44,7 @@ function rental(overrides: Partial<Rental>): Rental {
     status: "draft",
     quote: null,
     quoteHistory: [],
+  acceptance: null,
     assignedVehicleId: null,
     assignedDriverId: null,
     deposit: null,

@@ -58,6 +58,7 @@ function rental(id: string, overrides: Partial<Rental>): Rental {
     status: "confirmed",
     quote: null,
     quoteHistory: [],
+  acceptance: null,
     assignedVehicleId: "veh-1",
     assignedDriverId: null,
     deposit: null,

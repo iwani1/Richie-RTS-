@@ -32,6 +32,7 @@ function rental(reference: string): Rental {
     status: "draft",
     quote: null,
     quoteHistory: [],
+  acceptance: null,
     assignedVehicleId: null,
     assignedDriverId: null,
     deposit: null,

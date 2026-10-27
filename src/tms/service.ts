@@ -12,6 +12,7 @@ import { MIN_PASSWORD_LENGTH } from "./crypto";
 import { MAX_AMOUNT, formatAmount, isPercentWithTwoDecimals, linesTotal, parseAmount, parseQuantity, percentOf, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { readVehicleDetail } from "./vehicles";
+import { buildAcceptance, canAcceptQuotation } from "./acceptance";
 import { confinedClientId } from "./scope";
 import {
   CLIENT_STATUSES,
@@ -207,6 +208,7 @@ export type Command =
   | { type: "update_rental"; id: string; input: RentalRequestInput }
   | { type: "quote_rental"; id: string; input: QuoteInput }
   | { type: "requote_rental"; id: string; input: QuoteInput }
+  | { type: "accept_quotation"; id: string; note: string }
   | { type: "confirm_rental"; id: string; input: DepositInput }
   | { type: "assign_rental"; id: string; input: AssignmentInput }
   | { type: "start_rental"; id: string }
@@ -1256,6 +1258,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         status: "draft",
         quote: null,
         quoteHistory: [],
+        // Nobody has agreed to anything yet; an enquiry is not an order (D-116).
+        acceptance: null,
         assignedVehicleId: null,
         assignedDriverId: null,
         deposit: null,
@@ -1291,6 +1295,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         status: "draft",
         quote: null,
         quoteHistory: [],
+        // Nobody has agreed to anything yet; an enquiry is not an order (D-116).
+        acceptance: null,
         assignedVehicleId: null,
         assignedDriverId: null,
         deposit: null,
@@ -1382,6 +1388,50 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         summary: `${updated.reference} quotation renewed in place (revision ${currentRevision}): ${quote.currencyCode} ${quote.subtotal.toFixed(2)}, valid until ${quote.validUntil}. Prior quotation retained.`,
       }, now);
       return { ok: true, db: next, message: `Quotation renewed for ${updated.reference} as revision ${currentRevision}; prior quotation retained.` };
+    }
+
+    // The customer saying yes to a quotation (RNT-05, D-116).
+    //
+    // Two ways in, and the record says which: the customer's own contact pressing accept in the
+    // portal, or the office writing down a yes that came by phone — the way most of this business
+    // actually agrees to a price. It is not the deposit: accepting a quotation changes no money and
+    // moves no status, so the rental stays `quoted` until somebody records the deposit.
+    case "accept_quotation": {
+      const denied = authorise(actor, "rentals:accept");
+      if (denied) return denied;
+      const existing = db.rentals.find((rental) => rental.id === command.id);
+      if (!existing) return fail("Rental not found.");
+
+      // Own-record scope: a client contact may only answer its own client's quotation. The refusal
+      // says nothing about the other customer's rental, only that this one is not theirs.
+      const confined = confinedClientId(db, actor);
+      if (confined !== null && existing.clientId !== confined) {
+        return fail("This request is not on your account.");
+      }
+
+      const problems = canAcceptQuotation(existing, now.slice(0, 10));
+      if (Object.keys(problems).length) return fail(problems.status ?? problems.quote ?? problems.acceptance ?? "This quotation cannot be accepted.", problems);
+
+      const acceptance = buildAcceptance(
+        existing,
+        { actorId: actor?.id ?? null, name: actor?.fullName ?? "Unknown", channel: confined !== null ? "client_portal" : "office" },
+        command.note ?? "",
+        now,
+      );
+      const updated: Rental = { ...existing, acceptance, updatedAt: now };
+      const next = audit({ ...db, rentals: db.rentals.map((rental) => (rental.id === updated.id ? updated : rental)) }, actor, {
+        action: "rentals:accept",
+        entity: "rental",
+        entityId: updated.id,
+        summary: `${updated.reference}: ${acceptance.byName} accepted the quotation of ${acceptance.currencyCode} ${formatAmount(acceptance.total)} ${
+          acceptance.channel === "client_portal" ? "in the customer portal" : "on the office's word"
+        }${acceptance.note ? `. "${acceptance.note}"` : "."}`,
+      }, now);
+      return {
+        ok: true,
+        db: next,
+        message: `${updated.reference}: the quotation of ${acceptance.currencyCode} ${formatAmount(acceptance.total)} is accepted.`,
+      };
     }
 
     case "confirm_rental": {

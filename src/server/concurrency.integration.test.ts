@@ -139,6 +139,7 @@ function rentalRow(id: string, vehicleId: string): Rental {
     status: "confirmed",
     quote: null,
     quoteHistory: [],
+  acceptance: null,
     assignedVehicleId: vehicleId,
     assignedDriverId: null,
     deposit: null,

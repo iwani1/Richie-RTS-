@@ -49,6 +49,7 @@ const rental: Rental = {
   status: "declined",
   quote: null,
   quoteHistory: [],
+  acceptance: null,
   assignedVehicleId: null,
   assignedDriverId: null,
   deposit: null,

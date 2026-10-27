@@ -2637,3 +2637,47 @@ Answering that from the run sheet meant reading every row and holding the day in
 - **Consequence.** `src/tms/dispatchBoard.ts` (`dispatchBoard`, `BOARD_LIMITS`, `licenceDaysLeft`),
   `src/screens/DispatchBoard.tsx`, the `dispatch` route and nav entry (gated on `trips:read`), and its
   badge in `App.tsx`. No schema change, no server route, no new permission, no dependency. 15 new tests.
+
+## D-116 - The customer's yes is its own record, and not a payment (RNT-05)
+
+A quotation has been going out to customers since Phase 11, and the only place their answer could be
+kept was in somebody's head or in the free-text notes on the request. The office confirmed a hire on the
+strength of a phone call, and nothing in the system said whether the customer had ever agreed to the
+figure on the sheet — nor to *which* figure, after a requote.
+
+- **Decision 1: a separate acceptance record, not a status and not a badge.** `Rental.acceptance`
+  (`RentalAcceptance` in `src/tms/types.ts`) carries who answered, when, through which channel, the
+  quotation's `quotedAt`, its total and deposit as they stood, and an optional note. A status alone
+  would say *that* somebody agreed, never *to what*.
+- **Decision 2: the figures are copied, not looked up.** The record holds the total, the deposit and the
+  quotation's own timestamp rather than pointing at `rental.quote`. A requote after an acceptance
+  therefore does not silently inherit an agreement given to a different figure: `acceptanceStateOf`
+  reads the pair and reports the older yes as **superseded** in words — *"the quotation has been
+  replaced since. The figure on record now is different."* A reference would have made the agreement
+  follow the price, which is the one thing it must not do.
+- **Decision 3: a lapsed quotation cannot be accepted.** The validity date is a promise about a price,
+  and honouring it after it has run out is a decision for the office, not a side effect of a button.
+  The refusal says the date and tells them to issue a new one.
+- **Decision 4: one yes per quotation.** A second attempt is refused and names the first
+  (*"already accepted on 2026-06-09 by Ama Boateng"*), rather than quietly overwriting the record.
+- **Decision 5: accepting is not paying.** The command changes no money and no status: the status still
+  moves to `confirmed` when the deposit is recorded, and the deposit is recorded by finance. Agreeing to
+  a price and sending money are different acts, and collapsing them would have broken D-90's rule that
+  one place records money.
+- **Decision 6: the channel is recorded, in plain words.** `client_portal` when the customer pressed the
+  button themselves, `office` when a member of staff recorded a yes given on the phone. The difference
+  matters when a figure is disputed: one is the customer's own act in the system, the other is the
+  office's word about it, and the sentence on screen says which.
+- **Decision 7: the customer can only answer its own quotation.** `rentals:accept` is held by the
+  administrator, operations, finance and the client contact; the client contact is confined to its own
+  client's requests exactly as `rentals:create` is, and a refusal for another customer's hire says
+  *"This request is not on your account."* — it does not reveal that the reference exists.
+- **Decision 8: nothing is claimed that did not happen.** No notification is sent, because there is no
+  mail or SMS provider; the register row keeps that as its remaining gap rather than calling RNT-05 met
+  on the strength of a record nobody was told about.
+- **Consequence.** `src/tms/acceptance.ts` (`acceptanceStateOf`, `acceptanceLine`, `canAcceptQuotation`,
+  `buildAcceptance`), `acceptance` on `Rental`, schema **31** with a migration that fills `null` (no SQL
+  migration: the rental row is a JSON document), the `accept_quotation` command, the `rentals:accept`
+  permission, the portal's quotation column and **Accept quotation** panel, the office's **Record
+  customer acceptance** action, and 19 new tests (11 domain, 6 service, 1 scoping, 1 portal screen) —
+  the suite moves from 1,135 to 1,154.

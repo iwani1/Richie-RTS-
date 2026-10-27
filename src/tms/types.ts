@@ -387,6 +387,36 @@ export interface FinalInvoice {
   issuedBy: string;
 }
 
+/**
+ * The customer saying yes to a quotation (RNT-05, D-116).
+ *
+ * Before this, "the customer agreed" existed only as a phone call: the office quoted, somebody said
+ * yes, and the next thing on the record was the deposit. Who agreed, when, and to which figure were
+ * not written down anywhere, so a dispute about the price had nothing to appeal to.
+ *
+ * The quotation itself is copied onto the acceptance rather than referenced, for the same reason an
+ * invoice copies the buyer's details: a later requote must not silently inherit an agreement given to
+ * a different figure. `quotedAt` is the identity of the quotation accepted — the office's own
+ * timestamp — so a screen can say whether the yes still applies to what is on the record.
+ */
+export interface RentalAcceptance {
+  /** When the customer said yes, ISO. */
+  at: string;
+  /** The account that recorded it: the customer's own contact, or the person who took the call. */
+  byActorId: string | null;
+  byName: string;
+  /** Where it was given: in the customer's portal, or on the office's word from a phone call. */
+  channel: "client_portal" | "office";
+  /** The quotation accepted, by the office's own timestamp for it. */
+  quotedAt: string;
+  /** What they agreed to, as it stood: the total, the deposit and the currency. */
+  total: number;
+  depositRequired: number;
+  currencyCode: string;
+  /** Whatever they said with it. Optional, and never required to accept. */
+  note: string;
+}
+
 export interface Rental {
   id: string;
   reference: string; // RR-0001
@@ -407,6 +437,8 @@ export interface Rental {
   quote: Quote | null;
   // Immutable previous quotation snapshots; quote is the current/latest version.
   quoteHistory: Quote[];
+  /** The customer's yes to a quotation, or null while nobody has given one (D-116). */
+  acceptance: RentalAcceptance | null;
   assignedVehicleId: string | null;
   assignedDriverId: string | null;
   deposit: DepositPayment | null;
@@ -1259,7 +1291,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
 
 /**
  * Every schema version this build can still read.
@@ -1269,7 +1301,7 @@ export const SCHEMA_VERSION = 30;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1424,7 +1456,19 @@ export function migrate(value: unknown): Database | null {
           status: location.status === "closed" ? "closed" : "active",
         }))
       : [],
-    rentals: Array.isArray(v.rentals) ? (v.rentals as Rental[]).map((rental) => ({ ...rental, quoteHistory: rental.quoteHistory ?? [] })) : [],
+    // An acceptance arrived in schema 31. A rental written before it has none — the office may have
+    // been told yes on the phone, but nothing recorded it, and inventing an acceptance would be
+    // putting words in a customer's mouth.
+    rentals: Array.isArray(v.rentals)
+      ? (v.rentals as Rental[]).map((rental) => ({
+          ...rental,
+          quoteHistory: rental.quoteHistory ?? [],
+          acceptance:
+            rental.acceptance && typeof rental.acceptance.at === "string" && typeof rental.acceptance.quotedAt === "string"
+              ? rental.acceptance
+              : null,
+        }))
+      : [],
     routes: Array.isArray(v.routes)
       ? (v.routes as BusRoute[]).map((route) => ({
           ...route,

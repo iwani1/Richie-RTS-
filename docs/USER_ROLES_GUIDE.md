@@ -16,7 +16,7 @@ information in the language of the business.
 | **Operations / dispatch** | the person who runs the day | vehicles, drivers, rentals, routes, trips, dispatch, passengers, incidents, maintenance, documents |
 | **Finance** | the person who bills and reconciles | quotations' confirmation step, invoices, payments, costs, the rental report |
 | **Driver** | a driver, on their own phone | their own runs only: open a trip, board passengers, record a no-show, complete, report a defect |
-| **Client contact** | a corporate client's office | their own client's routes, roster, agreement and rental requests; can raise a request, not confirm one |
+| **Client contact** | a corporate client's office | their own client's routes, roster, agreement and rental requests; can raise a request and accept its quotation, not confirm the hire |
 | **Passenger** | a member of staff who travels on the bus | their own journeys only: the next run and its pickup time and stop, every seat they hold with its reference, ask for a seat on another run, cancel their own seat, report a problem with a journey |
 
 There is one installation per company. Nobody signs in and sees another company's data, because there
@@ -27,6 +27,10 @@ is no other company in the database.
 - **Quotations** are prepared by finance or an administrator and confirmed by finance. Operations can
   prepare a quotation but not confirm it — the person who dispatches the vehicle is not the person who
   takes the money.
+- **A customer's yes to a quotation** is recorded by anyone in the office who took the call (operations,
+  finance or an administrator), or by the customer itself in the portal on its own request. It records
+  what was agreed and through which channel; it takes no money and confirms nothing. Agreeing to a
+  price and paying the deposit are separate acts, and the second one still belongs to finance.
 - **Invoices** are issued, voided and paid through the finance role only. Operations completes a
   rental, which produces the line items to bill, and then stops.
 - **Settings** are administrator-only. This matters, because most blocks in the application exist
@@ -222,7 +226,9 @@ request a seat on a run for one of their own company's people, and cancel a seat
 **Cannot:** see any other client or another company's agreement, any billing, the price on their own
 agreement (the screen states the service and the term, not the money), staff phone numbers, invoices or
 payments; cannot draft, approve or end a contract; cannot
-confirm a rental or accept a quotation (that step belongs to finance); cannot **confirm** a booked
+confirm a rental or record a deposit (that step belongs to finance). It **can** accept the quotation
+on its own request — the figure, the deposit and the date the price holds are printed before the button
+— which records an answer and moves no money; cannot **confirm** a booked
 seat (the office confirms it once the seats are counted) and cannot book a seat for another company.
 
 ---

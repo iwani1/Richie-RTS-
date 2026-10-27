@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { formatAmount, fromMinor, lineAmount, linesTotalFromText, percentOf, toMinor } from "../tms/money";
 import { rentalQuotingReady, type AssignmentInput, type DepositInput, type QuoteInput, type QuoteLineInput, type RentalRequestInput } from "../tms/service";
+import { acceptanceLine, acceptanceStateOf, canAcceptQuotation } from "../tms/acceptance";
 import { readinessReport } from "../tms/maintenance";
 import { useTms } from "../tms/useTms";
 import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, type Rental, type RentalStatus } from "../tms/types";
@@ -157,7 +158,10 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
 
 function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }) {
   const { db, allowed, dispatch, setFlash } = useTms();
-  const [panel, setPanel] = useState<"edit" | "quote" | "requote" | "confirm" | "assign" | "complete" | "decline" | "cancel" | null>(null);
+  const [panel, setPanel] = useState<"edit" | "quote" | "requote" | "accept" | "confirm" | "assign" | "complete" | "decline" | "cancel" | null>(null);
+  // D-116: the note the office writes when a customer agreed by phone. Held here so one panel does
+  // not need a second component for a single field.
+  const [acceptNote, setAcceptNote] = useState("");
 
   const categoryName = db.settings.vehicleCategories.find((c) => c.id === rental.vehicleCategoryId)?.name ?? "Unknown";
   const vehicle = db.vehicles.find((v) => v.id === rental.assignedVehicleId);
@@ -182,6 +186,12 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
   if (rental.status === "quoted") {
     if (expired && db.settings.rental.requotePolicy === "revise_in_place" && allowed("rentals:quote"))
       actions.push(<Button key="requote" variant="primary" onClick={() => setPanel("requote")}>Renew quotation</Button>);
+    // RNT-05, D-116: most customers agree on the phone, so the office can write the yes down. The
+    // button appears only when the quotation can actually be accepted — unless the customer has
+    // already accepted it, in which case there is nothing left to record.
+    const acceptanceProblems = canAcceptQuotation(rental, todayYmd());
+    if (allowed("rentals:accept") && Object.keys(acceptanceProblems).length === 0)
+      actions.push(<Button key="accept" onClick={() => { setAcceptNote(""); setPanel("accept"); }}>Record customer acceptance</Button>);
     if (allowed("rentals:confirm")) actions.push(<Button key="confirm" variant="primary" disabled={expired} title={expired ? "Quotation expired" : undefined} onClick={() => setPanel("confirm")}>Record deposit & confirm</Button>);
     if (allowed("rentals:quote")) actions.push(<Button key="decline" variant="danger" onClick={() => setPanel("decline")}>Decline</Button>);
   }
@@ -279,6 +289,14 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
                 <div className="flex justify-between"><dt className="text-stone-500">Deposit ({rental.quote.depositPercent}%)</dt><dd>{money(rental.quote.depositRequired, rental.quote.currencyCode)}</dd></div>
                 <div className="flex justify-between"><dt className="text-stone-500">Valid until</dt><dd className={expired ? "text-red-700" : ""}>{formatDate(rental.quote.validUntil)}</dd></div>
               </dl>
+              {/* D-116: the customer's own answer, in their own record — and a warning when the
+                  quotation has moved on since they gave it. */}
+              {rental.acceptance && (
+                <p className={`mt-2 text-xs ${acceptanceStateOf(rental, todayYmd()) === "current" ? "text-stone-700" : "text-amber-800"}`}>
+                  {acceptanceLine(rental, todayYmd())}
+                  {rental.acceptance.note && <span className="block text-stone-600">&ldquo;{rental.acceptance.note}&rdquo;</span>}
+                </p>
+              )}
               <p className="mt-2 text-[11px] text-stone-400">No tax lines are applied; VAT/levy treatment is an open question (Q-14).</p>
               {rental.quoteHistory.length > 0 && (
                 <div className="mt-4 border-t border-stone-200 pt-3">
@@ -338,6 +356,33 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
       {panel === "quote" && <QuoteForm title={`Quote ${rental.reference}`} depositPercent={db.settings.rental.depositPercent} currency={db.settings.currencyCode} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "quote_rental", id: rental.id, input }))} />}
       {panel === "requote" && <QuoteForm title={`Renew quotation ${rental.reference}`} requoteMode depositPercent={db.settings.rental.depositPercent} currency={db.settings.currencyCode} initialLines={rental.quote?.lines.map((line) => ({ id: line.id, description: line.description, quantity: String(line.quantity), unitAmount: String(line.unitAmount) }))} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "requote_rental", id: rental.id, input }))} />}
       {panel === "complete" && <QuoteForm title={`Final invoice ${rental.reference}`} completeMode initialLines={rental.quote?.lines.map((l) => ({ id: l.id, description: l.description, quantity: String(l.quantity), unitAmount: String(l.unitAmount) }))} currency={rental.quote?.currencyCode ?? db.settings.currencyCode} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "complete_rental", id: rental.id, input }))} />}
+      {panel === "accept" && (
+        <Panel
+          title={`Record acceptance of ${rental.reference}`}
+          description="Write down a yes the customer gave by phone. It records what they agreed to and when; the deposit is a separate step."
+          onClose={() => setPanel(null)}
+        >
+          <div className="space-y-4">
+            <dl className="grid grid-cols-[140px_1fr] gap-y-2 text-sm">
+              <dt className="text-stone-500">Customer</dt>
+              <dd className="text-stone-800">{rental.customerName}</dd>
+              <dt className="text-stone-500">Quoted</dt>
+              <dd className="font-semibold text-stone-900">{money(rental.quote?.subtotal ?? 0, rental.quote?.currencyCode ?? null)}</dd>
+              <dt className="text-stone-500">Held until</dt>
+              <dd className="text-stone-800">{rental.quote ? formatDate(rental.quote.validUntil) : "—"}</dd>
+            </dl>
+            <Field label="What they said (optional)" hint="For example: agreed on the phone with the transport officer, or the pickup time they asked for.">
+              <TextArea value={acceptNote} onChange={(event) => setAcceptNote(event.target.value)} />
+            </Field>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button onClick={() => setPanel(null)}>Cancel</Button>
+              <Button variant="primary" onClick={() => void run(dispatch({ type: "accept_quotation", id: rental.id, note: acceptNote }))}>
+                Record acceptance
+              </Button>
+            </div>
+          </div>
+        </Panel>
+      )}
       {panel === "confirm" && <ConfirmForm reference={rental.reference} depositRequired={rental.quote?.depositRequired ?? 0} currency={rental.quote?.currencyCode ?? null} methods={db.settings.rental.paymentMethods} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "confirm_rental", id: rental.id, input }))} />}
       {panel === "assign" && <AssignForm rental={rental} needsDriver={needsDriver} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "assign_rental", id: rental.id, input }))} />}
       {(panel === "decline" || panel === "cancel") && <ReasonForm title={panel === "decline" ? `Decline ${rental.reference}` : `Cancel ${rental.reference}`} onClose={() => setPanel(null)} onSubmit={(reason) => run(dispatch(panel === "decline" ? { type: "decline_rental", id: rental.id, reason } : { type: "cancel_rental", id: rental.id, reason }))} />}

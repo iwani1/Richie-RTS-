@@ -1,6 +1,6 @@
 # Entity-relationship model
 
-The app stores these as arrays inside one JSON document (schema version 30; PostgreSQL keeps them in
+The app stores these as arrays inside one JSON document (schema version 31; PostgreSQL keeps them in
 typed tables, migration `020` being the latest). This diagram is the **target relational schema** that a PostgreSQL build would implement. Fields are simplified; `id` columns are UUIDs.
 
 ```mermaid
@@ -417,6 +417,33 @@ erDiagram
 Unique `(rental_id, revision_number)`; quote and line snapshots are immutable. The initial
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous
 snapshot, so the current quote count equals history length + 1.
+
+**The customer's answer to a quotation (RNT-05, D-116).** In the browser schema this is one object on
+the rental, `rental.acceptance`, holding the person, the time, the channel (`client_portal` or `office`),
+the quotation's `quotedAt`, its total, its deposit and a note. The figures are **copied**, deliberately:
+an acceptance is a statement about one specific quotation, so the record must not follow a later
+revision. Relationally it belongs on the revision, not on the rental:
+
+```mermaid
+erDiagram
+  RENTAL_QUOTE ||--o| RENTAL_ACCEPTANCE : "is answered by at most one"
+  RENTAL_ACCEPTANCE {
+    uuid id PK
+    uuid rental_quote_id FK
+    text accepted_by_name
+    uuid accepted_by_user_id FK
+    text channel
+    timestamptz accepted_at
+    numeric total
+    numeric deposit_required
+    text currency_code
+    text note
+  }
+```
+
+`UNIQUE (rental_quote_id)` is the rule that a quotation is answered once; a revision nobody accepted
+simply has no row. Storing the total and deposit as well as the foreign key is deliberate redundancy:
+it keeps the agreement readable in a backup and in an export that has lost the quote table.
 
 ## Phase 16 invoices and payments (implemented in `db/migrations/003_invoices_and_payments.sql`, extended by `008_credit_notes.sql`, `009_payment_cancellations.sql` and `010_refunds.sql`; expenses in `011_expenses.sql`)
 

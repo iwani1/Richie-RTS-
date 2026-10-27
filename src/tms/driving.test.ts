@@ -257,6 +257,7 @@ describe("what a driver is doing today (FLT-04)", () => {
         status: "in_progress",
         quote: null,
         quoteHistory: [],
+  acceptance: null,
         assignedVehicleId: null,
         assignedDriverId: "d1",
         deposit: null,

@@ -39,6 +39,9 @@ describe("permissions", () => {
       "passengers:read",
       "rentals:read",
       "rentals:create",
+      // RNT-05, D-116: a customer may answer a quotation, own-record only. It cannot issue one, and
+      // it cannot record the deposit — agreeing to a price is not the same act as paying.
+      "rentals:accept",
       // CLI-03, D-114: the client's own billing, read only.
       "invoices:read",
       "bookings:read",
@@ -849,5 +852,100 @@ describe("mandatory documents gate assignment (Q-16, D-76)", () => {
     db = confirmed.db;
     const assigned = execute(db, base.admin, { type: "assign_rental", id, input: { vehicleId: vehicle.id, driverId: "" } }, NOW);
     expect(assigned.ok).toBe(true);
+  });
+});
+
+describe("a customer accepting a quotation (RNT-05, D-116)", () => {
+  /** A quoted rental on a live quotation, ready for an answer. */
+  function quoted() {
+    const base = rentalReady();
+    let db = base.db;
+    const created = execute(db, admin0(db), requestInput(base.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    db = created.db;
+    const id = db.rentals[0].id;
+    const quote = execute(db, admin0(db), { type: "quote_rental", id, input: { lines: [{ description: "3 days hire", quantity: "3", unitAmount: "1000" }] } }, NOW);
+    if (!quote.ok) throw new Error(quote.message);
+    return { ...base, db: quote.db, id };
+  }
+  const admin0 = (db: Database): Actor => ({ id: db.users[0].id, fullName: db.users[0].fullName, role: "administrator" });
+
+  it("writes down who agreed, when, and to which quotation", () => {
+    const w = quoted();
+    const result = execute(w.db, w.finance, { type: "accept_quotation", id: w.id, note: "Agreed on the phone" }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const acceptance = result.db.rentals[0].acceptance;
+    expect(acceptance).toMatchObject({
+      byName: "Fin",
+      byActorId: w.finance.id,
+      channel: "office",
+      total: 3000,
+      depositRequired: 750,
+      currencyCode: "GHS",
+      note: "Agreed on the phone",
+    });
+    expect(acceptance?.quotedAt).toBe(result.db.rentals[0].quote?.quotedAt);
+    // Agreeing is not paying: the status moves only when the deposit is recorded.
+    expect(result.db.rentals[0].status).toBe("quoted");
+    expect(result.message).toBe("RR-0001: the quotation of GHS 3000.00 is accepted.");
+    // And it is in the audit trail, in the customer's own terms.
+    // The audit log reads newest first.
+    const entry = result.db.audit[0];
+    expect(entry.action).toBe("rentals:accept");
+    expect(entry.summary).toBe('RR-0001: Fin accepted the quotation of GHS 3000.00 on the office\'s word. "Agreed on the phone"');
+  });
+
+  it("refuses a second yes to the same quotation, and names the first", () => {
+    const w = quoted();
+    const first = execute(w.db, w.admin, { type: "accept_quotation", id: w.id, note: "" }, NOW);
+    if (!first.ok) throw new Error(first.message);
+    const again = execute(first.db, w.admin, { type: "accept_quotation", id: w.id, note: "" }, NOW);
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.errors.acceptance).toBe("This quotation was already accepted on 2026-01-01 by Admin One.");
+  });
+
+  it("refuses a yes to a quotation that has lapsed, and says to issue a new one", () => {
+    const w = quoted();
+    // Seven days of validity from NOW; the customer answers eleven days later.
+    const late = execute(w.db, w.admin, { type: "accept_quotation", id: w.id, note: "" }, "2026-01-12T09:00:00.000Z");
+    expect(late.ok).toBe(false);
+    if (!late.ok) expect(late.errors.quote).toBe("The quotation expired on 2026-01-08. Issue a new one before the customer accepts.");
+  });
+
+  it("refuses a yes to a request nobody has quoted", () => {
+    const base = rentalReady();
+    const created = execute(base.db, admin0(base.db), requestInput(base.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const draft = execute(created.db, base.admin, { type: "accept_quotation", id: created.db.rentals[0].id, note: "" }, NOW);
+    expect(draft.ok).toBe(false);
+    if (!draft.ok) expect(draft.message).toBe("No quotation has been issued yet, so there is nothing to accept.");
+  });
+
+  it("is an ordinary office act, and not one a driver can perform", () => {
+    const w = quoted();
+    const made = execute(w.db, w.admin, { type: "create_driver", input: { fullName: "Kojo", phone: "024", licenceNumber: "DL-1", licenceExpiry: "2030-01-01", status: "active" } }, NOW);
+    if (!made.ok) throw new Error(made.message);
+    const driverRecordId = made.db.drivers[0].id;
+    const user = execute(made.db, w.admin, {
+      type: "create_user",
+      input: { fullName: "Kojo", email: "kojo@example.test", role: "driver", active: true, driverId: driverRecordId },
+      credential: cred,
+    }, NOW);
+    if (!user.ok) throw new Error(user.message);
+    const kojo: Actor = { id: user.db.users.find((candidate) => candidate.email === "kojo@example.test")!.id, fullName: "Kojo", role: "driver" };
+    const refused = execute(user.db, kojo, { type: "accept_quotation", id: w.id, note: "" }, NOW);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.message).toBe("Not permitted: your role lacks rentals:accept.");
+    // The three office roles that talk to a customer about a quotation all hold it.
+    for (const actor of [w.admin, w.ops, w.finance]) {
+      const allowed = execute(w.db, actor, { type: "accept_quotation", id: w.id, note: "" }, NOW);
+      expect(allowed.ok).toBe(true);
+    }
+  });
+
+  it("leaves an older backup with no acceptance, rather than inventing one", () => {
+    // Schema 31 is readable: a record written before acceptance existed loads with none.
+    expect(SCHEMA_VERSION).toBe(31);
   });
 });

@@ -21,6 +21,10 @@ export const PERMISSIONS = [
   "rentals:create",
   "rentals:update",
   "rentals:quote",
+  // The customer saying yes to a quotation (RNT-05, D-116). Separate from rentals:confirm, which is
+  // taking the deposit: a customer agreeing to a price and the office banking the money are different
+  // acts, and a client contact may do the first and never the second.
+  "rentals:accept",
   "rentals:confirm",
   "rentals:dispatch",
   "rentals:complete",
@@ -132,6 +136,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "rentals:create",
     "rentals:update",
     "rentals:quote",
+    "rentals:accept",
     "rentals:dispatch",
     "rentals:complete",
     "rentals:cancel",
@@ -191,6 +196,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "drivers:read",
     "rentals:read",
     "rentals:quote",
+    "rentals:accept",
     "rentals:confirm",
     "routes:read",
     "trips:read",
@@ -240,7 +246,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // off it and what was paid back, on this client's own invoices and nothing else. It is a read
   // permission and nothing more — a client contact still cannot issue, void, credit or record a
   // payment. What it is for is the question a customer actually rings up to ask: what do we owe you?
-  client_contact: ["routes:read", "passengers:read", "rentals:read", "rentals:create", "invoices:read", "bookings:read", "bookings:create", "contracts:read"],
+  client_contact: ["routes:read", "passengers:read", "rentals:read", "rentals:create", "rentals:accept", "invoices:read", "bookings:read", "bookings:create", "contracts:read"],
   // Own-record scope: a passenger sees its own rider record, its route and the runs that carry it,
   // and the seats it holds (PAX-01, D-97). It may ask for a seat for **itself** and cancel one it
   // holds; it can never book for somebody else, confirm its own seat, or read another rider.
@@ -270,6 +276,7 @@ const OWN_SCOPED_FOR_BOUND_ROLES: readonly Permission[] = [
   "bookings:create",
   "contracts:read",
   "invoices:read",
+  "rentals:accept",
 ];
 
 export function isOwnScoped(role: Role, permission: Permission): boolean {

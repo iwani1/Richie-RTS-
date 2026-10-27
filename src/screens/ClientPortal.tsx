@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { RentalRequestInput } from "../tms/service";
+import { acceptanceLine, canAcceptQuotation, type AcceptanceProblems } from "../tms/acceptance";
 import { clientAccount, type ClientAdjustmentRow, type ClientInvoiceState, type ClientInvoiceRow, type ClientPaymentRow } from "../tms/clientAccount";
 import { formatAmount } from "../tms/money";
 import { scopedView } from "../tms/scope";
@@ -75,6 +76,8 @@ export function ClientPortalPage() {
   const { db, actor, currentUser, allowed, dispatch, setFlash } = useTms();
   const view = useMemo(() => scopedView(db, actor), [db, actor]);
   const [requesting, setRequesting] = useState(false);
+  // D-116: the quotation the customer is answering, if any. Null while no panel is open.
+  const [accepting, setAccepting] = useState<Rental | null>(null);
 
   const client = view.link.client;
   // D-105: the day's runs are the reason a client opens this page at 07:30 — and the reason it rings
@@ -380,10 +383,56 @@ export function ClientPortalPage() {
                 { key: "when", header: "Dates", render: (r: Rental) => <span className="text-xs">{formatDate(r.startDate)} – {formatDate(r.endDate)}</span> },
                 { key: "pax", header: "Passengers", render: (r: Rental) => r.passengers },
                 { key: "status", header: "Status", render: (r: Rental) => <Badge tone={RENTAL_TONE[r.status]}>{RENTAL_STATUS_LABELS[r.status]}</Badge> },
+                {
+                  // RNT-05, D-116: the price they are being asked to agree to, and whether they have
+                  // answered it. The sentence is printed rather than only a badge, because "accepted"
+                  // and "accepted the old figure" are different answers.
+                  key: "quotation",
+                  header: "Quotation",
+                  render: (r: Rental) =>
+                    r.quote ? (
+                      <span>
+                        <span className="font-medium">{money(r.quote.currencyCode, r.quote.subtotal)}</span>
+                        <span className="block text-xs text-stone-600">
+                          Deposit {money(r.quote.currencyCode, r.quote.depositRequired)} · valid until {formatDate(r.quote.validUntil)}
+                        </span>
+                        {acceptanceLine(r, today) && <span className="block text-xs text-stone-700">{acceptanceLine(r, today)}</span>}
+                      </span>
+                    ) : (
+                      <span className="text-stone-500">No quotation yet</span>
+                    ),
+                },
+                {
+                  key: "answer",
+                  header: "",
+                  render: (r: Rental) => {
+                    const problems = canAcceptQuotation(r, today);
+                    const open = Object.keys(problems).length === 0;
+                    if (!allowed("rentals:accept") || !open) return null;
+                    return (
+                      <Button variant="primary" onClick={() => setAccepting(r)}>
+                        Accept quotation
+                      </Button>
+                    );
+                  },
+                },
               ]}
             />
           </div>
         </>
+      )}
+
+      {accepting && (
+        <AcceptQuotation
+          rental={accepting}
+          onClose={() => setAccepting(null)}
+          onSubmit={async (note) => {
+            const result = await dispatch({ type: "accept_quotation", id: accepting.id, note });
+            setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+            if (result.ok) setAccepting(null);
+            return result.ok ? null : (result.errors as AcceptanceProblems);
+          }}
+        />
       )}
 
       {requesting && client && (
@@ -400,6 +449,67 @@ export function ClientPortalPage() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Accepting a quotation (RNT-05, D-116).
+ *
+ * It shows the figure, the deposit and how long the price holds before the button, because accepting
+ * is a commitment and the customer should be able to read what they are committing to without going
+ * back to the table.
+ */
+function AcceptQuotation({
+  rental,
+  onClose,
+  onSubmit,
+}: {
+  rental: Rental;
+  onClose: () => void;
+  onSubmit: (note: string) => Promise<AcceptanceProblems | null>;
+}) {
+  const [note, setNote] = useState("");
+  const [errors, setErrors] = useState<AcceptanceProblems>({});
+  const [busy, setBusy] = useState(false);
+  const quote = rental.quote!;
+
+  const submit = async () => {
+    setBusy(true);
+    setErrors((await onSubmit(note)) ?? {});
+    setBusy(false);
+  };
+
+  return (
+    <Panel title={`Accept the quotation for ${rental.reference}`} description="This records your agreement to the price below. The office still confirms the vehicle and the deposit." onClose={onClose}>
+      <div className="space-y-4">
+        <dl className="grid grid-cols-[140px_1fr] gap-y-2 text-sm">
+          <dt className="text-stone-500">Hire</dt>
+          <dd className="text-stone-800">{rental.purpose}</dd>
+          <dt className="text-stone-500">Dates</dt>
+          <dd className="text-stone-800">{formatDate(rental.startDate)} – {formatDate(rental.endDate)}</dd>
+          <dt className="text-stone-500">Total</dt>
+          <dd className="font-semibold text-stone-900">{money(quote.currencyCode, quote.subtotal)}</dd>
+          <dt className="text-stone-500">Deposit</dt>
+          <dd className="text-stone-800">{money(quote.currencyCode, quote.depositRequired)} ({quote.depositPercent}%)</dd>
+          <dt className="text-stone-500">Held until</dt>
+          <dd className="text-stone-800">{formatDate(quote.validUntil)}</dd>
+        </dl>
+        <Field label="Anything to add? (optional)" error={errors.note} hint="For example a pickup time, or who will travel.">
+          <TextArea value={note} onChange={(event) => setNote(event.target.value)} invalid={Boolean(errors.note)} />
+        </Field>
+        {(errors.status || errors.quote || errors.acceptance) && (
+          <Notice tone="error" title="This quotation cannot be accepted">
+            {errors.status ?? errors.quote ?? errors.acceptance}
+          </Notice>
+        )}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={() => void submit()} disabled={busy}>
+            Accept this quotation
+          </Button>
+        </div>
+      </div>
+    </Panel>
   );
 }
 
