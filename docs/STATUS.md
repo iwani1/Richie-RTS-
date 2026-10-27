@@ -16,7 +16,7 @@ Two different things are called "phase" in this repository, which is why the que
 
 | "Phase" | What it means | Where it stands |
 |---|---|---|
-| **Phases 0–49** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the seven queued policy answers, and so on | **All 50 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
+| **Phases 0–58** (`docs/PROGRESS.md`) | The order in which *this build* was delivered — inspect, foundation, rentals, busing, logistics, the server rewrite, invoices, money, the queued policy answers, then the requirement IDs one at a time — and so on | **All 59 closed**, each with its own evidence and gate run. Two carry a named open item: Phase 19's Playwright substitute (D-68) and Phase 20's live-database repeat |
 | **Phases 1A, 1B, 1C, 2, 3** | The brief's own grouping of requirements (its roadmap) | **1A built · 1B partial · 1C partial · 2 and 3 not started** |
 
 So: no delivery phase failed. What is unfinished is the brief's later roadmap, not this build's work.
@@ -25,14 +25,14 @@ So: no delivery phase failed. What is unfinished is the brief's later roadmap, n
 
 | Phase | What it covers | Verdict |
 |---|---|---|
-| **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 9 fully met, 20 met but narrower than the brief, **0 unbuilt** |
+| **1A** — foundation | Sign-in and sessions, roles and permissions, settings, audit log, vehicles, drivers, clients, documents, rental requests → quotation → deposit → assignment → completion, invoices and payments, CSV import, maintenance, the public enquiry form, rental report | **Built.** 29 requirement IDs: 12 fully met, 17 met but narrower than the brief, **0 unbuilt**. The fleet register became whole in Phases 57–58: what the bus runs on, whose it is, its usual driver, and a photograph kept in a folder of its own |
 | **1B** — busing and dispatch | Routes, rosters, trip generation, dispatch, driver portal, manifests, no-shows, seat bookings, on-time reporting, corporate agreements, a planning aid | **Built, with narrower registers than the brief.** 25 IDs: 15 met, 10 partial, **0 not built**. Contracts arrived in Phase 46 (a transcribed term, the lifecycle, renewals, a booking gate) and the planning aid in Phase 47 — ranked pairs that explain themselves, with no geometry because no stop has a position |
 | **1B** — a run that is late | A delay is reported while the run is out: minutes behind the timetable, why, who said it — on the dispatch sheet, the driver's screen, the client's portal and the rider's page (Phase 56, D-105) | **Built.** The newest report is the current one, a run can say it caught up (`0`), and nothing is edited afterwards. The transport report still measures lateness from the stop times afterwards; the two are different facts and both are shown |
 | **1C** — portals and reports | Customer portal, passenger portal, finance dashboard, staff transport and financial reports | **Built.** 6 IDs: 3 met (finance dashboard, passenger portal, staff transport report), 3 partial, **0 not built**. The passenger portal arrived in Phase 48 — a rider's own journeys, seats and references, with the bus's position honestly absent because nothing records one. The staff transport report arrived in Phase 50 — runs worked, riders carried, no-shows, the gap nobody recorded, empty seats, delays where they were measured, and the seats people asked for |
 | **2** — notifications, GPS, offline | SMS/email, in-app notifications, GPS tracking, driver app offline mode, boarding codes, two-factor sign-in, richer incidents | **Not started.** 11 IDs: 8 deferred, 3 partial (maintenance reminders, the two incident workflows) — the rest need a phone/SMS provider and hardware |
 | **3** — money integrations | Card/mobile-money gateway, expenses with receipts, payroll, reconciliation, PDF reports | **Started.** 7 IDs: 2 met, 5 deferred. Met: expenses with a receipt number, whether the paper is held **and, since Phase 51, the scanned copy itself** (kept in a folder on the office machine for three years, open to finance and administrators only), and the **printed management report** (a document the browser prints or saves as PDF — no stored file, no email) |
 
-Totals across all 78 brief requirements: **26 met · 39 partial · 0 not built · 13 deferred.**
+Totals across all 78 brief requirements: **32 met · 33 partial · 0 not built · 13 deferred.**
 
 "Partial" is not a failure mark. It means the system does the job, but does less than the brief's
 full paragraph — for example it tracks a driver's licence expiry, but not a licence class.
@@ -46,6 +46,12 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   intervals and a fleet-readiness view. A vehicle past its service interval is named to the
   dispatcher before it is chosen, and can be blocked outright with one setting; a safety defect
   always takes it off the road.
+- **A fleet register that describes the bus**: what it runs on, whether it is ours, whose it is when
+  it is not, which driver habitually takes it out, and **a photograph** — one picture per vehicle,
+  kept in a folder of its own and copied with the nightly backup, added or replaced from the register,
+  and taken off with a reason that is written into the audit log. Nothing is assumed: an ownership
+  nobody has recorded stays unrecorded rather than calling a hired bus ours, and the register counts
+  the buses with no fuel type, no ownership and no photograph instead of looking complete.
 - CSV import for vehicles, drivers, clients and staff rosters: preview first, every rejected row
   named by line number, nothing merged or silently dropped; a rider who looks like someone already
   on the roster is flagged **Check** rather than refused.
@@ -80,7 +86,7 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
   entry is numbered (EXP-2026-0001), never edited: a wrong one is voided with a reason and entered
   again, so a report built on the old figure stays explainable. It counts in the same cost figure the
   cost tab and the money report use, and the report states how much spending has no receipt number at
-  all. **A scanned copy is not stored** — where a file would live is still an owner decision.
+  all. **The scanned copy is stored** beside the entry (Phase 51, D-100) — see the bullet above.
 - **Printable documents**: an invoice and each credit note print as a formatted A4 sheet, or save as a
   PDF from the browser's own print dialog. The printed amount due is the same figure the screen shows,
   a void document says so in words before any figure, and a statement prints money paid back as its
@@ -179,7 +185,7 @@ These work, and the difference is worth knowing before relying on them:
 
 ## How this is proved, not asserted
 
-- `npm run typecheck`, `npm run lint`, `npm test` (**927 passed, 28 skipped**), `npm run build` — all
+- `npm run typecheck`, `npm run lint`, `npm test` (**968 passed, 28 skipped**), `npm run build` — all
   green on the current commit, and re-run in this check.
 - Integration tests against real PostgreSQL in CI, including six operators racing for one vehicle,
   the database refusing to credit an invoice past its own total, the database refusing to un-cancel a
@@ -203,8 +209,10 @@ These work, and the difference is worth knowing before relying on them:
 3. **Sending the documents** — an invoice, a credit note, a statement and the management report now
    print or save as a PDF from the browser, but nothing is emailed and no copy is stored: sending one
    is still a manual step, because there is no mail server and nowhere agreed to keep a file (Q-51).
-4. **Where a file would live** — scanned receipts (Q-51) and a stored PDF of each document both need
-   an answer to the same question: which storage, and who may read it. The owner has not chosen one.
+4. **How long a file is kept** — scanned receipts (Q-51) now live in a folder for three years and a
+   vehicle photograph (Q-18) in a folder of its own, but how long an unindexed photograph, or a stored
+   PDF of a document, should stay is still the owner's decision. Nothing deletes a file on the strength
+   of a screen action in the meantime.
 
 Everything else on the missing list needs a provider (SMS, mail, GPS, card payments), hardware, or a
 business decision that has not been made.

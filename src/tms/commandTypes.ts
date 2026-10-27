@@ -15,7 +15,7 @@ import type { Command } from "./service";
 export const KNOWN_COMMAND_TYPES = [
   "record_sign_in",
   "update_settings",
-  "create_vehicle", "update_vehicle", "transition_vehicle",
+  "create_vehicle", "update_vehicle", "transition_vehicle", "remove_vehicle_photo",
   "create_driver", "update_driver",
   "create_client", "update_client", "create_client_location", "update_client_location",
   "create_contract", "update_contract", "advance_contract",
@@ -57,6 +57,10 @@ export type KnownCommandType = (typeof KNOWN_COMMAND_TYPES)[number];
  * could send the command, it could manufacture a row pointing at a file that does not exist — or at
  * one belonging to another expense. The file and the row are made together, in `/api/receipts`.
  * Removing a scan touches no file, so `remove_receipt` does travel through `/api/commands`.
+ *
+ * `attach_vehicle_photo` (D-108) is here for exactly the same reason as `attach_receipt`: a
+ * photograph is a file, and the row that indexes it may only be written after the bytes are on the
+ * disk. Removing one touches no file, so `remove_vehicle_photo` travels through `/api/commands`.
  */
 export const COMMANDS_WITH_THEIR_OWN_ROUTE = [
   "setup_administrator",
@@ -65,6 +69,7 @@ export const COMMANDS_WITH_THEIR_OWN_ROUTE = [
   "change_own_password",
   "submit_enquiry",
   "attach_receipt",
+  "attach_vehicle_photo",
 ] as const;
 
 // The compiler holds this list to the service's own command union: a command added to `Command` and

@@ -439,6 +439,7 @@ describe("what the fleet register says about the vehicle itself (FLT-01)", () =>
     ownership: "owned",
     ownerName: "",
     usualDriverId: null,
+    photo: null,
     notes: "",
     createdAt: at,
     updatedAt: at,
@@ -556,7 +557,7 @@ describe("what the fleet register says about the vehicle itself (FLT-01)", () =>
         vehicleRecord({ id: "v2", registration: "GT 200-26", fuelType: "", ownership: null }),
       ],
     });
-    expect(screen.getByText(/1 with no fuel type · 1 with no ownership of 2/)).toBeTruthy();
+    expect(screen.getByText(/1 with no fuel type · 1 with no ownership · 2 with no photograph of 2/)).toBeTruthy();
   });
 
   it("offers fuel, ownership and the usual driver when adding a vehicle, and sends them", async () => {
@@ -590,5 +591,147 @@ describe("what the fleet register says about the vehicle itself (FLT-01)", () =>
         usualDriverId: "d1",
       }),
     });
+  });
+});
+
+// The photograph of a vehicle (FLT-01, D-108). The register has to say plainly which buses nobody has
+// photographed, and the picture itself is a session-checked URL rather than an inlined copy — so the
+// screen is checked for the URL it asks for, not for the bytes it cannot hold.
+describe("the photograph of a vehicle (FLT-01, D-108)", () => {
+  const vehicleRecord = (overrides: Partial<Vehicle> = {}): Vehicle => ({
+    id: "v1",
+    registration: "GT 100-26",
+    categoryId: "cat",
+    make: "Toyota",
+    model: "Coaster",
+    seatCapacity: 30,
+    status: "available",
+    fuelType: "Diesel",
+    ownership: "owned",
+    ownerName: "",
+    usualDriverId: null,
+    photo: null,
+    notes: "",
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  });
+
+  const photograph = {
+    storedName: "vhcl_" + "a".repeat(36) + ".jpg",
+    originalName: "bus-front.jpg",
+    mimeType: "image/jpeg",
+    byteSize: 1_572_864,
+    sha256: "b".repeat(64),
+    uploadedBy: "Ama Mensah",
+    uploadedAt: at,
+  };
+
+  function renderVehicles(db: Database) {
+    const tms = {
+      db,
+      actor: { id: admin.id, fullName: admin.fullName, role: admin.role },
+      currentUser: admin,
+      status: "ready",
+      connectionError: null,
+      auditTotal: 0,
+      setupRequired: false,
+      flash: null,
+      setFlash: vi.fn(),
+      allowed: () => true,
+      dispatch: vi.fn(async () => ({ ok: true, message: "Photograph taken off." })),
+      attachVehiclePhoto: vi.fn(async () => ({ ok: true, message: "Photograph filed for GT 100-26." })),
+      signIn: vi.fn(async () => null),
+      signOut: vi.fn(async () => {}),
+      setupAdministrator: vi.fn(async () => ({ ok: true, message: "" })),
+      exportBackup: vi.fn(async () => null),
+      refresh: vi.fn(async () => {}),
+    } as unknown as Tms;
+    render(
+      <TmsContext.Provider value={tms}>
+        <VehiclesPage navigate={() => {}} />
+      </TmsContext.Provider>,
+    );
+    return tms;
+  }
+
+  const photoFile = () => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], "bus-front.jpg", { type: "image/jpeg" });
+
+  it("says 'none' where there is no photograph, rather than leaving a gap that looks like a failed image", () => {
+    renderVehicles({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()] });
+    const row = rowFor("GT 100-26");
+    expect(row.textContent).toContain("none");
+    expect(within(row).queryByRole("img")).toBe(null);
+  });
+
+  it("asks the session-checked route for the picture it has, never a bare file path", () => {
+    renderVehicles({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord({ photo: photograph })] });
+    const image = within(rowFor("GT 100-26")).getByRole("img");
+    expect(image.getAttribute("src")).toBe("/api/vehicle-photo/v1");
+    expect(image.getAttribute("alt")).toContain("GT 100-26");
+  });
+
+  it("counts the buses nobody has photographed beside the other gaps", () => {
+    renderVehicles({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord({ photo: photograph }), vehicleRecord({ id: "v2", registration: "GT 200-26" })],
+    });
+    expect(screen.getByText(/1 with no photograph of 2/)).toBeTruthy();
+  });
+
+  it("offers 'Add photograph' for a bus with none, and 'Photograph' for one already pictured", () => {
+    renderVehicles({
+      ...emptyDatabase(),
+      users: [admin],
+      vehicles: [vehicleRecord({ photo: photograph }), vehicleRecord({ id: "v2", registration: "GT 200-26" })],
+    });
+    expect(screen.getByRole("button", { name: /^Add photograph$/ })).toBeTruthy();
+    expect(within(rowFor("GT 200-26")).getByRole("button", { name: /^Add photograph$/ })).toBeTruthy();
+    expect(within(rowFor("GT 100-26")).getByRole("button", { name: /^Photograph$/ })).toBeTruthy();
+  });
+
+  it("says there is no photograph on file instead of showing a placeholder", async () => {
+    renderVehicles({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()] });
+    fireEvent.click(screen.getByRole("button", { name: /^Add photograph$/ }));
+    const panel = screen.getByRole("dialog");
+    expect(within(panel).getByText(/No photograph has been filed/)).toBeTruthy();
+    // Nothing to take off, so no removal form.
+    expect(within(panel).queryByRole("button", { name: /Take the photograph off/ })).toBe(null);
+    expect(within(panel).getByRole("button", { name: /File the photograph/ })).toHaveProperty("disabled", true);
+  });
+
+  it("files the chosen picture through the photograph route", async () => {
+    const tms = renderVehicles({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord()] });
+    fireEvent.click(screen.getByRole("button", { name: /^Add photograph$/ }));
+    const panel = screen.getByRole("dialog");
+
+    fireEvent.change(within(panel).getByLabelText("Vehicle photograph"), { target: { files: [photoFile()] } });
+    fireEvent.click(within(panel).getByRole("button", { name: /File the photograph/ }));
+
+    await waitFor(() => expect(tms.attachVehiclePhoto).toHaveBeenCalled());
+    expect((tms.attachVehiclePhoto as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0]).toBe("v1");
+    expect(tms.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("shows the picture on file with its name, size and who filed it, and will not take it off without a reason", async () => {
+    const tms = renderVehicles({ ...emptyDatabase(), users: [admin], vehicles: [vehicleRecord({ photo: photograph })] });
+    fireEvent.click(screen.getByRole("button", { name: /^Photograph$/ }));
+    const panel = screen.getByRole("dialog");
+
+    expect(within(panel).getByRole("img").getAttribute("src")).toBe("/api/vehicle-photo/v1");
+    expect(panel.textContent).toContain("bus-front.jpg");
+    expect(panel.textContent).toContain("1.5 MB");
+    expect(panel.textContent).toContain("Ama Mensah");
+
+    fireEvent.click(within(panel).getByRole("button", { name: /Take the photograph off/ }));
+    const takeOff = within(panel).getByRole("button", { name: /^Take it off$/ });
+    expect(takeOff).toHaveProperty("disabled", true);
+
+    fireEvent.change(within(panel).getByLabelText(/Why is it coming off/), { target: { value: "Sold to Ama Transport" } });
+    fireEvent.click(within(panel).getByRole("button", { name: /^Take it off$/ }));
+
+    await waitFor(() => expect(tms.dispatch).toHaveBeenCalled());
+    expect(tms.dispatch).toHaveBeenCalledWith({ type: "remove_vehicle_photo", vehicleId: "v1", reason: "Sold to Ama Transport" });
   });
 });

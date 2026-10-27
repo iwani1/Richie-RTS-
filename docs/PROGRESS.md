@@ -35,7 +35,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RNT-08 | 1A | Cancellation releases reserved resources; reasons recorded. | Met | Verified live: a cancelled rental's dates were reusable immediately; reason required. |
 | RNT-09 | 1C | Rental customer portal: own requests, quotations, payment status; accept or cancel where permitted. | Partial | Client portal lists own requests and quotations. **No accept/cancel action and no payment status** (no payments). |
 | WEB-01 | 1A | Public rental enquiry endpoint and embeddable form for the existing website, with rate limiting and spam protection. It creates a Submitted request… | Met | `GET/POST /api/enquiry` (unauthenticated, `src/app/api/enquiry/route.ts`) creates a draft request through the `submit_enquiry` command and returns the reference and a sentence — no records, no counts. Throttled 8 per 10 minutes per address (`rateLimit.take`), plus a signed time-trap (`src/server/enquiryToken.ts`) and a honeypot. The form is `src/screens/PublicEnquiry.tsx` at `/enquiry` (`?embed=1` for the website iframe), the only path allowed to be framed (`next.config.ts`). *Submitted* is a `draft` in the existing status vocabulary — the office still quotes and confirms. Adding to PROGRESS 2026-10-24: no acknowledgement email (no mail provider). |
-| FLT-01 | 1A | Vehicle register: ID, registration number, make/model, category, seats, photo, fuel type, ownership/leasing, odometer, insurance, roadworthiness,… | Partial | Registration, make, model, category, seats, status, notes; **fuel type, ownership and the lessor, and the usual driver since Phase 57** (D-107) — displayed on the row, counted when missing, and carried by the CSV importer. Odometer readings, insurance/roadworthiness and service dates exist as their own records. **The vehicle's photograph is not built**: it needs a file store and its own upload route, which is the next piece (D-108) |
+| FLT-01 | 1A | Vehicle register: ID, registration number, make/model, category, seats, photo, fuel type, ownership/leasing, odometer, insurance, roadworthiness,… | Met | Registration, make, model, category, seats, status, notes; **fuel type, ownership and the lessor, and the usual driver** (Phase 57, D-107) — on the row, counted when missing, carried by the CSV importer; and **the vehicle's photograph** (Phase 58, D-108) — one picture per vehicle in its own folder, sniffed, server-named, replaced rather than duplicated, removed with a reason, served through a role-checked route, and counted when absent. Odometer readings, insurance/roadworthiness and service dates exist as their own records (FLT-03, MNT-01). Q-18 (how long a photograph is kept once it is off the register) is open, and nothing here deletes a file on the strength of a screen action |
 | FLT-02 | 1A | Vehicle statuses: Available, Reserved, Assigned, On Trip, Under Maintenance, Out of Service, Pending Inspection. Define the rule for each state in… | Partial | 4 statuses (`available`, `maintenance`, `out_of_service`, `retired`); blocking enforced and observed. Reserved/Assigned/On Trip/Pending Inspection do not exist. |
 | FLT-03 | 1A | Vehicle documents with expiry dates and configurable reminders. | Partial | Document register with expiry and configurable lead time; status computed per day. A type may be marked required, which blocks assignment while it is missing or lapsed (Phase 26). **Reminders are not sent** (no job runner, no notifications). |
 | FLT-04 | 1A | Driver register: licence class and expiry, qualifications, availability, status. | Met | `src/screens/Registers.tsx` + `src/tms/driving.ts` (Phase 54, D-103): each driver records **the classes printed on their licence** (upper-cased, compared ignoring case, up to 8) and **the certificates they hold**, beside the number, expiry and status that were already there. A **vehicle category may declare the classes that may drive it**, and dispatch then refuses a driver whose licence does not cover that vehicle — on both the trip and the hire path, and in the planning aid, which agrees with the save by construction. A blank class **fails closed once a requirement is declared** and says so in those words; an undeclared category checks nothing. **Availability** is shown as *free today* / *on TR-0001 (Northstar morning) today* / *on hire RR-0007 today*, derived from the runs and never stored. Tests: 20 domain (`driving.test.ts`), 1 planning-aid (`planning.test.ts`), 5 screen (`Registers.test.tsx`), 1 import (`import.test.ts`) |
@@ -98,7 +98,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RPT-05 | 3 | PDF reports. | Met | `src/tms/printableReport.ts` + `src/screens/PrintableReport.tsx` (Phase 49, D-98): the management report as an A4 document — company and period in the head, eight figures each with the sentence that qualifies it, then revenue by customer, revenue by service, costs by category, money in and back out, why rentals were lost, fleet utilisation and the per-unit costs, followed by the coverage counts and the definitions a reader would otherwise assume. Every value is **the report's own number formatted, never a second addition**, and it prints through the browser's own engine to paper or to PDF (the sheet the invoice and statement already use, D-87). **Withheld, not zero:** with no company currency set every amount is "Not stated" and the page says why; an empty table says so; a backwards period prints no report at all. **A PDF file is produced by the print dialog, not stored or emailed** — there is no PDF library and no second rendering engine in the build. Tests: 10 domain (`printableReport.test.ts`), 3 screen (`Reports.test.tsx`). |
 | GPS-01 | 2 | Provider interface; last reported location with timestamp; clear distinction between live, stale and simulated locations; never fabricate… | Deferred | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
 
-**78 IDs: 31 met, 34 partial, 0 not built, 13 deferred** (by phase: 1A 29 - 11 met / 18 partial; 1B 25 - 15 met / 10 partial; 1C 6 - 3 met / 3 partial; 2 11 - 3 partial / 8 deferred; 3 7 - 2 met / 5 deferred; the register above is the count). Phase 1C is complete in this build.
+**78 IDs: 32 met, 33 partial, 0 not built, 13 deferred** (by phase: 1A 29 - 12 met / 17 partial; 1B 25 - 15 met / 10 partial; 1C 6 - 3 met / 3 partial; 2 11 - 3 partial / 8 deferred; 3 7 - 2 met / 5 deferred; the register above is the count). Phase 1C is complete in this build.
 
 ## Phase 0 - Inspect and plan (approved)
 
@@ -1399,11 +1399,40 @@ same driver keeps reporting the same fault. `docs/DECISIONS.md` D-107 records th
 | Old records | Done (verified) | Schema 27. A vehicle written before this phase gains blanks and a null ownership ("gains blanks and a null ownership rather than claiming the fleet is ours") |
 | Tests | Done (verified) | 17 domain (`vehicles.test.ts`), 7 register screen (`Registers.test.tsx`), 4 importer (`import.test.ts`) — 28 new, and every existing suite unchanged and green |
 
-**Not yet built: the vehicle's photograph.** A photo is a file, and every other file in this program
-goes through a store that sniffs the bytes, generates the name on disk and pairs the row with the
-bytes in one order — receipts (D-100). Reusing that pattern for the fleet is the next piece rather
-than a corner cut at the end of this one; until it exists, the row shows no photo and the register
-does not pretend to hold one.
+*The vehicle's photograph, the fourth fact the brief lists, is a file and was built immediately after
+this phase — Phase 58.*
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **927 passed, 28 skipped** (76 files
 passed, 5 skipped), coverage 84.24 % statements / 88.02 % lines, `build` succeeds.
+
+## Phase 58 - The photograph of the vehicle (FLT-01, D-108)
+
+The last of the four facts the brief lists. It is the one that answers "is this the bus in front of
+me?", and it is also the only fact about a vehicle that is a *file*: where it lives, what it is really
+called, who may open it, and what is left behind when it is taken off. `docs/DECISIONS.md` D-108
+records the reasoning.
+
+| Item | Status | Evidence |
+|---|---|---|
+| One photograph per vehicle, and a new one replaces it | Done (verified) | `attach_vehicle_photo` writes the same field; the audit entry names both files ("replaces the one on file rather than keeping two pictures of the same bus") |
+| The file is kept in a folder the server names | Done (verified) | `VEHICLE_PHOTO_DIR`, or `data/vehicle-photos`; stored as `vhcl_<36 hex>.<ext>`, written `0600` into a `0700` folder, and the name the phone gave it is only ever a label ("writes a name of its own, never the one the phone gave it") |
+| Only a picture, and only from the bytes | Done (verified) | Sniffed with the receipt store's `sniffType`; JPEG, PNG and WebP accepted, a PDF or a web page wearing `.jpg` refused and nothing written ("decides the type from the bytes, so a PDF wearing .jpg is a PDF — and is refused here") |
+| A 2 MB ceiling, and a file that is not empty | Done (verified) | "refuses a web page, an empty file and anything over the ceiling, writing nothing" |
+| A refused row leaves no file behind | Done (verified) | The route saves, then indexes, and deletes what it wrote when the domain refuses ("deletes the file again when the domain refuses the row") |
+| Taking it off needs a reason, and the file stays | Done (verified) | `remove_vehicle_photo`: the sentence is in the audit log, the index is cleared, the bytes remain ("takes it off with a reason, and leaves the audit trail behind") |
+| Filing goes through its own route; removing does not | Done (verified) | `attach_vehicle_photo` is browser-forbidden and has its own route, because the row may only be written once the bytes are on the disk; `remove_vehicle_photo` touches no file ("keeps the file-filing command off the browser's list") |
+| Only an office role may file one | Done (verified) | `vehicles:update`; a driver and finance are refused at the domain and at the route, and nothing is written ("is vehicles:update — a driver cannot file one, and neither can finance", "refuses finance, whose role reads the fleet but does not maintain it") |
+| Opening one is a checked request, not a file path | Done (verified) | `GET /api/vehicle-photo/[id]`: session, `vehicles:read`, a second own-record gate, `nosniff`, `no-store`, and a sanitised inline name ("serves the bytes to a role that may read the fleet", "strips quotes, newlines and separators out of the download name") |
+| A missing file is said plainly | Done (verified) | "says the folder and the register disagree when the file has gone, rather than serving an empty image" |
+| The register shows the picture, and counts the buses nobody photographed | Done (verified) | A thumbnail column with "none" where there is nothing (never a broken image), and "N with no photograph" beside the other gaps ("says 'none' where there is no photograph", "counts the buses nobody has photographed beside the other gaps") |
+| The panel files, replaces and removes | Done (verified) | "files the chosen picture through the photograph route", "shows the picture on file with its name, size and who filed it, and will not take it off without a reason" |
+| Old records | Done (verified) | Schema 28. A vehicle written before this phase reads as having no photograph ("reads a vehicle with no photograph as having none"), and one that already has a photograph keeps it |
+| Tests | Done (verified) | 14 domain (`vehiclePhoto.test.ts`), 7 store (`vehiclePhotoStore.test.ts`), 13 route (7 filing, 6 opening), 7 register screen (`Registers.test.tsx`) — 41 new, and every existing suite unchanged and green |
+
+**A bug the tests caught.** The panel that renders the add/edit form keyed off "not the transition
+panel and not the import panel", so opening the photograph panel opened an "Add vehicle" form behind it
+— two dialogs, two places to type, and nothing on screen to say which one a keystroke would reach. The
+block now names the two modes it serves.
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **968 passed, 28 skipped** (80 files
+passed, 5 skipped), coverage 84.18 % statements / 87.93 % lines, `build` succeeds.

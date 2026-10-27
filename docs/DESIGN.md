@@ -200,7 +200,7 @@ from its own button, the scrim and Escape.
 |---|---|---|---|
 | Sign in / first run | Establish identity, once | One statement, one form, one action | Two panels: a brand half on a soft canvas wash (headline, purpose, the three things the desk does) and the form on a card at the right; one column under 980px |
 | Overview (dashboard) | Decide what to do next | Wrong today, then what leaves | Page head, four stat cards, then attention · run sheet · rentals beside a rail of readiness ring, setup checklist and quick actions |
-| Registers (vehicles, drivers, clients) | Find and change one record | The record and what is wrong with it | Page head, then a register card: title and count, filters inside the card, sticky table header, side panel for the form |
+| Registers (vehicles, drivers, clients) | Find and change one record | The record and what is wrong with it | Page head, then a register card: title and count, filters inside the card, sticky table header, side panel for the form. The vehicles register leads with a **56 × 40 thumbnail** (`object-fit: cover`) and the word *none* where nobody has filed a picture — never a broken image or an empty cell — and counts "N with no photograph" beside the other gaps. The photograph panel shows the picture at up to 320 px tall, contained rather than cropped, with its file name, its size and who filed it in one line of small print; removal asks for a reason in the same panel, because a picture taken off the register is a decision and not housekeeping (D-108) |
 | Rentals | Move a request through its states | The state machine of the selected record | Request list in a register card; then a five-step strip, request and quote side by side, actions for that state |
 | Busing | Run the day | Today's runs and the next action on each | Tabs, run sheet (departure in the gutter, route and crew in the middle, next action at the right), dispatch desk beside it. The planning aid sits inside the assign panel as one line of conclusion over three ranked pairs, each with its reason, and collapses what it cannot see behind a disclosure (D-96) |
 | Logistics | Close the response to a breakdown | What is open and what it costs | Incidents beside the work orders they raise; the cost report as a statement with coverage figures |
@@ -228,13 +228,15 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **927 passed, 28 skipped** across 81 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **968 passed, 28 skipped** across 85 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are
   `rts-badge--`, `rts-btn--` and similar, whose concrete variants all exist. Re-run while adding the
   printed sheet (D-87), it found one that did not: `.rts-summary`, used by the invoice and credit-note
-  previews since Phase 16, had no rule at all. It now has one.
+  previews since Phase 16, had no rule at all. It now has one. The photograph (D-108) added two more,
+  `.rts-thumb` and `.rts-photo`, both on the card ground so a picture with a transparent edge does not
+  float on the canvas.
 - Contrast: every text token measured against the card and the canvas (§5). No word sits below 4.5:1;
   the vivid semantic values are confined to graphics and pass 3:1.
 - Fonts are self-hosted and imported once, in `src/app/layout.tsx`: Inter Variable for the interface,

@@ -83,6 +83,14 @@ D-60). Hiding a control is a convenience, never the control.
 
 Rental separation of duties: operations runs the request/dispatch/completion steps; finance issues quotations and records deposits (confirm). Administrators can do everything.
 
+**The vehicle's photograph (FLT-01, D-108).** No new permission: filing, replacing and removing a
+photograph are `vehicles:update`, and opening one is `vehicles:read` — so a driver, a client contact and
+a rider may not read the pictures either. Finance reads the fleet and therefore the photographs; it may
+not file one, because a photograph is a fact about the vehicle and the office is what maintains the
+register. The GET route holds a second gate (the own-record check every screen already uses) even
+though no bound role holds `vehicles:read` today: a route that trusts a role to be company-scoped is one
+permission change away from handing out any bus in the company by id.
+
 **CSV import (MIG-01).** There is no separate import permission: importing vehicles needs
 `vehicles:create`, drivers need `drivers:create`, clients need `clients:create`. Each imported row
 runs through the same command as a typed one, so a role that cannot add a vehicle by hand cannot

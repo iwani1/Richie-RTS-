@@ -889,6 +889,28 @@ h1, h2, h3, h4 { text-wrap: balance; }
 
 .rts-unset { color: var(--muted); font-style: normal; }
 
+/* A vehicle's photograph (FLT-01, D-108). A fixed aspect box so a table of mixed photographs stays a
+   table: the thumbnail is cropped to it rather than allowed to set the row height. */
+.rts-thumb {
+  display: block;
+  width: 56px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+}
+
+.rts-photo {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+}
+
 /* ---------- notices and empty states -------------------------------------------------------------- */
 
 .rts-notice {

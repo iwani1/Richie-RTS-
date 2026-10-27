@@ -144,6 +144,7 @@ function world(): { db: Database; dispatch: Tms["dispatch"] } {
         ownership: null,
         ownerName: "",
         usualDriverId: null,
+        photo: null,
         status: "available",
         notes: "",
         createdAt: at,

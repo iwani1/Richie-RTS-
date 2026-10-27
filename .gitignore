@@ -14,6 +14,9 @@ backups/
 # scanned receipts (personal and financial data, kept on the office machine, never in git — D-100)
 data/receipts/
 
+# vehicle photographs (pictures of the fleet, kept on the office machine, copied with the backup — D-108)
+data/vehicle-photos/
+
 # local environment
 .env
 .env.*

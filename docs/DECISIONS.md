@@ -2225,3 +2225,67 @@ photograph is a file and is dealt with next (D-108).
   `fleetDetailGaps`, `isThirdParty`, `VEHICLE_DETAIL_LIMITS`); the vehicle form gained a "The vehicle
   itself" section; the register prints the facts, the usual driver and the gap count; the CSV importer
   gained `fuel`, `ownership` and `owner`; 28 new tests.
+
+## D-108 - The vehicle's photograph, and the folder it lives in (FLT-01)
+
+The last of the four facts D-107 left open. A photograph answers a question no other field in the
+register answers — "is this the bus in front of me?" — and it is the one fact about a vehicle that is a
+*file*, so it brings the questions a file brings: where it is kept, what it is really called, who may
+open it, and what happens when it is removed.
+
+- **Decision 1: one photograph per vehicle, and a new one replaces it.** Four pictures of the same bus
+  leave a reader choosing which one is the bus. A replacement is a change to the same field, recorded
+  in the audit log with both the old and the new name, so "who changed the picture, and when" is
+  answerable from the log rather than from the folder.
+- **Decision 2: removing the photograph needs a reason.** A photograph of a damaged bus, or of a bus
+  that has just been sold, is evidence. Evidence does not disappear without a sentence saying why,
+  and that sentence is printed in the audit log beside the name of whoever removed it.
+- **Decision 3: removal takes the index off; the file stays in the folder.** Deleting from the register
+  is a decision about what the fleet *is*; emptying the folder is a decision about what the company
+  *keeps*, and those are not the same decision. Q-18 (retention) is still open, so nothing here
+  destroys a file on the strength of a screen action. The message says so plainly, so nobody believes
+  the bytes are gone.
+- **Decision 4: the picture has its own folder, not the receipts' folder.** `VEHICLE_PHOTO_DIR`, or
+  `data/vehicle-photos` beside the application. Receipts (D-100) are financial evidence with a
+  retention term of their own; a photograph of a bus is fleet evidence. One folder with two rules
+  inside it becomes, in practice, one rule — whichever the last person to tidy it up believed. The
+  names carry the difference too: `vhcl_…` here, `rcpt_…` there, and each reader refuses the other's
+  prefix.
+- **Decision 5: the server names the file; the uploader never does.** Stored as
+  `vhcl_<36 hex>.<ext>`, eight random bytes of separation and no path separator possible. The name the
+  phone gave it ("IMG_20260914.jpg") is kept as the record's `originalName` for the reader's benefit
+  and never touches the disk. Every read re-validates the name against the pattern, so a hand-edited
+  record cannot walk out of the folder.
+- **Decision 6: the type comes from the bytes, and only a picture is accepted.** The sniffing and
+  fingerprinting are the receipt store's (`sniffType`, `fingerprint`), reused rather than re-invented;
+  JPEG, PNG and WebP are allowed and PDF is not. A PDF is a document, and documents have a register of
+  their own; letting one in here would mean two places that hold the same kind of file under different
+  rules. Ceiling 2 MB, because this is a picture for recognising a bus, not a print-quality image.
+- **Decision 7: the file is written first, the row second, and a refused row deletes the file.** The
+  route saves the bytes, then asks the domain to index them, and if the domain refuses — a vehicle that
+  is not on the register, a value that grew while the upload was in flight — the route deletes what it
+  just wrote. An unindexed file in the folder is one nobody can find, open, or ever remove.
+- **Decision 8: filing a photograph is browser-forbidden; removing one is not.** `attach_vehicle_photo`
+  is in `COMMANDS_WITH_THEIR_OWN_ROUTE` and `BrowserForbidden`, because a row may only be written after
+  the bytes are on the disk and only the server can promise that (the same reasoning as D-100).
+  `remove_vehicle_photo` touches no file, so it travels through `/api/commands` like any other command.
+  Both need `vehicles:update`.
+- **Decision 9: opening a photograph needs `vehicles:read` and own-record scope.** Today only
+  administrator, operations and finance hold that permission, and all three read the whole fleet — so
+  the scope check is a second gate that changes nothing yet. It stays because the alternative is a route
+  that trusts a role to be company-scoped, and that is one permission change away from handing out any
+  bus in the company by id. Responses carry `nosniff` and `no-store`, and the download name is stripped
+  of quotes, control characters and separators.
+- **Decision 10: schema 28, no SQL migration.** The photograph is a nested object on the vehicle's own
+  record; `migrate()` fills `null` for vehicles written before it existed, and the screen says "none"
+  rather than showing a broken image. The bytes live in the folder, not in the database.
+- **Consequence.** `VehiclePhoto` and `Vehicle.photo`; new module `src/tms/vehiclePhoto.ts`
+  (`VEHICLE_PHOTO_LIMITS`, `vehiclePhotoProblems`, `executeVehiclePhoto`, `vehiclePhotoOf`,
+  `vehiclePhotoLine`, `vehiclesWithoutPhoto`); new `src/server/vehiclePhotoStore.ts`; new routes
+  `POST /api/vehicle-photo` and `GET /api/vehicle-photo/[id]`; `attachVehiclePhoto` through
+  `useTms`; a thumbnail column, an "Add photograph" row action and a photograph panel on the vehicle
+  register; the gap notice now also counts "N with no photograph"; the backup note names two folders;
+  41 new tests.
+- **Corrected during the build.** The panel block that renders the add/edit form keyed off
+  "not transition and not import", so opening the photograph panel also opened an "Add vehicle" form
+  behind it. Caught by the screen test, not by eye; the block now names the two modes it serves.

@@ -38,6 +38,7 @@ No retention period is set. Every period below is a proposal to confirm, and non
 | Rental customer records | Keep for billing and dispute periods to be set | No |
 | Audit log | Keep for an accountability period to be set; do not rewrite entries | No |
 | Scanned expense receipts | **Three years from filing**, decided by the owner (Q-51, D-100); the image sits in a folder on the office machine and the database holds only the index | Stated on the filing panel and in the deployment guide; the deletion itself is a manual step, not a job |
+| Vehicle photographs | Proposed: keep while the vehicle is on the register, **and for a period to be set after it is taken off**. A photograph is a picture of a bus, not of a person, unless somebody happens to be in it — treat one that shows a face as personal data. The image sits in its own folder (`VEHICLE_PHOTO_DIR`, D-108); the database holds only the index | No. Removing a photograph takes the index off and leaves the file in the folder, so nothing is lost while the period is undecided |
 | Backups | Same retention as the source data; store encrypted | No |
 
 ## 4. Known gaps in this build

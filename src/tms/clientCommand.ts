@@ -21,7 +21,9 @@ type BrowserForbidden =
   | { type: "create_user" }
   | { type: "reset_user_password" }
   // A receipt scan arrives as a file through /api/receipts, never as a command (D-100).
-  | { type: "attach_receipt" };
+  | { type: "attach_receipt" }
+  // A vehicle photograph arrives through /api/vehicle-photo for the same reason (D-108).
+  | { type: "attach_vehicle_photo" };
 
 export type ClientCommand =
   | Exclude<AnyCommand, BrowserForbidden>

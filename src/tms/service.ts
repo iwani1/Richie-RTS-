@@ -1072,7 +1072,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (db.settings.vehicleCategories.length === 0) return fail("Blocked: no vehicle categories are configured. An administrator must add them in Settings first.");
       const { errors, value } = validateVehicle(db, command.input);
       if (Object.keys(errors).length) return fail("Please correct the highlighted fields.", errors);
-      const vehicle: Vehicle = { id: makeId(), ...value, status: "available", createdAt: now, updatedAt: now };
+      // A new vehicle has no photograph: the file is filed afterwards, through its own route (D-108).
+      const vehicle: Vehicle = { id: makeId(), ...value, photo: null, status: "available", createdAt: now, updatedAt: now };
       const next = audit({ ...db, vehicles: [...db.vehicles, vehicle] }, actor, {
         action: "vehicles:create",
         entity: "vehicle",

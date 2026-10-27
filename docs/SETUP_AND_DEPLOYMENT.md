@@ -57,6 +57,7 @@ Two values are required and the rest are optional:
 | `HTTPS` | `1` when TLS is terminated in front, which is what enables `Strict-Transport-Security` |
 | `DATABASE_POOL_MAX` | `1` on a single-connection database (the preview harness); default elsewhere |
 | `RECEIPT_DIR` | Where scanned expense receipts are kept (D-100). Default `data/receipts` beside the application. Put it beside the database, and **copy it with the nightly backup** — see §9 |
+| `VEHICLE_PHOTO_DIR` | Where vehicle photographs are kept (D-108). Default `data/vehicle-photos` beside the application. Its own folder, not the receipts': the retention stories differ. **Copy it with the nightly backup too** — see §9 |
 
 `.env` is git-ignored. It contains the database password and the cookie-sealing key; never commit it.
 
@@ -297,34 +298,50 @@ npm run db:restore -- ./backups/2026-10-23.json    # replaces the current conten
 The export is unencrypted and includes Argon2 hashes: store it encrypted and treat it as personal
 data. A PostgreSQL-native alternative is `pg_dump --format=custom`.
 
-### The receipt folder is a second thing to back up (Q-51, D-100)
+### Two folders sit outside the database, and both are yours to back up (Q-51, D-100, D-108)
 
-A scanned receipt is **not** in that export. The database holds only the index — which expense, which
-file, its fingerprint, who filed it — while the image sits in `RECEIPT_DIR` (default
-`data/receipts`) on the same machine. Restoring the database without the folder gives a register of
-receipts whose images are missing; the screen says so plainly rather than pretending, but the paper
-is still gone. So the backup is two things, every night:
+A scanned receipt and a vehicle photograph are **not** in that export. The database holds only the
+index — which expense or vehicle, which file, its fingerprint, who filed it — while the bytes sit in
+`RECEIPT_DIR` (`data/receipts` by default) and `VEHICLE_PHOTO_DIR` (`data/vehicle-photos` by default)
+on the same machine. Restoring the database without the folders gives a register of receipts and
+photographs whose files are missing; the screens say so plainly rather than pretending, but the paper
+is still gone. So the backup is three things, every night:
 
 ```bash
-npm run db:backup -- ./backups/$(date +%F).json     # the figures and the index
-tar czf ./backups/$(date +%F)-receipts.tgz data/receipts   # the paper those figures came from
+npm run db:backup -- ./backups/$(date +%F).json                    # the figures and the two indexes
+tar czf ./backups/$(date +%F)-receipts.tgz data/receipts           # the paper those figures came from
+tar czf ./backups/$(date +%F)-vehicle-photos.tgz data/vehicle-photos   # the fleet, in pictures
 ```
 
-Schedule both together, and test both by restoring into a scratch copy once. The same two archives
-are what a machine replacement needs.
+They are two folders rather than one because the two kinds of file are kept for different reasons:
+a receipt is financial evidence with a term of its own, a photograph of a bus is a fact about the
+fleet. One folder holding both would, in practice, be tidied by whichever rule the last person
+believed; the names keep them apart as well (`rcpt_…` and `vhcl_…`).
 
-**How long the folder is kept.** Three years from the date a scan was filed: that is the owner's
-answer to the retention question, and it is what the filing panel says on screen. After that, a scan
-may be deleted from the folder; its row stays in the database with its fingerprint, so the register
-still shows that a receipt was filed and when. Deleting a scan before then is a decision for the
-owner, not a housekeeping step.
+Schedule all three together, and test all three by restoring into a scratch copy once. The same
+archives are what a machine replacement needs.
+
+**How long the receipt folder is kept.** Three years from the date a scan was filed: that is the
+owner's answer to the retention question, and it is what the filing panel says on screen. After that, a
+scan may be deleted from the folder; its row stays in the database with its fingerprint, so the
+register still shows that a receipt was filed and when. Deleting a scan before then is a decision for
+the owner, not a housekeeping step.
+
+**How long a photograph is kept.** Nothing deletes one yet, and that is deliberate: removing a
+photograph from the register takes the index off and leaves the file where it is, so a picture of a bus
+that has been sold is still there if the question is ever asked. How long an unindexed file stays is
+open (Q-18) — until the owner answers it, emptying the folder is a decision, not housekeeping.
+
+**Restoring.** Put both folders back before starting the application: the screens name a missing file
+in words ("the register has a photograph whose file is not in the folder"), which is a diagnosis, not
+a repair.
 
 ## 10. Checks
 
 ```bash
 npm run typecheck        # tsc --noEmit
 npm run lint             # eslint
-npm test                 # 426 unit and component tests
+npm test                 # 968 unit and component tests
 npm run test:integration # against a real database; needs TEST_DATABASE_URL (14 tests, 4 files)
 npm run build            # production build
 ```

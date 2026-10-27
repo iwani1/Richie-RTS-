@@ -76,6 +76,7 @@ const vehicle = (id: string, registration: string, seatCapacity: number, status:
   ownership: null,
   ownerName: "",
   usualDriverId: null,
+  photo: null,
   status,
   notes: "",
   createdAt: at,

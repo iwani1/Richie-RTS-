@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { VEHICLE_TRANSITIONS, type VehicleInput } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { fleetDetailGaps, isThirdParty, usualDriverOf, vehicleDetailLine } from "../tms/vehicles";
+import { VEHICLE_PHOTO_LIMITS, vehiclePhotoLine, vehiclesWithoutPhoto } from "../tms/vehiclePhoto";
 import {
   VEHICLE_OWNERSHIPS,
   VEHICLE_OWNERSHIP_LABELS,
@@ -14,7 +15,13 @@ import { Badge, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel,
 import { ImportPanel } from "../ui/ImportPanel";
 import type { Route } from "../routes";
 
-type PanelState = { mode: "create" } | { mode: "edit"; vehicle: Vehicle } | { mode: "transition"; vehicle: Vehicle } | { mode: "import" } | null;
+type PanelState =
+  | { mode: "create" }
+  | { mode: "edit"; vehicle: Vehicle }
+  | { mode: "transition"; vehicle: Vehicle }
+  | { mode: "photo"; vehicle: Vehicle }
+  | { mode: "import" }
+  | null;
 
 const statusTone: Record<VehicleStatus, "success" | "warning" | "error" | "neutral"> = {
   available: "success",
@@ -111,9 +118,11 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
                 the office should see on the screen, not discover at audit time. */}
             {(() => {
               const gaps = fleetDetailGaps(db);
+              const noPhoto = vehiclesWithoutPhoto(db);
               const parts = [
                 gaps.noFuelType ? `${gaps.noFuelType} with no fuel type` : "",
                 gaps.noOwnership ? `${gaps.noOwnership} with no ownership` : "",
+                noPhoto ? `${noPhoto} with no photograph` : "",
               ].filter(Boolean);
               return parts.length > 0 ? (
                 <p className="rts-filter-bar-note rts-unset" role="status">
@@ -129,6 +138,26 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
         rowKey={(v) => v.id}
         emptyState={<EmptyState title={db.vehicles.length ? "No vehicles match" : "No vehicles registered"} body={db.vehicles.length ? "Adjust the search or status filter." : "Vehicles added here become available for trip assignment in the next phase."} />}
         columns={[
+          {
+            key: "photo",
+            header: "Photograph",
+            // A thumbnail, or the plain statement that there is none. The image is served through the
+            // route that checks the role and the caller's own-record scope (D-108), never inlined.
+            render: (v) =>
+              v.photo ? (
+                // A plain <img>, not next/image: the optimiser caches what it fetches, and this
+                // route serves a private picture under a session check (D-108).
+                <img
+                  src={`/api/vehicle-photo/${v.id}`}
+                  alt={`${v.registration}`}
+                  className="rts-thumb"
+                  width={56}
+                  height={40}
+                />
+              ) : (
+                <span className="text-xs rts-unset">none</span>
+              ),
+          },
           { key: "reg", header: "Registration", render: (v) => <span className="font-mono text-xs font-semibold text-stone-900">{v.registration}</span> },
           { key: "cat", header: "Category", render: (v) => categoryName(v.categoryId) },
           {
@@ -170,6 +199,11 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
             render: (v) => (
               <div className="flex justify-end gap-1">
                 {allowed("vehicles:update") && <Button variant="ghost" onClick={() => setPanel({ mode: "edit", vehicle: v })}>Edit</Button>}
+                {allowed("vehicles:update") && (
+                  <Button variant="ghost" onClick={() => setPanel({ mode: "photo", vehicle: v })}>
+                    {v.photo ? "Photograph" : "Add photograph"}
+                  </Button>
+                )}
                 {allowed("vehicles:transition") && (
                   <Button variant="ghost" disabled={VEHICLE_TRANSITIONS[v.status].length === 0} onClick={() => setPanel({ mode: "transition", vehicle: v })}>
                     Change status
@@ -184,7 +218,9 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
 
       {panel && panel.mode === "import" && <ImportPanel kind="vehicles" onClose={() => setPanel(null)} />}
 
-      {panel && panel.mode !== "transition" && panel.mode !== "import" && (
+      {/* Modes with a panel of their own are excluded here: every mode this form does not name would
+          otherwise open behind it, and two dialogs at once is two places to type. */}
+      {panel && (panel.mode === "create" || panel.mode === "edit") && (
         <VehicleForm
           key={panel.mode === "edit" ? panel.vehicle.id : "create"}
           initial={panel.mode === "edit" ? toInput(panel.vehicle) : emptyInput()}
@@ -201,6 +237,10 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
             return result.errors;
           }}
         />
+      )}
+
+      {panel && panel.mode === "photo" && (
+        <VehiclePhotoForm vehicle={panel.vehicle} onClose={() => setPanel(null)} />
       )}
 
       {panel && panel.mode === "transition" && (
@@ -333,6 +373,128 @@ function TransitionForm({ vehicle, onClose, onSubmit }: { vehicle: Vehicle; onCl
           <Button type="submit" variant="primary">Apply</Button>
         </div>
       </form>
+    </Panel>
+  );
+}
+
+/**
+ * The vehicle's photograph (FLT-01, D-108).
+ *
+ * One picture per vehicle: filing a new one replaces what is on file, because a register holding four
+ * photographs of the same bus leaves a reader wondering which one is the bus. Taking one off needs a
+ * reason — a photograph of a damaged bus is evidence, and evidence does not vanish silently.
+ *
+ * The file goes through `/api/vehicle-photo`, not a command: the row may only be written after the
+ * bytes are on the disk, which is a thing only the server can promise.
+ */
+function VehiclePhotoForm({ vehicle, onClose }: { vehicle: Vehicle; onClose: () => void }) {
+  const { attachVehiclePhoto, dispatch, setFlash } = useTms();
+  const [file, setFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [reason, setReason] = useState("");
+  const [removeErrors, setRemoveErrors] = useState<Record<string, string>>({});
+
+  const megabytes = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const tooBig = file !== null && file.size > VEHICLE_PHOTO_LIMITS.maxBytes;
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!file) {
+      setErrors({ file: "Choose the photograph of the vehicle." });
+      return;
+    }
+    setSaving(true);
+    const result = await attachVehiclePhoto(vehicle.id, file);
+    setSaving(false);
+    setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) onClose();
+    else setErrors(result.errors);
+  };
+
+  const remove = async (event: FormEvent) => {
+    event.preventDefault();
+    const result = await dispatch({ type: "remove_vehicle_photo", vehicleId: vehicle.id, reason });
+    setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+    if (result.ok) onClose();
+    else setRemoveErrors(result.errors);
+  };
+
+  return (
+    <Panel
+      title={`Photograph: ${vehicle.registration}`}
+      description="One picture per vehicle, used to recognise the bus in the yard. The file is kept in a folder on this machine, not inside the database."
+      onClose={onClose}
+    >
+      {vehicle.photo ? (
+        <figure className="mb-4">
+          {/* A plain <img> for the same reason as the row thumbnail: nothing here may be cached. */}
+          <img
+            src={`/api/vehicle-photo/${vehicle.id}`}
+            alt={`Photograph of ${vehicle.registration}`}
+            className="rts-photo"
+          />
+          <figcaption className="mt-2 text-xs text-stone-600">
+            {vehicle.photo.originalName} · {megabytes(vehicle.photo.byteSize)} · {vehiclePhotoLine(vehicle.photo)}
+          </figcaption>
+        </figure>
+      ) : (
+        <Notice tone="info">No photograph has been filed for this vehicle. The register says so rather than showing a placeholder picture.</Notice>
+      )}
+
+      <form onSubmit={submit} className="mt-4 space-y-4">
+        <Field
+          label={vehicle.photo ? "Replace the photograph" : "The photograph"}
+          hint={`JPEG, PNG or WebP, under ${megabytes(VEHICLE_PHOTO_LIMITS.maxBytes)}. Most phones will let you choose a smaller size.`}
+          error={errors.file ?? (tooBig ? `That file is ${megabytes(file.size)}. Choose a smaller size.` : undefined)}
+        >
+          <input
+            type="file"
+            className="rts-input"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            aria-label="Vehicle photograph"
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null);
+              setErrors({});
+            }}
+          />
+        </Field>
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Close</Button>
+          <Button type="submit" variant="primary" disabled={saving || !file || tooBig}>
+            {saving ? "Filing…" : vehicle.photo ? "Replace the photograph" : "File the photograph"}
+          </Button>
+        </div>
+      </form>
+
+      {vehicle.photo && (
+        <form onSubmit={remove} className="mt-6 space-y-3 border-t border-stone-200 pt-4">
+          {!removing ? (
+            <div className="flex justify-end">
+              <Button variant="danger" onClick={() => setRemoving(true)}>
+                Take the photograph off
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Field
+                label="Why is it coming off?"
+                hint="Recorded in the audit log with your name. The file stays in the folder until the office empties it."
+                error={removeErrors.reason ?? removeErrors.vehicleId}
+              >
+                <TextArea value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
+              </Field>
+              <div className="flex justify-end gap-2">
+                <Button onClick={() => setRemoving(false)}>Keep it</Button>
+                <Button type="submit" variant="danger" disabled={!reason.trim()}>
+                  Take it off
+                </Button>
+              </div>
+            </>
+          )}
+        </form>
+      )}
     </Panel>
   );
 }

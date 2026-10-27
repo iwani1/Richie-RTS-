@@ -48,6 +48,8 @@ export interface Tms {
    * command so a screen handles both the same way.
    */
   attachReceipt: (expenseId: string, file: File) => Promise<CommandResult>;
+  /** FLT-01, D-108: a vehicle photograph goes through its own route, for the reason a receipt does. */
+  attachVehiclePhoto: (vehicleId: string, file: File) => Promise<CommandResult>;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   setupAdministrator: (fullName: string, email: string, password: string) => Promise<CommandResult>;
@@ -190,6 +192,31 @@ export function useTmsState(): Tms {
     [applyWrite],
   );
 
+  const attachVehiclePhoto = useCallback(
+    (vehicleId: string, file: File): Promise<CommandResult> => {
+      setInFlight((n) => n + 1);
+      const run = async (): Promise<CommandResult> => {
+        try {
+          const body = new FormData();
+          body.append("vehicleId", vehicleId);
+          body.append("file", file);
+          // No content-type header: the browser sets `multipart/form-data` with its own boundary.
+          const response = await fetch("/api/vehicle-photo", { method: "POST", body, credentials: "same-origin" });
+          const data = (await response.json().catch(() => null)) as Parameters<typeof applyWrite>[1];
+          return applyWrite(response.status, data);
+        } catch {
+          setConnectionError(NETWORK_ERROR);
+          setStatus("offline");
+          return { ok: false, message: NETWORK_ERROR, errors: {} };
+        }
+      };
+      const next = queue.current.then(run, run);
+      queue.current = next.catch(() => undefined);
+      return next.finally(() => setInFlight((n) => Math.max(0, n - 1)));
+    },
+    [applyWrite],
+  );
+
   const dispatch = useCallback(
     (command: ClientCommand): Promise<CommandResult> => {
       setInFlight((n) => n + 1);
@@ -287,6 +314,7 @@ export function useTmsState(): Tms {
     allowed,
     dispatch,
     attachReceipt,
+    attachVehiclePhoto,
     signIn,
     signOut,
     setupAdministrator,

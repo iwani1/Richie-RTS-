@@ -60,6 +60,27 @@ export const VEHICLE_OWNERSHIP_LABELS: Record<VehicleOwnership, string> = {
   hire_purchase: "Hire purchase",
 };
 
+/**
+ * A photograph of the vehicle itself, filed through `/api/vehicle-photo` (FLT-01, D-108).
+ *
+ * The row is an index: the bytes live in a folder beside the database, exactly as a receipt scan does
+ * (D-100), for the same reasons — a backup that carries a thousand photographs is slow to move, and a
+ * name chosen by a phone must never become a path on this machine. Everything here is what the server
+ * learned from the bytes and from its own clock; none of it comes from the browser.
+ */
+export interface VehiclePhoto {
+  /** The name the file was stored under: always `vhcl_…`, always generated here. */
+  storedName: string;
+  /** The name the phone gave it, kept to be shown and for the download header. Never used as a path. */
+  originalName: string;
+  /** Decided by sniffing the first bytes, not by the browser's `Content-Type`. */
+  mimeType: string;
+  byteSize: number;
+  sha256: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
 export interface Vehicle {
   id: string;
   registration: string;
@@ -79,6 +100,8 @@ export interface Vehicle {
    * own vehicle and driver are what dispatch records, and this never stands in for them.
    */
   usualDriverId: string | null;
+  /** The vehicle's photograph, or null when none has been filed (FLT-01). */
+  photo: VehiclePhoto | null;
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -1203,7 +1226,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 /**
  * Every schema version this build can still read.
@@ -1213,7 +1236,7 @@ export const SCHEMA_VERSION = 27;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1330,6 +1353,8 @@ export function migrate(value: unknown): Database | null {
             : null,
           ownerName: typeof vehicle.ownerName === "string" ? vehicle.ownerName : "",
           usualDriverId: typeof vehicle.usualDriverId === "string" && vehicle.usualDriverId !== "" ? vehicle.usualDriverId : null,
+          // The photograph arrived in schema 28. A record without one keeps working and shows none.
+          photo: vehicle.photo && typeof vehicle.photo.storedName === "string" ? vehicle.photo : null,
         }))
       : [],
     drivers: (v.drivers as Driver[]).map((driver) => ({

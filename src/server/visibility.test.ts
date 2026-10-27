@@ -50,6 +50,7 @@ const vehicle = (id: string): Vehicle => ({
   ownership: null,
   ownerName: "",
   usualDriverId: null,
+  photo: null,
   status: "available",
   notes: "",
   createdAt: at,

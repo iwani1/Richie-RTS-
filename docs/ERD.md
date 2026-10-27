@@ -290,6 +290,18 @@ recorded it, because a default of "owned" would put a hired bus on the company's
 where the form and the importer meet (`readVehicleDetail`), because a dangling id must produce a
 sentence a person can act on rather than a constraint violation.
 
+`Vehicle.photo` is the same shape and for a sharper reason (schema 28, D-108): the record holds
+`storedName`, `originalName`, `mimeType`, `byteSize`, `sha256`, `uploadedBy` and `uploadedAt`, and the
+**bytes are not in the database at all**. They sit in `VEHICLE_PHOTO_DIR` (`data/vehicle-photos` by
+default), named `vhcl_<36 hex>.<ext>` by the server. A photograph in a `bytea` column would make every
+nightly dump carry every picture of every bus, so a backup that used to take seconds would grow without
+bound and a restore would drag the fleet along with the figures. One picture per vehicle — the field
+holds one object, so a replacement is a replacement rather than a second row — and removing it clears
+the field while the file stays in the folder, because the retention question (Q-18) is still open and
+nothing here deletes a file on the strength of a screen action. The receipts' folder (`RECEIPT_DIR`,
+D-100) is deliberately a different one: the two kinds of file are kept for different reasons and hold
+different names (`rcpt_…` and `vhcl_…`).
+
 `Booking.history` is embedded on the booking rather than kept in a table of its own: it is written
 once with the change it describes, never edited, and read whole beside the booking (BKG-06).
 

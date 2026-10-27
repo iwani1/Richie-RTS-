@@ -30,6 +30,7 @@ function vehicle(id: string, registration: string): Vehicle {
     ownership: null,
     ownerName: "",
     usualDriverId: null,
+    photo: null,
     status: "available",
     notes: "",
     createdAt: NOW,

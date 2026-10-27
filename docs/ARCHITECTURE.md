@@ -65,7 +65,7 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 27` (the migration number and the snapshot version are counted separately: four phases shipped without a new migration — the newest is FLT-01, whose fleet facts live inside each vehicle's record), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–27) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 28` (the migration number and the snapshot version are counted separately: five phases shipped without a new migration — the newest is FLT-01, whose fleet facts and photograph live inside each vehicle's record), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–28) |
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `mayReportOnRun`, `confinedClientId`, `confinedPassengerId`. Confines `driver`, `client_contact` and `passenger` to their one linked record. Fails closed |
@@ -95,6 +95,10 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 | `src/server/receiptStore.ts` | The only code that touches the receipt folder: sniffs the type from the bytes, generates the name on disk, enforces the ceiling, reads back only names it wrote, and computes the retention date |
 | `src/app/api/receipts/route.ts` | `POST`, the one route that accepts a file: origin, session, `receipts:write`, sniff, save, then the server-only `attach_receipt` command — deleting the file again if the row is refused |
 | `src/app/api/receipts/[id]/route.ts` | `GET`: session, `receipts:read`, then the disk. Serves the image under a sanitised name, `no-store` and `nosniff`, and says so plainly when the index has a scan the folder does not |
+| `src/tms/vehiclePhoto.ts` | The photograph of a vehicle (FLT-01, D-108): `VEHICLE_PHOTO_LIMITS` (2 MB, jpeg/png/webp), `vehiclePhotoProblems`, the `attach_vehicle_photo` / `remove_vehicle_photo` commands, `vehiclePhotoOf`, `vehiclePhotoLine` and `vehiclesWithoutPhoto`. It indexes a file; it never touches one — that is `vehiclePhotoStore.ts`. One picture per vehicle, a new one replaces the old, and a removal keeps its reason and its file |
+| `src/server/vehiclePhotoStore.ts` | The only code that touches the vehicle photograph folder (`VEHICLE_PHOTO_DIR`, or `data/vehicle-photos`): sniffs the type from the bytes with the receipt store's own helpers, names the file `vhcl_<36 hex>.<ext>`, enforces the ceiling, and reads back only names it wrote. Separate from the receipts because the retention stories differ |
+| `src/app/api/vehicle-photo/route.ts` | `POST`: origin, session, `vehicles:update`, sniff, save, then the server-only `attach_vehicle_photo` command — deleting the file again if the row is refused |
+| `src/app/api/vehicle-photo/[id]/route.ts` | `GET`: session, `vehicles:read`, then the same own-record check the screens use, then the disk. `no-store`, `nosniff`, a sanitised inline name, and a plain sentence when the index has a photograph the folder does not |
 | `src/tms/expenses.ts` | Spending that is not a repair: `record_expense` / `void_expense`, numbered `EXP-YYYY-NNNN`, with the receipt number and whether the paper is held (D-93) |
 | `src/tms/commands.ts` | `executeCommand()`: the single router for every write (`AnyCommand`) |
 | `src/tms/crypto.ts` | PBKDF2-SHA256 password hashing via Web Crypto |
