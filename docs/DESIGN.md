@@ -280,16 +280,20 @@ describe the interface as built, not as proposed.
 The interface is being rebuilt on a standard stack rather than a bespoke stylesheet:
 
 - **Components** are shadcn/ui (new-york), vendored under `src/components/ui/` — the same files the
-  registry ships, with `cn` re-pointed at `@/lib/utils`. Buttons, cards, badges, inputs, tables,
-  dialogs, sheets, dropdowns, selects, tabs, tooltips, command and skeletons all come from there.
+  registry ships, with `cn` re-pointed at `@/lib/utils`. Nine of them are in the product: badge, button,
+  card, dialog, input, label, separator, sheet and table. Ten others were vendored and never imported;
+  Phase 77 deleted them rather than carry untested code (D-127), and any screen that needs one can take
+  it from the registry again.
 - **Colour** exists only in `src/app/globals.css`, as Tailwind v4 tokens: a dark neutral palette and one
   accent (amber `#FF8A00`). No component names a colour; it asks for `bg-card`, `text-dim` or
   `border-divider` and the token decides. There is no `tailwind.config` in this build.
 - **Icons** are Lucide (`lucide-react`), the icon set shadcn/ui pairs with.
 - **Type** is Inter (variable), bundled for offline use, with JetBrains Mono for references, times and
   captions.
-- **Tables** are TanStack Table where a list needs sorting, and Recharts is installed for the charts
-  that follow; neither is a second design language.
+- **Tables** are TanStack Table where a list needs sorting. There is no chart library in the build:
+  the two figures that needed a graphic are drawn as SVG by hand (`RingGauge`, the sparkline inside
+  `StatCard`), because a chart package that draws two shapes is a dependency nobody needs. Recharts
+  was installed and unused; it was removed with ten unused components in Phase 77 (D-127).
 
 **Converted so far:** the token layer, `src/ui/primitives.tsx` (so every screen that uses the shared
 Button/Field/Card/Band/TableCard/DataTable/Panel/Notice/Badge/Stat draws the new system at once), the

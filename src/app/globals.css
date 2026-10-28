@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Where classes may be found. Tailwind's automatic detection walks the whole project, and the
+   documentation quotes class names in prose (D-125 lists the old `stone` utilities it replaced),
+   so the build was generating utilities — and one dark text colour — from sentences in `docs/`.
+   Prose is not a source of classes; `src/` is. */
+@source not "../../docs";
+@source not "../../README.md";
+@source not "../../audit";
+
 /* TEMPORARY — the screens written before the design-system migration read these classes.
    Every converted screen removes its rules from this file; it is deleted when the last one is
    gone. Nothing new may be added to it. */

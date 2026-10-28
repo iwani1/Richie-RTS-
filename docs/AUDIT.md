@@ -31,8 +31,8 @@ a provider that is not installed — email, SMS, GPS or a card gateway.
 | Secrets in the repository | **Pass** | only `.env.example` is tracked; no key, token or password |
 | Injection and XSS | **Pass** | no `dangerouslySetInnerHTML`, no `eval`, no dynamic code, no `any` |
 | Database integrity | **Pass** | 19 triggers, 1 exclusion constraint, 22 migrations applied |
-| Dependencies | **Pass with drift** | `npm audit` 0 vulnerabilities; one version drift and two majors deferred (P3) |
-| Dead code | **Finding** | 10 unused components, 2 unused packages (P2-2) |
+| Dependencies | **Pass** | `npm audit` 0 vulnerabilities; the one version drift was closed in Phase 77; two majors deferred (P3-2) |
+| Dead code | **Fixed** | 10 unused components and 2 unused packages removed in Phase 77; the build had also been reading class names out of prose (P2-2) |
 | Documentation accuracy | **Finding, fixed** | feature counts were wrong by 6 rows (P2-1) |
 | Accessibility | **Pass** | icon buttons labelled, images described, tables and radios given names |
 | Design tokens and contrast | **Pass** | 234 colour rules in the legacy sheet re-checked; lowest 4.90:1, none below 4.5 |
@@ -69,7 +69,7 @@ in 5 files. A re-read of the table now gives 39 / 26 / 0 / 13 and the arithmetic
 **Guarded against.** The rule is now written down as D-126: **the table is the register; prose is
 derived from it and never maintained beside it.**
 
-### P2-2 - Ten components and two packages that nothing in the product uses (decision for the owner)
+### P2-2 - Ten components and two packages that nothing in the product uses (removed in Phase 77)
 
 Ten shadcn components sit under `src/components/ui/` with **no importer anywhere**: `alert`,
 `avatar`, `command`, `dropdown-menu`, `popover`, `select`, `skeleton`, `tabs`, `textarea`, `tooltip`.
@@ -86,9 +86,15 @@ bundle), and the next screen that needs a select or a tooltip can take one off t
 every unused file is code that no test covers and no type-check exercises through use, and `recharts`
 is a dependency in the lockfile that a security advisory would one day make someone patch for nothing.
 
-**Status: left in place, awaiting the owner's word.** The options are (a) delete the ten components and
-`recharts` and `cmdk` now, (b) keep them and delete `recharts` and `cmdk` only, or (c) keep everything
-until the screens' structural rebuild decides which ones it wants.
+**Status: removed.** The owner answered "do it" on 28 October 2026 and Phase 77 took the first
+option: the ten components, `recharts` and `cmdk` are gone, `radix-ui` and the nine components in use
+(`badge`, `button`, `card`, `dialog`, `input`, `label`, `separator`, `sheet`, `table`) remain. Removing
+them exposed a second fault worth recording under this heading: **Tailwind had been reading class names
+out of the documentation.** Its automatic source detection walks the whole project, and `DECISIONS.md`
+quotes the old `stone` utilities in prose, so the build emitted a `.text-stone-500\/600` utility — a
+dark text colour at 4.1:1 on the dark card, waiting for somebody to type the class. `globals.css` now
+names its sources (`@source not` for `docs/`, `README.md` and `audit/`), and the compiled stylesheet
+contains no literal text colour at all.
 
 ### P2-3 - The working screens are the thinnest-tested part of the product
 
@@ -109,14 +115,15 @@ directly — but it is where a regression would most likely slip through, and wh
 rebuild will take the most risk. **Next action:** as each screen is rebuilt on `components/tms`, write
 its screen test against the new structure rather than porting the old one.
 
-### P3-1 - Two Tailwind pieces are on different releases
+### P3-1 - Two Tailwind pieces were on different releases (closed in Phase 77)
 
 `package.json` pins the engine exactly — `"tailwindcss": "4.1.17"` — but takes the PostCSS plugin on a
 caret range, `"@tailwindcss/postcss": "^4.1.17"`, and 4.3.3 already satisfies that range. The lockfile
 currently holds 4.1.17 for both, so today they agree; the next `npm install` that refreshes the
 lockfile may not. The compiler and its plugin are meant to move together, and a silent split in this
-pair is a classic source of "the class works in dev and not in the build". **Fix:** bump
-both to the same release in one commit and re-run the build and the CSS scan (Section 5).
+pair is a classic source of "the class works in dev and not in the build". **Fixed in Phase 77:** both are now pinned to the same exact release, `4.3.3`, and the build, the
+suite and the stylesheet scan were re-run against it. Pinning both exactly (rather than one exact and
+one caret) is what stops the pair drifting again.
 
 ### P3-2 - Big majors are available and deliberately not taken
 
@@ -230,8 +237,8 @@ That is the standard this audit is holding the rest of the register to.
 
 | # | Action | Owner | Size |
 | --- | --- | --- | --- |
-| 1 | Decide P2-2: delete, partly delete, or keep the unused components and `recharts` / `cmdk` | owner | a word |
-| 2 | Bump `tailwindcss` and `@tailwindcss/postcss` to one release, re-run build and CSS scan | build | small |
+| 1 | ~~Decide P2-2: delete, partly delete, or keep the unused components and `recharts` / `cmdk`~~ — done in Phase 77 | owner | done |
+| 2 | ~~Bump `tailwindcss` and `@tailwindcss/postcss` to one release, re-run build and CSS scan~~ — done in Phase 77 | build | done |
 | 3 | Rebuild the 27 screens on `components/tms`, screen by screen, testing each against the new structure | build | the large remaining piece |
 | 4 | Once a screen is rebuilt, delete its rules from `legacy.css`; the file should reach zero | build | follows 3 |
 | 5 | Re-run this audit at each phase boundary rather than once a year | build | 20 minutes |
@@ -263,3 +270,20 @@ The register count is checked mechanically, not by eye:
 ```bash
 grep -c '^| [A-Z]\+-[0-9]\+ |' docs/PROGRESS.md     # rows in the table
 ```
+
+---
+
+## 6. Follow-up: what changed after the audit (Phase 77)
+
+The owner answered the audit's first two actions with "do it" on 28 October 2026. Phase 77 carried them
+out and the measurements above were re-taken on the new tree:
+
+| Change | Evidence |
+| --- | --- |
+| Ten unused components deleted, two packages removed (`recharts`, `cmdk`), lockfile re-resolved | `radix-ui` and the nine components in use remain; `npm install` removed 37 packages and still reports **0 vulnerabilities** |
+| Tailwind pinned exactly on both sides (`4.3.3`) | build succeeds; the compiled stylesheet keeps every token, utility and keyframe (`rounded-card`, `tms-mono`, `fade-up`, `--ease-spring`, `bg-sidebar` all present) |
+| Class detection limited to `src/` | the stray `.text-stone-500\/600` utility is gone; **no literal text colour and no light background** remains in the compiled CSS |
+| Gates re-run | `tsc` clean, `eslint` clean, **1,340 tests passed** (28 skipped — unchanged, because nothing under test was deleted), `next build` 62 s, coverage 89.24 % lines / 76.79 % branches |
+
+The one thing this follow-up did **not** change is the shape of the product: no screen gained or lost a
+feature, and the 27 screens still read `legacy.css` until each is rebuilt.

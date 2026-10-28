@@ -3174,3 +3174,37 @@ section of `docs/STATUS.md`, the database-suite line in `docs/SETUP_AND_DEPLOYME
 decision. No product code changed in the audit: the tree at `5aed55e` passed every gate, and the audit's
 own contribution is a corrected record. Counts: register 78 (39 Met / 26 Partial / 0 not built / 13
 Deferred); suite 1,340 tests; database suite 28 tests in 5 files.
+
+## D-127 - The shelf holds only what a screen imports, and prose is not a source of classes
+
+**The problem.** The audit of 28 October 2026 found ten components in `src/components/ui` that no file
+imports (`alert`, `avatar`, `command`, `dropdown-menu`, `popover`, `select`, `skeleton`, `tabs`,
+`textarea`, `tooltip`), a `recharts` dependency imported nowhere, and a `cmdk` dependency reachable only
+through `command.tsx` — which was itself one of the unused ten. It also found that `globals.css` pinned
+`tailwindcss` exactly while taking `@tailwindcss/postcss` on a caret range, so the compiler and its
+plugin could drift a minor version apart on a future install.
+
+**Decision 1: delete, do not shelve.** A component that no screen imports is code no test covers and no
+type-check exercises through use; it is the part of the tree that rots quietly. These are shadcn
+components — the source lives in this repository and can be re-added from the registry in a minute when
+a screen actually needs one — so keeping them "for later" buys nothing and costs a maintenance surface.
+Ten files went, `recharts` and `cmdk` went with them, and the nine components in use (`badge`, `button`,
+`card`, `dialog`, `input`, `label`, `separator`, `sheet`, `table`) stayed.
+
+**Decision 2: paired build tools are pinned to the same exact version.** `tailwindcss` and
+`@tailwindcss/postcss` are both `4.3.3`, exact. A caret on one side of a pair that must agree is how a
+project ends up compiling with one minor and post-processing with another.
+
+**Decision 3: only `src/` may declare a class.** Tailwind's automatic detection walks the project, and
+`docs/DECISIONS.md` quotes old utilities in prose — D-125 lists the `stone` classes it replaced. The
+build was therefore emitting a `.text-stone-500\/600` utility from a sentence: a dark text colour, at
+4.1:1 on the dark card, one keystroke away from appearing on a screen. `globals.css` now says where
+classes may be found (`@source not` for `docs/`, `README.md` and `audit/`), and the compiled stylesheet
+contains no literal text colour at all — every colour comes through a token.
+
+**Consequence.** `src/components/ui/*` (ten deleted), `package.json` and `package-lock.json`
+(`recharts`, `cmdk` removed; Tailwind pinned), `src/app/globals.css` (source declarations),
+`docs/DESIGN.md` (no chart library), `docs/AUDIT.md` (P2-2 and P3-1 marked closed, with the prose-source
+fault added to P2-2). Gates after: `tsc` clean, `eslint` clean, 1,340 tests passed (28 skipped — the
+count is unchanged because nothing under test was deleted), build 62 s, coverage 89.24 / 76.79, and the
+compiled CSS scanned clean. **No screen, table or form changed.**

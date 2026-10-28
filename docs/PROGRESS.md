@@ -1870,3 +1870,13 @@ passed, 5 skipped), `build` succeeds. No schema change, no migration.
 | Database-suite count in the setup guide | Fixed | "14 tests, 4 files" became 28 tests in 5 files. |
 | Dead weight | Reported, not removed | Ten `components/ui` files have no importer; `recharts` and `cmdk` are unused (`tw-animate-css` is used by `globals.css` and was wrongly suspected). Left in place for the owner to decide — see `docs/AUDIT.md` P2-2. |
 | Gates at the audit | Pass | `tsc` clean, `eslint .` clean, 1,340 tests passed (28 skipped), `next build` 42 s, `npm audit` 0 vulnerabilities, database suite 28/28 against PostgreSQL 18.4. |
+
+## Phase 77 - The audit's two actions, carried out (D-127)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Ten unused components removed | Done (verified) | `alert`, `avatar`, `command`, `dropdown-menu`, `popover`, `select`, `skeleton`, `tabs`, `textarea`, `tooltip`. The nine in use stay: badge, button, card, dialog, input, label, separator, sheet, table |
+| Two unused packages removed | Done (verified) | `recharts` (imported nowhere) and `cmdk` (reachable only through the deleted `command.tsx`); `npm install` shed 37 packages, `npm audit` still 0 |
+| Tailwind pinned on both sides | Done (verified) | `tailwindcss` and `@tailwindcss/postcss` both exact at 4.3.3; build and stylesheet scan re-run |
+| Class detection limited to the product source | Done (verified) | Tailwind had been reading class names out of `docs/DECISIONS.md` and emitting a dark `.text-stone-500\/600`; `@source not` now excludes `docs/`, `README.md` and `audit/`. The compiled CSS contains no literal text colour and no light background |
+| Gates | Pass | `tsc` clean, `eslint` clean, **1,340 tests passed, 28 skipped** (unchanged: nothing under test was deleted), build 62 s, coverage 89.24 lines / 76.79 branches |
