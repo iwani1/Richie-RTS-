@@ -116,8 +116,11 @@ async function confirmedRental(adminId: string, start: string, end: string): Pro
     TODAY,
   );
   const id = created.rentals[created.rentals.length - 1].id;
-  await step("quote_rental", { id, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } } as never, adminId, TODAY);
-  await step("confirm_rental", { id, input: { amount: "600", method: "Cash", reference: "DEP-1" } } as never, adminId, TODAY);
+  const quoted = await step("quote_rental", { id, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } } as never, adminId, TODAY);
+  // The deposit is the company's percentage of the quotation's own total (RNT-04, D-121), so it is
+  // read back rather than assumed: a registered company adds tax, and the share follows the total.
+  const deposit = String(quoted.rentals.find((rental) => rental.id === id)?.quote?.depositRequired ?? 0);
+  await step("confirm_rental", { id, input: { amount: deposit, method: "Cash", reference: "DEP-1" } } as never, adminId, TODAY);
   return id;
 }
 

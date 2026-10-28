@@ -96,8 +96,11 @@ async function confirmedRental(adminId: string, name: string): Promise<{ id: str
     adminId,
   );
   const rental = created.rentals[created.rentals.length - 1];
-  await step("quote_rental", { id: rental.id, input: { lines: [{ description: "Two days", quantity: "2", unitAmount: "1500" }] } }, adminId);
-  await step("confirm_rental", { id: rental.id, input: { amount: "600", method: "Cash", reference: `DEP-${name.replace(/\s/g, "-")}` } }, adminId);
+  const quoted = await step("quote_rental", { id: rental.id, input: { lines: [{ description: "Two days", quantity: "2", unitAmount: "1500" }] } }, adminId);
+  // Read the deposit back rather than assuming it: it is the company's percentage of the quotation's
+  // total, so a registered company's tax moves it (RNT-04, D-121).
+  const deposit = String(quoted.rentals.find((candidate) => candidate.id === rental.id)?.quote?.depositRequired ?? 0);
+  await step("confirm_rental", { id: rental.id, input: { amount: deposit, method: "Cash", reference: `DEP-${name.replace(/\s/g, "-")}` } }, adminId);
   return { id: rental.id };
 }
 
