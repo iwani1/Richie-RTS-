@@ -12,6 +12,19 @@ import { RingGauge } from "@/components/tms/RingGauge";
 import { FleetMap } from "@/components/tms/FleetMap";
 import { DataTable, TableFoot, type TmsColumn } from "@/components/tms/DataTable";
 import { DensityToggle } from "./density";
+import {
+  Sheet,
+  SheetFoot,
+  SheetHeader,
+  SheetMeta,
+  SheetMetaItem,
+  SheetRow,
+  SheetTable,
+  SheetTd,
+  SheetTh,
+  SheetTotals,
+  SheetWords,
+} from "./Sheet";
 import { ActivityFeed } from "@/components/tms/ActivityFeed";
 import { ActivityKindBadge, StatusBadge, TripStatusBadge, type BadgeTone } from "@/components/tms/StatusBadge";
 import { LiveDot } from "@/components/tms/LiveDot";
@@ -311,6 +324,65 @@ export function DesignGallery() {
             />
           </Panel>
         </div>
+      </Section>
+
+      <Section
+        title="Paper"
+        note="The sheet the invoice, the statement and the management report share. White in a dark product, because paper is."
+      >
+        <Sheet label="Sample invoice">
+          <SheetHeader
+            docType="Invoice"
+            reference="INV-2026-0142"
+            state="Issued"
+            companyName="Richie Transport Services"
+          />
+          <SheetMeta>
+            <SheetMetaItem label="Billed to" value="Volta Star Logistics" detail="Tema Harbour, Gate 3" />
+            <SheetMetaItem label="Issued" value="12 Oct 2026" />
+            <SheetMetaItem label="Payment due" value="26 Oct 2026" />
+            <SheetMetaItem label="Hire" value="RR-0004" />
+          </SheetMeta>
+          <SheetTable
+            label="Sample line items"
+            head={
+              <>
+                <SheetTh>Description</SheetTh>
+                <SheetTh num>Qty</SheetTh>
+                <SheetTh num>Unit price</SheetTh>
+                <SheetTh num>Amount</SheetTh>
+              </>
+            }
+          >
+            <tr>
+              <SheetTd>Staff shuttle, Accra to Tema</SheetTd>
+              <SheetTd num>2</SheetTd>
+              <SheetTd num>GHS 900.00</SheetTd>
+              <SheetTd num>GHS 1,800.00</SheetTd>
+            </tr>
+            <tr>
+              <SheetTd>Waiting time, 3 hours</SheetTd>
+              <SheetTd num>3</SheetTd>
+              <SheetTd num>GHS 120.00</SheetTd>
+              <SheetTd num>GHS 360.00</SheetTd>
+            </tr>
+          </SheetTable>
+          <SheetTotals>
+            <SheetRow label="Subtotal" value="GHS 2,160.00" />
+            <SheetRow label="VAT at 15%" value="GHS 324.00" />
+            <SheetRow label="Total" value="GHS 2,484.00" emphasis="total" />
+            <SheetRow label="Received" value="GHS 1,000.00" />
+            <SheetRow label="Amount due" value="GHS 1,484.00" emphasis="due" />
+          </SheetTotals>
+          <SheetWords>
+            Please pay GHS 1,484.00 by 26 Oct 2026. Every figure here is produced by the same helper the screen and
+            the reports use, so the paper cannot disagree with the register.
+          </SheetWords>
+          <SheetFoot reference="INV-2026-0142" printed="Printed 28 Oct 2026" />
+        </Sheet>
+        <p className="mt-3 text-[11.5px] text-dim">
+          Sample document, shown for the design review. It is not a record and nothing here is owed.
+        </p>
       </Section>
 
       <Section title="States" note="Shared empty and failed blocks, for cards that are not tables.">
