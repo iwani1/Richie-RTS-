@@ -525,6 +525,11 @@ Verified by running:
 - `npm run build` and `npm start`, with `/api/health` reporting the database and every migration.
 - Sign-in, a write, the audit entry it produces, and the redaction of every `passwordHash`.
 - Migration from an empty database, in order, twice.
+- The path in §2–§7 exactly as written, on a fresh clone and an empty database (28 Oct 2026): `npm ci`
+  (393 packages, no peer conflicts), a two-line `.env`, `npm run db:migrate` (22 migrations),
+  `/api/health` reporting `PostgreSQL 18.4 … migrations applied: 22`, `/api/session` answering
+  `setupRequired: true`, the first-run administrator created through `/api/setup`, and the session then
+  reporting that user. `/`, `/dashboard` and `/design` all served 200 throughout.
 
 Not verified here: installation on a specific operating system, a container runtime, a reverse proxy
 with TLS, and a second application instance. The commands above are the ones used; the platform
