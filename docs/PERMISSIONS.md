@@ -89,7 +89,9 @@ Rental separation of duties: operations runs the request/dispatch/completion ste
 price** (`rentals:approve`, RNT-04, D-121) is held by the three office roles, because the check is
 that somebody other than the author looked at the figure: it is refused inside the service when the
 actor is the person who wrote the quotation, whatever their role. A client contact never holds it —
-who signs off inside the office is not the customer's business. Administrators can do everything.
+who signs off inside the office is not the customer's business. **The same permission signs off an extra
+charge added when a hire comes back** (RNT-07, D-123), with the same four-eyes refusal against the person
+who added the charge. Administrators can do everything.
 
 **The vehicle's photograph (FLT-01, D-108).** No new permission: filing, replacing and removing a
 photograph are `vehicles:update`, and opening one is `vehicles:read` — so a driver, a client contact and

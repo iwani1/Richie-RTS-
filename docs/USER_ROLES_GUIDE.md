@@ -37,6 +37,11 @@ is no other company in the database.
   finance or an administrator), or by the customer itself in the portal on its own request. It records
   what was agreed and through which channel; it takes no money and confirms nothing. Agreeing to a
   price and paying the deposit are separate acts, and the second one still belongs to finance.
+- **A charge added when a hire comes back** — fuel, damage, waiting — is written down when the hire is
+  completed, with the reason the customer was given, and that reason is printed on their invoice. Above
+  the figure the company sets it needs a second name from somebody other than the person who added it,
+  and until then the bill cannot be issued. The charge itself is still recorded: refusing to write down
+  that a vehicle came back damaged because the money is unfinished would be losing a fact.
 - **Moving a request along** is one button that names the next stage: take it on, start the review,
   ready to be priced. A request may be priced at any of those stages, so the steps are there for the
   ones that need looking at, not as paperwork. Once a price exists the request cannot be edited; if the
@@ -69,7 +74,8 @@ entry — records are archived by status, never removed.
 1. Open the application. While no account exists it asks for the first administrator: give the owner's name, email and a password of at least the configured minimum.
 2. **Settings** — set the company name, currency, vehicle categories, payment methods, deposit
    percentage, quotation validity in hours, the terms printed on every quotation, the figure above which
-   a quotation needs a second signature, and the on-time threshold. Everything left blank stays blank, and the
+   a quotation needs a second signature, the figure above which a charge added when a hire comes back
+   needs one, and the on-time threshold. Everything left blank stays blank, and the
    feature that needs it stays blocked.
 3. **Users** — add the operations and finance accounts, then the drivers and client contacts.
 4. **Fleet** — add vehicles and drivers (or import them from CSV in **Vehicles → Import**).
@@ -89,8 +95,9 @@ drivers; create and manage passengers; report incidents, advance them, record co
 orders, advance them, record costs; record compliance documents; draft a client's agreement, approve
 it, suspend it or end it with a reason; read the audit log.
 
-**Also signs off prices:** above the figure the company sets, a quotation of somebody else's needs a
-second name before the customer can be answered or the deposit taken. You can give it — the total, the
+**Also signs off prices and charges:** above the figure the company sets, a quotation of somebody
+else's needs a second name before the customer can be answered or the deposit taken, and a charge added
+when a hire comes back needs one before the invoice can be issued. You can give it — the total, the
 discount and its reason, and the tax are on the card before the button — but never on a quotation you
 wrote yourself, and the record keeps who signed and when.
 

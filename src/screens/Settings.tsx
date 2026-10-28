@@ -299,6 +299,26 @@ export function SettingsPage() {
               invalid={!!errors["rental.quotationApprovalAbove"]}
             />
           </Field>
+          <Field
+            label="Second signature on extra charges above"
+            hint={
+              draft.currencyCode
+                ? `In ${draft.currencyCode}. A charge added when a hire comes back (fuel, damage, waiting) at or above this figure needs approving by somebody other than the person who added it, before it can be billed. Blank means no approval is required for charges.`
+                : "A charge added when a hire comes back at or above this figure needs approving by somebody other than the person who added it, before it can be billed. Blank means no approval is required for charges."
+            }
+            error={errors["rental.extraChargeApprovalAbove"]}
+          >
+            <TextInput
+              type="number"
+              min={0}
+              step="0.01"
+              value={draft.rental.extraChargeApprovalAbove ?? ""}
+              onChange={(e) => update({ rental: { ...draft.rental, extraChargeApprovalAbove: e.target.value === "" ? null : Number(e.target.value) } })}
+              disabled={!editable}
+              placeholder="No approval required"
+              invalid={!!errors["rental.extraChargeApprovalAbove"]}
+            />
+          </Field>
           <Field label="Quotation validity (hours)" hint="How long a price holds, counted from the minute the quotation is issued. 168 is one week." error={errors["rental.quotationValidityHours"]}>
             <TextInput type="number" min={24} max={8760} step={1} value={draft.rental.quotationValidityHours ?? ""} onChange={(e) => update({ rental: { ...draft.rental, quotationValidityHours: e.target.value === "" ? null : Number(e.target.value) } })} disabled={!editable} placeholder="Not set" invalid={!!errors["rental.quotationValidityHours"]} />
           </Field>

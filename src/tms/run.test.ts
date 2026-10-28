@@ -149,6 +149,8 @@ describe("what the hire cost and what is still owed (RNT-07)", () => {
     assignedVehicleId: "v1",
     assignedDriverId: null,
     deposit: null,
+    // Nothing charged beyond the price on these fixtures (D-123).
+    extraCharges: [],
     finalInvoice: null,
     resolutionReason: null,
     createdAt: NOW,

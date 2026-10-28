@@ -5,6 +5,7 @@ import { rentalQuotingReady, type AssignmentInput, type CompleteRentalInput, typ
 import { balanceLine, damageLine, distanceLine, rentalBalance, runLine, toLocalInput } from "../tms/run";
 import { acceptanceLine, acceptanceStateOf, canAcceptQuotation } from "../tms/acceptance";
 import { approvalLine, approvalProblem, approvalRequiredAt, approvalIsCurrent, quotationHeading, quotationIsNumbered, validityLine } from "../tms/quotations";
+import { chargeAmount, chargeApprovalLine, chargeApprovalProblem, chargeIsApproved, chargeNeedsApproval, unapprovedCharges } from "../tms/extraCharges";
 import { MAX_STOPS, planLine, SOURCE_LABELS, sourceLabel, stopsLine, tripContactLine } from "../tms/request";
 import { awaitingPrice, canEditRequest, isActiveRental, nextTriageStep, TRIAGE_ACTIONS } from "../tms/rentalWorkflow";
 import { readinessReport } from "../tms/maintenance";
@@ -208,6 +209,9 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
   // not need a second component for a single field.
   const [acceptNote, setAcceptNote] = useState("");
   const [approveNote, setApproveNote] = useState("");
+  // D-123: which charge is being signed off, and the note left beside the signature.
+  const [approvingCharge, setApprovingCharge] = useState<string | null>(null);
+  const [chargeNote, setChargeNote] = useState("");
 
   const categoryName = db.settings.vehicleCategories.find((c) => c.id === rental.vehicleCategoryId)?.name ?? "Unknown";
   const vehicle = db.vehicles.find((v) => v.id === rental.assignedVehicleId);
@@ -491,6 +495,45 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
             {rental.deposit && <p className="mt-1 text-right text-xs text-stone-500">Deposit received: {money(rental.deposit.amount, rental.finalInvoice.currencyCode)} · Balance: {money(rental.finalInvoice.total - rental.deposit.amount, rental.finalInvoice.currencyCode)}</p>}
           </Card>
         )}
+
+        {/* D-123: what was charged beyond the price that was agreed, why, who added it, and whether
+            anybody else has signed it off. The charges are part of the hire; the bill waits. */}
+        {rental.extraCharges.length > 0 && (
+          <Card title="Charges added after the quotation" className="lg:col-span-2">
+            <ul className="space-y-2">
+              {rental.extraCharges.map((charge) => {
+                const currency = rental.finalInvoice?.currencyCode ?? db.settings.currencyCode;
+                const threshold = db.settings.rental.extraChargeApprovalAbove;
+                const problem = chargeApprovalProblem(charge, rental.extraCharges.indexOf(charge), actor?.id ?? null, actor?.fullName ?? "");
+                const billed = db.invoices.find((invoice) => invoice.rentalId === rental.id && invoice.status !== "void");
+                const canApprove = allowed("rentals:approve") && !chargeIsApproved(charge) && chargeNeedsApproval(chargeAmount(charge), threshold) && problem === null && !billed;
+                return (
+                  <li key={charge.id} className="rounded-sm bg-stone-50 px-3 py-2">
+                    <div className="flex justify-between gap-2 text-sm">
+                      <span className="font-medium text-stone-900">{charge.description}</span>
+                      <span className="rts-mono">{money(chargeAmount(charge), currency)}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-stone-700">Reason given: {charge.reason}</p>
+                    <p className="mt-0.5 text-[10px] text-stone-500">Added by {charge.addedByName} · {formatDateTime(charge.addedAt)}</p>
+                    {chargeApprovalLine(charge, threshold, currency ?? "") && (
+                      <p className={`mt-1 text-xs ${chargeIsApproved(charge) ? "text-stone-700" : "text-amber-800"}`}>{chargeApprovalLine(charge, threshold, currency ?? "")}</p>
+                    )}
+                    {canApprove && (
+                      <div className="mt-1 flex justify-end">
+                        <Button onClick={() => { setChargeNote(""); setApprovingCharge(charge.id); }}>Approve this charge</Button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            {unapprovedCharges(rental, db.settings.rental.extraChargeApprovalAbove).length > 0 && (
+              <Notice tone="warning" className="mt-3">
+                The invoice for this hire cannot be issued while a charge above the company&apos;s figure is waiting for a second signature.
+              </Notice>
+            )}
+          </Card>
+        )}
       </div>
 
       {panel === "edit" && <RequestForm title={`Edit ${rental.reference}`} initial={toRequestInput(rental)} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "update_rental", id: rental.id, input }))} />}
@@ -547,6 +590,41 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
           </div>
         </Panel>
       )}
+      {approvingCharge && (() => {
+        const charge = rental.extraCharges.find((candidate) => candidate.id === approvingCharge);
+        if (!charge) return null;
+        const currency = rental.finalInvoice?.currencyCode ?? db.settings.currencyCode;
+        return (
+          <Panel
+            title={`Approve the charge for ${charge.description}`}
+            description="A second signature on money added after the price was agreed. It is recorded with your name and the figure you approved, and it does not change the charge."
+            onClose={() => setApprovingCharge(null)}
+          >
+            <div className="space-y-4">
+              <dl className="grid grid-cols-[120px_1fr] gap-y-2 text-sm">
+                <dt className="text-stone-500">Amount</dt>
+                <dd className="font-semibold text-stone-900">{money(chargeAmount(charge), currency)}</dd>
+                <dt className="text-stone-500">Reason given</dt>
+                <dd className="text-stone-800">{charge.reason}</dd>
+                <dt className="text-stone-500">Added by</dt>
+                <dd className="text-stone-800">{charge.addedByName}</dd>
+              </dl>
+              <Field label="Note (optional)" hint="Why it was approved, if there is anything worth saying at the time.">
+                <TextArea value={chargeNote} onChange={(event) => setChargeNote(event.target.value)} rows={3} />
+              </Field>
+              <div className="flex justify-end gap-2">
+                <Button onClick={() => setApprovingCharge(null)}>Cancel</Button>
+                <Button
+                  variant="primary"
+                  onClick={() => void run(dispatch({ type: "approve_extra_charge", id: rental.id, chargeId: charge.id, note: chargeNote }))}
+                >
+                  Approve the charge
+                </Button>
+              </div>
+            </div>
+          </Panel>
+        );
+      })()}
       {panel === "confirm" && <ConfirmForm reference={rental.reference} depositRequired={rental.quote?.depositRequired ?? 0} currency={rental.quote?.currencyCode ?? null} methods={db.settings.rental.paymentMethods} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "confirm_rental", id: rental.id, input }))} />}
       {panel === "assign" && <AssignForm rental={rental} needsDriver={needsDriver} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "assign_rental", id: rental.id, input }))} />}
       {(panel === "decline" || panel === "cancel") && <ReasonForm title={panel === "decline" ? `Decline ${rental.reference}` : `Cancel ${rental.reference}`} onClose={() => setPanel(null)} onSubmit={(reason) => run(dispatch(panel === "decline" ? { type: "decline_rental", id: rental.id, reason } : { type: "cancel_rental", id: rental.id, reason }))} />}
@@ -704,9 +782,17 @@ function CompleteForm({
     damageNotes: rental.run?.damageNotes ?? "",
     feedback: rental.run?.feedback ?? "",
   });
+  // Charges added after the price was agreed (D-123). One blank row is enough to start; it is ignored
+  // if nobody fills it in, so an office that added nothing does not have to delete it.
+  const [charges, setCharges] = useState<{ description: string; quantity: string; unitAmount: string; reason: string }[]>([
+    { description: "", quantity: "1", unitAmount: "", reason: "" },
+  ]);
   const [errors, setErrors] = useState<Errors>({});
   const set = (field: keyof typeof run) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setRun({ ...run, [field]: event.target.value });
+  const setCharge = (index: number, field: keyof (typeof charges)[number]) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setCharges(charges.map((row, i) => (i === index ? { ...row, [field]: event.target.value } : row)));
+  const chargeTotal = linesTotalFromText(charges.map((row) => ({ quantity: row.quantity === "" ? "1" : row.quantity, unitAmount: row.unitAmount })));
 
   return (
     <Panel
@@ -717,11 +803,48 @@ function CompleteForm({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          setErrors((await onSubmit({ lines, ...run })) ?? {});
+          setErrors((await onSubmit({ lines, extraCharges: charges, ...run })) ?? {});
         }}
         className="space-y-4"
       >
         <LineItemsEditor lines={lines} setLines={setLines} errors={errors} currency={currency} />
+        <div className="border-t border-stone-200 pt-3">
+          <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Charges added after the quotation</h3>
+          <p className="mb-2 text-xs text-stone-600">
+            Fuel, damage, waiting, a stop nobody priced: anything the customer was not quoted for. Each charge is recorded with the reason they were given, and one at or above the company&apos;s figure needs a second signature before it can be billed.
+          </p>
+          <div className="space-y-2">
+            {charges.map((row, index) => (
+              <div key={index} className="rounded-sm bg-stone-50 p-2">
+                <div className="grid gap-2 sm:grid-cols-[1fr_70px_110px]">
+                  <Field label={`Charge ${index + 1}`} error={errors[`extraCharges.${index}.description`]}>
+                    <TextInput value={row.description} onChange={setCharge(index, "description")} invalid={!!errors[`extraCharges.${index}.description`]} placeholder="e.g. Damaged seat cover" />
+                  </Field>
+                  <Field label="Qty" error={errors[`extraCharges.${index}.quantity`]}>
+                    <TextInput type="number" min={0} step="0.001" value={row.quantity} onChange={setCharge(index, "quantity")} invalid={!!errors[`extraCharges.${index}.quantity`]} />
+                  </Field>
+                  <Field label="Amount each" error={errors[`extraCharges.${index}.unitAmount`]}>
+                    <TextInput type="number" min={0} step="0.01" value={row.unitAmount} onChange={setCharge(index, "unitAmount")} invalid={!!errors[`extraCharges.${index}.unitAmount`]} placeholder="0.00" />
+                  </Field>
+                </div>
+                <div className="mt-2">
+                  <Field label="Reason the customer was given" error={errors[`extraCharges.${index}.reason`]} hint="Printed on their invoice, so write it for them.">
+                    <TextInput value={row.reason} onChange={setCharge(index, "reason")} invalid={!!errors[`extraCharges.${index}.reason`]} placeholder="e.g. Seat cover torn on return" />
+                  </Field>
+                </div>
+                {charges.length > 1 && (
+                  <div className="mt-1 flex justify-end">
+                    <Button variant="ghost" onClick={() => setCharges(charges.filter((_, i) => i !== index))}>Remove charge {index + 1}</Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center justify-between">
+            <Button onClick={() => setCharges([...charges, { description: "", quantity: "1", unitAmount: "", reason: "" }])}>Add another charge</Button>
+            {chargeTotal > 0 && <p className="text-xs text-stone-700">Charges total {money(chargeTotal, currency)}</p>}
+          </div>
+        </div>
         <div className="border-t border-stone-200 pt-3">
           <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500">The journey</h3>
           <div className="grid gap-3 sm:grid-cols-2">

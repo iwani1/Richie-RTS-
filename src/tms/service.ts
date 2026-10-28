@@ -9,11 +9,20 @@ import { overdueServiceFor } from "./maintenance";
 import { can, type Permission } from "./permissions";
 import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
-import { MAX_AMOUNT, formatAmount, isPercentWithTwoDecimals, linesTotal, parseAmount, parseQuantity, toMinor } from "./money";
+import { MAX_AMOUNT, formatAmount, fromMinor, isPercentWithTwoDecimals, linesTotal, parseAmount, parseQuantity, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { readVehicleDetail } from "./vehicles";
 import { buildAcceptance, canAcceptQuotation } from "./acceptance";
 import { approvalIsCurrent, approvalProblem, approvalRequiredAt, QUOTATION_TERMS_LIMIT, quotationIsLive, readQuoteFigures, validityEndsAt, validityProblem } from "./quotations";
+import {
+  chargeAmount,
+  chargeApproval,
+  chargeApprovalProblem,
+  chargeLines,
+  chargeNeedsApproval,
+  readExtraCharges,
+  type ChargeInput,
+} from "./extraCharges";
 import { readRun, runLine } from "./run";
 import { ACTIVE_RENTAL_STATUSES, canEditRequest, canMoveRental, nextTriageStep, TRIAGE_STATUSES } from "./rentalWorkflow";
 
@@ -38,6 +47,7 @@ import {
   type Database,
   type Driver,
   type DriverStatus,
+  type ExtraCharge,
   type FinalInvoice,
   type Quote,
   type QuoteLine,
@@ -227,6 +237,8 @@ export type Command =
   | { type: "requote_rental"; id: string; input: QuoteInput }
   | { type: "accept_quotation"; id: string; note: string }
   | { type: "approve_quotation"; id: string; note: string }
+  /** The second signature on one charge added at completion (RNT-07, D-123). */
+  | { type: "approve_extra_charge"; id: string; chargeId: string; note: string }
   | { type: "confirm_rental"; id: string; input: DepositInput }
   | { type: "assign_rental"; id: string; input: AssignmentInput }
   | { type: "start_rental"; id: string; odometerKm?: string }
@@ -629,6 +641,9 @@ export function validateSettings(db: Database, input: Settings) {
     // RNT-04 (D-121): the figure at or above which a quotation needs a second signature. Null is a
     // real answer — nobody has asked for one — and the screens say so rather than implying cover.
     quotationApprovalAbove: rentalIn.quotationApprovalAbove ?? null,
+    // RNT-07 (D-123): the figure at or above which an extra charge added at completion needs a second
+    // signature. Null is a real answer here too — the company has not asked for one on charges.
+    extraChargeApprovalAbove: rentalIn.extraChargeApprovalAbove ?? null,
   };
   if (rental.pricingBasis !== null && !PRICING_BASES.includes(rental.pricingBasis)) errors["rental.pricingBasis"] = "Invalid pricing basis.";
   // A percentage is computed in integer basis points (money.ts), so it may not carry more precision
@@ -652,6 +667,14 @@ export function validateSettings(db: Database, input: Settings) {
       Math.abs(rental.quotationApprovalAbove * 100 - Math.round(rental.quotationApprovalAbove * 100)) > 1e-9)
   )
     errors["rental.quotationApprovalAbove"] = "Enter an amount of 0 or more, with at most two decimal places, or leave it blank.";
+  if (
+    rental.extraChargeApprovalAbove !== null &&
+    (!Number.isFinite(rental.extraChargeApprovalAbove) ||
+      rental.extraChargeApprovalAbove < 0 ||
+      rental.extraChargeApprovalAbove > MAX_AMOUNT ||
+      Math.abs(rental.extraChargeApprovalAbove * 100 - Math.round(rental.extraChargeApprovalAbove * 100)) > 1e-9)
+  )
+    errors["rental.extraChargeApprovalAbove"] = "Enter an amount of 0 or more, with at most two decimal places, or leave it blank.";
   const seenMethod = new Set<string>();
   for (const m of rental.paymentMethods) {
     if (seenMethod.has(norm(m))) errors["rental.paymentMethods"] = "Duplicate payment method.";
@@ -971,6 +994,11 @@ export function validateQuoteLines(input: QuoteInput) {
  * invented one is worse than none.
  */
 export interface CompleteRentalInput extends QuoteInput {
+  /**
+   * Charges added after the quotation was agreed — fuel, damage, waiting (RNT-07, D-123). Each carries
+   * a reason, because the customer reads it, and each may need a second signature before it is billed.
+   */
+  extraCharges?: ChargeInput[];
   departedAt?: string;
   returnedAt?: string;
   odometerStartKm?: string;
@@ -1041,6 +1069,19 @@ function buildQuote(
     driverIncluded: db.settings.rental.driversAlwaysIncluded ?? rental.driverRequired,
   };
   return { ok: true, quote, counters: allocated ? allocated.counters : db.referenceCounters };
+}
+
+/**
+ * What the audit trail says about the charges added at completion (D-123): each one, in the customer's
+ * reading, and a plain statement when one of them is waiting for a signature — never the claim that the
+ * money was checked when it was not.
+ */
+function extraChargeNote(charges: ExtraCharge[], currency: string, threshold: number | null): string {
+  if (charges.length === 0) return "";
+  const parts = charges.map((charge) => `${charge.description} ${currency} ${formatAmount(chargeAmount(charge))} (${charge.reason})`);
+  const waiting = charges.filter((charge) => chargeNeedsApproval(chargeAmount(charge), threshold)).length;
+  const tail = waiting === 0 ? "" : ` ${waiting === 1 ? "One charge needs" : `${waiting} charges need`} a second signature before the bill can be issued.`;
+  return ` Extra charges: ${parts.join("; ")}.${tail}`;
 }
 
 /** The working behind a quotation's total, in the words the audit trail keeps (D-121). */
@@ -1370,6 +1411,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         acceptance: null,
         // Nothing has happened on the road yet, and nothing is assumed about when it will (D-118).
         run: null,
+        // Nothing has been charged beyond the price yet (D-123).
+        extraCharges: [],
         assignedVehicleId: null,
         assignedDriverId: null,
         deposit: null,
@@ -1409,6 +1452,8 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         acceptance: null,
         // Nothing has happened on the road yet, and nothing is assumed about when it will (D-118).
         run: null,
+        // Nothing has been charged beyond the price yet (D-123).
+        extraCharges: [],
         assignedVehicleId: null,
         assignedDriverId: null,
         deposit: null,
@@ -1617,6 +1662,38 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       return { ok: true, db: next, message: `Quotation ${quote.number} approved.` };
     }
 
+    case "approve_extra_charge": {
+      // RNT-07 (D-123): the same four eyes as a quotation, applied to money added after the price was
+      // settled. The charge already exists on a completed hire, so there is no expiry and no draft to
+      // wait for; what matters is that it is not signed by its author, and that it is signed once.
+      const denied = authorise(actor, "rentals:approve");
+      if (denied) return denied;
+      if (!actor) return fail("Sign in is required.");
+      const existing = db.rentals.find((rental) => rental.id === command.id);
+      if (!existing) return fail("Rental not found.");
+      if (existing.extraCharges.length === 0) return fail("There are no extra charges on this hire to approve.");
+      const index = existing.extraCharges.findIndex((charge) => charge.id === command.chargeId);
+      if (index === -1) return fail("That charge is not on this hire.");
+      const charge = existing.extraCharges[index];
+      const currency = existing.finalInvoice?.currencyCode ?? db.settings.currencyCode ?? "";
+      // Nothing to sign once it has been billed: the invoice is immutable, so an approval now would
+      // change nothing on the document the customer is holding.
+      const billed = db.invoices.find((invoice) => invoice.rentalId === existing.id && invoice.status !== "void");
+      if (billed) return fail(`This charge has already been billed on ${billed.reference}, which cannot be changed. Credit the invoice instead.`);
+      const problem = chargeApprovalProblem(charge, index, actor.id, actor.fullName);
+      if (problem) return fail(problem);
+      const approval = chargeApproval(charge, { id: actor.id, fullName: actor.fullName }, command.note, now);
+      const charges = existing.extraCharges.map((candidate) => (candidate.id === charge.id ? { ...candidate, approval } : candidate));
+      const updated: Rental = { ...existing, extraCharges: charges, updatedAt: now };
+      const next = audit({ ...db, rentals: db.rentals.map((rental) => (rental.id === updated.id ? updated : rental)) }, actor, {
+        action: "rentals:approve-charge",
+        entity: "rental",
+        entityId: updated.id,
+        summary: `${updated.reference} extra charge approved by ${actor.fullName}: ${charge.description} ${currency} ${formatAmount(chargeAmount(charge))}.${approval.note ? ` "${approval.note}"` : ""}`,
+      }, now);
+      return { ok: true, db: next, message: `Charge approved: ${charge.description}.` };
+    }
+
     case "confirm_rental": {
       const denied = authorise(actor, "rentals:confirm");
       if (denied) return denied;
@@ -1821,10 +1898,17 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (!canMoveRental(existing.status, "completed")) return fail(`A rental cannot be completed from status "${RENTAL_STATUS_LABELS[existing.status]}".`);
       const { errors, lines, subtotal } = validateQuoteLines(command.input);
       if (Object.keys(errors).length) return fail("Please correct the final invoice line items.", errors);
+      // Anything charged beyond the price that was agreed (D-123): read exactly as typed, each with the
+      // reason the customer will read, and recorded with who added it. They join the final invoice's
+      // lines, so the hire's own total says what was supplied — but the bill waits for the signatures.
+      const readCharges = readExtraCharges(command.input.extraCharges, { id: actor!.id, fullName: actor!.fullName }, now, makeId);
+      if (Object.keys(readCharges.errors).length) return fail("Please correct the extra charges.", readCharges.errors);
+      const extraCharges = readCharges.charges;
+      const chargeTotal = linesTotal(chargeLines(extraCharges).map((line) => ({ quantity: line.quantity, unitAmount: line.unitAmount })));
       const finalInvoice: FinalInvoice = {
         currencyCode: existing.quote?.currencyCode ?? db.settings.currencyCode ?? "",
-        lines,
-        total: subtotal,
+        lines: [...lines, ...chargeLines(extraCharges).map((line) => ({ id: line.id, description: line.description, quantity: line.quantity, unitAmount: line.unitAmount }))],
+        total: fromMinor(toMinor(subtotal) + toMinor(chargeTotal)),
         issuedAt: now,
         issuedBy: actor!.fullName,
       };
@@ -1857,12 +1941,12 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
           createdBy: actor!.fullName,
         },
       ];
-      const updated: Rental = { ...existing, status: "completed", finalInvoice, run, updatedAt: now };
+      const updated: Rental = { ...existing, status: "completed", finalInvoice, extraCharges, run, updatedAt: now };
       const next = audit({ ...db, odometerReadings: readings, rentals: db.rentals.map((r) => (r.id === updated.id ? updated : r)) }, actor, {
         action: "rentals:complete",
         entity: "rental",
         entityId: updated.id,
-        summary: `${updated.reference} completed; final invoice ${finalInvoice.currencyCode} ${finalInvoice.total.toFixed(2)}.${runLine(run)}${run && run.distanceKm !== null ? ` ${run.distanceKm.toLocaleString("en-GB")} km.` : ""}${run && run.damageNotes ? ` Damage reported: ${run.damageNotes}` : ""}`,
+        summary: `${updated.reference} completed; final invoice ${finalInvoice.currencyCode} ${finalInvoice.total.toFixed(2)}.${runLine(run)}${run && run.distanceKm !== null ? ` ${run.distanceKm.toLocaleString("en-GB")} km.` : ""}${run && run.damageNotes ? ` Damage reported: ${run.damageNotes}` : ""}${extraChargeNote(extraCharges, finalInvoice.currencyCode, db.settings.rental.extraChargeApprovalAbove)}`,
       }, now);
       return { ok: true, db: next, message: `${updated.reference} completed.${run && run.distanceKm !== null ? ` ${run.distanceKm.toLocaleString("en-GB")} km recorded.` : ""}` };
     }

@@ -101,6 +101,8 @@ const unbilled: Rental = {
   assignedVehicleId: null,
   assignedDriverId: null,
   deposit: null,
+  // Nothing charged beyond the price on these fixtures (D-123).
+  extraCharges: [],
   finalInvoice: { currencyCode: "GHS", lines: [], total: 1800, issuedAt: `${daysAgo(2)}T17:00:00.000Z`, issuedBy: "Ops" },
   resolutionReason: null,
   createdAt: at,

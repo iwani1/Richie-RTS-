@@ -238,7 +238,7 @@ function rentalReady(): { db: Database; admin: Actor; ops: Actor; finance: Actor
   const catId = db.settings.vehicleCategories[0].id;
   const r = execute(db, admin, {
     type: "update_settings",
-    input: { ...db.settings, currencyCode: "GHS", rental: { quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 25, quotationValidityHours: 168, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer", "Mobile money"], requotePolicy: null, quotationApprovalAbove: null } },
+    input: { ...db.settings, currencyCode: "GHS", rental: { quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 25, quotationValidityHours: 168, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer", "Mobile money"], requotePolicy: null, quotationApprovalAbove: null, extraChargeApprovalAbove: null } },
   }, NOW);
   if (!r.ok) throw new Error(r.message);
   db = r.db;
@@ -975,7 +975,7 @@ describe("a customer accepting a quotation (RNT-05, D-116)", () => {
 
   it("leaves an older backup with no acceptance, rather than inventing one", () => {
     // Schema 31 is readable: a record written before acceptance existed loads with none.
-    expect(SCHEMA_VERSION).toBe(36);
+    expect(SCHEMA_VERSION).toBe(37);
   });
 });
 
@@ -1086,7 +1086,7 @@ describe("what actually happened on a hire (RNT-07, D-118)", () => {
     const w = rentalReady();
     const admin: Actor = w.admin;
     let db = w.db;
-    const created = execute(db, admin, requestInput(w.catId, "2026-03-01", "2026-03-03", true), NOW);
+    const created = execute(db, admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
     if (!created.ok) throw new Error(created.message);
     db = created.db;
     const id = db.rentals[0].id;
@@ -1611,5 +1611,192 @@ describe("a quotation carries its figures and its signature (RNT-04, D-121)", ()
     const noQuote = execute(draft.db, w.finance, { type: "approve_quotation", id: draft.db.rentals[1].id, note: "" }, NOW);
     expect(noQuote.ok).toBe(false);
     if (!noQuote.ok) expect(noQuote.message).toBe("There is no quotation on this rental to approve.");
+  });
+});
+
+describe("charges added after the price was agreed (RNT-07, D-123)", () => {
+  /** A hire on the road, with the company's figure for a second signature set to GHS 500. */
+  function onTheRoad(threshold: number | null = 500) {
+    const w = rentalReady();
+    const admin: Actor = w.admin;
+    let db = w.db;
+    const configured = execute(db, admin, {
+      type: "update_settings",
+      input: { ...db.settings, currencyCode: "GHS", rental: { ...db.settings.rental, extraChargeApprovalAbove: threshold } },
+    }, NOW);
+    if (!configured.ok) throw new Error(configured.message);
+    db = configured.db;
+    const created = execute(db, admin, requestInput(w.catId, "2026-03-01", "2026-03-03", true), NOW);
+    if (!created.ok) throw new Error(created.message);
+    db = created.db;
+    const id = db.rentals[0].id;
+    const quoted = execute(db, w.finance, { type: "quote_rental", id, input: { lines: [{ description: "Three days hire", quantity: "3", unitAmount: "1000" }] } }, NOW);
+    if (!quoted.ok) throw new Error(quoted.message);
+    const confirmed = execute(quoted.db, w.finance, { type: "confirm_rental", id, input: { amount: "750", method: "Bank transfer", reference: "TX1" } }, NOW);
+    if (!confirmed.ok) throw new Error(confirmed.message);
+    const vehicle = addVehicle(confirmed.db, admin, w.catId, "GT 888-26");
+    const driver = execute(vehicle.db, admin, { type: "create_driver", input: { fullName: "Kojo Mensah", phone: "024", licenceNumber: "DL-77", licenceExpiry: "2030-01-01", status: "active" } }, NOW);
+    if (!driver.ok) throw new Error(driver.message);
+    const assigned = execute(driver.db, admin, { type: "assign_rental", id, input: { vehicleId: vehicle.id, driverId: driver.db.drivers[0].id } }, NOW);
+    if (!assigned.ok) throw new Error(assigned.message);
+    const started = execute(assigned.db, admin, { type: "start_rental", id, odometerKm: "51000" }, "2026-03-01T07:00:00.000Z");
+    if (!started.ok) throw new Error(started.message);
+    // The company bills on terms and is not VAT registered, so an invoice can be issued afterwards.
+    const billable = execute(started.db, admin, {
+      type: "update_settings",
+      input: { ...started.db.settings, taxPosition: "not_registered", invoiceDueDays: 14 },
+    }, NOW);
+    if (!billable.ok) throw new Error(billable.message);
+    return { ...w, db: billable.db, id };
+  }
+
+  const finalLines = { lines: [{ description: "Three days hire", quantity: "3", unitAmount: "1000" }] };
+  const complete = (w: ReturnType<typeof onTheRoad>, extraCharges: { description: string; quantity: string; unitAmount: string; reason: string }[]) =>
+    execute(w.db, w.admin, { type: "complete_rental", id: w.id, input: { ...finalLines, returnedAt: "2026-03-03T18:00:00.000Z", extraCharges } }, "2026-03-03T18:00:00.000Z");
+
+  it("records the charge, its reason and who added it, and puts it on the final invoice", () => {
+    const w = onTheRoad();
+    const done = complete(w, [{ description: "Fuel", quantity: "1", unitAmount: "400", reason: "Tank refilled before return" }]);
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    const rental = done.db.rentals[0];
+    expect(rental.extraCharges).toHaveLength(1);
+    expect(rental.extraCharges[0]).toMatchObject({ description: "Fuel", quantity: 1, unitAmount: 400, reason: "Tank refilled before return", addedByName: "Admin One", approval: null });
+    // The customer's invoice carries the charge with the reason, and the hire's total includes it.
+    expect(rental.finalInvoice?.lines.map((line) => line.description)).toEqual(["Three days hire", "Fuel (Tank refilled before return)"]);
+    expect(rental.finalInvoice?.total).toBe(3400);
+    expect(done.db.audit[0].summary).toContain("Extra charges: Fuel GHS 400.00 (Tank refilled before return).");
+  });
+
+  it("refuses a charge with no reason, and leaves the hire on the road", () => {
+    const w = onTheRoad();
+    const refused = complete(w, [{ description: "Waiting", quantity: "1", unitAmount: "80", reason: "" }]);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.message).toBe("Please correct the extra charges.");
+      expect(refused.errors["extraCharges.0.reason"]).toBe("Give a reason for the charge: the customer will read it.");
+    }
+    expect(w.db.rentals[0].status).toBe("dispatched");
+  });
+
+  it("will not bill a charge above the company's figure until somebody else signs it", () => {
+    const w = onTheRoad(500);
+    const done = complete(w, [{ description: "Damaged seat cover", quantity: "1", unitAmount: "900", reason: "Seat cover torn on return" }]);
+    if (!done.ok) throw new Error(done.message);
+    const blocked = executeCommand(done.db, w.finance, { type: "issue_rental_invoice", input: { rentalId: w.id, issuedOn: "2026-03-04", discountAmount: "", discountReason: "", notes: "" } }, "2026-03-04T08:00:00.000Z");
+    expect(blocked.ok).toBe(false);
+    if (!blocked.ok) expect(blocked.errors.rentalId).toContain("needs a second signature");
+    expect(blocked.ok === false && blocked.errors.rentalId).toContain("Somebody other than the person who added it");
+
+    // The person who added it cannot sign it off.
+    const own = execute(done.db, w.admin, { type: "approve_extra_charge", id: w.id, chargeId: done.db.rentals[0].extraCharges[0].id, note: "" }, "2026-03-04T09:00:00.000Z");
+    expect(own.ok).toBe(false);
+    if (!own.ok) expect(own.message).toContain("cannot also approve it");
+
+    // Somebody else can, and then the bill goes out.
+    const approved = execute(done.db, w.finance, { type: "approve_extra_charge", id: w.id, chargeId: done.db.rentals[0].extraCharges[0].id, note: "Photo seen" }, "2026-03-04T09:00:00.000Z");
+    expect(approved.ok).toBe(true);
+    if (!approved.ok) return;
+    expect(approved.db.rentals[0].extraCharges[0].approval).toMatchObject({ byName: "Fin", note: "Photo seen", total: 900 });
+    expect(approved.db.audit[0].summary).toBe('RR-0001 extra charge approved by Fin: Damaged seat cover GHS 900.00. "Photo seen"');
+    const issued = executeCommand(approved.db, w.finance, { type: "issue_rental_invoice", input: { rentalId: w.id, issuedOn: "2026-03-04", discountAmount: "", discountReason: "", notes: "" } }, "2026-03-04T08:00:00.000Z");
+    expect(issued.ok).toBe(true);
+    if (issued.ok) expect(issued.db.invoices[0].total).toBe(3900);
+  });
+
+  it("bills a charge below the figure without asking anybody", () => {
+    const w = onTheRoad(500);
+    const done = complete(w, [{ description: "Fuel", quantity: "1", unitAmount: "400", reason: "Tank refilled" }]);
+    if (!done.ok) throw new Error(done.message);
+    const issued = executeCommand(done.db, w.finance, { type: "issue_rental_invoice", input: { rentalId: w.id, issuedOn: "2026-03-04", discountAmount: "", discountReason: "", notes: "" } }, "2026-03-04T08:00:00.000Z");
+    expect(issued.ok).toBe(true);
+    if (issued.ok) expect(issued.db.invoices[0].total).toBe(3400);
+  });
+
+  it("asks for nothing when the company has set no figure, and says so", () => {
+    const w = onTheRoad(null);
+    const done = complete(w, [{ description: "Fuel", quantity: "1", unitAmount: "5000", reason: "Long trip" }]);
+    if (!done.ok) throw new Error(done.message);
+    const issued = executeCommand(done.db, w.finance, { type: "issue_rental_invoice", input: { rentalId: w.id, issuedOn: "2026-03-04", discountAmount: "", discountReason: "", notes: "" } }, "2026-03-04T08:00:00.000Z");
+    expect(issued.ok).toBe(true);
+  });
+
+  it("refuses to sign a charge that has already been billed, and names the invoice", () => {
+    const w = onTheRoad(100);
+    const done = complete(w, [{ description: "Fuel", quantity: "1", unitAmount: "400", reason: "Tank refilled" }]);
+    if (!done.ok) throw new Error(done.message);
+    // Below the figure? No: 400 is above 100, so it waits. Take it down to 50 to bill it.
+    const cheap = complete(w, [{ description: "Parking", quantity: "1", unitAmount: "50", reason: "Parked overnight" }]);
+    if (!cheap.ok) throw new Error(cheap.message);
+    const issued = executeCommand(cheap.db, w.finance, { type: "issue_rental_invoice", input: { rentalId: w.id, issuedOn: "2026-03-04", discountAmount: "", discountReason: "", notes: "" } }, "2026-03-04T08:00:00.000Z");
+    if (!issued.ok) throw new Error(issued.message);
+    const late = execute(issued.db, w.finance, { type: "approve_extra_charge", id: w.id, chargeId: issued.db.rentals[0].extraCharges[0].id, note: "" }, "2026-03-05T09:00:00.000Z");
+    expect(late.ok).toBe(false);
+    if (!late.ok) expect(late.message).toBe(`This charge has already been billed on ${issued.db.invoices[0].reference}, which cannot be changed. Credit the invoice instead.`);
+  });
+
+  it("has nothing to approve on a hire with no charges, and names a charge that is not there", () => {
+    const w = onTheRoad(500);
+    const done = complete(w, []);
+    if (!done.ok) throw new Error(done.message);
+    const none = execute(done.db, w.finance, { type: "approve_extra_charge", id: w.id, chargeId: "ch-nope", note: "" }, "2026-03-04T09:00:00.000Z");
+    expect(none.ok).toBe(false);
+    if (!none.ok) expect(none.message).toBe("There are no extra charges on this hire to approve.");
+
+    const withCharge = complete(onTheRoad(500), [{ description: "Fuel", quantity: "1", unitAmount: "400", reason: "Tank refilled" }]);
+    if (!withCharge.ok) throw new Error(withCharge.message);
+    const wrong = execute(withCharge.db, w.finance, { type: "approve_extra_charge", id: withCharge.db.rentals[0].id, chargeId: "ch-nope", note: "" }, "2026-03-04T09:00:00.000Z");
+    expect(wrong.ok).toBe(false);
+    if (!wrong.ok) expect(wrong.message).toBe("That charge is not on this hire.");
+  });
+
+  it("keeps an older hire with no charges working, and adds none to it", () => {
+    const w = onTheRoad();
+    const done = complete(w, []);
+    if (!done.ok) throw new Error(done.message);
+    expect(done.db.rentals[0].extraCharges).toEqual([]);
+    expect(done.db.audit[0].summary).not.toContain("Extra charges");
+  });
+});
+
+describe("a hire completed before anything was charged beyond the price (D-123)", () => {
+  it("carries no charges, and says so rather than inventing a blank one", () => {
+    const db = emptyDatabase() as unknown as Record<string, unknown>;
+    const rental = {
+      id: "r-old",
+      reference: "RR-0009",
+      clientId: null,
+      customerName: "Old Customer",
+      customerPhone: "",
+      customerEmail: "",
+      purpose: "",
+      pickupLocation: "",
+      dropoffLocation: "",
+      startDate: "2026-01-01",
+      endDate: "2026-01-02",
+      passengers: 1,
+      vehicleCategoryId: "cat-1",
+      driverRequired: false,
+      notes: "",
+      status: "completed",
+      quote: null,
+      quoteHistory: [],
+      acceptance: null,
+      run: null,
+      plan: null,
+      assignedVehicleId: null,
+      assignedDriverId: null,
+      deposit: null,
+      finalInvoice: { currencyCode: "GHS", lines: [{ id: "l1", description: "Hire", quantity: 1, unitAmount: 100 }], total: 100, issuedAt: "2026-01-02T10:00:00.000Z", issuedBy: "Ops" },
+      resolutionReason: null,
+      createdAt: "2026-01-01T08:00:00.000Z",
+      updatedAt: "2026-01-02T10:00:00.000Z",
+    };
+    const loaded = migrate({ ...db, schemaVersion: 36, rentals: [rental] });
+    expect(loaded).not.toBeNull();
+    // A hire completed before charges existed was billed for what it was billed for; no charge is
+    // invented for it, and none is signed off.
+    expect(loaded!.rentals[0].extraCharges).toEqual([]);
+    expect(loaded!.settings.rental.extraChargeApprovalAbove).toBeNull();
   });
 });

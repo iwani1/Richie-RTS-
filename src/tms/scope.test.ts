@@ -594,7 +594,7 @@ describe("write scoping in the service layer", () => {
       input: {
         ...db.settings,
         currencyCode: "GHS",
-        rental: { quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 25, quotationValidityHours: 168, driversAlwaysIncluded: null, paymentMethods: ["Cash", "Bank transfer"], requotePolicy: null, quotationApprovalAbove: null },
+        rental: { quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 25, quotationValidityHours: 168, driversAlwaysIncluded: null, paymentMethods: ["Cash", "Bank transfer"], requotePolicy: null, quotationApprovalAbove: null, extraChargeApprovalAbove: null },
       },
     }, NOW);
     if (!settings.ok) throw new Error(settings.message);

@@ -64,6 +64,8 @@ function rental(id: string, overrides: Partial<Rental>): Rental {
     assignedVehicleId: "veh-1",
     assignedDriverId: null,
     deposit: null,
+    // Nothing charged beyond the price on these fixtures (D-123).
+    extraCharges: [],
     finalInvoice: null,
     resolutionReason: null,
     createdAt: NOW,

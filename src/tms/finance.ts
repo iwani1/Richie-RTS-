@@ -12,6 +12,7 @@
 // note move, and the void path refuses once money has been recorded against it.
 
 import { creditedTotal, invoiceBalance, isLiveRefund, livePayments } from "./creditNotes";
+import { chargeAmount, unapprovedCharges } from "./extraCharges";
 import { formatAmount, fromMinor, linesTotal, parseAmount, parsePositiveAmount, percentOfMinor, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { audit, authorise, fail, isValidDate, makeId, type Actor, type CommandResult, type Errors } from "./service";
@@ -233,6 +234,18 @@ export function executeFinance(db: Database, actor: Actor | null, command: Finan
         const live = db.invoices.find((invoice) => invoice.billableEvent === billableEventFor(rental.id) && invoice.status !== "void");
         if (live) {
           errors.rentalId = `${rental.reference} is already invoiced as ${live.reference}. Void that invoice before issuing another, so the same service is never billed twice.`;
+        }
+      }
+      // RNT-07 (D-123): money added after the price was agreed does not go on a bill until somebody
+      // other than the person who added it has signed it off. The charge stays on the hire either way —
+      // what waits is the document the customer has to pay.
+      if (rental && !errors.rentalId) {
+        const waiting = unapprovedCharges(rental, db.settings.rental.extraChargeApprovalAbove);
+        if (waiting.length > 0) {
+          const first = waiting[0];
+          const more = waiting.length > 1 ? ` and ${waiting.length - 1} more` : "";
+          const currency = db.settings.currencyCode ?? rental.finalInvoice?.currencyCode ?? "";
+          errors.rentalId = `${rental.reference} has an extra charge of ${currency} ${formatAmount(chargeAmount(first))} (${first.description})${more} that needs a second signature. Somebody other than the person who added it has to approve the charge before it can be billed.`;
         }
       }
       if (Object.keys(errors).length) return fail("Please correct the invoice details.", errors);

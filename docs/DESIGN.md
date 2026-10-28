@@ -250,7 +250,7 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1281 passed, 28 skipped** across 104 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1305 passed, 28 skipped** across 105 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - The sortable header is tested at both ends: the pure ordering rules (`tableSort.test.ts`, including
   the tie that must not move and the third click that must restore) and the rendered control

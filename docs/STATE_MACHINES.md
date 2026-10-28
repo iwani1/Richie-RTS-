@@ -60,6 +60,13 @@ The triage stages are not a queue of their own: a request may be priced from any
 a small job skips the review without the review being fake. `dispatched` replaced `in_progress` in
 schema 35 (D-120).
 
+**The bill (RNT-07, D-123).** Completion records any charge added after the price was agreed, with its
+reason and its author, and adds it to the final invoice's lines. `quoted → completed` is unchanged; what
+the signature gates is `issue_rental_invoice` on a completed hire — while a charge at or above
+`settings.rental.extraChargeApprovalAbove` has no approval from somebody other than its author, the
+invoice is refused by name. The approval is refused once the invoice exists, because an invoice never
+changes after it is issued.
+
 **The second signature (RNT-04, D-121).** `approve_quotation` is not a transition: it changes no status,
 it writes an approval onto the quotation — who, when, which total, and an optional note. It is required
 only when the quotation's total is at or above `settings.rental.quotationApprovalAbove`, and `null` there

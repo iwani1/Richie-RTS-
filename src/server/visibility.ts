@@ -109,6 +109,7 @@ function journeySettings(settings: Database["settings"]): Database["settings"] {
       requotePolicy: null,
       quotationTerms: "",
       quotationApprovalAbove: null,
+      extraChargeApprovalAbove: null,
     },
     documentTypes: [],
     taxPosition: null,

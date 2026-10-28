@@ -102,6 +102,8 @@ const rental = (id: string, vehicleId: string, startDate: string, endDate: strin
   assignedVehicleId: vehicleId,
   assignedDriverId: null,
   deposit: null,
+  // Nothing charged beyond the price on these fixtures (D-123).
+  extraCharges: [],
   finalInvoice: null,
   resolutionReason: null,
   createdAt: at,

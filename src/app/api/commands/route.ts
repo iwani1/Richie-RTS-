@@ -53,6 +53,7 @@ const envelope = z.object({
 const PERMISSION_FOR: Record<string, Parameters<typeof can>[1]> = {
   update_settings: "settings:update",
   approve_quotation: "rentals:approve",
+  approve_extra_charge: "rentals:approve",
   issue_rental_invoice: "invoices:issue",
   void_invoice: "invoices:void",
   issue_credit_note: "credits:issue",

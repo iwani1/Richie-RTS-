@@ -257,6 +257,11 @@ export interface RentalSettings {
    * than pretending every price is checked by two people.
    */
   quotationApprovalAbove: number | null;
+  /**
+   * The figure at or above which an extra charge added at completion needs a second signature
+   * (RNT-07, D-123). Null is a real answer: the company has not asked for one on charges.
+   */
+  extraChargeApprovalAbove: number | null;
 }
 
 // Compliance document types (Q-16). Admin-defined, same pattern as VehicleCategory/Shift:
@@ -412,13 +417,45 @@ export interface QuoteLine {
  * The record answers the two questions a dispute asks: was a second person involved, and who were
  * they. It copies the total that was approved, so a later revision cannot borrow this signature.
  */
-export interface QuoteApproval {
+/**
+ * A second signature on a figure: who gave it, when, for how much, and anything they wrote beside it.
+ *
+ * One shape does three jobs — a quotation's sign-off (D-121), and an extra charge added at completion
+ * (D-123) — because the question asked of all of them is the same, and the answer must be recorded the
+ * same way: nobody signs their own figure, and the signature belongs to the amount it was given for.
+ */
+export interface Approval {
   at: string;
   byActorId: string | null;
   byName: string;
   note: string;
   /** The figure agreed, as it stood when the approval was given. */
   total: number;
+}
+
+/** A quotation's approval is an approval. Two names for one shape only where a screen reads better for it. */
+export type QuoteApproval = Approval;
+
+/**
+ * A charge added when the hire comes back — fuel, a damaged seat, a waiting hour the office agreed on
+ * the phone — and the second signature it may need (RNT-07, D-123).
+ *
+ * It carries its own reason: a customer being charged for something nobody explained is the first line
+ * of a dispute. The charge is copied onto the final invoice as a line when the hire is completed, and
+ * the signature is checked before that invoice can be issued.
+ */
+export interface ExtraCharge {
+  id: string;
+  description: string;
+  quantity: number;
+  unitAmount: number;
+  /** Why the customer is being charged this. Required, and kept in the office's words. */
+  reason: string;
+  addedById: string | null;
+  addedByName: string;
+  addedAt: string;
+  /** Null while nobody has signed it off. */
+  approval: Approval | null;
 }
 
 export interface Quote {
@@ -595,6 +632,8 @@ export interface Rental {
   assignedDriverId: string | null;
   deposit: DepositPayment | null;
   finalInvoice: FinalInvoice | null;
+  /** Charges added at completion, with their reasons and signatures (D-123). Empty for most hires. */
+  extraCharges: ExtraCharge[];
   resolutionReason: string | null; // decline / cancel reason
   createdAt: string;
   updatedAt: string;
@@ -1451,7 +1490,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 36;
+export const SCHEMA_VERSION = 37;
 
 /**
  * Every schema version this build can still read.
@@ -1461,7 +1500,7 @@ export const SCHEMA_VERSION = 36;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1493,7 +1532,7 @@ export interface Database {
 }
 
 export function emptyRentalSettings(): RentalSettings {
-  return { pricingBasis: null, depositPercent: null, quotationValidityHours: null, driversAlwaysIncluded: null, paymentMethods: [], requotePolicy: null, quotationTerms: "", quotationApprovalAbove: null };
+  return { pricingBasis: null, depositPercent: null, quotationValidityHours: null, driversAlwaysIncluded: null, paymentMethods: [], requotePolicy: null, quotationTerms: "", quotationApprovalAbove: null, extraChargeApprovalAbove: null };
 }
 
 export function emptyDatabase(): Database {
@@ -1727,6 +1766,11 @@ export function migrate(value: unknown): Database | null {
             rental.acceptance && typeof rental.acceptance.at === "string" && typeof rental.acceptance.quotedAt === "string"
               ? rental.acceptance
               : null,
+          // Charges added at completion arrived in schema 37. A hire completed before that was billed
+          // for whatever it was billed for, and nothing here invents a charge nobody added (D-123).
+          extraCharges: Array.isArray(rental.extraCharges)
+            ? rental.extraCharges.filter((charge) => typeof charge?.description === "string")
+            : [],
         }))
       : [],
     routes: Array.isArray(v.routes)

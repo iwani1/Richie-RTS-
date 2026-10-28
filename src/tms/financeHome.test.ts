@@ -122,6 +122,8 @@ const rental = (overrides: Partial<Rental> = {}): Rental => ({
   assignedVehicleId: null,
   assignedDriverId: null,
   deposit: null,
+  // Nothing charged beyond the price on these fixtures (D-123).
+  extraCharges: [],
   finalInvoice: { currencyCode: "GHS", lines: [], total: 1800, issuedAt: "2026-06-04T17:00:00.000Z", issuedBy: "Ops" },
   resolutionReason: null,
   createdAt: at,

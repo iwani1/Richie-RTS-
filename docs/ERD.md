@@ -456,6 +456,41 @@ Unique `(rental_id, revision_number)` and unique `reference`; quote and line sna
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous
 snapshot, so the current quote count equals history length + 1.
 
+**A charge added after the price was agreed (RNT-07, D-123).** `rental.extraCharges[]` is its own
+collection rather than anonymous invoice lines, because the screen has to say what was added after the
+event, by whom, why, and whether anybody else signed it:
+
+```mermaid
+erDiagram
+  RENTAL ||--o{ RENTAL_EXTRA_CHARGE : bills
+  RENTAL_EXTRA_CHARGE ||--o| CHARGE_APPROVAL : signed_off
+  RENTAL_EXTRA_CHARGE {
+    uuid id PK
+    uuid rental_id FK
+    text description
+    numeric quantity
+    numeric unit_amount
+    text reason
+    uuid added_by FK
+    text added_by_name
+    timestamptz added_at
+  }
+  CHARGE_APPROVAL {
+    uuid id PK
+    uuid extra_charge_id FK
+    uuid approved_by FK
+    text approved_by_name
+    timestamptz approved_at
+    numeric total_approved
+    text note
+  }
+```
+
+`reason` is printed on the customer's invoice line, so it is not an internal note. As with a quotation,
+`total_approved` is the point of `CHARGE_APPROVAL`: an approval whose amount no longer matches the charge
+was given to something else and does not count. The charge is copied into the final invoice's lines when
+the hire is completed; the approval gates `issue_rental_invoice`, not the completion.
+
 **The journey a request asked for (RNT-01, D-119).** `rental.plan` is the pair to `rental.run`: the two
 clock times, the stops in the order the vehicle calls, luggage, special needs, the contact for the day
 and the channel the request arrived through. Relationally it belongs on the rental as a one-to-one

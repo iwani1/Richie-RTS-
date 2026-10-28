@@ -71,6 +71,8 @@ const rental = (overrides: Partial<Rental> = {}): Rental => ({
   assignedVehicleId: null,
   assignedDriverId: null,
   deposit: null,
+  // Nothing charged beyond the price on these fixtures (D-123).
+  extraCharges: [],
   finalInvoice: null,
   resolutionReason: null,
   createdAt: AT,

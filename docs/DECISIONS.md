@@ -2986,3 +2986,49 @@ activity widgets, gradient charts, hover motion, and importing the library itsel
 things the owner ruled out (motion, gradients, 3D) dressed as a component registry. **Not built:**
 sorting inside a printed sheet, since a print is a document in its own order; and a saved view, which
 would need somewhere to keep it per user.
+
+## D-123 - A charge added after the price was agreed needs a reason, and above a figure a second name (RNT-07)
+
+**The problem.** The quotation is agreed before the vehicle leaves; the extras are decided after it
+comes back. Fuel, a torn seat cover, an hour of waiting somebody agreed on the phone — the office types
+them into the completion screen, they join the final invoice, and nobody else ever looks at them. That
+is the one place in the money trail where the person who benefits from a figure is also the person who
+writes it: everything before it — the price, the discount, the deposit — has a document behind it, and
+everything after it is checked by whoever raises the invoice. Q-12 had been open on exactly this point.
+
+**Decision 1: a charge is a record, not a line item.** Each charge now carries a description, a
+quantity, an amount, **the reason the customer was given**, who added it and when. The reason is
+required, and it is printed on the invoice line, because a customer charged for something nobody
+explained is the first line of a dispute. The charges are kept on the hire as their own collection
+rather than as anonymous invoice lines, so the screen can say what was added after the event and the
+audit trail can name each one.
+
+**Decision 2: the charge is on the hire; the bill is what waits.** Completion records the charge and
+adds it to the final invoice's lines, so the hire's own total says what was supplied. What the signature
+gates is `issue_rental_invoice`, not completion: refusing to record that the vehicle came back with a
+broken seat would be refusing to record a fact because the money around it is unfinished.
+
+**Decision 3: above a figure the company sets, somebody else signs it.** `extraChargeApprovalAbove` in
+settings, and `null` means the company has not asked for a signature on charges — which the screens say
+in those words rather than implying the money was checked. The rule is the same four eyes as a quotation
+(D-121): the person who added the charge is never the person who approves it, an approval is given once,
+and it belongs to the amount it was given for, so a charge edited afterwards is not the charge that was
+signed. One new command, `approve_extra_charge`, under the existing `rentals:approve` permission.
+
+**Decision 4: an approval after the bill is refused, not ignored.** Once the invoice exists the charge
+is on a document the customer holds, and an approval recorded afterwards would change nothing while
+looking like it had. The refusal names the invoice and points at the credit note, which is the only
+honest way to take money off a bill that has gone out (D-86).
+
+**Decision 5: schema 37, and older hires carry no charges.** Everything new lives on the rental record.
+A hire completed before this phase gained nothing: it was billed for what it was billed for, and a blank
+charge invented to fill the shape would be a fact nobody stated.
+
+**Consequence.** `src/tms/types.ts` (`Approval`, with `QuoteApproval` as its alias, `ExtraCharge`,
+`Rental.extraCharges`, `RentalSettings.extraChargeApprovalAbove`, schema **37**), `src/tms/extraCharges.ts`
+(the reading, the arithmetic, the four-eyes rule and the sentences), `src/tms/service.ts`
+(`complete_rental` taking charges, `approve_extra_charge`), `src/tms/finance.ts` (the bill waits while a
+charge is unsigned), the completion screen's charge rows, the hire's charge card with its approval line,
+the settings field, and 23 new tests — the suite moves from 1,281 to 1,305. **Not built:** no waiting or
+overtime *rate* is priced (still FIN-01) — a waiting charge is a figure somebody types, now with a reason
+and a signature; and nothing tells the customer about the charge, because there is no mail or SMS channel.

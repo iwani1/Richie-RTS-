@@ -145,6 +145,8 @@ const quotedRental = (clientId: string): Rental => ({
   assignedVehicleId: null,
   assignedDriverId: null,
   deposit: null,
+  // Nothing charged beyond the price on these fixtures (D-123).
+  extraCharges: [],
   finalInvoice: null,
   resolutionReason: null,
   createdAt: NOW,

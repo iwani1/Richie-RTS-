@@ -371,6 +371,6 @@ describe("a quotation written before the figures existed (schema 36)", () => {
     expect(stored.taxLines).toEqual([]);
     expect(stored.quotedById).toBe("");
     expect(stored.approval).toBeNull();
-    expect(SCHEMA_VERSION).toBe(36);
+    expect(SCHEMA_VERSION).toBe(37);
   });
 });

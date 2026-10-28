@@ -126,7 +126,8 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     await waitFor(() => expect(screen.getByText(/Less discount: Repeat customer/i)).toBeTruthy());
     expect(screen.getByText(/Deposit \(25%\)/i)).toBeTruthy();
     // No threshold is set, and the screen says so rather than implying a second signature exists.
-    expect(screen.getByText(/No approval is required: the company has not set a figure that needs one/i)).toBeTruthy();
+    // Nobody has asked for a signature on the charge, and the screen says exactly that.
+    expect(screen.getAllByText(/No approval is required: the company has not set a figure that needs one/i).length).toBeGreaterThanOrEqual(1);
 
     // Confirm with deposit.
     fireEvent.click(screen.getByRole("button", { name: /Record deposit & confirm/i }));
@@ -148,6 +149,11 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     fireEvent.change(within(dialog).getByLabelText(/Odometer at departure/i), { target: { value: "48000" } });
     fireEvent.change(within(dialog).getByLabelText(/Odometer at return/i), { target: { value: "48180" } });
     fireEvent.change(within(dialog).getByLabelText(/Damage or anything wrong/i), { target: { value: "Rear tyre worn." } });
+    // A charge added after the quotation went out (RNT-07, D-123): what it was, and the reason the
+    // customer will read on their invoice.
+    fireEvent.change(within(dialog).getByLabelText(/^Charge 1$/i), { target: { value: "Damaged seat cover" } });
+    fireEvent.change(within(dialog).getByLabelText(/Amount each/i), { target: { value: "250" } });
+    fireEvent.change(within(dialog).getByLabelText(/Reason the customer was given/i), { target: { value: "Seat cover torn on return" } });
     fireEvent.click(within(dialog).getByRole("button", { name: /Complete rental/i }));
     await screen.findByText(/completed\./i);
     expect(screen.getByText(/Final invoice/i)).toBeTruthy();
@@ -157,5 +163,9 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     expect(screen.getByText(/Rear tyre worn\./)).toBeTruthy();
     // And the money: no invoice has been raised yet, which is not the same as nothing owed.
     expect(screen.getByText(/No invoice has been raised for this hire yet/i)).toBeTruthy();
+    // The charge is on the record with its reason, and the screen says nobody has asked for a
+    // signature on it because the company has not set a figure.
+    expect(screen.getByText(/Reason given: Seat cover torn on return/i)).toBeTruthy();
+    expect(screen.getAllByText(/No approval is required: the company has not set a figure that needs one/i).length).toBeGreaterThanOrEqual(1);
   }, 30000);
 });

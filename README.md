@@ -115,7 +115,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Management report as an A4 document, printed or saved as a PDF by the browser | Works; the figures are the report's own, a figure it cannot state is printed as withheld, and no file is stored or emailed |
 | Notifications (SMS or email), offline driver app, GPS tracking, card/mobile-money gateway, payroll | **Not built** — see `docs/PROGRESS.md` |
 
-1281 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+1305 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.
