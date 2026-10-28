@@ -19,6 +19,9 @@ import {
   type WorkOrder,
   type WorkOrderStatus,
 } from "../tms/types";
+import { SectionPanel, SectionTabs } from "../components/tms/SectionTabs";
+import { FigureStrip } from "../components/tms/FigureStrip";
+import { Panel as SurfacePanel } from "../components/tms/Panel";
 import { useTms } from "../tms/useTms";
 import {
   Badge,
@@ -69,23 +72,23 @@ export function StaffLogisticsPage() {
         title="Staff logistics"
         description="Breakdown response, maintenance coordination and recorded costs. Vehicle status follows what an operator records here; nothing is assumed."
       />
-      <div role="tablist" aria-label="Staff logistics sections" className="rts-tabs">
-        {(["incidents", "maintenance", "costs"] as Tab[]).map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
-            className="rts-tab"
-          >
-            {id === "incidents" ? "Incidents & breakdowns" : id === "maintenance" ? "Work orders" : "Cost report"}
-          </button>
-        ))}
-      </div>
-      {tab === "incidents" && <IncidentsTab onRaiseWorkOrder={() => setTab("maintenance")} />}
-      {tab === "maintenance" && <MaintenanceTab />}
-      {tab === "costs" && <CostsTab />}
+      <SectionTabs
+        tabs={[
+          { id: "incidents", label: "Incidents & breakdowns" },
+          { id: "maintenance", label: "Work orders" },
+          { id: "costs", label: "Cost report" },
+        ]}
+        value={tab}
+        onChange={setTab}
+        ariaLabel="Staff logistics sections"
+        idPrefix="logistics"
+        className="mb-4"
+      />
+      <SectionPanel prefix="logistics" id={tab}>
+        {tab === "incidents" && <IncidentsTab onRaiseWorkOrder={() => setTab("maintenance")} />}
+        {tab === "maintenance" && <MaintenanceTab />}
+        {tab === "costs" && <CostsTab />}
+      </SectionPanel>
     </div>
   );
 }
@@ -201,7 +204,10 @@ function IncidentsTab({ onRaiseWorkOrder }: { onRaiseWorkOrder: () => void }) {
         .sort((a, b) => (a.reportedDate === b.reportedDate ? b.reference.localeCompare(a.reference) : a.reportedDate < b.reportedDate ? 1 : -1)),
     [db.incidents, statusFilter],
   );
-  const vehicleReg = (id: string | null) => db.vehicles.find((v) => v.id === id)?.registration ?? "-";
+  // Three states, three sentences: no vehicle named, the registration, or an id the register no
+  // longer holds. A dash for the last one hides a broken link.
+  const vehicleReg = (id: string | null) =>
+    id ? db.vehicles.find((v) => v.id === id)?.registration ?? "not on the register" : "none named";
 
   // The other half of the response: what is already in the workshop, and which vehicles the
   // incident register has taken off the road. Both are read from the same snapshot as the table.
@@ -210,7 +216,7 @@ function IncidentsTab({ onRaiseWorkOrder }: { onRaiseWorkOrder: () => void }) {
 
   return (
     <div>
-      <div className="rts-toolbar">
+      <div className="mb-4 flex flex-wrap items-end gap-2">
         <Select className="max-w-[210px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} aria-label="Filter by status">
           <option value="all">All statuses</option>
           {(["reported", "acknowledged", "responding", "resolved", "closed"] as IncidentStatus[]).map((s) => (
@@ -218,7 +224,7 @@ function IncidentsTab({ onRaiseWorkOrder }: { onRaiseWorkOrder: () => void }) {
           ))}
         </Select>
         {allowed("incidents:create") && <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Report incident</Button>}
-        <p className="rts-toolbar-note">
+        <p className="ml-auto text-[11px] text-muted-foreground">
           {rows.length} of {db.incidents.length} incident{db.incidents.length === 1 ? "" : "s"} shown
         </p>
       </div>
@@ -227,7 +233,7 @@ function IncidentsTab({ onRaiseWorkOrder }: { onRaiseWorkOrder: () => void }) {
         Taking a vehicle out of service here changes its status immediately, which blocks it from being assigned to trips and rentals. Record only what happened; do not infer a cause.
       </Notice>
 
-      <div className="rts-spread">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
         <div>
       <DataTable
         rows={rows}
@@ -258,51 +264,56 @@ function IncidentsTab({ onRaiseWorkOrder }: { onRaiseWorkOrder: () => void }) {
       />
         </div>
 
-        <aside aria-label="Work orders and vehicles off the road">
-          <p className="rts-kicker">Work orders</p>
-          <p className="rts-desk-figure">
-            {openOrders.length}
-            <span>still open</span>
-          </p>
-          <div className="rts-statusline" style={{ marginTop: 12 }}>
-            {(["open", "in_progress", "on_hold", "completed"] as WorkOrderStatus[]).map((status) => (
-              <span className="rts-statusline-cell" key={status}>
-                <b>{db.workOrders.filter((w) => w.status === status).length}</b>
-                <span>{WORK_ORDER_STATUS_LABELS[status]}</span>
-              </span>
-            ))}
-          </div>
+        <aside aria-label="Work orders and vehicles off the road" className="self-start">
+          <SurfacePanel
+            kicker="Work orders"
+            title={`${openOrders.length} still open`}
+            description="Raised from an incident, so the cost keeps its source."
+          >
+            <div className="space-y-3 px-4 pb-4">
+              <FigureStrip
+                figures={(["open", "in_progress", "on_hold", "completed"] as WorkOrderStatus[]).map((status) => ({
+                  label: WORK_ORDER_STATUS_LABELS[status],
+                  value: db.workOrders.filter((w) => w.status === status).length,
+                }))}
+              />
 
-          <p className="rts-desk-head">Latest raised</p>
-          {openOrders.length === 0 ? (
-            <p className="rts-band-empty">
-              No work order is open. A breakdown that needs workshop time is raised from the incident it
-              came from, so the cost keeps its source.
-            </p>
-          ) : (
-            <ul className="rts-desk-list">
-              {openOrders.slice(0, 5).map((w) => (
-                <li key={w.id}>
-                  <b>{w.reference}</b>
-                  <span>{WORK_ORDER_STATUS_LABELS[w.status]}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+              <div>
+                <h3 className="tms-mono text-muted-foreground">Latest raised</h3>
+                {openOrders.length === 0 ? (
+                  <p className="mt-2 text-[12.5px] text-muted-foreground">
+                    No work order is open. A breakdown that needs workshop time is raised from the incident it came from, so the
+                    cost keeps its source.
+                  </p>
+                ) : (
+                  <ul className="mt-2 divide-y divide-divider border-y border-divider">
+                    {openOrders.slice(0, 5).map((w) => (
+                      <li key={w.id} className="flex items-baseline justify-between gap-2 py-2">
+                        <span className="tms-num text-foreground">{w.reference}</span>
+                        <span className="text-[11.5px] text-muted-foreground">{WORK_ORDER_STATUS_LABELS[w.status]}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
-          <p className="rts-desk-head">Off the road</p>
-          {offRoad.length === 0 ? (
-            <p className="rts-band-empty">Every registered vehicle is available.</p>
-          ) : (
-            <ul className="rts-desk-list">
-              {offRoad.map((v) => (
-                <li key={v.id}>
-                  <b>{v.registration}</b>
-                  <span>{VEHICLE_STATUS_LABELS[v.status]}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+              <div>
+                <h3 className="tms-mono text-muted-foreground">Off the road</h3>
+                {offRoad.length === 0 ? (
+                  <p className="mt-2 text-[12.5px] text-muted-foreground">Every registered vehicle is available.</p>
+                ) : (
+                  <ul className="mt-2 divide-y divide-divider border-y border-divider">
+                    {offRoad.map((v) => (
+                      <li key={v.id} className="flex items-baseline justify-between gap-2 py-2">
+                        <span className="tms-num text-foreground">{v.registration}</span>
+                        <span className="text-[11.5px] text-muted-foreground">{VEHICLE_STATUS_LABELS[v.status]}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </SurfacePanel>
         </aside>
       </div>
 
@@ -578,7 +589,7 @@ function MaintenanceTab() {
         .sort((a, b) => (a.createdAt === b.createdAt ? b.reference.localeCompare(a.reference) : a.createdAt < b.createdAt ? 1 : -1)),
     [db.workOrders, statusFilter],
   );
-  const vehicleReg = (id: string) => db.vehicles.find((v) => v.id === id)?.registration ?? "-";
+  const vehicleReg = (id: string) => db.vehicles.find((v) => v.id === id)?.registration ?? "not on the register";
 
   // The incidents these orders came from, so the workshop column and the incident column answer
   // each other's question without switching tabs.
@@ -586,7 +597,7 @@ function MaintenanceTab() {
 
   return (
     <div>
-      <div className="rts-toolbar">
+      <div className="mb-4 flex flex-wrap items-end gap-2">
         <Select className="max-w-[210px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} aria-label="Filter by status">
           <option value="all">All statuses</option>
           {(["open", "in_progress", "on_hold", "completed", "closed"] as WorkOrderStatus[]).map((s) => (
@@ -594,12 +605,12 @@ function MaintenanceTab() {
           ))}
         </Select>
         {allowed("maintenance:create") && <Button variant="primary" onClick={() => setPanel({ mode: "create" })}>Raise work order</Button>}
-        <p className="rts-toolbar-note">
+        <p className="ml-auto text-[11px] text-muted-foreground">
           {rows.length} of {db.workOrders.length} work order{db.workOrders.length === 1 ? "" : "s"} shown
         </p>
       </div>
 
-      <div className="rts-spread">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
         <div>
       <DataTable
         rows={rows}
@@ -629,42 +640,44 @@ function MaintenanceTab() {
       />
         </div>
 
-        <aside aria-label="Open incidents">
-          <p className="rts-kicker">Incidents still open</p>
-          <p className="rts-desk-figure">
-            {openIncidents.length}
-            <span>awaiting resolution</span>
-          </p>
-          <div className="rts-statusline" style={{ marginTop: 12 }}>
-            {(["reported", "acknowledged", "responding"] as IncidentStatus[]).map((status) => (
-              <span className="rts-statusline-cell" key={status}>
-                <b>{db.incidents.filter((i) => i.status === status).length}</b>
-                <span>{INCIDENT_STATUS_LABELS[status]}</span>
-              </span>
-            ))}
-          </div>
+        <aside aria-label="Open incidents" className="self-start">
+          <SurfacePanel
+            kicker="Incidents still open"
+            title={`${openIncidents.length} awaiting resolution`}
+            description="Oldest first: the one that has been waiting longest is the one to ask about."
+          >
+            <div className="space-y-3 px-4 pb-4">
+              <FigureStrip
+                figures={(["reported", "acknowledged", "responding"] as IncidentStatus[]).map((status) => ({
+                  label: INCIDENT_STATUS_LABELS[status],
+                  value: db.incidents.filter((i) => i.status === status).length,
+                }))}
+              />
 
-          <p className="rts-desk-head">Oldest first</p>
-          {openIncidents.length === 0 ? (
-            <p className="rts-band-empty">No incident is waiting on a repair.</p>
-          ) : (
-            <ul className="rts-desk-list">
-              {[...openIncidents]
-                .sort((a, b) => (a.reportedDate < b.reportedDate ? -1 : 1))
-                .slice(0, 6)
-                .map((i) => (
-                  <li key={i.id}>
-                    <b>{i.reference}</b>
-                    <span>{INCIDENT_TYPE_LABELS[i.type]} · {formatDate(i.reportedDate)}</span>
-                  </li>
-                ))}
-            </ul>
-          )}
+              {openIncidents.length === 0 ? (
+                <p className="text-[12.5px] text-muted-foreground">No incident is waiting on a repair.</p>
+              ) : (
+                <ul className="divide-y divide-divider border-y border-divider">
+                  {[...openIncidents]
+                    .sort((a, b) => (a.reportedDate < b.reportedDate ? -1 : 1))
+                    .slice(0, 6)
+                    .map((i) => (
+                      <li key={i.id} className="flex items-baseline justify-between gap-2 py-2">
+                        <span className="tms-num text-foreground">{i.reference}</span>
+                        <span className="text-[11.5px] text-muted-foreground">
+                          {INCIDENT_TYPE_LABELS[i.type]} · {formatDate(i.reportedDate)}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+              )}
 
-          <p className="rts-desk-note">
-            A work order raised from an incident keeps that link: the cost is reported against the
-            incident it came from, and the vehicle stays off the road until an operator says otherwise.
-          </p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                A work order raised from an incident keeps that link: the cost is reported against the incident it came from, and
+                the vehicle stays off the road until an operator says otherwise.
+              </p>
+            </div>
+          </SurfacePanel>
         </aside>
       </div>
 
@@ -813,7 +826,7 @@ function WorkOrderDetail({ order, onClose }: { order: WorkOrder; onClose: () => 
   };
 
   return (
-    <Panel title={`${current.reference} · ${current.title}`} description={`Vehicle ${vehicle?.registration ?? "-"} · ${WORK_ORDER_STATUS_LABELS[current.status]}`} onClose={onClose}>
+    <Panel title={`${current.reference} · ${current.title}`} description={`Vehicle ${vehicle?.registration ?? "not on the register"} · ${WORK_ORDER_STATUS_LABELS[current.status]}`} onClose={onClose}>
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <Badge tone={WORK_ORDER_TONE[current.status]}>{WORK_ORDER_STATUS_LABELS[current.status]}</Badge>
@@ -964,39 +977,27 @@ function CostsTab() {
             {report.status === "ok" && <Notice tone="info" className="mb-3">{report.message}</Notice>}
             {/* A ruled total, not four cards: the number that matters is the sum, and the three
                 coverage figures belong under it as a line of evidence, not beside it as equals. */}
-            <p className="rts-report-total">
-              {report.status === "ok" ? money(report.total, report.currencyCode) : "Not computed"}
-              <span>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <p className="text-[34px] leading-none font-semibold tracking-[-0.04em] text-foreground tabular-nums">
+                {report.status === "ok" ? money(report.total, report.currencyCode) : "Not computed"}
+              </p>
+              <p className="text-[12px] text-muted-foreground">
                 total recorded · {report.lines.length} {report.lines.length === 1 ? "entry" : "entries"}
-              </span>
-            </p>
-            <div className="rts-statusline" style={{ marginTop: 18 }}>
-              <span className="rts-statusline-cell">
-                <b>{report.coverage === null ? "—" : `${Math.round(report.coverage * 100)}%`}</b>
-                <span>records with a cost</span>
-              </span>
-              <span className="rts-statusline-cell">
-                <b>{report.workOrdersWithoutCosts}</b>
-                <span>work orders with no cost</span>
-              </span>
-              <span className="rts-statusline-cell">
-                <b>{report.incidentsWithoutCosts}</b>
-                <span>incidents with no cost</span>
-              </span>
-              <span className="rts-statusline-cell">
-                <b>{report.incidentsWithCosts}</b>
-                <span>incidents with an entry</span>
-              </span>
-              <span className="rts-statusline-cell">
-                <b>{report.expenseCount}</b>
-                <span>expenses</span>
-              </span>
-              <span className="rts-statusline-cell">
-                <b>{report.expensesWithoutReceipt}</b>
-                <span>expenses with no receipt number</span>
-              </span>
+              </p>
             </div>
-            <p className="rts-footnote" style={{ marginTop: 10 }}>
+            <div className="mt-4">
+              <FigureStrip
+                figures={[
+                  { label: "Records with a cost", value: report.coverage === null ? "—" : `${Math.round(report.coverage * 100)}%` },
+                  { label: "Work orders with no cost", value: report.workOrdersWithoutCosts },
+                  { label: "Incidents with no cost", value: report.incidentsWithoutCosts },
+                  { label: "Incidents with an entry", value: report.incidentsWithCosts },
+                  { label: "Expenses", value: report.expenseCount },
+                  { label: "Expenses with no receipt number", value: report.expensesWithoutReceipt },
+                ]}
+              />
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
               {report.workOrdersCostsConfirmed} work order(s) confirmed complete, including zero.
               {report.expenseCount > 0 &&
                 ` Of ${report.expenseCount} expense(s), ${report.expensesWithReceiptHeld} carry the paper receipt; the rest are counted but weaker evidence.`}
@@ -1005,28 +1006,41 @@ function CostsTab() {
 
           <Band label="By category" note="Categories come from the list in Settings. Uncategorised entries are shown as their own line, not folded into another.">
             {report.lines.length === 0 ? (
-              <p className="rts-band-empty">Nothing recorded in this period.</p>
+              <p className="text-[12.5px] text-muted-foreground">Nothing recorded in this period.</p>
             ) : (
-              <div className="rts-report">
-                <div className="rts-report-row rts-report-row--head">
-                  <span>Category</span>
-                  <span>Entries</span>
-                  <span>Amount</span>
-                </div>
-                {[...byCategory.entries()]
-                  .sort((a, b) => b[1].amount - a[1].amount || a[0].localeCompare(b[0]))
-                  .map(([category, line]) => (
-                    <div className="rts-report-row" key={category}>
-                      <span>{category}</span>
-                      <span>{line.count}</span>
-                      <span>{money(line.amount, report.currencyCode)}</span>
-                    </div>
-                  ))}
-                <div className="rts-report-row rts-report-row--total">
-                  <span>Total recorded</span>
-                  <span>{report.lines.length}</span>
-                  <span>{money(report.total, report.currencyCode)}</span>
-                </div>
+              <div className="overflow-x-auto rounded-control border border-border">
+                <table className="w-full border-collapse text-left">
+                  <caption className="sr-only">Recorded spending by category, with the count and the amount</caption>
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40">
+                      {["Category", "Entries", "Amount"].map((heading, index) => (
+                        <th
+                          key={heading}
+                          scope="col"
+                          className={index === 2 ? "tms-mono px-3 py-2 text-right font-medium text-muted-foreground" : "tms-mono px-3 py-2 text-left font-medium text-muted-foreground"}
+                        >
+                          {heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...byCategory.entries()]
+                      .sort((a, b) => b[1].amount - a[1].amount || a[0].localeCompare(b[0]))
+                      .map(([category, line]) => (
+                        <tr key={category} className="border-b border-divider last:border-b-0 hover:bg-row-hover">
+                          <td className="px-3 py-2 text-[13px] text-foreground">{category}</td>
+                          <td className="px-3 py-2 text-[13px] text-muted-foreground tabular-nums">{line.count}</td>
+                          <td className="tms-num px-3 py-2 text-right text-foreground">{money(line.amount, report.currencyCode)}</td>
+                        </tr>
+                      ))}
+                    <tr className="border-t border-border bg-muted/30">
+                      <td className="px-3 py-2 text-[13px] font-semibold text-foreground">Total recorded</td>
+                      <td className="px-3 py-2 text-[13px] text-muted-foreground tabular-nums">{report.lines.length}</td>
+                      <td className="tms-num px-3 py-2 text-right font-semibold text-foreground">{money(report.total, report.currencyCode)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
           </Band>

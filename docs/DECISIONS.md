@@ -3580,3 +3580,58 @@ every `rts-*` class still used in `src/` still has a rule: 55 classes, none miss
 (79 blocks), `src/screens/Busing.test.tsx` (+2 tests: the run sheet is a table with three crew states,
 and the strip is a real tab list). Three screens remain on the old stylesheet: `StaffLogistics` (42),
 `PublicEnquiry` (23) and `Settings` (16).
+
+## D-136 - StaffLogistics joins the layer; the tab strip is finished, not just shared (Phase 86)
+
+`StaffLogistics` was the last screen of its size on the old stylesheet: 42 `rts-*` classes across the
+incident register, the work order list and the cost report. Reading it beside the rebuilt screens showed
+three things to fix beyond the classes.
+
+**Decision 1: a section strip must say which panel it opens, and keep the keyboard with it.** Sharing
+`SectionTabs` between four screens made the gap obvious: the strip announced tabs but the panel below it
+had no relationship to them, and pressing Home or End moved the selection while focus stayed behind on
+the previous tab, so a keyboard user was reading one panel and typing at another. `SectionTabs` now
+requires an `idPrefix`, emits stable ids from one `sectionIds` helper, gives every tab `aria-controls`,
+and moves focus with the selection on arrow keys, Home and End. `SectionPanel` is the other half:
+`role="tabpanel"`, `aria-labelledby` pointing at its tab, and one tab stop so the panel is reachable
+without a Tab through every control inside it. The panel is named by the tab and by nothing else — an
+`sr-only` copy of the tab's words inside the panel read as the same sentence twice and made
+`Reports.test.tsx` fail with "Found multiple elements with the text: Hire report".
+
+**Decision 2: every table gets a name.** The incident register, the work order list, the cost entries and
+the new "By category" table each carry a `DataTable` label or a `<caption className="sr-only">`, so a
+screen reader announces which of the three it has landed in rather than "table" four times.
+
+**Decision 3: coverage is a figure strip, not a second paragraph.** The cost report's six counts
+(records with a cost, work orders with no cost, incidents with no cost, incidents with an entry,
+expenses, expenses with no receipt number) were six lines of prose. They are now one
+`components/tms/FigureStrip` — a `dl` of label and value that formats nothing, so the screen keeps
+control of "100%" versus "0". The same strip carries the desk's four counts and the work order aside's
+three.
+
+**Decision 4: the aside is a real aside.** Both side panels were `<div>`s wearing a card class. They are
+now `<aside aria-label="...">` around the layer's `SurfacePanel`, `self-start` so a short aside does not
+stretch to the height of the register beside it. Same rule as the dispatch desk: if it is complementary
+content, the markup says so.
+
+**Decision 5: an unregistered vehicle is three sentences, never a dash.** `vehicleReg` printed `-` for a
+vehicle id the register no longer holds. It now yields `none named`, the registration, or `not on the
+register` — the same three-state wording the run sheet adopted in D-135. The work order dialog's
+description was still doing the old thing and was corrected with it.
+
+**Decision 6: the test was wrong twice, and both times about the product.** The new `StaffLogistics`
+screen test first reported no costs at all: the fixtures built incidents and work orders with
+`createdAt: at` (a time, no date part at the front), and `costReport` scopes work orders by the calendar
+day of `createdAt`, so a work order from "09:00:00.000Z" fell outside the range. The screen was right;
+the fixture was not. The second round of failures were all duplicate matches — a state that appears on
+the register row and again in the desk list, a total that appears as a headline and again as the ruled
+total of the category table — and were fixed by scoping with `within(...)` and asserting the count, not
+by loosening the matcher. One assertion was dropped rather than repaired: the old test asserted that
+`getByLabelText("From")` returns `null`, which documented a `Field` quirk instead of a behaviour.
+
+**Consequence.** `src/components/tms/SectionTabs.tsx` (+`SectionPanel`, `sectionIds`; focus follows the
+selection; two more tests), `src/components/tms/FigureStrip.tsx` (new), `src/screens/StaffLogistics.tsx`
+(no `rts-*` class left), `src/screens/{Reports,FleetReadiness,StaffBusing}.tsx` (the `idPrefix` prop),
+`src/screens/StaffLogistics.test.tsx` (new, 8 tests). `legacy.css` is unchanged at 28.2 KB because two
+screens still need it; it is deleted when they are clear.
+

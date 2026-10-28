@@ -2015,3 +2015,22 @@ opens, its planning list a panel, and its report table a `DataTable` — then `l
 report), then `PublicEnquiry` (a page outside the app frame, embedded on the company's website), then
 `Settings`; `legacy.css` and its 28 KB are deleted when the last one is clear. `src/screens` coverage
 is 81.0% of lines and needs the forms' happy paths to reach the 85% the register asks for.
+
+## Phase 86 - Incidents, work orders and the cost report join the layer (D-136)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| The strip, finished | Done (verified) | `SectionTabs` takes a required `idPrefix`, publishes `aria-controls` and stable ids from one helper, and moves focus with the selection on arrows, Home and End. `SectionPanel` is the other half: `role="tabpanel"`, `aria-labelledby` the tab, one tab stop inside it. Four screens pass the prefix |
+| Three tables, three names | Done (verified) | Incidents, work orders and cost entries carry a `DataTable` label; "By category" is a real `<table>` with an `sr-only` caption and a ruled total row |
+| The cost report reads as money, not prose | Done (verified) | A 34px ruled total with its entry count, then a six-cell `FigureStrip` for coverage, then the category table, then the entries. The RPT-03/RPT-02 notice stays: no figure is invented where Q-29 has no definition |
+| The asides are asides | Done (verified) | `<aside aria-label="Work orders and vehicles off the road">` and `<aside aria-label="Open incidents">` around `SurfacePanel`, each with its own `FigureStrip` and a short list, `self-start` so neither stretches |
+| An unregistered vehicle is a sentence | Done (verified) | `none named` / the registration / `not on the register`, in the register cell and in the work order dialog's description. No dash survives in either |
+| Tests | Done (verified) | **1,384 passed, 28 skipped** (from 1,371): `StaffLogistics.test.tsx` 8 (the strip and its panels, the three tables, the vehicle states, the dialog, the total and the categories, a backwards period, and the empty month), and `SectionTabs` 3 → 5 (focus follows the selection; every tab names its panel) |
+| Gates | Pass | `tsc` clean, `eslint` clean, `next build` 4.4 s compile, compiled CSS 86,933 + 10,903 bytes, no `rts-*` class left in `StaffLogistics`, `src/screens` coverage 81.1% of lines |
+
+**Still queued for "every part":** two screens on the old stylesheet — `PublicEnquiry` (22) and
+`Settings` (14). `PublicEnquiry` next: it is the one page outside the app frame, embedded on the
+company's website, so its shape has to come from the tokens rather than from the layer's cards. Then
+`Settings`, a band of rules with a setup meter. `legacy.css` (28 KB) is deleted when the last one is
+clear.
+

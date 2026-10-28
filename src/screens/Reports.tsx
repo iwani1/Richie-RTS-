@@ -10,7 +10,7 @@ import { formatAmount } from "../tms/money";
 import { financialReport, financialReportCsv } from "../tms/financialReport";
 import { printableReport } from "../tms/printableReport";
 import { ReportPrintPreview } from "./PrintableReport";
-import { SectionTabs } from "../components/tms/SectionTabs";
+import { SectionPanel, SectionTabs } from "../components/tms/SectionTabs";
 import { StaffTransportReport } from "./StaffTransportReport";
 import { rentalReport, rentalReportCsv } from "../tms/rentalReport";
 import { useTms } from "../tms/useTms";
@@ -59,9 +59,11 @@ export function ReportsPage() {
         description={tab === "hire" ? "What was quoted, what was hired, what came in and what it cost." : "What the buses did: runs worked, riders carried, no-shows, empty seats and on-time performance."}
       />
       {tabs.length > 1 && (
-        <SectionTabs tabs={tabs} value={tab} onChange={setRequested} ariaLabel="Report sections" className="mb-5" />
+        <SectionTabs tabs={tabs} value={tab} onChange={setRequested} ariaLabel="Report sections" idPrefix="reports" className="mb-5" />
       )}
-      {tab === "staff" ? <StaffTransportReport /> : <HireReport />}
+      <SectionPanel prefix="reports" id={tab}>
+        {tab === "staff" ? <StaffTransportReport /> : <HireReport />}
+      </SectionPanel>
     </div>
   );
 }

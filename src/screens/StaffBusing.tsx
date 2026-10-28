@@ -32,7 +32,7 @@ import {
 } from "../tms/types";
 import { CopyButton } from "../ui/CopyButton";
 import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, Stat, TableCard, TextArea, TextInput, formatDate, formatDateTime, todayYmd } from "../ui/primitives";
-import { SectionTabs } from "../components/tms/SectionTabs";
+import { SectionPanel, SectionTabs } from "../components/tms/SectionTabs";
 // The layer's card surface. The `Panel` above is the dialog: two different things, two names.
 import { Panel as SurfacePanel } from "../components/tms/Panel";
 import { DataTable as TmsDataTable, type TmsColumn } from "../components/tms/DataTable";
@@ -92,13 +92,16 @@ export function StaffBusingPage() {
         value={tab}
         onChange={setRequested}
         ariaLabel="Staff busing sections"
+        idPrefix="busing"
         className="mb-4"
       />
-      {tab === "routes" && <RoutesTab />}
-      {tab === "passengers" && <PassengersTab />}
-      {tab === "trips" && <TripsTab />}
-      {tab === "bookings" && <BookingsTab />}
-      {tab === "performance" && <PerformanceTab />}
+      <SectionPanel prefix="busing" id={tab}>
+        {tab === "routes" && <RoutesTab />}
+        {tab === "passengers" && <PassengersTab />}
+        {tab === "trips" && <TripsTab />}
+        {tab === "bookings" && <BookingsTab />}
+        {tab === "performance" && <PerformanceTab />}
+      </SectionPanel>
     </div>
   );
 }

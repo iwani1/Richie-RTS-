@@ -23,6 +23,7 @@ function Harness() {
       value={value}
       onChange={setValue}
       ariaLabel="Sections"
+      idPrefix="harness"
     />
   );
 }
@@ -61,5 +62,24 @@ describe("SectionTabs", () => {
     // Typing a letter is not a shortcut: the strip must not move under somebody using a screen reader.
     fireEvent.keyDown(tab("Routes"), { key: "t" });
     expect(tab("Routes").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("moves the focus with the selection, so the reader is never left on a closed tab", () => {
+    render(<Harness />);
+    // A tab that is not open is not a tab stop; if the key moved the selection but not the focus,
+    // the next Tab press would leave the strip from a control that has `tabIndex={-1}`.
+    fireEvent.keyDown(tab("Routes"), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tab("Passengers"));
+    fireEvent.keyDown(tab("Passengers"), { key: "End" });
+    expect(document.activeElement).toBe(tab("Trips"));
+    fireEvent.keyDown(tab("Trips"), { key: "Home" });
+    expect(document.activeElement).toBe(tab("Routes"));
+  });
+
+  it("names the panel it controls, and the panel names the tab back", () => {
+    render(<Harness />);
+    const routes = tab("Routes");
+    expect(routes.getAttribute("aria-controls")).toBe("harness-panel-routes");
+    expect(routes.id).toBe("harness-tab-routes");
   });
 });

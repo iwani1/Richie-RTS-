@@ -4,7 +4,7 @@ import type { OdometerReading } from "../tms/types";
 import { useTms } from "../tms/useTms";
 import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 import { IntervalBar } from "../components/tms/IntervalBar";
-import { SectionTabs } from "../components/tms/SectionTabs";
+import { SectionPanel, SectionTabs } from "../components/tms/SectionTabs";
 
 type Tab = "readiness" | "odometer";
 type Errors = Record<string, string>;
@@ -41,9 +41,12 @@ export function FleetReadinessPage() {
         value={tab}
         onChange={setTab}
         ariaLabel="Fleet readiness sections"
+        idPrefix="readiness"
         className="mb-5"
       />
-      {tab === "readiness" ? <ReadinessTab /> : <OdometerTab />}
+      <SectionPanel prefix="readiness" id={tab}>
+        {tab === "readiness" ? <ReadinessTab /> : <OdometerTab />}
+      </SectionPanel>
     </div>
   );
 }
