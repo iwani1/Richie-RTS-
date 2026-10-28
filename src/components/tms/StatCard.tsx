@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSpotlight } from "./useSpotlight";
@@ -33,8 +34,29 @@ function Sparkline({ series, label }: { series: number[]; label?: string }) {
  * One recorded figure: mono caption, 30px number, delta chip, and the shape of the last seven
  * periods. It takes a `Kpi` — the screen decides what the figure is, the card only decides how it
  * looks.
+ *
+ * A figure that has somewhere to go gets an `href`. Reading "3 late" and being unable to press it is
+ * the commonest dead end a board has; the card carries the arrow so the door is visible before the
+ * pointer finds it. A figure with nowhere honest to go stays a plain card rather than a link to
+ * nothing.
  */
-export function StatCard({ kpi, index = 0, className }: { kpi: Kpi; index?: number; className?: string }) {
+export function StatCard({
+  kpi,
+  index = 0,
+  href,
+  onPress,
+  pressLabel,
+  className,
+}: {
+  kpi: Kpi;
+  index?: number;
+  href?: string;
+  /** Act in place — narrow the list below, for instance — when there is no screen to go to. */
+  onPress?: () => void;
+  /** The accessible name of that action: "Show the 18 runs that are moving". */
+  pressLabel?: string;
+  className?: string;
+}) {
   const delta = kpi.delta;
   const trend = delta ? TREND[delta.trend] : null;
   const TrendIcon = trend?.icon;
@@ -50,16 +72,27 @@ export function StatCard({ kpi, index = 0, className }: { kpi: Kpi; index?: numb
     setPulse((count) => count + 1);
   }, [kpi.value]);
 
-  return (
+  const card = (
     <article
       className={cn("tms-surface tms-lift tms-spotlight tms-stagger animate-fade-up group relative overflow-hidden p-4", className)}
       style={{ ["--stagger" as string]: index }}
       onPointerMove={spotlight.onPointerMove}
     >
-      <p className="tms-mono text-muted-foreground">{kpi.label}</p>
-      <p key={pulse} className={cn("mt-2 inline-block text-[30px] leading-none font-semibold tracking-[-0.03em] text-foreground tabular-nums", pulse > 0 && "animate-bump")}>
-        {kpi.value}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="tms-mono text-muted-foreground">{kpi.label}</p>
+        {(href || onPress) && (
+          <ArrowUpRight
+            className="size-3.5 shrink-0 text-dim opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+      {/* The figure changes in place; this wrapper stays put so a screen reader is told once. */}
+      <div aria-live="polite">
+        <p key={pulse} className={cn("mt-2 inline-block text-[30px] leading-none font-semibold tracking-[-0.03em] text-foreground tabular-nums", pulse > 0 && "animate-bump")}>
+          {kpi.value}
+        </p>
+      </div>
       <div className="mt-2.5 flex min-h-5 items-center gap-2">
         {delta && trend && TrendIcon && (
           <>
@@ -80,6 +113,27 @@ export function StatCard({ kpi, index = 0, className }: { kpi: Kpi; index?: numb
       {kpi.series && kpi.series.length > 1 && <Sparkline series={kpi.series} label={kpi.seriesLabel} />}
     </article>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="block rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {card}
+      </Link>
+    );
+  }
+  if (onPress) {
+    return (
+      <button
+        type="button"
+        onClick={onPress}
+        aria-label={pressLabel ?? `${kpi.label}: ${kpi.value}`}
+        className="block w-full rounded-card text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {card}
+      </button>
+    );
+  }
+  return card;
 }
 
 /** The row of four. The grid owns the sibling-dimming behaviour, so it is one hover idea, not four. */

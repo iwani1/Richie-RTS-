@@ -47,7 +47,7 @@ export function AppShell({
 
       <div className="flex">
         {/* Desktop rail */}
-        <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex" aria-label="Main">
+        <aside className="tms-print-hide sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex" aria-label="Main">
           <div className="flex items-center gap-2.5 px-4 py-4">
             <span className="grid size-8 place-items-center rounded-control bg-primary text-[13px] font-bold text-primary-foreground" aria-hidden="true">
               R
@@ -68,7 +68,7 @@ export function AppShell({
           <TopBar breadcrumb={breadcrumb} onOpenPalette={() => setPaletteOpen(true)} />
 
           {/* Phone: the rail becomes a horizontal strip under the bar. */}
-          <div className="border-b border-border bg-sidebar lg:hidden">
+          <div className="tms-print-hide border-b border-border bg-sidebar lg:hidden">
             <SidebarNav orientation="horizontal" />
           </div>
 

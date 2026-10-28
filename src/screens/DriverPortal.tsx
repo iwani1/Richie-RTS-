@@ -18,11 +18,11 @@ import {
   type Trip,
 } from "../tms/types";
 import { useTms } from "../tms/useTms";
+import { GlidingTabs } from "../components/tms/GlidingTabs";
 import {
   Badge,
   Button,
   Card,
-  DataTable,
   EmptyState,
   Field,
   Notice,
@@ -63,6 +63,83 @@ export function DriverPortalPage() {
   const vehicleReg = (id: string | null) => db.vehicles.find((v) => v.id === id)?.registration ?? "-";
   const upcoming = view.trips.filter((t) => t.serviceDate >= today && t.status !== "cancelled").length;
 
+
+  /** Where a run has got to, and what the driver needs to know about it. */
+  const progressOf = (t: Trip) => {
+    const route = routeOf(t.routeId);
+    const next = route && t.status === "in_progress" ? route.stops[t.stopLogs.length] : null;
+    const directions = next ? stopDetailLine(next) : null;
+    const map = next ? stopMapLink(next) : null;
+    return (
+      <div className="text-[12.5px] text-muted-foreground">
+        {route ? `${t.stopLogs.length} / ${route.stops.length} stops` : "-"}
+        {/* RTE-01: a driver on the way to a stop should not have to open anything else to know what
+            to look for. */}
+        {next && (
+          <span className="mt-1 block">
+            Next: {next.name} · {next.scheduledTime}
+            {directions ? <span className="block">{directions}</span> : <span className="block text-dim">no directions recorded</span>}
+            {map && (
+              <a className="underline underline-offset-2" href={map} target="_blank" rel="noreferrer">
+                Open in maps
+              </a>
+            )}
+          </span>
+        )}
+        {/* D-105: the driver is the person who knows. The sentence is shown back to them so they can
+            see it was heard, and it is the same one the office reads. */}
+        {liveDelay(t) && <span className="mt-1 block text-warning">{delayLine(liveDelay(t)!)}</span>}
+        {/* The roster marker lives on the run, so it is visible before the stop form is opened (Q-48). */}
+        {t.rosterChanges.length > 0 && <p className="mt-1 font-medium text-warning">Roster changed while you were running</p>}
+        {(t.status === "dispatched" || t.status === "in_progress") && allowed("trips:record") && (
+          <Button variant="ghost" onClick={() => setReportingDelay(t)}>
+            {liveDelay(t) ? "Update delay" : "Running late"}
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  /** The one thing this run needs from the driver next. */
+  const actionOf = (t: Trip) => {
+    const route = routeOf(t.routeId);
+    if (t.status === "dispatched" && allowed("trips:start")) {
+      return (
+        <Button
+          variant="primary"
+          onClick={async () => {
+            const result = await dispatch({ type: "start_trip", id: t.id });
+            setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+          }}
+        >
+          Start run
+        </Button>
+      );
+    }
+    if (t.status === "in_progress" && allowed("trips:record") && route && route.stops[t.stopLogs.length]) {
+      return (
+        <Button variant="primary" onClick={() => setRecordingStop(t)}>
+          Record next stop
+        </Button>
+      );
+    }
+    if (t.status === "in_progress" && allowed("trips:complete") && route && t.stopLogs.length === route.stops.length) {
+      return (
+        <Button
+          variant="primary"
+          onClick={async () => {
+            const result = await dispatch({ type: "complete_trip", id: t.id });
+            setFlash({ tone: result.ok ? "success" : "error", message: result.message });
+          }}
+        >
+          Complete run
+        </Button>
+      );
+    }
+    if (t.status === "completed") return <span className="text-xs text-muted-foreground">Recorded</span>;
+    return null;
+  };
+
   return (
     <div>
       <PageHeader
@@ -90,106 +167,49 @@ export function DriverPortalPage() {
           </Card>
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex gap-2">
-              <Button variant={dateFilter === "today" ? "primary" : "secondary"} onClick={() => setDateFilter("today")}>Today</Button>
-              <Button variant={dateFilter === "all" ? "primary" : "secondary"} onClick={() => setDateFilter("all")}>All my runs ({view.trips.length})</Button>
-            </div>
+            <GlidingTabs
+              ariaLabel="Which runs to show"
+              value={dateFilter}
+              onChange={(key) => setDateFilter(key as "today" | "all")}
+              options={[
+                { key: "today", label: "Today" },
+                { key: "all", label: `All my runs (${view.trips.length})` },
+              ]}
+            />
             {allowed("incidents:create") && <Button variant="primary" onClick={() => setReporting(true)}>Report a problem</Button>}
           </div>
 
+          {/* Runs are cards, at every size. A driver has a handful a day, not a register: a card fits a
+              thumb in a yard and reads at a desk, and one layout cannot drift from the other because
+              there is only one. */}
           <div className="mt-3">
-            <DataTable
-              rows={trips}
-              rowKey={(t: Trip) => t.id}
-              emptyState={
-                <EmptyState
-                  title={dateFilter === "today" ? "No runs assigned to you today" : "No runs assigned to you"}
-                  body={dateFilter === "today" ? `You have ${upcoming} upcoming run(s). Switch to "All my runs" to see them.` : "When operations assigns you a run it appears here."}
-                />
-              }
-              columns={[
-                { key: "date", header: "Date", render: (t: Trip) => formatDate(t.serviceDate) },
-                { key: "ref", header: "Run", render: (t: Trip) => <span className="font-mono text-xs">{t.reference}</span> },
-                { key: "route", header: "Route", render: (t: Trip) => <span className="font-medium">{routeName(t.routeId)}</span> },
-                { key: "vehicle", header: "Vehicle", render: (t: Trip) => vehicleReg(t.vehicleId) },
-                {
-                  key: "status",
-                  header: "Status",
-                  render: (t: Trip) => <Badge tone={TRIP_TONE[t.status]}>{TRIP_STATUS_LABELS[t.status]}</Badge>,
-                },
-                {
-                  key: "progress",
-                  header: "Run progress",
-                  render: (t: Trip) => {
-                    const route = routeOf(t.routeId);
-                    return (
-                      <>
-                        {route ? `${t.stopLogs.length} / ${route.stops.length} stops` : "-"}
-                        {/* RTE-01: where the next stop actually is. A driver on the way to a stop
-                            should not have to open anything else to know what to look for. */}
-                        {route && t.status === "in_progress" && (() => {
-                          const next = route.stops[t.stopLogs.length];
-                          if (!next) return null;
-                          const directions = stopDetailLine(next);
-                          const map = stopMapLink(next);
-                          return (
-                            <span className="mt-1 block text-xs text-muted-foreground">
-                              Next: {next.name} · {next.scheduledTime}
-                              {directions ? <span className="block">{directions}</span> : <span className="block rts-unset">no directions recorded</span>}
-                              {map && (
-                                <a className="underline" href={map} target="_blank" rel="noreferrer">
-                                  Open in maps
-                                </a>
-                              )}
-                            </span>
-                          );
-                        })()}
-                        {/* D-105: the driver is the person who knows. The sentence is shown back to
-                            them so they can see it was heard, and it is the same one the office reads. */}
-                        {liveDelay(t) && <span className="rts-run-late" style={{ display: "block" }}>{delayLine(liveDelay(t)!)}</span>}
-                        {/* The control sits with the sentence it produces, so a driver reporting a
-                            delay does not have to hunt for it beside the run's main action. */}
-                        {(t.status === "dispatched" || t.status === "in_progress") && allowed("trips:record") && (
-                          <Button variant="ghost" onClick={() => setReportingDelay(t)}>
-                            {liveDelay(t) ? "Update delay" : "Running late"}
-                          </Button>
-                        )}
-                        {/* The roster marker lives on the run, so it is visible before the stop form
-                            is even opened (Q-48). */}
-                        {t.rosterChanges.length > 0 && (
-                          <p className="mt-1 text-xs font-medium text-amber-800">Roster changed while you were running</p>
-                        )}
-                      </>
-                    );
-                  },
-                },
-                {
-                  key: "actions",
-                  header: "",
-                  className: "text-right",
-                  render: (t: Trip) => {
-                    const route = routeOf(t.routeId);
-                    if (t.status === "dispatched" && allowed("trips:start")) {
-                      return <Button variant="primary" onClick={async () => {
-                        const result = await dispatch({ type: "start_trip", id: t.id });
-                        setFlash({ tone: result.ok ? "success" : "error", message: result.message });
-                      }}>Start run</Button>;
-                    }
-                    if (t.status === "in_progress" && allowed("trips:record") && route && route.stops[t.stopLogs.length]) {
-                      return <Button variant="primary" onClick={() => setRecordingStop(t)}>Record next stop</Button>;
-                    }
-                    if (t.status === "in_progress" && allowed("trips:complete") && route && t.stopLogs.length === route.stops.length) {
-                      return <Button variant="primary" onClick={async () => {
-                        const result = await dispatch({ type: "complete_trip", id: t.id });
-                        setFlash({ tone: result.ok ? "success" : "error", message: result.message });
-                      }}>Complete run</Button>;
-                    }
-                    if (t.status === "completed") return <span className="text-xs text-muted-foreground">Recorded</span>;
-                    return null;
-                  },
-                },
-              ]}
-            />
+            {trips.length === 0 ? (
+              <EmptyState
+                title={dateFilter === "today" ? "No runs assigned to you today" : "No runs assigned to you"}
+                body={
+                  dateFilter === "today"
+                    ? `You have ${upcoming} upcoming run(s). Switch to "All my runs" to see them.`
+                    : "When operations assigns you a run it appears here."
+                }
+              />
+            ) : (
+              <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {trips.map((t) => (
+                  <li key={t.id} className="rounded-card border border-border bg-card p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[12px] text-muted-foreground">{t.reference}</span>
+                      <Badge tone={TRIP_TONE[t.status]}>{TRIP_STATUS_LABELS[t.status]}</Badge>
+                    </div>
+                    <p className="mt-1 text-[15px] leading-snug font-medium">{routeName(t.routeId)}</p>
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      {formatDate(t.serviceDate)} · {vehicleReg(t.vehicleId)}
+                    </p>
+                    <div className="mt-2">{progressOf(t)}</div>
+                    {actionOf(t) && <div className="mt-3 [&_button]:h-11 [&_button]:w-full">{actionOf(t)}</div>}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="mt-5">

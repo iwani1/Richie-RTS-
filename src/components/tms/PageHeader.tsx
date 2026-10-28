@@ -28,6 +28,7 @@ export function PageHeader({
   onRangeChange,
   actions,
   onNewBooking,
+  asOf,
   className,
 }: {
   /** The mono line above the title, saying what part of the product this is. */
@@ -39,6 +40,8 @@ export function PageHeader({
   /** Screen-specific controls, placed beside the period. At most one primary action per screen. */
   actions?: React.ReactNode;
   onNewBooking?: () => void;
+  /** When the figures on this screen were taken, already formatted. Shown as mono, never guessed. */
+  asOf?: string;
   className?: string;
 }) {
   return (
@@ -47,9 +50,14 @@ export function PageHeader({
         {kicker && <p className="tms-mono text-dim">{kicker}</p>}
         <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.03em] text-foreground">{title}</h1>
         <p className="mt-1.5 max-w-[68ch] text-[13px] leading-relaxed text-muted-foreground">{subtitle}</p>
+        {asOf && (
+          <p className="tms-mono mt-2 text-dim">
+            Figures as at <span className="text-muted-foreground">{asOf}</span>
+          </p>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="tms-print-hide flex flex-wrap items-center gap-2">
         {range && onRangeChange && (
           <GlidingTabs
             options={RANGES.map((option) => ({ key: option.key, label: option.label }))}

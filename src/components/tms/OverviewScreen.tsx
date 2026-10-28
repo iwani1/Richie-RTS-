@@ -16,6 +16,10 @@ import { LiveDot } from "@/components/tms/LiveDot";
 import { EmptyState } from "@/components/tms/States";
 import { Button } from "@/components/ui/button";
 import { BookingIntakeDialog } from "./BookingIntakeDialog";
+import { TripDetailDialog } from "./TripDetailDialog";
+import { DensityToggle } from "./density";
+import { FilterSelect } from "./FilterBar";
+import { formatClockUtc } from "@/lib/format";
 import { overviewSample } from "@/lib/mock/overview.sample";
 import type { LiveTrip, RangeKey } from "@/lib/mock/types";
 
@@ -54,6 +58,20 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
   const data = useMemo(() => overviewSample(range), [range]);
   const [tripsState, setTripsState] = useState<"ready" | "loading">("ready");
   const [bookingOpen, setBookingOpen] = useState(false);
+  // A figure can narrow the list beneath it. "Active trips" shows the moving ones, "On time" shows
+  // the ones that are not — the request a dispatcher makes after reading either number.
+  const [tripFilter, setTripFilter] = useState<"all" | "moving" | "delayed">("all");
+  const [openTrip, setOpenTrip] = useState<LiveTrip | null>(null);
+
+  const visibleTrips = useMemo(
+    () =>
+      data.trips.filter((trip) => {
+        if (tripFilter === "moving") return trip.status === "on_route" || trip.status === "boarding" || trip.status === "delayed";
+        if (tripFilter === "delayed") return trip.status === "delayed";
+        return true;
+      }),
+    [data.trips, tripFilter],
+  );
 
   const refreshTrips = () => {
     setTripsState("loading");
@@ -122,6 +140,7 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
         range={range}
         onRangeChange={setRange}
         onNewBooking={() => setBookingOpen(true)}
+        asOf={formatClockUtc(data.capturedAt)}
       />
 
       <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -140,7 +159,27 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
 
       <StatGrid className="mt-4">
         {data.kpis.map((kpi, index) => (
-          <StatCard key={kpi.key} kpi={kpi} index={index} />
+          <StatCard
+            key={kpi.key}
+            kpi={kpi}
+            index={index}
+            // Only the two figures the board can answer for itself are pressable. A revenue figure
+            // has no screen behind it in this build, so it stays a card rather than a link to nothing.
+            onPress={
+              kpi.key === "active_trips"
+                ? () => setTripFilter("moving")
+                : kpi.key === "on_time_rate"
+                  ? () => setTripFilter("delayed")
+                  : undefined
+            }
+            pressLabel={
+              kpi.key === "active_trips"
+                ? "Show the runs that are moving"
+                : kpi.key === "on_time_rate"
+                  ? "Show the runs that are late"
+                  : undefined
+            }
+          />
         ))}
       </StatGrid>
 
@@ -184,7 +223,7 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-12">
         <Panel className="xl:col-span-8" kicker="Live trips" title="On the road now" bodyClassName="-mt-1">
           <DataTable
-            data={data.trips}
+            data={visibleTrips}
             columns={columns}
             state={tripsState}
             caption="Live trips: route, driver, vehicle, status and estimated arrival"
@@ -192,17 +231,24 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
             maxHeight="22rem"
             emptyTitle="No runs in this period"
             emptyBody="Change the period, or add a booking to put a run on this board."
+            onRowActivate={setOpenTrip}
+            rowLabel={(trip) => `Open ${trip.id}, ${trip.route}`}
             toolbar={
               <>
+                <FilterSelect value={tripFilter} onChange={(value) => setTripFilter(value as typeof tripFilter)} label="Narrow the runs">
+                  <option value="all">All runs</option>
+                  <option value="moving">Moving</option>
+                  <option value="delayed">Late</option>
+                </FilterSelect>
                 <span className="tms-mono flex items-center gap-1.5 text-dim">
-                  <LiveDot tone="success" /> {data.trips.length} runs
+                  <LiveDot tone="success" /> {visibleTrips.length} of {data.trips.length} runs
                 </span>
-                <span className="tms-mono hidden text-dim sm:inline">Sorted by trip</span>
+                <DensityToggle className="ml-auto" />
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={refreshTrips}
-                  className="ml-auto text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground"
                   aria-label="Refresh the trip list"
                 >
                   <RefreshCw className="size-3.5" aria-hidden="true" />
@@ -211,7 +257,10 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
               </>
             }
           />
-          <TableFoot left={`Showing ${data.trips.length} of ${data.trips.length} runs`} right={range === "today" ? "Today" : range === "week" ? "This week" : "This month"} />
+          <TableFoot
+            left={`Showing ${visibleTrips.length} of ${data.trips.length} runs${tripFilter === "all" ? "" : tripFilter === "moving" ? ", moving" : ", late"}`}
+            right={range === "today" ? "Today" : range === "week" ? "This week" : "This month"}
+          />
         </Panel>
 
         <Panel
@@ -235,6 +284,7 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
       </div>
 
       <BookingIntakeDialog open={bookingOpen} onOpenChange={setBookingOpen} />
+      <TripDetailDialog trip={openTrip} onOpenChange={(open) => !open && setOpenTrip(null)} />
     </AppShell>
   );
 }

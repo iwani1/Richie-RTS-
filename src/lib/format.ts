@@ -22,3 +22,16 @@ export const formatDate = (ymd: string) => {
 /** Today in the storage format. The server decides what "today" means; this is for a screen's own
  *  comparison against a stored date, never for writing a record. */
 export const todayYmd = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * A clock time that reads the same on a server and in a browser: 24-hour, UTC, said out loud.
+ *
+ * `toLocaleTimeString` follows the reader's machine, which is right for a record and wrong for a
+ * figure that is rendered once on the server and again in the browser — the two can disagree and the
+ * page then corrects itself in front of the person reading it. A freshness line is not worth that.
+ */
+export const formatClockUtc = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
+};

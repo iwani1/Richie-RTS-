@@ -108,7 +108,7 @@ export function StaffTransportReport() {
                 emptyState={<EmptyState title="No seats asked for" body="Nobody requested a seat on a run in this period." />}
                 columns={[
                   { key: "label", header: "Where the seat stands", render: (row) => row.label },
-                  { key: "value", header: "Seats", className: "text-right rts-mono", render: (row) => row.value },
+                  { key: "value", header: "Seats", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.value },
                 ]}
               />
               <p className="mt-3 text-xs text-muted-foreground">
@@ -124,7 +124,7 @@ export function StaffTransportReport() {
                 emptyState={<EmptyState title="No seat was lost" body="Nothing was refused or cancelled in this period." />}
                 columns={[
                   { key: "reason", header: "Reason the office recorded", render: (row) => row.reason },
-                  { key: "count", header: "Seats", className: "text-right rts-mono", render: (row) => row.count },
+                  { key: "count", header: "Seats", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.count },
                 ]}
               />
             </TableCard>
@@ -136,14 +136,14 @@ export function StaffTransportReport() {
               rowKey={(row) => row.routeId}
               emptyState={<EmptyState title="No route ran" body="No run on any route has a service date in this period." />}
               columns={[
-                { key: "route", header: "Route", render: (row) => <span><span className="rts-mono text-xs">{row.reference}</span> {row.name}</span> },
+                { key: "route", header: "Route", render: (row) => <span><span className="font-mono text-[11.5px] tabular-nums text-xs">{row.reference}</span> {row.name}</span> },
                 { key: "client", header: "Client", render: (row) => row.clientName },
-                { key: "runs", header: "Runs", className: "text-right rts-mono", render: (row) => `${row.runsCompleted} of ${row.runsScheduled}` },
-                { key: "carried", header: "Carried", className: "text-right rts-mono", render: (row) => row.carried },
-                { key: "noshow", header: "No-shows", className: "text-right rts-mono", render: (row) => row.noShows },
-                { key: "unrecorded", header: "Not recorded", className: "text-right rts-mono", render: (row) => row.notRecorded },
-                { key: "seats", header: "Seats offered", className: "text-right rts-mono", render: (row) => row.seatsOffered },
-                { key: "occupancy", header: "Occupancy", className: "text-right rts-mono", render: (row) => percent(row.occupancy) },
+                { key: "runs", header: "Runs", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => `${row.runsCompleted} of ${row.runsScheduled}` },
+                { key: "carried", header: "Carried", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.carried },
+                { key: "noshow", header: "No-shows", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.noShows },
+                { key: "unrecorded", header: "Not recorded", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.notRecorded },
+                { key: "seats", header: "Seats offered", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.seatsOffered },
+                { key: "occupancy", header: "Occupancy", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => percent(row.occupancy) },
               ]}
             />
             <p className="mt-3 text-xs text-muted-foreground">
@@ -160,10 +160,10 @@ export function StaffTransportReport() {
                 emptyState={<EmptyState title="No client" body="No run in this period belonged to a client route." />}
                 columns={[
                   { key: "client", header: "Client", render: (row) => row.clientName },
-                  { key: "routes", header: "Routes", className: "text-right rts-mono", render: (row) => row.routes },
-                  { key: "carried", header: "Carried", className: "text-right rts-mono", render: (row) => row.carried },
-                  { key: "noshow", header: "No-shows", className: "text-right rts-mono", render: (row) => row.noShows },
-                  { key: "booked", header: "Booked seats", className: "text-right rts-mono", render: (row) => row.bookedSeats },
+                  { key: "routes", header: "Routes", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.routes },
+                  { key: "carried", header: "Carried", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.carried },
+                  { key: "noshow", header: "No-shows", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.noShows },
+                  { key: "booked", header: "Booked seats", className: "text-right font-mono text-[11.5px] tabular-nums", render: (row) => row.bookedSeats },
                 ]}
               />
             </TableCard>
@@ -177,25 +177,25 @@ export function StaffTransportReport() {
               <ul className="mt-4 space-y-2 border-t border-border pt-3 text-sm text-foreground">
                 <li className="flex justify-between gap-4">
                   <span>Runs with no vehicle assigned</span>
-                  <span className="rts-mono">{report.coverage.runsWithoutVehicle}</span>
+                  <span className="font-mono text-[11.5px] tabular-nums">{report.coverage.runsWithoutVehicle}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Completed runs with no boarding recorded</span>
-                  <span className="rts-mono">{report.coverage.completedRunsWithoutBoardings}</span>
+                  <span className="font-mono text-[11.5px] tabular-nums">{report.coverage.completedRunsWithoutBoardings}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Stops recorded</span>
-                  <span className="rts-mono">
+                  <span className="font-mono text-[11.5px] tabular-nums">
                     {report.coverage.stopsRecorded} of {report.coverage.stopsExpected}
                   </span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Roster riders with no pickup stop</span>
-                  <span className="rts-mono">{report.coverage.runsFromRosterWithoutStop}</span>
+                  <span className="font-mono text-[11.5px] tabular-nums">{report.coverage.runsFromRosterWithoutStop}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Period</span>
-                  <span className="rts-mono">
+                  <span className="font-mono text-[11.5px] tabular-nums">
                     {formatDate(report.from)} – {formatDate(report.to)}
                   </span>
                 </li>

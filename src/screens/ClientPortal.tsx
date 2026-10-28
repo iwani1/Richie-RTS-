@@ -262,7 +262,7 @@ export function ClientPortalPage() {
                     return (
                       <li key={contract.id} className="rounded-sm border border-border p-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rts-mono text-xs font-semibold">{contract.reference}</span>
+                          <span className="font-mono text-[11.5px] tabular-nums text-xs font-semibold">{contract.reference}</span>
                           <Badge tone={state === "active" ? "success" : state === "draft" || state === "terminated" ? "neutral" : "warning"}>
                             {CONTRACT_STATUS_LABELS[state]}
                           </Badge>

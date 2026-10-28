@@ -439,3 +439,90 @@
     animation: pulse-dot 9s ease-in-out infinite;
   }
 }
+
+/* ============================================================================================
+   PAPER — D-131.
+   Invoices, statements and the printable report leave the building on A4. The screen is dark; paper
+   is not, and a document printed with near-black ink over a near-black page is a page of nothing.
+   So print re-points the same tokens to a light set: every component keeps its classes and its
+   meaning, and only the values change. Nothing here is a second design — it is the same one, read in
+   daylight, on a sheet with margins.
+   ============================================================================================ */
+@page {
+  size: A4;
+  margin: 16mm;
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+    --background: #ffffff;
+    --foreground: #111318;
+    --card: #ffffff;
+    --popover: #ffffff;
+    --secondary: #f4f5f8;
+    --muted: #f4f5f8;
+    --muted-foreground: #3a3f4b;
+    --dim: #4b5160;
+    --border: #c9cdd6;
+    --divider: #dfe2e8;
+    --input: #c9cdd6;
+    --row-hover: #f4f5f8;
+    --primary: #2b36a8;
+    --primary-foreground: #ffffff;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #111318;
+    --sidebar-border: #dfe2e8;
+    --shadow-card: none;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  /* Chrome is not content: no rail, no bar, no toolbar, no buttons, no density switch. */
+  .tms-print-hide,
+  [data-slot="button"] {
+    display: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  /* A card on paper is a bordered block, not a lit surface. */
+  .tms-surface {
+    border: 1px solid var(--border) !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  /* Long registers carry their column headings onto every sheet. */
+  thead {
+    display: table-header-group;
+  }
+  thead th {
+    position: static !important;
+  }
+  tr {
+    break-inside: avoid;
+  }
+
+  /* A scrolling window on screen is a page on paper. */
+  .overflow-x-auto,
+  .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .tms-mono {
+    letter-spacing: 0.04em;
+  }
+}

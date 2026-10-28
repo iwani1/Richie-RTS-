@@ -25,6 +25,7 @@ import { BookingIntakeDialog } from "@/components/tms/BookingIntakeDialog";
 import { DataTable, type TmsColumn } from "@/components/tms/DataTable";
 import { FilterNote, FilterSelect, SearchField } from "@/components/tms/FilterBar";
 import { DesignGallery } from "@/components/tms/DesignGallery";
+import { DensityToggle } from "@/components/tms/density";
 import { GlidingTabs } from "@/components/tms/GlidingTabs";
 import { AppFrame } from "@/components/tms/AppFrame";
 import { BusFront, Receipt } from "lucide-react";
@@ -605,5 +606,116 @@ describe("AppFrame", () => {
     expect(onSignOut).toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /Search or jump to a screen/ }));
     expect(onOpenPalette).toHaveBeenCalled();
+  });
+});
+
+describe("a row is a way in", () => {
+  it("calls back with the row's own data when it is pressed", () => {
+    const onRowActivate = vi.fn();
+    render(
+      <DataTable
+        data={ROWS}
+        columns={COLUMNS}
+        caption="Runs"
+        onRowActivate={onRowActivate}
+        rowLabel={(row) => `Open ${row.id}`}
+      />,
+    );
+    fireEvent.click(screen.getByRole("row", { name: "Open TRP-2418" }));
+    expect(onRowActivate).toHaveBeenCalledWith(ROWS[0]);
+  });
+
+  it("does the same from the keyboard, and the arrows walk the register", () => {
+    const onRowActivate = vi.fn();
+    render(
+      <DataTable
+        data={ROWS}
+        columns={COLUMNS}
+        caption="Runs"
+        onRowActivate={onRowActivate}
+        rowLabel={(row) => `Open ${row.id}`}
+      />,
+    );
+    const first = screen.getByRole("row", { name: "Open TRP-2418" });
+    fireEvent.keyDown(first, { key: "Enter" });
+    expect(onRowActivate).toHaveBeenCalledWith(ROWS[0]);
+
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(screen.getByRole("row", { name: "Open TRP-2410" }));
+  });
+
+  it("leaves a table without a handler as a table, not a grid of buttons", () => {
+    render(<DataTable data={ROWS} columns={COLUMNS} caption="Runs" />);
+    const row = screen.getByRole("row", { name: /TRP-2418/ });
+    expect(row.getAttribute("tabindex")).toBeNull();
+  });
+});
+
+describe("row density", () => {
+  it("switches, says so, and remembers the choice", () => {
+    render(<DensityToggle />);
+    const compact = screen.getByRole("button", { name: "Compact rows" });
+    const comfortable = screen.getByRole("button", { name: "Comfortable rows" });
+    expect(comfortable.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(compact);
+    expect(compact.getAttribute("aria-pressed")).toBe("true");
+    expect(window.localStorage.getItem("richie.density")).toBe("compact");
+
+    // One preference for the product, not one per table — and it goes back for the tests after it.
+    fireEvent.click(comfortable);
+    expect(window.localStorage.getItem("richie.density")).toBe("comfortable");
+  });
+});
+
+describe("a figure with somewhere to go", () => {
+  it("acts in place when given a handler, and says what it will do", () => {
+    const onPress = vi.fn();
+    render(<StatCard kpi={KPI} onPress={onPress} pressLabel="Show the runs that are moving" />);
+    fireEvent.click(screen.getByRole("button", { name: "Show the runs that are moving" }));
+    expect(onPress).toHaveBeenCalledOnce();
+  });
+
+  it("is a link when it has a destination", () => {
+    render(<StatCard kpi={KPI} href="/design" />);
+    expect(screen.getByRole("link").getAttribute("href")).toBe("/design");
+  });
+
+  it("stays a plain card when there is nowhere honest to go", () => {
+    render(<StatCard kpi={KPI} />);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+});
+
+describe("figures as at", () => {
+  it("says when the numbers were taken, in mono, under the title", () => {
+    render(<PageHeader title="Operations overview" subtitle="Runs and money." asOf="14:05 UTC" />);
+    expect(screen.getByText(/Figures as at/)).toBeTruthy();
+    expect(screen.getByText("14:05 UTC")).toBeTruthy();
+  });
+
+  it("says nothing at all when the screen cannot vouch for a time", () => {
+    render(<PageHeader title="Audit log" subtitle="Append-only." />);
+    expect(screen.queryByText(/Figures as at/)).toBeNull();
+  });
+});
+
+describe("the board, pressed", () => {
+  it("narrows the runs when a figure is pressed", () => {
+    render(<OverviewScreen />);
+    expect(screen.getByText("TRP-2418")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show the runs that are late" }));
+    expect(screen.queryByText("TRP-2418")).toBeNull();
+    expect(screen.getByText("TRP-2421")).toBeTruthy();
+  });
+
+  it("opens a run from its row and gives it back unchanged", () => {
+    render(<OverviewScreen />);
+    fireEvent.click(screen.getByRole("row", { name: "Open TRP-2418, East Legon → Airport" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getAllByText("East Legon → Airport").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Kojo Mensah").length).toBeGreaterThan(1);
   });
 });

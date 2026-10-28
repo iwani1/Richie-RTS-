@@ -11,6 +11,7 @@ import { Panel } from "@/components/tms/Panel";
 import { RingGauge } from "@/components/tms/RingGauge";
 import { FleetMap } from "@/components/tms/FleetMap";
 import { DataTable, TableFoot, type TmsColumn } from "@/components/tms/DataTable";
+import { DensityToggle } from "./density";
 import { ActivityFeed } from "@/components/tms/ActivityFeed";
 import { ActivityKindBadge, StatusBadge, TripStatusBadge, type BadgeTone } from "@/components/tms/StatusBadge";
 import { LiveDot } from "@/components/tms/LiveDot";
@@ -272,10 +273,26 @@ export function DesignGallery() {
         </div>
       </Section>
 
-      <Section title="Table" note="Sticky header, hover row, sortable columns. Four states, all shown.">
+      <Section
+        title="Table"
+        note="Sticky header, hover row, sortable columns, rows that open, a density switch. Four states, all shown."
+      >
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          <Panel kicker="Ready" title="Rows loaded" bodyClassName="-mt-1">
-            <DataTable data={DEMO_ROWS} columns={demoColumns} caption="Demo rows" maxHeight="14rem" initialSorting={[{ id: "id", desc: true }]} />
+          <Panel
+            kicker="Ready"
+            title="Rows loaded"
+            bodyClassName="-mt-1"
+            action={<DensityToggle />}
+          >
+            <DataTable
+              data={DEMO_ROWS}
+              columns={demoColumns}
+              caption="Demo rows"
+              maxHeight="14rem"
+              initialSorting={[{ id: "id", desc: true }]}
+              onRowActivate={() => undefined}
+              rowLabel={(row) => `Open ${row.id}`}
+            />
             <TableFoot left="Showing 3 of 3" right="Sorted by trip" />
           </Panel>
           <Panel kicker="Loading" title="Skeleton while the query runs" bodyClassName="-mt-1">

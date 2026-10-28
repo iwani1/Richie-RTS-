@@ -13,10 +13,11 @@ import {
   type RowData,
   type SortingState,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ChevronsUpDown, RotateCw } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, ChevronsUpDown, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, TableSkeleton } from "./States";
+import { HEADER_HEIGHT, ROW_PADDING, useDensity } from "./density";
 
 /**
  * The table's feature set, declared once. TanStack v9 stitches features in explicitly, so the set a
@@ -42,6 +43,11 @@ export type DataTableState = "ready" | "loading" | "error";
  * loading, failed — are part of the component so no screen can forget one. Sorting is handled by
  * TanStack; a column that sets `enableSorting: false` simply is not sortable.
  *
+ * A row can be a way in. Pass `onRowActivate` and the row becomes focusable and clickable, with
+ * Enter and Space doing what the pointer does and the arrow keys walking the list — a register whose
+ * rows cannot be opened is a picture of a register, and a dispatcher's first move after reading a
+ * reference is to press it.
+ *
  * `limit` caps how many rows are drawn **after** sorting, not before: a log that shows its first
  * five hundred entries unsorted would claim to be "oldest first" while hiding the oldest it was
  * asked for. The screen says how many it is showing; this component only obeys.
@@ -60,6 +66,8 @@ export function DataTable<T extends RowData>({
   caption,
   initialSorting = [],
   limit,
+  onRowActivate,
+  rowLabel,
   className,
 }: {
   columns: TmsColumn<T>[];
@@ -77,8 +85,13 @@ export function DataTable<T extends RowData>({
   initialSorting?: SortingState;
   /** Draw at most this many rows, taken from the sorted order. The screen reports the total. */
   limit?: number;
+  /** Open a row. The screen decides what opening means; the table only makes the row pressable. */
+  onRowActivate?: (row: T) => void;
+  /** Spoken for the row: "Open TRP-2418, East Legon to Airport". */
+  rowLabel?: (row: T) => string;
   className?: string;
 }) {
+  const density = useDensity();
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
   const table = useTable({
     features,
@@ -90,7 +103,7 @@ export function DataTable<T extends RowData>({
 
   return (
     <div className={cn("flex min-h-0 flex-col", className)}>
-      {toolbar && <div className="flex flex-wrap items-center gap-2 border-b border-divider px-4 py-2.5">{toolbar}</div>}
+      {toolbar && <div className="tms-print-hide flex flex-wrap items-center gap-2 border-b border-divider px-4 py-2.5">{toolbar}</div>}
 
       {state === "error" ? (
         <ErrorState title="The rows did not load" body={errorMessage} onRetry={onRetry} />
@@ -114,7 +127,10 @@ export function DataTable<T extends RowData>({
                         key={header.id}
                         scope="col"
                         aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : sortable ? "none" : undefined}
-                        className="tms-mono h-9 bg-card px-4 text-left font-medium text-muted-foreground first:pl-4"
+                        className={cn(
+                          "tms-mono bg-card px-4 text-left font-medium text-muted-foreground first:pl-4",
+                          HEADER_HEIGHT[density],
+                        )}
                       >
                         {sortable ? (
                           <button
@@ -134,17 +150,66 @@ export function DataTable<T extends RowData>({
                       </th>
                     );
                   })}
+                  {onRowActivate && <th scope="col" aria-hidden="true" className="w-8 bg-card" />}
                 </tr>
               ))}
             </thead>
             <tbody>
               {(limit === undefined ? table.getRowModel().rows : table.getRowModel().rows.slice(0, limit)).map((row) => (
-                <tr key={row.id} className="border-b border-divider transition-colors last:border-b-0 hover:bg-row-hover">
+                <tr
+                  key={row.id}
+                  tabIndex={onRowActivate ? 0 : undefined}
+                  aria-label={onRowActivate ? rowLabel?.(row.original) : undefined}
+                  onClick={onRowActivate ? () => onRowActivate(row.original) : undefined}
+                  onKeyDown={
+                    onRowActivate
+                      ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onRowActivate(row.original);
+                            return;
+                          }
+                          // Arrow keys walk the register without leaving it. The rows are siblings,
+                          // so the next one is simply the next element that is also a row.
+                          const rowEl = event.currentTarget;
+                          const target =
+                            event.key === "ArrowDown"
+                              ? rowEl.nextElementSibling
+                              : event.key === "ArrowUp"
+                                ? rowEl.previousElementSibling
+                                : null;
+                          if (target instanceof HTMLElement) {
+                            event.preventDefault();
+                            target.focus();
+                          }
+                        }
+                      : undefined
+                  }
+                  className={cn(
+                    "group border-b border-divider transition-colors last:border-b-0 hover:bg-row-hover",
+                    onRowActivate &&
+                      "cursor-pointer focus-visible:bg-row-hover focus-visible:ring-1 focus-visible:ring-primary/70 focus-visible:outline-none focus-visible:ring-inset",
+                  )}
+                >
                   {row.getAllCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 align-middle text-[13px] text-muted-foreground first:pl-4">
+                    <td
+                      key={cell.id}
+                      className={cn(
+                        "px-4 align-middle text-[13px] text-muted-foreground tabular-nums first:pl-4",
+                        ROW_PADDING[density],
+                      )}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
+                  {onRowActivate && (
+                    <td className="w-8 pr-3">
+                      <ChevronRight
+                        className="size-3.5 text-dim transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+                        aria-hidden="true"
+                      />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

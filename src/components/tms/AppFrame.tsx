@@ -185,7 +185,7 @@ export function AppFrame({
         Skip to content
       </a>
 
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-sidebar-border lg:block" aria-label="Main">
+      <aside className="tms-print-hide fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-sidebar-border lg:block" aria-label="Main">
         {rail}
       </aside>
 
@@ -197,7 +197,7 @@ export function AppFrame({
       </Sheet>
 
       <div className="lg:pl-60">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background/95 px-4 lg:px-6">
+        <header className="tms-print-hide sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background/95 px-4 lg:px-6">
           <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={() => setNavOpen(true)} aria-label="Open navigation" aria-expanded={navOpen}>
             <Menu aria-hidden="true" />
           </Button>

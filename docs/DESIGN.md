@@ -367,6 +367,17 @@ colour, so every screen — converted or not — sits on the same surface inside
 utilisation card carries a segmented mix bar under the ring — the ring answers "how much", the bar answers
 "how many of each" from the same slices.
 
+**Answers, not pictures (D-131).** A row opens when the screen can open it, and the arrow keys walk a
+register without leaving it. A figure is pressable when pressing it leads somewhere real — the board's
+"Active trips" narrows the runs below it — and stays inert when it does not, because a dead door is worse
+than a wall. Row density is one preference for the whole product, kept in the browser. The header says
+when its numbers were taken, in UTC, so the line reads the same on the server and in the browser.
+
+**On paper.** `@page` is A4 at 16mm and one print block re-points the tokens to a light set: the same
+components, in daylight, with the rail, the top bar, the toolbars and every button removed. Table headers
+repeat on each sheet and rows do not break across pages, because an invoice or a statement is the thing
+most likely to be printed and the thing least able to survive a dark palette.
+
 **Where to see it.** `/dashboard` is the board; `/design` is every component in every state, including
 the four states of the table. Both are sample data and say so. The live application at `/` is untouched
 by this pass and still writes real records.

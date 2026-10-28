@@ -3333,3 +3333,62 @@ shadow), `src/styles/legacy.css` (the `--rts-*` block re-pointed), `src/componen
 layout), `DesignGallery` (swatches now name the Studio values, including the action fill). Nine new tests:
 the bar's shares and its spoken label, and three that read the stylesheet and fail if the palette drifts,
 if amber returns, or if a text/ink pair drops under 4.5:1.
+
+## D-131 - The interface answers back: pressable figures, rows that open, density, and paper
+
+**The problem.** The board was a good-looking picture of an operations desk and not quite a desk. A
+figure saying "3 late" could not be pressed to show the three; a row naming a run opened nothing; every
+table was set at one height; the printed invoice left the building with the screen's near-black palette
+on it; nothing said when the numbers were taken. Each is small. Together they are the difference between
+reading a dashboard and working in one.
+
+**Decision 1: a row is a way in, or it is not a row.** `DataTable` takes `onRowActivate` and
+`rowLabel`. With a handler the row becomes focusable, presses with Enter or Space as well as the pointer,
+carries a chevron that appears under the pointer, and the arrow keys walk the register without leaving
+it. Without one, nothing changes — a table with no destination does not pretend to have one. `rowLabel`
+is required by the caller because a screen reader should hear "Open TRP-2418, East Legon to Airport",
+not "row".
+
+**Decision 2: a figure with somewhere honest to go is pressable; otherwise it stays a card.** `StatCard`
+now takes `href` (a real destination) or `onPress` (act in place) plus `pressLabel`, and renders as a
+link or a button accordingly. On the board, "Active trips" and "On time" set the run filter below them —
+the request a dispatcher makes after reading either number. "Monthly revenue" has no screen behind it in
+this review build, so it stays inert rather than linking to nothing. The rule is the point: no dead doors.
+
+**Decision 3: row density is one preference for the product.** Comfortable or compact, kept in
+`localStorage` behind a small external store, so a screen does not thread a prop and a table does not
+need a provider. `DataTable` reads it; `DensityToggle` sets it; the choice survives the hour someone
+spends reconciling. Compact is 6px of row padding, comfortable 12px — no other dimension changes.
+
+**Decision 4: print is the same design read in daylight.** `@page` is A4 with 16mm margins, and one
+`@media print` block re-points the tokens to a light set. Every component keeps its classes and its
+meaning; only the values change. Chrome is removed by `.tms-print-hide` (rail, top bar, toolbars, the
+density switch) and by hiding shadcn buttons; cards become bordered blocks with no shadow; table headers
+repeat on every sheet; rows do not break across pages; scroll windows become pages. A dark screen printed
+as-is is a page of nothing, and an invoice is the document most likely to leave the building.
+
+**Decision 5: say when the numbers were taken.** `PageHeader` takes `asOf` and prints "Figures as at
+14:05 UTC" in mono under the title. UTC, formatted by hand rather than by locale, because the same line
+is rendered on the server and again in the browser and a freshness stamp that corrects itself in front
+of the reader is worse than none. A screen that cannot vouch for a time passes nothing.
+
+**Decision 6: the driver's screen is cards, at every size.** A driver has a handful of runs a day, not a
+register. The portal now lists runs as cards with a full-width 44px action, the next stop and its
+directions, the delay sentence and the roster warning in place; the licence, incidents and documents
+follow the same treatment. One layout, because two would drift. The desktop table was removed rather
+than hidden behind a breakpoint: two sets of the same controls in one document is one set of duplicate
+buttons for a screen reader and two chances for them to disagree.
+
+**Decision 7: clear the old classes where the swap is exact, and only there.** `DriverPortal`,
+`ClientPortal` and `StaffTransportReport` are now free of `rts-*`; the first by rebuilding it, the other
+two by replacing `.rts-mono` with the identical utilities (`font-mono text-[11.5px] tabular-nums`) rather
+than with `tms-mono`, which is 11px, tracked and **uppercase** — a different thing wearing the same name.
+`.rts-run-late` was deleted with its last use. Twelve of thirty screens are class-clean; eighteen remain,
+and the largest are `StaffBusing` (51 classes), `Documents` (32) and `PrintableReport` (29).
+
+**Consequence.** `DataTable` (activation, density, keyboard), `density.tsx` (new), `StatCard` (href,
+onPress, aria-live on the figure), `PageHeader` (asOf), `globals.css` (`@page`, the print block),
+`AppShell`/`AppFrame`/`PageHeader`/`DataTable` (print-hide), `TripDetailDialog.tsx` (new),
+`OverviewScreen` (filter from a figure, rows that open, freshness line), `DriverPortal` (cards),
+`ClientPortal`/`StaffTransportReport` (class swap), `DesignGallery` (density switch and openable rows),
+`legacy.css` (one dead rule). Eleven new tests.

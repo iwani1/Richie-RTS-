@@ -1927,3 +1927,24 @@ rebuild, not a fix.
 **Not changed:** the component layer, the motion, the four table states, and every rule about what the
 product may claim. This phase is a palette and one layout; the twenty-one rebuilt screens queued behind it
 are untouched.
+
+## Phase 81 - The interface answers back: pressable figures, rows that open, density and paper (D-131)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| A row is a way in | Done (verified) | `DataTable` takes `onRowActivate` and `rowLabel`: the row becomes focusable, presses with Enter or Space as well as the pointer, shows a chevron under the pointer, and the arrow keys walk the register. No handler, no change — a table with no destination stays a table |
+| Figures that answer | Done (verified) | `StatCard` takes `href` or `onPress` plus `pressLabel`. On the board, "Active trips" and "On time" narrow the run list beneath them; "Monthly revenue" has no screen behind it and stays a card rather than a door to nothing |
+| A run opens | Done (verified) | `TripDetailDialog`: reference, route, driver, vehicle, arrival and how late, and a plain statement of what the board does not hold. Sample data says so |
+| Row density | Done (verified) | One preference for the product in `localStorage` behind a small store; `DensityToggle` sets it, every `DataTable` obeys. Comfortable 12px rows, compact 6px, nothing else changes |
+| When the numbers were taken | Done (verified) | `PageHeader asOf` prints "Figures as at 14:05 UTC" in mono. UTC and formatted by hand: the line is rendered on the server and again in the browser, and a stamp that corrects itself in front of the reader is worse than none |
+| Print, for the documents that leave the building | Done (verified) | `@page` A4 at 16mm; one `@media print` block re-points the tokens to a light set. Rail, top bar, toolbars and buttons hidden by `.tms-print-hide`; cards become bordered blocks; headers repeat per sheet; rows do not split across pages |
+| The driver's screen, phone-first | Done (verified) | Runs are cards at every size, with a full-width 44px action, the next stop and its directions, the delay sentence and the roster warning in place. The desktop table was removed rather than hidden: two sets of the same controls is one set of duplicate buttons for a screen reader |
+| Three more screens clear of the old stylesheet | Done (verified) | `DriverPortal` rebuilt; `ClientPortal` and `StaffTransportReport` swapped `.rts-mono` for the identical utilities (not `tms-mono`, which is 11px, tracked and uppercase — a different thing). `.rts-run-late` deleted with its last use. Twelve of thirty screens class-clean |
+| Gates | Pass | `tsc` clean, `eslint` clean, **1,368 tests passed, 28 skipped** (from 1,357), `next build` 61 s, compiled CSS 101,772 + 10,903 bytes, no amber in either file |
+
+**Still queued for "every part":** eighteen screens carry `rts-*` classes — `StaffBusing` (51),
+`Documents` (32), `PrintableReport` (29), `StaffLogistics` (19), `PublicEnquiry` (16), `Settings` (15),
+`Vehicles` (8), `FleetReadiness` (7), `FinanceHome` (7), `Statements` (6), `Rentals` (6), `Fleet` (4),
+`Expenses` (4), `Reports`, `Registers`, `Invoices`, `Contracts` and `Compliance` (3 each). The driver
+portal's incident form and the two sheet screens (Documents, PrintableReport) are the next three, and
+`legacy.css` is deleted when the last one is clean.
