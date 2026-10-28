@@ -56,6 +56,19 @@ git fetch origin && git checkout arena/368c3fd2-richie-rts && git pull --ff-only
 npm ci && npm run build && npm start     # migrations are idempotent: npm run db:migrate again if the branch added one
 ```
 
+### The interface review pages
+
+Two pages exist to judge the new interface before the working screens are rebuilt on it. They need no
+database and no sign-in, and they contain no records:
+
+- <http://localhost:3000/dashboard> — the operations overview: four figures, the fleet picture, how the
+  fleet is spent, the runs on the road and what has just happened.
+- <http://localhost:3000/design> — the component gallery: every shared component in every state,
+  including the loading, empty and failed states a list can be in.
+
+Every figure on both is **sample data**, written as such on the page. The live application is still
+`/`, signed in, and it is the only place that reads or writes a record.
+
 Exact commands for every step, including backups and deployment notes:
 **`docs/SETUP_AND_DEPLOYMENT.md`**.
 
@@ -113,9 +126,10 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | A reference you can copy instead of typing — invoice, rental, run and receipt numbers | Works; one quiet button beside the number, a word of confirmation, and an honest "Not copied" when the browser refuses. Nothing is sent anywhere and no new dependency was added |
 | A photograph of each vehicle, plus what it runs on, whose it is and its usual driver | Works; one picture per vehicle in a folder of its own, added or replaced from the register, removed with a reason that is recorded, and counted when nobody has filed one. The folder is copied with the nightly backup |
 | Management report as an A4 document, printed or saved as a PDF by the browser | Works; the figures are the report's own, a figure it cannot state is printed as withheld, and no file is stored or emailed |
+| Design system and app shell: dark by default, one amber accent, tokens in one file, shared components that take their data | Works at `/design`, which shows every component in every state. The operations overview at `/dashboard` is built from nothing else — **with sample data**, and it says so. The working screens have not been converted yet |
 | Notifications (SMS or email), offline driver app, GPS tracking, card/mobile-money gateway, payroll | **Not built** — see `docs/PROGRESS.md` |
 
-1305 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+1336 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

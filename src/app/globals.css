@@ -1,0 +1,288 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* TEMPORARY — the screens written before the design-system migration read these classes.
+   Every converted screen removes its rules from this file; it is deleted when the last one is
+   gone. Nothing new may be added to it. */
+@import "../styles/legacy.css";
+
+/* ============================================================================================
+   RICHIE TMS — design tokens
+   The only place a colour, radius, type size or easing is written down. Components ask for
+   `bg-card`, `text-muted`, `rounded-card`, `animate-fade-up` and never for a literal value.
+   Dark is the default and only theme of this build.
+   ============================================================================================ */
+
+@theme {
+  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Radii: cards 14, controls 10, badges full. */
+  --radius-card: 14px;
+  --radius-control: 10px;
+
+  /* One inset top highlight is the whole of the "depth" language: no drop shadows on cards. */
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --shadow-pop: 0 18px 44px -18px rgb(0 0 0 / 0.7);
+
+  /* Motion. Two curves, named for what they do. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-fade-up: fade-up 520ms var(--ease-glide) both;
+  --animate-grow-bar: grow-bar 620ms var(--ease-glide) both;
+  --animate-ring: ring 900ms var(--ease-glide) both;
+  --animate-pulse-dot: pulse-dot 2.4s ease-in-out infinite;
+  --animate-slide-in: slide-in 260ms var(--ease-glide) both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes grow-bar {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  @keyframes ring {
+    from {
+      stroke-dashoffset: var(--ring-circumference);
+    }
+    to {
+      stroke-dashoffset: var(--ring-offset);
+    }
+  }
+
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.82);
+    }
+  }
+
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
+
+/* Semantic tokens exposed to Tailwind (bg-success, text-muted, border-divider, …). */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-dim: var(--dim);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-divider: var(--divider);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-row-hover: var(--row-hover);
+  --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
+  --color-danger-tint: var(--danger-tint);
+  --color-info-tint: var(--info-tint);
+  --color-warning-tint: var(--warning-tint);
+  --color-primary-tint: var(--primary-tint);
+  --color-neutral-tint: var(--neutral-tint);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius-card);
+}
+
+:root {
+  color-scheme: dark;
+  --radius: 10px;
+
+  --background: #0e0e10;
+  --foreground: #f2f1ee;
+  --card: #1a1a1d;
+  --card-foreground: #f2f1ee;
+  --popover: #1a1a1d;
+  --popover-foreground: #f2f1ee;
+  --secondary: #202024;
+  --secondary-foreground: #f2f1ee;
+  --muted: #202024;
+  --muted-foreground: #a8a6a0;
+  --dim: #8a8882;
+  --accent: #202024;
+  --accent-foreground: #f2f1ee;
+  --destructive: #ff6b6b;
+  --border: #2a2a2e;
+  --divider: #26262a;
+  --input: #2a2a2e;
+  --ring: #ff8a00;
+  --row-hover: #202024;
+
+  /* The single accent. Ink on it is the background, never white. */
+  --primary: #ff8a00;
+  --primary-foreground: #0e0e10;
+
+  /* 13% tints of each status colour over the card, for badge surfaces. Written once here so a
+     badge never invents its own colour. */
+  --success-tint: color-mix(in oklab, #4cd08a 13%, transparent);
+  --danger-tint: color-mix(in oklab, #ff6b6b 13%, transparent);
+  --info-tint: color-mix(in oklab, #6b9bf2 13%, transparent);
+  --warning-tint: color-mix(in oklab, #e4a11b 13%, transparent);
+  --primary-tint: color-mix(in oklab, #ff8a00 13%, transparent);
+  --neutral-tint: color-mix(in oklab, #a8a6a0 12%, transparent);
+
+  --success: #4cd08a;
+  --danger: #ff6b6b;
+  --info: #6b9bf2;
+  --warning: #e4a11b;
+
+  --sidebar: #121214;
+  --sidebar-foreground: #a8a6a0;
+  --sidebar-accent: #202024;
+  --sidebar-accent-foreground: #f2f1ee;
+  --sidebar-border: #2a2a2e;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 30%, transparent);
+    color: var(--foreground);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* Scrollbars inside a dense console should not shout. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
+
+@layer utilities {
+  /* The mono caption: IDs, times, ETAs, section labels, KPI captions. */
+  .tms-mono {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Static card surface: 1px edge plus a 1px inset top highlight, no drop shadow. */
+  .tms-surface {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Physical press on the primary action: 3px down, spring back. */
+  .tms-press {
+    transition:
+      transform 180ms var(--ease-spring),
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease;
+  }
+  .tms-press:active {
+    transform: translateY(3px);
+  }
+
+  /* Cards that lift a little under the pointer. */
+  .tms-lift {
+    transition:
+      transform 240ms var(--ease-spring),
+      border-color 240ms ease,
+      background-color 240ms ease;
+  }
+  .tms-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Hovering one KPI card dims its siblings, so the one being read is the bright one. */
+  .tms-kpi-grid {
+    transition: opacity 200ms ease;
+  }
+  .tms-kpi-grid > * {
+    transition:
+      opacity 220ms ease,
+      transform 240ms var(--ease-spring),
+      border-color 240ms ease;
+  }
+  .tms-kpi-grid:has(> *:hover) > *:not(:hover) {
+    opacity: 0.55;
+  }
+
+  /* Entrance for a card that arrives in sequence: set --stagger on the element. */
+  .tms-stagger {
+    animation-delay: calc(var(--stagger, 0) * 80ms);
+  }
+}
+
+/* Motion is a preference, not a decoration. Everything stops, nothing is hidden. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .tms-lift:hover,
+  .tms-press:active {
+    transform: none;
+  }
+}

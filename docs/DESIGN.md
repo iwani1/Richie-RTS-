@@ -281,28 +281,65 @@ The interface is being rebuilt on a standard stack rather than a bespoke stylesh
 
 - **Components** are shadcn/ui (new-york), vendored under `src/components/ui/` — the same files the
   registry ships, with `cn` re-pointed at `@/lib/utils`. Buttons, cards, badges, inputs, tables,
-  dialogs, sheets, dropdowns, selects, tabs, alerts, tooltips, command and skeletons all come from there.
-- **Colour** exists only in `src/styles/tokens.css`, as Tailwind v4 tokens: a neutral palette and one
-  accent (`--primary`, indigo). No component names a colour; it asks for `bg-card`,
-  `text-muted-foreground` or `border-border` and the token decides.
-- **Icons** are Lucide (`lucide-react`), the icon set shadcn/ui pairs with. The hand-drawn icon module
-  is still used by the not-yet-migrated screens.
-- **Type** is Inter (variable), already bundled for offline use, with IBM Plex Mono for references and
-  figures.
+  dialogs, sheets, dropdowns, selects, tabs, tooltips, command and skeletons all come from there.
+- **Colour** exists only in `src/app/globals.css`, as Tailwind v4 tokens: a dark neutral palette and one
+  accent (amber `#FF8A00`). No component names a colour; it asks for `bg-card`, `text-dim` or
+  `border-divider` and the token decides. There is no `tailwind.config` in this build.
+- **Icons** are Lucide (`lucide-react`), the icon set shadcn/ui pairs with.
+- **Type** is Inter (variable), bundled for offline use, with JetBrains Mono for references, times and
+  captions.
+- **Tables** are TanStack Table where a list needs sorting, and Recharts is installed for the charts
+  that follow; neither is a second design language.
 
 **Converted so far:** the token layer, `src/ui/primitives.tsx` (so every screen that uses the shared
 Button/Field/Card/Band/TableCard/DataTable/Panel/Notice/Badge/Stat draws the new system at once), the
 application shell (rail, top bar, skip link, mobile sheet, jump-to-screen palette) and the dashboard,
 which is laid out as a board of unequal cards.
 
-**Still on the old classes:** twenty-eight screens carry `rts-*` classes served from
+**Still on the old classes:** twenty-seven screens carry `rts-*` classes served from
 `src/styles/legacy.css`, marked temporary in the file itself. That file shrinks screen by screen and is
 deleted when the last one is converted; nothing new may be added to it. Until then these screens are
 consistent with each other but not yet with the new components.
 
+## 6c. The design-system pass: dark, one accent, components that take their data (D-124)
+
+A second, deliberate pass rebuilt the whole visual layer on a dark surface and proved it by building the
+operations overview out of nothing else. It is not a reskin of the old screens; it is the set of pieces
+they will each be rebuilt from.
+
+**The surface.** Background `#0E0E10`, rail `#121214`, card `#1A1A1D`, hover and secondary `#202024`,
+border `#2A2A2E`, divider `#26262A`. Text `#F2F1EE`, body `#A8A6A0`, and `#8A8882` as the floor — the
+dimmest text in the product, at 5.44:1 on a card and 4.58:1 on a hovered row. Depth is a 1px edge plus a
+1px inset top highlight; there are no drop shadows on cards.
+
+**The accent.** Amber `#FF8A00`, with the background as ink on it (8.16:1). It marks one thing per
+screen: the primary action, the active section, the live dot. Status is separate and never solid: a
+badge is a 13% tint of the status colour (`success #4CD08A`, `warning #E4A11B`, `danger #FF6B6B`, `info
+#6B9BF2`), the same colour as text, a 6px dot, and the word.
+
+**Type.** Inter carries every sentence. JetBrains Mono carries machine data — references, ETAs,
+timestamps, captions, section labels — at 11px with 0.08em tracking, uppercase. Seven sizes:
+11, 12, 13, 14, 15, 26 (page title), 30 (KPI, tabular). Nothing between.
+
+**Shape and motion.** Cards 14px, controls 10px, badges full. Two curves — `--ease-spring`
+(`cubic-bezier(.34,1.56,.64,1)`) for anything that responds to a finger, `--ease-glide`
+(`cubic-bezier(.16,1,.3,1)`) for anything that arrives. Cards rise 14px into place 80ms apart, bars
+grow from the bottom, the utilisation ring draws once, live dots pulse, buttons press 3px. All of it is
+CSS, and `prefers-reduced-motion` stops it without hiding anything.
+
+**Behaviour the components own.** Every list has three states — loading skeleton, empty state with the
+screen's own words, and a failed state with a retry that really calls back — because a screen that only
+shows the happy path has not decided what to show when the query fails. A row under the pointer is the
+row being read; hovering one KPI dims the other three; sorting is announced in `aria-sort`; every
+icon-only button has a name; a menu only links to screens that exist.
+
+**Where to see it.** `/dashboard` is the board; `/design` is every component in every state, including
+the four states of the table. Both are sample data and say so. The live application at `/` is untouched
+by this pass and still writes real records.
+
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1305 passed, 28 skipped** across 105 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1336 passed, 28 skipped** across 106 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - The sortable header is tested at both ends: the pure ordering rules (`tableSort.test.ts`, including
   the tie that must not move and the third click that must restore) and the rendered control

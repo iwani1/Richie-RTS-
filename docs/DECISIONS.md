@@ -3032,3 +3032,60 @@ charge is unsigned), the completion screen's charge rows, the hire's charge card
 the settings field, and 23 new tests — the suite moves from 1,281 to 1,305. **Not built:** no waiting or
 overtime *rate* is priced (still FIN-01) — a waiting charge is a figure somebody types, now with a reason
 and a signature; and nothing tells the customer about the charge, because there is no mail or SMS channel.
+
+## D-124 - One token file, one accent, and components that take their data (interface)
+
+**The problem.** The screens were built one at a time, each with its own idea of a card: 1,674
+`className` literals, 485 leftover `stone-*` utilities, five hand-rolled tables and a second stylesheet
+(`src/styles/tokens.css`, indigo) that only some screens read. Nothing was wrong with any single
+screen; the collection was. Two screens could show the same state in two colours, and a new screen had
+to copy whichever one it was near. This phase builds the pieces the screens will be made of, and one
+page that uses nothing else.
+
+**Decision 1: the tokens live in one file.** `src/app/globals.css` is the only place a colour, radius,
+easing, type size or status tint is written down, declared through Tailwind 4's `@theme` (there is no
+`tailwind.config` in this build, and adding one would be a second source of truth). Components ask for
+`bg-card`, `text-dim`, `rounded-card`, `animate-fade-up`; no component writes a literal value. The old
+`tokens.css` is deleted; `src/styles/legacy.css` remains **temporarily** for the screens that have not
+been converted, is imported only by `globals.css`, and may not gain another rule.
+
+**Decision 2: one accent, and state that is never only a colour.** Amber `#FF8A00` is the only accent,
+with `#0E0E10` as its ink; everything else is a neutral grey or one of four status colours. A badge is a
+13% tint of its status colour with the same colour as text, a 6px dot and — the part that matters — a
+word. `dim` `#8A8882` is the floor for text: nothing is set lighter than 5.4:1 on the card surface, and
+4.58:1 on a hovered row. Contrast was measured rather than eyeballed.
+
+**Decision 3: a component takes its data.** Every component in `src/components/tms` receives props and
+imports nothing from `src/lib/mock`. The dashboard asks `overviewSample(range)` for a payload shaped
+like the one a query will return; replacing that call with a fetch changes nothing in the components.
+The payload says in words that it is sample data, and the page prints it.
+
+**Decision 4: the map is a component, not a claim.** There is no telematics provider in this system and
+none was added: MapLibre is outside the sanctioned library list and needs a style endpoint this
+deployment does not have. `<FleetMap />` draws route lines and markers from props on a static SVG
+canvas, its props are the shape a real map would need, and both the card and the payload's caption say
+the positions are illustrative. Nothing on the page implies live tracking exists.
+
+**Decision 5: a control that cannot act says so.** "New booking" is the primary action of the board, and
+booking intake is a later phase. It opens a dialog that states where a booking is recorded today and
+links to it, rather than accepting a booking the review build cannot keep. The section menu lists only
+screens that exist; an unbuilt one renders disabled with the word *planned* beside it, which is why the
+menu already knows about trips, vehicles and invoices without linking to them.
+
+**Decision 6: TanStack Table's feature set is declared once.** Version 9 registers features explicitly
+rather than switching them on with row-model options, so `DataTable` declares core rows plus sorting
+with two string comparators at the top of its own file, and exports `TmsColumn<T>` so a screen never
+names the feature set. A column opts out with `enableSorting: false`.
+
+**Decision 7: motion is CSS, on two named curves.** `--ease-spring` and `--ease-glide`; cards rise 14px
+into place 80ms apart, bars grow from the bottom, the ring draws once, live dots pulse, and a primary
+button moves 3px down under the finger. There is no animation library. `prefers-reduced-motion` stops
+all of it and hides nothing.
+
+**Consequence.** `src/app/globals.css` (tokens, semantic map, utilities, keyframes, reduced motion),
+`src/lib/mock/{types,overview.sample}.ts` (the payload and its shapes), thirteen components in
+`src/components/tms` (shell, rail, top bar, palette, page header, stat card and grid, panel, status
+badge, table, ring, activity feed, live dot, map, states, and the booking dialog), two routes —
+`/dashboard` and `/design` — and 31 new tests: the suite moves from 1,305 to 1,336. **Not built:** no
+screen outside these two has been converted (27 still read `legacy.css`), booking intake has no form, and
+nothing here reads the database — the board is a review of an interface, not a second source of records.

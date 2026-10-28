@@ -1812,3 +1812,29 @@ Now a charge carries a reason the customer reads and, above a figure the company
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **1305 passed, 28 skipped** (100 files
 passed, 5 skipped), coverage 85.64 / 76.6 / 82.44 / 89.35, `build` succeeds. Schema **37**; no migration,
 because every new field lives on the rental record.
+
+## Phase 74 - The design system, and one board built only from it (interface, D-124)
+
+The screens were built one at a time and each has its own idea of a card. This phase builds the pieces
+instead: one token file, one accent, dark by default, and a set of components that take their data. Then
+it proves the set by building the operations overview out of nothing else, and a gallery that shows
+every component in every state a query can put it in.
+
+| Item | Status | Evidence |
+|---|---|---|
+| One place for colour, radius, type and motion | Done (verified) | `src/app/globals.css`; `tokens.css` deleted; contrast measured 17.07 (text), 7.92 (muted), 5.44 (dim), 8.16 (accent) — no pair below 4.5 |
+| Shell: rail, top bar, ⌘K palette, phone strip | Done (verified) | `AppShell`, `SidebarNav`, `TopBar`, `CommandPalette` (\"opens the palette on ⌘K and navigates on Enter\") |
+| Only screens that exist are links | Done (verified) | Unbuilt rows render disabled and marked *planned* (\"does not offer a link to a screen that has not been built\") |
+| Four figures with a caption, a change and a shape | Done (verified) | `StatCard` (\"shows the figure, its caption and the change, and describes the sparkline\") |
+| Register table with sorting, sticky header and three states | Done (verified) | `DataTable` on TanStack (\"reorders when a header is pressed\", \"announces loading\", \"shows a failure and offers a retry that really calls back\") |
+| Rings, feed and map | Done (verified) | `RingGauge` (\"names the arcs and shows each count\", \"survives an empty fleet\"), `ActivityFeed` (\"lists entries newest first with a mono relative time\"), `FleetMap` (\"labels the picture as illustrative\") |
+| The board | Done (verified) | `/dashboard` — four figures, map, ring with legend, live trips, activity (\"renders the four figures, the trackables and the sample-data label\", \"re-cuts the payload when the period changes\") |
+| The gallery | Done (authored) | `/design` — tokens, type, buttons, badges, stat cards, rings, all four table states, feed, map, shell. Rendered by the server and checked for every section; not covered by an assertion of its own |
+| Sample data says it is sample data | Done (verified) | `overviewSample()` carries \"Sample data — not records\"; printed on the board, and the map states that no vehicle reports a position |
+| New booking | **Not built, and said so** | The button opens a dialog naming where a booking is recorded today and linking to it |
+| Live vehicle positions | **Not built, on purpose** | No telematics provider; the map is a swappable placeholder with a data seam |
+| The other 27 screens | **Not converted, and said so** | They still read `legacy.css`; conversion is one screen per phase |
+| Tests | Done (verified) | 31 new in `src/components/tms/tms.test.tsx` — 31 passed |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **1336 passed, 28 skipped** (101 files
+passed, 5 skipped), coverage 85.25 / 76.73 / 81.21 / 88.72, `build` succeeds (both routes static). No schema change, no migration.
