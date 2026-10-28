@@ -81,7 +81,7 @@ export function GlidingTabs({
       <span
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute top-0.5 bottom-0.5 rounded-[7px] bg-primary transition-[left,width,opacity] duration-[420ms] ease-[cubic-bezier(0.65,0,0.35,1)]",
+          "pointer-events-none absolute top-0.5 bottom-0.5 rounded-[7px] bg-action shadow-[inset_0_1px_0_rgb(255_255_255/0.16)] transition-[left,width,opacity] duration-[420ms] ease-[cubic-bezier(0.65,0,0.35,1)]",
           pill ? "opacity-100" : "opacity-0",
         )}
         style={{ left: pill?.left ?? 0, width: pill?.width ?? 0 }}
@@ -102,7 +102,7 @@ export function GlidingTabs({
             className={cn(
               "relative z-10 rounded-[7px] font-medium transition-colors duration-200 focus-visible:outline-none",
               size === "sm" ? "px-3 py-1.5 text-[12px]" : "px-3.5 py-2 text-[13px]",
-              active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+              active ? "text-action-foreground" : "text-muted-foreground hover:text-foreground",
             )}
           >
             {option.label}

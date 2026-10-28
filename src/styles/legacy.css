@@ -7,46 +7,46 @@
   /* Re-pointed to the dark design language (D-125). The shapes and rules below are still the
      pre-migration ones; only the values changed, so a screen that has not been rebuilt yet reads
      the same tokens every new component reads. */
-  --rts-canvas: #0e0e10;
-  --rts-card: #1a1a1d;
-  --rts-card-2: #171719;
-  --rts-line: #2a2a2e;
-  --rts-line-2: #333338;
-  --rts-ink: #f2f1ee;
-  --rts-ink-2: #d5d3ce;
-  --rts-muted: #a8a6a0;
-  --rts-muted-2: #a8a6a0;
-  --rts-faint: #8a8882;
+  --rts-canvas: #0a0c11;
+  --rts-card: #12151d;
+  --rts-card-2: #161a24;
+  --rts-line: #1f2534;
+  --rts-line-2: #232a3a;
+  --rts-ink: #f2f3f8;
+  --rts-ink-2: #d7dae4;
+  --rts-muted: #9aa2b6;
+  --rts-muted-2: #9aa2b6;
+  --rts-faint: #7e879e;
 
-  --rts-accent: #ff8a00;
-  --rts-accent-hover: #ffa333;
-  --rts-accent-soft: color-mix(in oklab, #ff8a00 13%, transparent);
-  --rts-accent-line: color-mix(in oklab, #ff8a00 32%, transparent);
-  --rts-accent-ink: #0e0e10;
+  --rts-accent: #7c88ff;
+  --rts-accent-hover: #98a1ff;
+  --rts-accent-soft: color-mix(in oklab, #7c88ff 13%, transparent);
+  --rts-accent-line: color-mix(in oklab, #7c88ff 32%, transparent);
+  --rts-accent-ink: #0a0c11;
 
-  --rts-green: #4cd08a;
-  --rts-green-soft: color-mix(in oklab, #4cd08a 13%, transparent);
-  --rts-amber: #e4a11b;
-  --rts-amber-soft: color-mix(in oklab, #e4a11b 13%, transparent);
-  --rts-red: #ff6b6b;
-  --rts-red-soft: color-mix(in oklab, #ff6b6b 13%, transparent);
-  --rts-blue: #6b9bf2;
-  --rts-blue-soft: color-mix(in oklab, #6b9bf2 13%, transparent);
-  --rts-teal: #4cc9c0;
-  --rts-teal-soft: color-mix(in oklab, #4cc9c0 13%, transparent);
-  --rts-red-line: color-mix(in oklab, #ff6b6b 38%, transparent);
-  --rts-green-line: color-mix(in oklab, #4cd08a 32%, transparent);
+  --rts-green: #7ee0b0;
+  --rts-green-soft: color-mix(in oklab, #7ee0b0 13%, transparent);
+  --rts-amber: #f0c27a;
+  --rts-amber-soft: color-mix(in oklab, #f0c27a 13%, transparent);
+  --rts-red: #ff9f96;
+  --rts-red-soft: color-mix(in oklab, #ff9f96 13%, transparent);
+  --rts-blue: #9ebdff;
+  --rts-blue-soft: color-mix(in oklab, #9ebdff 13%, transparent);
+  --rts-teal: #8fe3dc;
+  --rts-teal-soft: color-mix(in oklab, #8fe3dc 13%, transparent);
+  --rts-red-line: color-mix(in oklab, #ff9f96 38%, transparent);
+  --rts-green-line: color-mix(in oklab, #7ee0b0 32%, transparent);
 
   /* On a dark surface the vivid value is the readable one: measured 8.84 green, 7.78 amber,
      6.26 red, 6.28 blue against the card. */
-  --rts-green-ink: #4cd08a;
-  --rts-amber-ink: #e4a11b;
-  --rts-red-ink: #ff6b6b;
-  --rts-blue-ink: #6b9bf2;
-  --rts-teal-ink: #4cc9c0;
-  --rts-neutral-ink: #8a8882;
+  --rts-green-ink: #7ee0b0;
+  --rts-amber-ink: #f0c27a;
+  --rts-red-ink: #ff9f96;
+  --rts-blue-ink: #9ebdff;
+  --rts-teal-ink: #8fe3dc;
+  --rts-neutral-ink: #7e879e;
 
-  --rts-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 12px 28px -22px rgba(0, 0, 0, 0.8);
+  --rts-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 18px 40px -30px #000;
   --rts-shadow-pop: 0 24px 64px -28px rgba(0, 0, 0, 0.85), 0 2px 6px rgba(0, 0, 0, 0.5);
 
   --rts-display: "Inter Variable", "Inter", system-ui, sans-serif;
@@ -138,7 +138,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
   font-size: 15px;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 6px 16px -8px rgba(255, 138, 0, 0.4);
+  box-shadow: 0 6px 16px -8px rgba(124, 136, 255, 0.4);
 }
 
 .rts-wordmark {

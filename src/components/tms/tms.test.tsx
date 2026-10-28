@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState, type ReactNode } from "react";
+import { readFileSync } from "node:fs";
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }));
 
@@ -31,7 +32,7 @@ import { FleetMap } from "@/components/tms/FleetMap";
 import { LiveDot } from "@/components/tms/LiveDot";
 import { OverviewScreen } from "@/components/tms/OverviewScreen";
 import { PageHeader } from "@/components/tms/PageHeader";
-import { RingGauge } from "@/components/tms/RingGauge";
+import { FleetMixBar, RingGauge } from "@/components/tms/RingGauge";
 import { StatCard, StatGrid } from "@/components/tms/StatCard";
 import { StatusBadge, TripStatusBadge } from "@/components/tms/StatusBadge";
 import { TopBar } from "@/components/tms/TopBar";
@@ -152,6 +153,63 @@ describe("RingGauge", () => {
   it("survives an empty fleet instead of dividing by zero", () => {
     render(<RingGauge summary={{ percent: 0, caption: "Nothing measured.", slices: [] }} />);
     expect(screen.getByText("0%")).toBeTruthy();
+  });
+});
+
+describe("FleetMixBar", () => {
+  it("gives each slice the share of the bar its count earns", () => {
+    const { container } = render(<FleetMixBar summary={RING} />);
+    const shares = Array.from(container.querySelectorAll("span")).map((span) =>
+      Number.parseFloat((span as HTMLElement).style.width),
+    );
+    expect(shares.map((share) => Math.round(share * 100) / 100)).toEqual([63.64, 22.73, 13.64]);
+    expect(shares.reduce((sum, share) => sum + share, 0)).toBeCloseTo(100, 6);
+  });
+
+  it("says the counts in words, because the bar is a picture", () => {
+    render(<FleetMixBar summary={RING} />);
+    expect(screen.getByRole("img", { name: "On route: 14. Available: 5. Maintenance: 3" })).toBeTruthy();
+  });
+
+  it("draws nothing at all when the fleet is empty", () => {
+    const { container } = render(<FleetMixBar summary={{ percent: 0, caption: "", slices: [] }} />);
+    expect(container.querySelector("div")).toBeNull();
+  });
+});
+
+// The palette is a decision, and decisions drift. These read the stylesheet itself rather than a
+// rendered element: a colour appears here once, and every component inherits it.
+describe("palette", () => {
+  const css = readFileSync("src/app/globals.css", "utf8");
+
+  it("keeps the Studio values in one place", () => {
+    expect(css).toMatch(/--background: #0a0c11;/);
+    expect(css).toMatch(/--card: #12151d;/);
+    expect(css).toMatch(/--primary: #7c88ff;/);
+    expect(css).toMatch(/--action: #4453f0;/);
+    expect(css).toMatch(/--action-foreground: #ffffff;/);
+  });
+
+  it("keeps one accent: no amber survives the switch", () => {
+    expect(css.toLowerCase()).not.toContain("#ff8a00");
+    expect(css.toLowerCase()).not.toContain("#ffa333");
+  });
+
+  it("keeps the dim ink at or above the 4.5:1 floor on a card", () => {
+    // #7e879e on #12151d is 5.08:1; Studio's own faint (#667085) is 3.67 and was lightened.
+    const relative = (hex: string) => {
+      const channel = (c: number) => (c / 255 <= 0.04045 ? c / 255 / 12.92 : ((c / 255 + 0.055) / 1.055) ** 2.4);
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    };
+    const ratio = (a: string, b: string) => {
+      const [hi, lo] = [relative(a), relative(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    expect(ratio("#7e879e", "#12151d")).toBeGreaterThanOrEqual(4.5);
+    expect(ratio("#9aa2b6", "#12151d")).toBeGreaterThanOrEqual(4.5);
+    expect(ratio("#ffffff", "#4453f0")).toBeGreaterThanOrEqual(4.5);
+    expect(ratio("#0a0c11", "#7c88ff")).toBeGreaterThanOrEqual(4.5);
   });
 });
 

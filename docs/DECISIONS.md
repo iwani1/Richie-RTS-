@@ -3284,3 +3284,52 @@ class names), the compiled stylesheet (137 KB → 98 KB), `src/screens/{Profile,
 DispatchBoard}.tsx` (no `rts-` class remains), `src/screens/StaffBusing.tsx` (two undefined variables
 replaced with tokens). No behaviour changed: 1,351 tests still pass, and the suite was written against
 what the screens do, not what they are painted with.
+
+## D-130 - The palette becomes "Studio": near-black canvas, one indigo family
+
+**The problem.** The dark build (D-124) was warm: a `#0E0E10` canvas with `#FF8A00` amber as the single
+accent. Three directions had been drawn up side by side — Daylight, Graphite and Studio — and Studio was
+described then as "striking in a screenshot and the heaviest to live in for eight hours". The owner has
+now read that proposal and chosen Studio for the whole product, not for one screen: *"rebuild the whole
+system"*. Amber is therefore retired, and this decision supersedes the palette half of D-124 and the
+`stone-*` remap in D-125. Nothing about the component layer, the motion or the rules changes.
+
+**Decision 1: one palette, written once.** Canvas `#0A0C11`, rail `#070910`, card `#12151D`, raised and
+row-hover `#161A24`, card edge `#1F2534`, row rule `#191D27`. Text `#F2F3F8`, body `#9AA2B6`, floor
+`#7E879E`. Every screen reads these through the same semantic tokens, so the twenty-one screens still
+built on `legacy.css` re-tint with the rest: their `--rts-*` block was re-pointed to the same values
+rather than left warm. The stylesheet contains no `#FF8A00` after this decision, and a test fails if one
+comes back.
+
+**Decision 2: the accent is two steps, because reading and pressing are different jobs.** `#7C88FF` is
+the reading accent — active section, live dot, ring arcs, sparkline, badge text, links (5.93:1 on a
+card). `#4453F0` is the action fill, with white ink (5.61:1). Using one value for both was the trap:
+`#7C88FF` behind white text is 3.1:1 and fails, and `#4453F0` as text on the card is 3.25:1 and fails.
+The tokens `--primary` and `--action` therefore hold the two roles, and the `Button` default variant
+reads the second.
+
+**Decision 3: Studio's faint ink is lightened, and its destructive fill is deepened.** The proposal's
+`--faint: #667085` measures 3.67:1 on a card, under the 4.5 floor this product holds itself to, so the
+floor here is `#7E879E` (5.08:1) — same hue family, one step up. Its danger ink `#FF9F96` is right for
+text and wrong for a button: white on it is 1.6:1, so `--destructive` (the fill shadcn puts white text on)
+is `#D13B38`. A test computes both ratios from the stylesheet, so the departure is checked rather than
+remembered.
+
+**Decision 4: the rail's active item is a raised chip, not a filled button.** Studio's own rail uses a
+`#161A24` chip with white ink and an indigo edge; a solid indigo bar in the rail made the navigation look
+like the primary action of every screen. The chip is `bg-sidebar-accent` with a 2px inset indigo rule, the
+glyph in `--primary`, the count in `--primary-tint`. The segmented control keeps a filled pill, because
+there the pill *is* the selection.
+
+**Decision 5: the board is one twelve-column field.** The overview's cards were arranged as two rows of
+two-thirds and one-third. They are now placed on a 12-column grid — the map and the trip table take 8, the
+ring and the activity feed take 4 — so a card that holds a table earns its width and a card that holds one
+figure does not. The utilisation card gained a segmented mix bar beside the ring: a ring answers "how
+much" and is poor at "how many of each", and the bar answers that from the same numbers already on screen.
+
+**Consequence.** `src/app/globals.css` (`:root` palette, `--action`/`--action-foreground`, the card
+shadow), `src/styles/legacy.css` (the `--rts-*` block re-pointed), `src/components/ui/button.tsx`,
+`GlidingTabs`, `SidebarNav`, `AppFrame`, `RingGauge` (new `FleetMixBar`), `OverviewScreen` (12-column
+layout), `DesignGallery` (swatches now name the Studio values, including the action fill). Nine new tests:
+the bar's shares and its spoken label, and three that read the stylesheet and fail if the palette drifts,
+if amber returns, or if a text/ink pair drops under 4.5:1.

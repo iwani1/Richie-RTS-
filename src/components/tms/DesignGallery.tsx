@@ -26,20 +26,21 @@ const TONES: BadgeTone[] = ["success", "danger", "info", "warning", "primary", "
 const TRIP_STATUSES: TripStatus[] = ["on_route", "boarding", "delayed", "scheduled", "completed", "cancelled"];
 
 const SWATCHES: Array<{ name: string; value: string; note: string }> = [
-  { name: "bg", value: "#0E0E10", note: "Page" },
-  { name: "sidebar", value: "#121214", note: "Rail" },
-  { name: "card", value: "#1A1A1D", note: "Card surface" },
-  { name: "row-hover", value: "#202024", note: "Row hover, secondary" },
-  { name: "border", value: "#2A2A2E", note: "Card edge" },
-  { name: "divider", value: "#26262A", note: "Row rule" },
-  { name: "primary", value: "#FF8A00", note: "The one accent" },
-  { name: "text", value: "#F2F1EE", note: "Primary text" },
-  { name: "muted", value: "#A8A6A0", note: "Body text" },
-  { name: "dim", value: "#8A8882", note: "Floor — never darker" },
-  { name: "success", value: "#4CD08A", note: "On time, available" },
-  { name: "warning", value: "#E4A11B", note: "Late, workshop" },
-  { name: "danger", value: "#FF6B6B", note: "Failed, cancelled" },
-  { name: "info", value: "#6B9BF2", note: "Boarding, completed" },
+  { name: "bg", value: "#0A0C11", note: "Page — Studio canvas" },
+  { name: "sidebar", value: "#070910", note: "Rail, a shade below the page" },
+  { name: "card", value: "#12151D", note: "Card surface" },
+  { name: "row-hover", value: "#161A24", note: "Row hover, raised chip" },
+  { name: "border", value: "#1F2534", note: "Card edge" },
+  { name: "divider", value: "#191D27", note: "Row rule" },
+  { name: "primary", value: "#7C88FF", note: "The one accent — read, never pressed" },
+  { name: "action", value: "#4453F0", note: "The button fill; white ink, 5.6:1" },
+  { name: "text", value: "#F2F3F8", note: "Primary text" },
+  { name: "muted", value: "#9AA2B6", note: "Body text" },
+  { name: "dim", value: "#7E879E", note: "Floor — never darker" },
+  { name: "success", value: "#7EE0B0", note: "On time, available" },
+  { name: "warning", value: "#F0C27A", note: "Late, workshop" },
+  { name: "danger", value: "#FF9F96", note: "Failed, cancelled" },
+  { name: "info", value: "#9EBDFF", note: "Boarding, completed" },
 ];
 
 const TYPE: Array<{ size: string; use: string; className: string }> = [

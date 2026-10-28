@@ -80,15 +80,19 @@ export function SidebarNav({ orientation = "vertical" }: { orientation?: "vertic
     const base = cn(
       "group relative flex items-center gap-2.5 rounded-control text-[13px] font-medium transition-colors",
       orientation === "vertical" ? "w-full px-2.5 py-2" : "shrink-0 px-2.5 py-1.5",
-      active ? "bg-primary text-primary-foreground" : item.planned ? "text-dim" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+      active
+        ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-[inset_2px_0_0_var(--primary)]"
+        : item.planned
+          ? "text-dim"
+          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
     );
 
     const inner = (
       <>
-        <Glyph className={cn("size-4 shrink-0", active ? "text-primary-foreground" : "text-dim group-hover:text-sidebar-accent-foreground")} aria-hidden="true" />
+        <Glyph className={cn("size-4 shrink-0", active ? "text-primary" : "text-dim group-hover:text-sidebar-accent-foreground")} aria-hidden="true" />
         <span className="truncate">{item.label}</span>
         {item.planned && (
-          <span className={cn("tms-mono ml-auto rounded-full px-1.5 py-0.5 text-[9px] tracking-[0.06em]", active ? "bg-primary-foreground/15 text-primary-foreground" : "bg-muted text-dim")}>
+          <span className={cn("tms-mono ml-auto rounded-full px-1.5 py-0.5 text-[9px] tracking-[0.06em]", active ? "bg-primary-tint text-primary" : "bg-muted text-dim")}>
             planned
           </span>
         )}

@@ -102,12 +102,12 @@ export function AppFrame({
                       className={cn(
                         "group relative flex w-full items-center gap-2.5 rounded-control px-2.5 py-[7px] text-left text-[12.5px] transition-[background-color,color,transform] duration-200 focus-visible:outline-none",
                         active
-                          ? "bg-primary font-semibold text-primary-foreground"
+                          ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-[inset_2px_0_0_var(--primary)]"
                           : "font-medium text-sidebar-foreground hover:translate-x-[2px] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       )}
                     >
                       <Glyph
-                        className={cn("size-4 shrink-0 transition-colors", active ? "text-primary-foreground" : "text-dim group-hover:text-sidebar-accent-foreground")}
+                        className={cn("size-4 shrink-0 transition-colors", active ? "text-primary" : "text-dim group-hover:text-sidebar-accent-foreground")}
                         aria-hidden="true"
                       />
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
@@ -115,7 +115,7 @@ export function AppFrame({
                         <span
                           className={cn(
                             "tms-mono rounded-full px-1.5 py-0.5 text-[10px] leading-none",
-                            active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground",
+                            active ? "bg-primary-tint text-primary" : "bg-muted text-muted-foreground",
                           )}
                         >
                           {item.count}

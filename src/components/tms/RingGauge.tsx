@@ -6,12 +6,44 @@ const STROKE = 12;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
+const INK_FILL: Record<string, string> = {
+  on_route: "bg-primary",
+  available: "bg-info",
+  maintenance: "bg-warning",
+  reserved: "bg-muted-foreground",
+};
+
 const SLICE_INK: Record<string, string> = {
   on_route: "text-primary",
   available: "text-info",
   maintenance: "text-warning",
   reserved: "text-muted-foreground",
 };
+
+
+/**
+ * The same mix as one bar. A ring is good at "how much", poor at "how many of each"; the bar answers
+ * the second without a second legend. Decorative — the counts are already in the ring's list.
+ */
+export function FleetMixBar({ summary, className }: { summary: RingSummary; className?: string }) {
+  const total = summary.slices.reduce((sum, slice) => sum + slice.count, 0);
+  if (total === 0) return null;
+  return (
+    <div
+      className={cn("flex h-2 w-full overflow-hidden rounded-full bg-muted", className)}
+      role="img"
+      aria-label={summary.slices.map((slice) => `${slice.label}: ${slice.count}`).join(". ")}
+    >
+      {summary.slices.map((slice) => (
+        <span
+          key={slice.key}
+          className={cn("h-full first:rounded-l-full last:rounded-r-full", INK_FILL[slice.key] ?? "bg-muted-foreground")}
+          style={{ width: `${(slice.count / total) * 100}%` }}
+        />
+      ))}
+    </div>
+  );
+}
 
 /**
  * How the fleet is spent this morning, as a ring and a legend.

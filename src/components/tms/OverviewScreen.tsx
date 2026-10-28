@@ -7,7 +7,7 @@ import { AppShell } from "@/components/tms/AppShell";
 import { PageHeader } from "@/components/tms/PageHeader";
 import { StatCard, StatGrid } from "@/components/tms/StatCard";
 import { Panel } from "@/components/tms/Panel";
-import { RingGauge } from "@/components/tms/RingGauge";
+import { FleetMixBar, RingGauge } from "@/components/tms/RingGauge";
 import { FleetMap } from "@/components/tms/FleetMap";
 import { DataTable, TableFoot, type TmsColumn } from "@/components/tms/DataTable";
 import { ActivityFeed } from "@/components/tms/ActivityFeed";
@@ -144,9 +144,9 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
         ))}
       </StatGrid>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-12">
         <Panel
-          className="lg:col-span-2"
+          className="xl:col-span-8"
           kicker="Fleet"
           title="Where the vehicles are"
           description="Route lines and vehicle positions for the runs in progress."
@@ -161,6 +161,7 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
         </Panel>
 
         <Panel
+          className="xl:col-span-4"
           kicker="Utilisation"
           title="How the fleet is spent"
           description={data.ring.caption}
@@ -173,12 +174,15 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
             </Button>
           }
         >
-          <RingGauge summary={data.ring} className="px-4 pb-4" />
+          <div className="px-4 pb-4">
+            <RingGauge summary={data.ring} />
+            <FleetMixBar summary={data.ring} className="mt-4" />
+          </div>
         </Panel>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <Panel className="lg:col-span-2" kicker="Live trips" title="On the road now" bodyClassName="-mt-1">
+      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-12">
+        <Panel className="xl:col-span-8" kicker="Live trips" title="On the road now" bodyClassName="-mt-1">
           <DataTable
             data={data.trips}
             columns={columns}
@@ -211,6 +215,7 @@ export function OverviewScreen({ initialRange = "today" }: { initialRange?: Rang
         </Panel>
 
         <Panel
+          className="xl:col-span-4"
           kicker="Activity"
           title="Latest on the board"
           action={

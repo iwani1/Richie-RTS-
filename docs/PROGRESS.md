@@ -1909,3 +1909,21 @@ left every other screen exactly as it was.
 not been rebuilt on `components/tms` (Documents 123, StaffBusing 65, StaffLogistics 42, PrintableReport
 37, FinanceHome 25, Invoices 24, PublicEnquiry 23 are the largest). None of them is broken; each is a
 rebuild, not a fix.
+
+## Phase 80 - The whole product turns "Studio": near-black canvas, one indigo family (D-130)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| The palette, replaced rather than added to | Done (verified) | Canvas `#0A0C11`, rail `#070910`, card `#12151D`, raised `#161A24`, edge `#1F2534`, rule `#191D27`; text `#F2F3F8`, body `#9AA2B6`, floor `#7E879E`. Amber is gone: the compiled stylesheet contains no `#FF8A00`, and a test fails if it returns |
+| Reading and pressing split into two indigo steps | Done (verified) | `--primary #7C88FF` (5.93:1 on a card) for anything read — active section, live dot, arcs, sparkline, badge words; `--action #4453F0` with white ink (5.61:1) for the button fill. `Button`'s default variant reads the action pair |
+| Two departures from the proposal, on the record | Done (verified) | Its faint `#667085` is 3.67:1, under the 4.5 floor, so the floor is `#7E879E` (5.08:1); its danger ink is right for text and wrong for a fill, so `--destructive` is `#D13B38`. Both ratios are computed by a test, not remembered |
+| The screens still on the old stylesheet re-tint with the rest | Done (verified) | `legacy.css`'s `--rts-*` block re-pointed to the same values (canvas, card, card-2, lines, ink, muted, floor, accent, and the status inks and tints). Nothing warm is left next to anything cool |
+| The rail's active item stops looking like the primary action | Done (verified) | A raised `#161A24` chip with a 2px inset indigo rule, glyph in `--primary`, count in `--primary-tint`, in both `SidebarNav` and the live application's `AppFrame`. The segmented control keeps its filled pill — there the pill *is* the selection |
+| The board is one twelve-column field | Done (verified) | Map 8 / utilisation 4, trip table 8 / activity 4, replacing two rows of two-thirds and one-third. The narrow cards now hold one figure and one list each |
+| A mix bar beside the ring | Done (verified) | `FleetMixBar` draws the same slices as one bar: a ring answers "how much", a bar answers "how many of each". Decorative, with the counts spoken in its label; nothing when the fleet is empty |
+| Six tests | Done (verified) | Three for the bar (shares, spoken label, empty fleet) and three that read `globals.css`: the Studio values in one place, no amber, and four contrast pairs at or above 4.5:1 |
+| Gates | Pass | `tsc` clean, `eslint` clean, **1,357 tests passed, 28 skipped** (from 1,351), `next build` 65 s, compiled CSS 99,250 + 10,903 bytes, no `#FF8A00` in either file |
+
+**Not changed:** the component layer, the motion, the four table states, and every rule about what the
+product may claim. This phase is a palette and one layout; the twenty-one rebuilt screens queued behind it
+are untouched.

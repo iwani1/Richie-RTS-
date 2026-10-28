@@ -285,7 +285,8 @@ The interface is being rebuilt on a standard stack rather than a bespoke stylesh
   Phase 77 deleted them rather than carry untested code (D-127), and any screen that needs one can take
   it from the registry again.
 - **Colour** exists only in `src/app/globals.css`, as Tailwind v4 tokens: a dark neutral palette and one
-  accent (amber `#FF8A00`). No component names a colour; it asks for `bg-card`, `text-dim` or
+  accent (`#7C88FF` to read, `#4453F0` to press, D-130). No component names a colour; it asks for
+  `bg-card`, `text-dim` or
   `border-divider` and the token decides. There is no `tailwind.config` in this build.
 - **Icons** are Lucide (`lucide-react`), the icon set shadcn/ui pairs with.
 - **Type** is Inter (variable), bundled for offline use, with JetBrains Mono for references, times and
@@ -319,15 +320,18 @@ A second, deliberate pass rebuilt the whole visual layer on a dark surface and p
 operations overview out of nothing else. It is not a reskin of the old screens; it is the set of pieces
 they will each be rebuilt from.
 
-**The surface.** Background `#0E0E10`, rail `#121214`, card `#1A1A1D`, hover and secondary `#202024`,
-border `#2A2A2E`, divider `#26262A`. Text `#F2F1EE`, body `#A8A6A0`, and `#8A8882` as the floor — the
-dimmest text in the product, at 5.44:1 on a card and 4.58:1 on a hovered row. Depth is a 1px edge plus a
-1px inset top highlight; there are no drop shadows on cards.
+**The surface — "Studio" (D-130).** Background `#0A0C11`, rail `#070910`, card `#12151D`, raised and
+row-hover `#161A24`, border `#1F2534`, divider `#191D27`. Text `#F2F3F8`, body `#9AA2B6`, and `#7E879E`
+as the floor — 5.08:1 on a card. Depth is a 1px edge, a 1px inset top highlight and one long soft shadow
+(`0 18px 40px -30px #000`), which sets the card on the canvas instead of drawing it on the canvas.
 
-**The accent.** Amber `#FF8A00`, with the background as ink on it (8.16:1). It marks one thing per
-screen: the primary action, the active section, the live dot. Status is separate and never solid: a
-badge is a 13% tint of the status colour (`success #4CD08A`, `warning #E4A11B`, `danger #FF6B6B`, `info
-#6B9BF2`), the same colour as text, a 6px dot, and the word.
+**The accent is one indigo family in two roles.** `#7C88FF` reads — the active section, the live dot, the
+ring arcs, the sparkline, a badge's word (5.93:1 on a card). `#4453F0` is pressed: the button fill, with
+white ink (5.61:1). One value cannot do both; white on the bright indigo is 3.1:1 and the deep indigo as
+text is 3.25:1. The rail's active item is a raised `#161A24` chip with a 2px inset indigo rule, never a
+filled bar, so navigation does not compete with the screen's one action. Status is separate and never
+solid: a badge is a 13% tint of the status colour (`success #7EE0B0`, `warning #F0C27A`, `danger #FF9F96`,
+`info #9EBDFF`), the same colour as text, a 6px dot, and the word.
 
 **Type.** Inter carries every sentence. JetBrains Mono carries machine data — references, ETAs,
 timestamps, captions, section labels — at 11px with 0.08em tracking, uppercase. Seven sizes:
@@ -357,6 +361,11 @@ works in a table for hours, so nothing moves away from the pointer.
 (canvas, card, ink, muted, lines, accent, and 13% status tints), and 494 leftover `stone-*` utilities were
 remapped to semantic tokens. The built stylesheet now contains no light background and no dark text
 colour, so every screen — converted or not — sits on the same surface inside the same frame.
+
+**The board's shape (D-130).** The overview is one twelve-column field: map 8, utilisation 4, trip table
+8, activity 4. A card that holds a table earns its width; a card that holds one figure does not. The
+utilisation card carries a segmented mix bar under the ring — the ring answers "how much", the bar answers
+"how many of each" from the same slices.
 
 **Where to see it.** `/dashboard` is the board; `/design` is every component in every state, including
 the four states of the table. Both are sample data and say so. The live application at `/` is untouched

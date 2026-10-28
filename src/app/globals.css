@@ -30,7 +30,7 @@
   --radius-control: 10px;
 
   /* One inset top highlight is the whole of the "depth" language: no drop shadows on cards. */
-  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 18px 40px -30px #000;
   --shadow-pop: 0 18px 44px -18px rgb(0 0 0 / 0.7);
 
   /* Motion. Two curves, named for what they do. */
@@ -125,6 +125,8 @@
   --color-info-tint: var(--info-tint);
   --color-warning-tint: var(--warning-tint);
   --color-primary-tint: var(--primary-tint);
+  --color-action: var(--action);
+  --color-action-foreground: var(--action-foreground);
   --color-neutral-tint: var(--neutral-tint);
   --color-danger: var(--danger);
   --color-info: var(--info);
@@ -140,53 +142,73 @@
   --radius-xl: var(--radius-card);
 }
 
+/* ============================================================================================
+   THE PALETTE — "Studio".
+   A near-black canvas (#0A0C11), cards a step above it (#12151D), and one indigo family: #7C88FF for
+   anything that has to be read, #4453F0 for the action you press, white ink on it. Chosen over the
+   warm amber build because the board reads as a console rather than a form, and the indigo holds up
+   at 6:1 on the canvas without the brown cast amber gets at low light.
+
+   Two deliberate departures from the proposal it came from, both about reading rather than taste:
+   the faint ink is lightened from #667085 (3.67:1 on a card — under the 4.5 floor) to #7E879E
+   (5.08:1), and the destructive fill is a deeper red than the danger ink, because white on #FF9F96
+   is 1.6:1 and a button is not a label.
+   ============================================================================================ */
 :root {
   color-scheme: dark;
   --radius: 10px;
 
-  --background: #0e0e10;
-  --foreground: #f2f1ee;
-  --card: #1a1a1d;
-  --card-foreground: #f2f1ee;
-  --popover: #1a1a1d;
-  --popover-foreground: #f2f1ee;
-  --secondary: #202024;
-  --secondary-foreground: #f2f1ee;
-  --muted: #202024;
-  --muted-foreground: #a8a6a0;
-  --dim: #8a8882;
-  --accent: #202024;
-  --accent-foreground: #f2f1ee;
-  --destructive: #ff6b6b;
-  --border: #2a2a2e;
-  --divider: #26262a;
-  --input: #2a2a2e;
-  --ring: #ff8a00;
-  --row-hover: #202024;
+  /* Surfaces, darkest to lightest: canvas, rail, card, raised. */
+  --background: #0a0c11;
+  --sidebar: #070910;
+  --card: #12151d;
+  --popover: #161a24;
 
-  /* The single accent. Ink on it is the background, never white. */
-  --primary: #ff8a00;
-  --primary-foreground: #0e0e10;
+  --foreground: #f2f3f8;
+  --card-foreground: #f2f3f8;
+  --popover-foreground: #f2f3f8;
+  --secondary: #161a24;
+  --secondary-foreground: #f2f3f8;
+  --muted: #161a24;
+  --muted-foreground: #9aa2b6;
+  /* The floor: 5.08:1 on a card. Nothing in the interface may be darker than this. */
+  --dim: #7e879e;
+  --accent: #161a24;
+  --accent-foreground: #f2f3f8;
 
-  /* 13% tints of each status colour over the card, for badge surfaces. Written once here so a
-     badge never invents its own colour. */
-  --success-tint: color-mix(in oklab, #4cd08a 13%, transparent);
-  --danger-tint: color-mix(in oklab, #ff6b6b 13%, transparent);
-  --info-tint: color-mix(in oklab, #6b9bf2 13%, transparent);
-  --warning-tint: color-mix(in oklab, #e4a11b 13%, transparent);
-  --primary-tint: color-mix(in oklab, #ff8a00 13%, transparent);
-  --neutral-tint: color-mix(in oklab, #a8a6a0 12%, transparent);
+  --border: #1f2534;
+  --divider: #191d27;
+  --input: #1f2534;
+  --row-hover: #161a24;
 
-  --success: #4cd08a;
-  --danger: #ff6b6b;
-  --info: #6b9bf2;
-  --warning: #e4a11b;
+  /* The one accent. Ink on it is the canvas, never white — white on #7C88FF is 3.1:1. */
+  --primary: #7c88ff;
+  --primary-foreground: #0a0c11;
+  --ring: #7c88ff;
 
-  --sidebar: #121214;
-  --sidebar-foreground: #a8a6a0;
-  --sidebar-accent: #202024;
-  --sidebar-accent-foreground: #f2f1ee;
-  --sidebar-border: #2a2a2e;
+  /* The action fill, and the only place white ink is used: 5.61:1 on #4453F0. */
+  --action: #4453f0;
+  --action-foreground: #ffffff;
+
+  /* Status ink, each light enough to read as text on the card, with a 12–14% tint of the same hue
+     for the surface a badge sits on. Written once here so a badge never invents its own colour. */
+  --success: #7ee0b0;
+  --warning: #f0c27a;
+  --danger: #ff9f96;
+  --info: #9ebdff;
+  --destructive: #d13b38;
+
+  --success-tint: color-mix(in oklab, #7ee0b0 13%, transparent);
+  --danger-tint: color-mix(in oklab, #ff9f96 13%, transparent);
+  --info-tint: color-mix(in oklab, #9ebdff 13%, transparent);
+  --warning-tint: color-mix(in oklab, #f0c27a 13%, transparent);
+  --primary-tint: color-mix(in oklab, #7c88ff 14%, transparent);
+  --neutral-tint: color-mix(in oklab, #9aa2b6 12%, transparent);
+
+  --sidebar-foreground: #b6bdcc;
+  --sidebar-accent: #161a24;
+  --sidebar-accent-foreground: #f2f3f8;
+  --sidebar-border: #191d27;
 }
 
 @layer base {
