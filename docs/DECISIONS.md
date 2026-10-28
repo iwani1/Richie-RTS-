@@ -3480,12 +3480,20 @@ and no invoice claimed as paid that has no payment behind it. The one place the 
 degraded condition — the expired roadworthy on the bus that is in the workshop — is real data about a
 state the product is supposed to surface.
 
-**Consequence.** `scripts/seed.ts` (new, ~1,050 lines, 190-odd commands), `package.json` (`db:seed`),
+**Decision 6: the money has live debt, not only settled history.** The first draft ended with every
+invoice settled, which made the finance home's ageing bands, its overdue list and a customer statement
+all say nothing. A sixth hire was added — billed six weeks ago, half paid, now ten days late — and a
+seventh completed and deliberately not yet billed, so the two lists a finance person acts on both carry
+a record. This cost the script nothing but realism: the two figures are the same records the office
+would have.
+
+**Consequence.** `scripts/seed.ts` (new, ~1,150 lines, 200-odd commands), `package.json` (`db:seed`),
 `README.md` ("Try it with demonstration data"), `docs/SETUP_AND_DEPLOYMENT.md` §12b. The database it
 produces: 6 users, 6 clients, 5 branches, 4 contracts, 8 vehicles, 8 drivers, 23 documents, 5 routes,
-18 riders, 80 trips, 5 bookings, 7 rental requests, 2 invoices, 3 payments, 1 credit note, 1 refund, 9
-expenses, 2 incidents, 2 work orders, 13 odometer readings and an audit trail of the whole thing. It
-runs in about four seconds against an empty database.
+18 riders, 80 trips, 5 bookings, 9 rental requests, 3 invoices, 4 payments, 1 credit note, 1 refund, 9
+expenses, 2 incidents, 2 work orders, 17 odometer readings and an audit trail of the whole thing. It
+runs in about four seconds against an empty database, and it is verified end to end on a fresh schema
+(22 migrations) — `tsc`, `eslint`, 1,368 tests and the production build unchanged by it.
 
 ## D-134 - The money desk and the registers leave the old stylesheet; four screens still hold to it
 

@@ -937,6 +937,55 @@ await request({
   notes: "Customer will drive; asked whether a second driver can be added.",
 }, at(0, "07:45"));
 
+// (f) A hire that was billed six weeks ago, part paid, and is now overdue — so the ageing bands,
+// the overdue list and a customer statement all have live money in them rather than history.
+const hireF = await request({
+  clientId: tema.id,
+  customerName: "Efua Mensimah",
+  customerPhone: "+233 20 880 3376",
+  customerEmail: "efua.mensimah@temaportlogistics.com.gh",
+  purpose: "Three days of executive transport for a shipping line inspection team.",
+  pickupLocation: "Tema Port Gate 3",
+  dropoffLocation: "Tema Community 1",
+  startDate: day(-45),
+  endDate: day(-42),
+  passengers: "3",
+  vehicleCategoryId: "cat_exec",
+  driverRequired: true,
+  notes: "Team inspected two vessels; the third day finished early.",
+}, at(-46, "08:20"));
+await run({
+  type: "quote_rental",
+  id: hireF.id,
+  input: {
+    lines: [
+      { description: "Executive van with driver, 3 days", quantity: "3", unitAmount: "1150.00" },
+      { description: "Airport transfers, two trips", quantity: "2", unitAmount: "160.00" },
+    ],
+  },
+}, at(-46, "10:00"));
+await run({ type: "accept_quotation", id: hireF.id, note: "Accepted by the logistics coordinator at Tema." }, at(-45, "08:05"));
+await run({ type: "confirm_rental", id: hireF.id, input: { amount: depositFor(hireF.id), method: "Bank transfer", reference: "GCB/TRF/861207" } }, at(-45, "09:30"));
+await run({ type: "assign_rental", id: hireF.id, input: { vehicleId: staria.id, driverId: abena.id } }, at(-45, "10:15"));
+await run({ type: "start_rental", id: hireF.id, odometerKm: "20850" }, at(-45, "11:00"));
+await run({
+  type: "complete_rental",
+  id: hireF.id,
+  input: {
+    lines: [
+      { description: "Executive van with driver, 3 days", quantity: "3", unitAmount: "1150.00" },
+      { description: "Airport transfers, two trips", quantity: "2", unitAmount: "160.00" },
+    ],
+    departedAt: day(-45),
+    returnedAt: day(-42),
+    odometerStartKm: "20850",
+    odometerEndKm: "21148",
+    distanceKm: "298",
+    damageNotes: "",
+    feedback: "The team asked for the same driver for their next call.",
+  },
+}, at(-42, "17:10"));
+
 // (e) A completed hire that was billed, part-paid, part-credited and partly refunded.
 const hireE = await request({
   clientId: volta.id,
@@ -979,6 +1028,47 @@ await run({
   },
 }, at(-11, "18:20"));
 
+// (g) A hire that has been completed and not yet billed, so "completed but not billed" is a real
+// decision on the finance screen rather than an empty list.
+const hireG = await request({
+  clientId: oguaa.id,
+  customerName: "Comfort Aidoo",
+  customerPhone: "+233 55 610 2298",
+  customerEmail: "comfort.aidoo@oguaaeducation.org.gh",
+  purpose: "Two-day trip to Elmina and Cape Coast Castle for a school group.",
+  pickupLocation: "Pedu Junction, Cape Coast",
+  dropoffLocation: "Pedu Junction, Cape Coast",
+  startDate: day(-10),
+  endDate: day(-8),
+  passengers: "14",
+  vehicleCategoryId: "cat_mini",
+  driverRequired: true,
+  notes: "One teacher and thirteen pupils. Billed with the rest of the trust's term at the end of the month.",
+}, at(-11, "09:15"));
+await run({
+  type: "quote_rental",
+  id: hireG.id,
+  input: { lines: [{ description: "Minibus with driver, 2 days, Cape Coast and Elmina", quantity: "2", unitAmount: "780.00" }] },
+}, at(-11, "11:00"));
+await run({ type: "accept_quotation", id: hireG.id, note: "Agreed by telephone with Ms Aidoo." }, at(-10, "08:40"));
+await run({ type: "confirm_rental", id: hireG.id, input: { amount: depositFor(hireG.id), method: "MTN MoMo", reference: "MP260221.0914.B11092" } }, at(-10, "09:20"));
+await run({ type: "assign_rental", id: hireG.id, input: { vehicleId: hiace.id, driverId: kofi.id } }, at(-10, "10:00"));
+await run({ type: "start_rental", id: hireG.id, odometerKm: "141420" }, at(-10, "07:30"));
+await run({
+  type: "complete_rental",
+  id: hireG.id,
+  input: {
+    lines: [{ description: "Minibus with driver, 2 days, Cape Coast and Elmina", quantity: "2", unitAmount: "780.00" }],
+    departedAt: day(-10),
+    returnedAt: day(-8),
+    odometerStartKm: "141420",
+    odometerEndKm: "141882",
+    distanceKm: "462",
+    damageNotes: "",
+    feedback: "Teacher asked whether the same bus is free in December.",
+  },
+}, at(-8, "18:00"));
+
 // ============================================================
 // 13. The money: invoices, payments, a credit note and a refund.
 // ============================================================
@@ -999,6 +1089,12 @@ const invoiceE = state.invoices.find((invoice) => invoice.rentalId === hireE.id)
 await run({ type: "record_payment", input: { invoiceId: invoiceE.id, amount: invoiceE.total.toFixed(2), method: "Bank transfer", paidOn: day(-8), externalReference: "ECOBANK/TRF/442110", note: "Paid in full against the invoice as issued." } }, at(-8, "10:20"));
 await run({ type: "issue_credit_note", input: { invoiceId: invoiceE.id, issuedOn: day(-6), amount: "900.00", description: "One day of hire released at the customer's request", reason: "The regional director's site visit finished a day early." } }, at(-6, "11:00"));
 await run({ type: "record_refund", input: { invoiceId: invoiceE.id, amount: "900.00", method: "Bank transfer", paidOn: day(-5), externalReference: "ECOBANK/OUT/778201", reason: "Returning the value of the released day, which the customer had already paid for." } }, at(-5, "15:40"));
+
+// A third invoice that was issued six weeks ago and is only part paid: it is what makes the ageing
+// bands, the overdue list and a customer statement show live money rather than settled history.
+await run({ type: "issue_rental_invoice", input: { rentalId: hireF.id, issuedOn: day(-40), discountAmount: "", discountReason: "", notes: "Executive transport, Tema Port inspection team." } }, at(-40, "09:30"));
+const invoiceF = state.invoices.find((invoice) => invoice.rentalId === hireF.id)!;
+await run({ type: "record_payment", input: { invoiceId: invoiceF.id, amount: (invoiceF.total / 2).toFixed(2), method: "Bank transfer", paidOn: day(-36), externalReference: "GCB/TRF/863410", note: "Half paid on account; the balance is being queried against the third day." } }, at(-36, "14:00"));
 
 // ============================================================
 // 14. Costs.

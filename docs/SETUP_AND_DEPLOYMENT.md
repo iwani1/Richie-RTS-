@@ -540,7 +540,10 @@ Three things make it safe to demo and easy to remove:
   hold. A seed that wrote INSERTs directly could create records the application itself would refuse.
 - **Its dates follow the day it runs.** Completed runs and hires are behind today, future runs and
   hires are ahead of it, and the compliance list always holds one paper expiring inside the reminder
-  lead time and one already expired — so the screens look current whenever the demo is given.
+  lead time and one already expired — so the screens look current whenever the demo is given. The
+  money is arranged the same way: invoices settled in full, one credited and refunded, and one hire
+  billed six weeks ago and only part paid, so the ageing bands, the overdue list and a customer
+  statement all have live figures on them, plus one completed hire deliberately left unbilled.
 
 It prints a summary table of what it wrote and the accounts it created. All of those accounts use the
 password `Demo-Ghana-2026`; the administrator account is **not** reset — if the database already had
