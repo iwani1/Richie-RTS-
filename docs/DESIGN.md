@@ -250,11 +250,14 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 6a. A second pass, proposed and not yet applied
 
-`docs/ui-proposal/index.html` holds a review page — open it in a browser, no build needed — that shows
-the shipped screens beside a proposed tightening of the same language, called **Daylight 2** for the
-sake of the argument. It is a proposal: nothing in `src/` has been changed to produce it, and no
-dependency or font was added (the page reuses the same Inter and IBM Plex Mono files the app already
-bundles).
+`docs/ui-proposal/index.html` holds a review page — open it in a browser, no build needed — with three
+finished treatments of the same screen, called **Porcelain**, **Ink** and **Studio** for the sake of the
+argument: warm white with layered depth; a near-black rail against a white work surface; and an entirely
+dark workspace with a lightened accent. The quieter first attempt is kept beside it as
+`v1-daylight-2.html`. They are proposals: nothing in `src/` has been changed to produce them, and no
+dependency or font was added (the pages reuse the same Inter and IBM Plex Mono files the app already
+bundles). Every colour pair used is listed with its measured contrast on the page itself; none falls
+below 5:1.
 
 The diagnosis behind it, measured on the code rather than guessed: the palette and the single accent are
 already consistent, but 30 screens finished one at a time have drifted — 485 leftover `stone` colour
@@ -264,7 +267,8 @@ volume: ink at near-black, body at 13.5–14px, page titles at 26px, figures at 
 at 9.5–10px uppercase, one bordered figure strip instead of four floating cards, a tinted rail with a
 white work surface, and shadows reserved for things that genuinely float.
 
-It is awaiting a decision. Until it is taken, §4 and §5 describe the interface as built, not as proposed.
+A decision is awaited, including which of the three skins to take. Until it is taken, §4 and §5
+describe the interface as built, not as proposed.
 
 ## 7. What was verified
 

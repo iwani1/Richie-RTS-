@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Interface proposal · Richie TMS</title>
+<title>Premium interface proposal · Richie TMS</title>
 <style>
   @font-face {
     font-family: "Inter Variable";
@@ -24,800 +24,1156 @@
     font-display: swap;
   }
 
-  /* ------------------------------------------------------------------------------------------
-     The document itself. Deliberately quiet: the mock screens are the subject, not this page.
-     ------------------------------------------------------------------------------------------ */
-  :root {
-    --doc-ink: #101828;
-    --doc-body: #38415a;
-    --doc-muted: #5b6577;
-    --doc-line: #e4e7ee;
-    --doc-canvas: #ffffff;
-    --doc-panel: #f7f8fb;
-    --doc-accent: #4453f0;
-    --mono: "IBM Plex Mono", ui-monospace, monospace;
-  }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
-    background: var(--doc-canvas);
-    color: var(--doc-body);
+    background: #fbfbfa;
+    color: #2a3145;
     font-family: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
     font-size: 15px;
     line-height: 1.6;
     font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
   }
-  .doc { max-width: 1240px; margin: 0 auto; padding: 40px 28px 96px; }
-  .doc a { color: var(--doc-accent); }
-  .doc :focus-visible { outline: 2px solid var(--doc-accent); outline-offset: 2px; border-radius: 4px; }
+  body:focus-within { outline: none; }
+  .doc { max-width: 1280px; margin: 0 auto; padding: 44px 28px 110px; }
 
-  .masthead { border-bottom: 1px solid var(--doc-line); padding-bottom: 28px; margin-bottom: 12px; }
+  /* ---------- the document: deliberately quiet, the mocks are the subject ---------- */
+  .mast { border-bottom: 1px solid #e6e6e1; padding-bottom: 30px; }
   .kicker {
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--doc-muted);
-    margin: 0 0 14px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: #6a7285; margin: 0 0 16px;
   }
   h1 {
-    font-size: 34px;
-    line-height: 1.14;
-    letter-spacing: -0.028em;
-    font-weight: 640;
-    color: var(--doc-ink);
-    margin: 0 0 14px;
-    max-width: 20ch;
+    font-size: 42px; line-height: 1.06; letter-spacing: -0.042em; font-weight: 600;
+    color: #0e1424; margin: 0 0 18px; max-width: 17ch;
   }
-  .lede { font-size: 16.5px; line-height: 1.62; color: var(--doc-body); max-width: 68ch; margin: 0; }
+  h1 em { font-style: normal; color: #4453f0; }
+  .lede { font-size: 16.5px; line-height: 1.62; max-width: 70ch; margin: 0; color: #3b4356; }
   .lede + .lede { margin-top: 12px; }
+  .lede b { color: #0e1424; font-weight: 600; }
 
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    margin: 24px 0 0;
+  .switcher { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 26px; }
+  .switcher .lbl {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #6a7285; margin-right: 2px;
   }
-  .controls .label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--doc-muted); margin-right: 4px; }
-  .seg { display: inline-flex; border: 1px solid var(--doc-line); border-radius: 9px; overflow: hidden; }
+  .seg { display: inline-flex; border: 1px solid #dfe0da; border-radius: 11px; overflow: hidden; background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
   .seg button {
-    appearance: none;
-    border: 0;
-    background: #fff;
-    color: var(--doc-body);
-    font: inherit;
-    font-size: 13.5px;
-    font-weight: 550;
-    padding: 8px 15px;
-    cursor: pointer;
-    border-right: 1px solid var(--doc-line);
+    appearance: none; border: 0; background: transparent; color: #3b4356; font: inherit;
+    font-size: 13px; font-weight: 550; padding: 9px 15px; cursor: pointer;
+    border-right: 1px solid #ecece7;
   }
   .seg button:last-child { border-right: 0; }
-  .seg button[aria-pressed="true"] { background: #0e1526; color: #fff; }
+  .seg button[aria-pressed="true"] { background: #0e1424; color: #fff; }
+  .seg button:hover:not([aria-pressed="true"]) { background: #f5f5f1; }
 
   h2 {
-    font-size: 13px;
-    font-family: var(--mono);
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--doc-ink);
-    margin: 56px 0 6px;
-    padding-top: 18px;
-    border-top: 1px solid var(--doc-line);
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; color: #0e1424;
+    margin: 60px 0 8px; padding-top: 20px; border-top: 1px solid #e6e6e1;
   }
-  h2 .num { color: var(--doc-muted); margin-right: 10px; }
-  .why { font-size: 14.5px; color: var(--doc-muted); max-width: 74ch; margin: 0 0 22px; }
-  h3 { font-size: 15.5px; font-weight: 620; color: var(--doc-ink); margin: 30px 0 10px; letter-spacing: -0.008em; }
+  h2 .num { color: #9aa0ad; margin-right: 12px; }
+  .why { font-size: 14.5px; color: #5b6478; max-width: 76ch; margin: 0 0 24px; }
 
-  .compare { display: grid; gap: 26px; }
-  body[data-mode="today"] .pane[data-theme="next"] { display: none; }
-  body[data-mode="next"] .pane[data-theme="today"] { display: none; }
+  .panel { margin: 30px 0 0; }
+  body[data-view="porcelain"] .panel:not([data-dir="porcelain"]),
+  body[data-view="ink"] .panel:not([data-dir="ink"]),
+  body[data-view="studio"] .panel:not([data-dir="studio"]) { display: none; }
 
-  .pane-label { display: flex; align-items: baseline; gap: 10px; margin: 0 0 9px; }
-  .pane-label b { font-size: 12px; font-weight: 650; letter-spacing: 0.09em; text-transform: uppercase; color: var(--doc-ink); }
-  .pane-label span { font-size: 13px; color: var(--doc-muted); }
-  .frame { border: 1px solid var(--doc-line); border-radius: 12px; overflow: hidden; background: #fff; }
+  .panel-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .panel-head b { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: #0e1424; font-weight: 650; }
+  .panel-head .tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .06em;
+    border: 1px solid #dddcd5; border-radius: 999px; padding: 2px 9px; color: #5b6478; background: #fff;
+  }
+  .panel-head span { font-size: 13.5px; color: #5b6478; }
+  .frame {
+    border: 1px solid #e2e2db; border-radius: 16px; overflow: hidden; background: #fff;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 24px 48px -34px rgba(16,24,40,.35);
+  }
 
   .note {
-    margin: 26px 0 0;
-    padding: 14px 16px;
-    background: var(--doc-panel);
-    border-left: 2px solid var(--doc-accent);
-    border-radius: 0 8px 8px 0;
-    font-size: 13.5px;
-    color: var(--doc-body);
+    margin: 30px 0 0; padding: 15px 18px; background: #f4f4f0;
+    border-left: 2px solid #4453f0; border-radius: 0 10px 10px 0;
+    font-size: 13.5px; color: #3b4356;
   }
-  .note b { color: var(--doc-ink); }
+  .note b { color: #0e1424; }
 
-  table.tokens { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 8px 0 0; }
-  table.tokens th { text-align: left; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--doc-muted); font-weight: 500; padding: 0 12px 8px 0; border-bottom: 1px solid var(--doc-line); }
-  table.tokens td { padding: 9px 12px 9px 0; border-bottom: 1px solid #f0f2f6; vertical-align: middle; color: var(--doc-body); }
-  table.tokens td:first-child { color: var(--doc-ink); font-weight: 550; }
-  table.tokens code { font-family: var(--mono); font-size: 12px; color: #38415a; }
-  .sw { display: inline-block; width: 22px; height: 22px; border-radius: 5px; border: 1px solid rgba(16,24,40,0.12); vertical-align: middle; margin-right: 8px; }
+  .two { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 34px; }
+  @media (max-width: 940px) { .two { grid-template-columns: minmax(0,1fr); } h1 { font-size: 31px; } }
 
-  ol.decisions { counter-reset: d; list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 2px; }
-  ol.decisions li {
-    counter-increment: d;
-    display: grid;
-    grid-template-columns: 34px minmax(0, 1fr);
-    gap: 4px 12px;
-    padding: 14px 0;
-    border-bottom: 1px solid #f0f2f6;
+  ol.dec { counter-reset: d; list-style: none; padding: 0; margin: 10px 0 0; }
+  ol.dec li {
+    counter-increment: d; display: grid; grid-template-columns: 36px minmax(0,1fr);
+    gap: 4px 14px; padding: 16px 0; border-bottom: 1px solid #edede8;
   }
-  ol.decisions li::before {
-    content: counter(d, decimal-leading-zero);
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--doc-muted);
-    padding-top: 3px;
+  ol.dec li::before {
+    content: counter(d, decimal-leading-zero); font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; color: #9aa0ad; padding-top: 4px;
   }
-  ol.decisions b { display: block; color: var(--doc-ink); font-weight: 600; font-size: 14.5px; margin-bottom: 3px; }
-  ol.decisions p { margin: 0; font-size: 13.5px; color: var(--doc-muted); max-width: 78ch; }
+  ol.dec b { display: block; color: #0e1424; font-weight: 600; font-size: 14.5px; margin-bottom: 4px; letter-spacing: -0.006em; }
+  ol.dec p { margin: 0; font-size: 13.5px; color: #5b6478; max-width: 80ch; }
 
-  .two { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 30px; }
-  @media (max-width: 900px) { .two { grid-template-columns: minmax(0,1fr); } h1 { font-size: 27px; } }
-
-  ul.rules { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
-  ul.rules li { position: relative; padding-left: 20px; font-size: 13.5px; color: var(--doc-body); }
-  ul.rules li::before { content: ""; position: absolute; left: 2px; top: 9px; width: 6px; height: 1px; background: #8791a5; }
-  ul.rules li b { color: var(--doc-ink); font-weight: 600; }
-
-  .foot { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--doc-line); font-size: 13px; color: var(--doc-muted); }
-
-  /* ==========================================================================================
-     TODAY — an approximation of the shipped screen, built from src/index.css.
-     ========================================================================================== */
-  .mock { font-family: "Inter Variable", Inter, system-ui, sans-serif; }
-  .t { background: #f5f6f9; padding: 20px 22px 26px; color: #0f172a; font-size: 13px; }
-  .t-crumbs { font-size: 11.5px; color: #667085; margin-bottom: 14px; }
-  .t-crumbs b { color: #3d4759; }
-  .t-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
-  .t-eyebrow { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #667085; margin: 0 0 5px; font-weight: 600; }
-  .t-title { font-size: 22px; font-weight: 620; letter-spacing: -0.012em; margin: 0; color: #0f172a; }
-  .t-desc { font-size: 12.5px; line-height: 1.55; color: #667085; margin: 5px 0 0; max-width: 72ch; }
-  .t-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
-  .t-btn { font-size: 12.5px; font-weight: 550; padding: 7px 13px; border-radius: 10px; border: 1px solid #e7e9ef; background: #fff; color: #3d4759; }
-  .t-btn--primary { background: #4453f0; border-color: #4453f0; color: #fff; }
-  .t-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
-  .t-stat { background: #fff; border: 1px solid #eceef4; border-radius: 14px; padding: 13px 14px; box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 12px 28px -22px rgba(16,24,40,0.35); }
-  .t-stat p { margin: 0 0 6px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #667085; font-weight: 600; }
-  .t-stat strong { font-size: 24px; font-weight: 600; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; color: #0f172a; }
-  .t-stat small { display: block; font-size: 11.5px; color: #667085; margin-top: 3px; }
-  .t-card { background: #fff; border: 1px solid #eceef4; border-radius: 14px; box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 12px 28px -22px rgba(16,24,40,0.35); overflow: hidden; }
-  .t-card-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #eceef4; }
-  .t-card-head h4 { margin: 0; font-size: 13.5px; font-weight: 600; }
-  .t-card-head span { font-size: 12px; color: #667085; }
-  .t-card-head .t-btn { margin-left: auto; }
-  table.t-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .t-table th { text-align: left; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: #667085; font-weight: 600; padding: 10px 16px; border-bottom: 1px solid #eceef4; background: #fafbfc; }
-  .t-table td { padding: 11px 16px; border-bottom: 1px solid #f1f2f6; color: #3d4759; }
-  .t-table tr:last-child td { border-bottom: 0; }
-  .t-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: #0f172a; }
-  .t-table td.ref { font-family: var(--mono); font-size: 12px; color: #3d4759; }
-  .t-pill { display: inline-block; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 550; }
-  .t-pill--go { background: #eaf2ff; color: #134fb8; }
-  .t-pill--wait { background: #fdf3e3; color: #8a5606; }
-  .t-pill--ok { background: #e8f7f0; color: #0b7d4e; }
-  .t-pill--quiet { background: #f1f2f6; color: #4a5468; }
-  .t-foot { display: flex; gap: 14px; align-items: center; padding: 11px 16px; border-top: 1px solid #eceef4; font-size: 12px; color: #667085; }
-
-  /* component tiles for "today" */
-  .t-tile { background: #f5f6f9; padding: 18px; border-radius: 12px; }
-  .t-field { margin-bottom: 14px; }
-  .t-field label { display: block; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #667085; font-weight: 600; margin-bottom: 5px; }
-  .t-input { width: 100%; font-size: 13px; padding: 8px 10px; border: 1px solid #dfe3ea; border-radius: 10px; background: #fff; color: #0f172a; }
-  .t-input--bad { border-color: #d92d20; }
-  .t-hint { font-size: 12px; color: #667085; margin: 5px 0 0; }
-  .t-err { font-size: 12px; color: #b42318; margin: 5px 0 0; }
-  .t-notice { background: #fdf3e3; border: 1px solid #f3e0c2; border-radius: 12px; padding: 11px 13px; font-size: 12.5px; color: #8a5606; }
-  .t-empty { background: #fff; border: 1px dashed #dfe3ea; border-radius: 14px; padding: 22px; text-align: center; }
-  .t-empty strong { display: block; font-size: 13.5px; color: #0f172a; margin-bottom: 4px; }
-  .t-empty span { font-size: 12.5px; color: #667085; }
-  .t-money { font-size: 26px; font-weight: 600; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; color: #0f172a; }
-  .t-money small { font-size: 12px; color: #667085; font-weight: 500; letter-spacing: 0; margin-left: 4px; }
-
-  /* ==========================================================================================
-     PROPOSED — "Daylight 2".
-     ========================================================================================== */
-  .n {
-    --n-canvas: #f6f7fa;
-    --n-rail: #eef0f5;
-    --n-card: #ffffff;
-    --n-line: #e2e6ee;
-    --n-line-2: #d5dae5;
-    --n-ink: #0b1220;
-    --n-ink-2: #2c3547;
-    --n-muted: #59637a;
-    --n-faint: #8791a5;
-    --n-accent: #4453f0;
-    --n-accent-soft: #eef0ff;
-    --n-accent-line: #dfe3ff;
-    background: var(--n-canvas);
-    color: var(--n-ink-2);
-    font-size: 13.5px;
-    line-height: 1.55;
-    padding: 18px 20px 24px;
+  table.tokens { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 6px; }
+  table.tokens th {
+    text-align: left; font-family: "IBM Plex Mono", monospace; font-size: 10px;
+    letter-spacing: 0.1em; text-transform: uppercase; color: #6a7285; font-weight: 500;
+    padding: 0 12px 9px 0; border-bottom: 1px solid #e6e6e1;
   }
-  .n-crumbs { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--n-faint); margin-bottom: 16px; }
-  .n-crumbs b { color: var(--n-ink-2); font-weight: 500; }
+  table.tokens td { padding: 10px 12px 10px 0; border-bottom: 1px solid #f0f0eb; color: #3b4356; }
+  table.tokens td:first-child { color: #0e1424; font-weight: 550; }
+  table.tokens code { font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .sw { display: inline-block; width: 20px; height: 20px; border-radius: 6px; border: 1px solid rgba(16,24,40,.13); vertical-align: middle; margin-right: 9px; }
 
-  .n-head { display: flex; align-items: flex-start; gap: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--n-line); margin-bottom: 16px; }
-  .n-title { font-size: 26px; line-height: 1.15; font-weight: 640; letter-spacing: -0.026em; margin: 0; color: var(--n-ink); }
-  .n-meta { display: flex; align-items: center; gap: 8px; margin: 7px 0 0; font-size: 12.5px; color: var(--n-muted); }
-  .n-meta i { width: 3px; height: 3px; border-radius: 50%; background: var(--n-faint); display: inline-block; }
-  .n-meta b { color: var(--n-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
-  .n-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
-  .n-btn {
-    font: inherit; font-size: 12.5px; font-weight: 560; letter-spacing: -0.004em;
-    padding: 7px 12px; border-radius: 8px; border: 1px solid var(--n-line-2);
-    background: var(--n-card); color: var(--n-ink-2); cursor: default;
+  .foot { margin-top: 64px; padding-top: 22px; border-top: 1px solid #e6e6e1; font-size: 13px; color: #5b6478; }
+  code.inline { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; background: #f1f1ec; padding: 1px 5px; border-radius: 4px; }
+
+  /* =========================================================================================
+     THE MOCK. One markup, three skins, driven entirely by the variables below.
+     ========================================================================================= */
+  .app {
+    display: grid; grid-template-columns: 238px minmax(0, 1fr);
+    background: var(--canvas); color: var(--text);
+    font-family: "Inter Variable", Inter, system-ui, sans-serif;
+    font-size: 13.5px; line-height: 1.5; min-height: 640px;
   }
-  .n-btn--primary { background: var(--n-accent); border-color: var(--n-accent); color: #fff; font-weight: 570; }
-  .n-btn--quiet { border-color: transparent; background: transparent; color: var(--n-muted); }
-  .n-btn--danger { color: #b42318; border-color: #f0cfcb; background: #fff; }
 
-  .n-strip {
+  /* ---- rail ---- */
+  .rail {
+    background: var(--rail); border-right: 1px solid var(--rail-line);
+    padding: 16px 12px 14px; display: flex; flex-direction: column; min-height: 640px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px 18px; }
+  .mark {
+    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+    font-size: 13px; font-weight: 650; letter-spacing: -0.02em;
+    background: var(--mark-bg); color: var(--mark-ink);
+    box-shadow: var(--mark-shadow);
+  }
+  .brand b { display: block; font-size: 12.5px; font-weight: 620; color: var(--rail-ink); letter-spacing: -0.012em; }
+  .brand span { display: block; font-size: 10.5px; color: var(--rail-muted); letter-spacing: 0.005em; }
+
+  .grp { margin-bottom: 16px; }
+  .grp > p {
+    margin: 0 0 6px; padding: 0 9px; font-size: 9.5px; font-weight: 620;
+    letter-spacing: 0.13em; text-transform: uppercase; color: var(--rail-muted);
+  }
+  .item {
+    position: relative; display: flex; align-items: center; gap: 10px;
+    padding: 7px 9px; border-radius: 8px; color: var(--rail-text);
+    font-size: 12.5px; font-weight: 500; margin-bottom: 1px;
+  }
+  .item .ic { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--rail-icon); flex: none; }
+  .item .n {
+    margin-left: auto; font-size: 10px; font-weight: 620; font-variant-numeric: tabular-nums;
+    color: var(--rail-muted); background: var(--rail-chip); border-radius: 5px; padding: 1px 5px;
+  }
+  .item.on {
+    background: var(--rail-on); color: var(--rail-on-ink); font-weight: 600;
+    box-shadow: var(--rail-on-shadow);
+  }
+  .item.on .ic { border-color: var(--accent); background: var(--accent-soft); }
+  .item.on .n { background: var(--accent-soft); color: var(--accent-ink); }
+  .item.on::before {
+    content: ""; position: absolute; left: -13px; top: 9px; bottom: 9px; width: 2px;
+    background: var(--accent); border-radius: 0 2px 2px 0;
+  }
+  .rail-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--rail-line); }
+  .who { display: flex; align-items: center; gap: 9px; padding: 5px 8px; }
+  .who .av {
+    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 9.5px; font-weight: 650; background: var(--rail-chip); color: var(--rail-ink);
+  }
+  .who b { display: block; font-size: 11.5px; font-weight: 570; color: var(--rail-ink); }
+  .who span { display: block; font-size: 10.5px; color: var(--rail-muted); }
+
+  /* ---- top bar ---- */
+  .work { display: flex; flex-direction: column; min-width: 0; }
+  .top {
+    display: flex; align-items: center; gap: 14px; height: 52px; padding: 0 24px;
+    background: var(--top); border-bottom: 1px solid var(--line);
+  }
+  .crumb {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .crumb b { color: var(--text); font-weight: 500; }
+  .search {
+    margin-left: auto; display: flex; align-items: center; gap: 9px;
+    border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px;
+    font-size: 11.5px; color: var(--muted); background: var(--input-bg); min-width: 240px;
+  }
+  .search kbd {
+    margin-left: auto; font-family: "IBM Plex Mono", monospace; font-size: 9.5px;
+    border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: var(--muted);
+  }
+  .av-lg {
+    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 9.5px; font-weight: 650; background: var(--accent-soft); color: var(--accent-ink);
+  }
+
+  /* ---- page ---- */
+  .canvas { padding: 24px 26px 30px; }
+  .head { display: flex; align-items: flex-start; gap: 22px; margin-bottom: 20px; }
+  .head h3 {
+    margin: 0; font-size: 30px; line-height: 1.06; font-weight: 620;
+    letter-spacing: -0.036em; color: var(--ink);
+  }
+  .head .meta {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 9px;
+    margin: 9px 0 0; font-size: 12.5px; color: var(--muted);
+  }
+  .head .meta b { color: var(--text); font-weight: 570; font-variant-numeric: tabular-nums; }
+  .head .meta .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--faint); }
+  .head .acts { margin-left: auto; display: flex; gap: 8px; align-items: center; flex: none; }
+
+  .btn {
+    font: inherit; font-size: 12.5px; font-weight: 550; letter-spacing: -0.004em;
+    padding: 8px 13px; border-radius: 9px; border: 1px solid var(--btn-line);
+    background: var(--btn-bg); color: var(--text); cursor: default; white-space: nowrap;
+    box-shadow: var(--btn-shadow);
+  }
+  .btn.primary {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 1px 2px rgba(16,24,40,.22), 0 6px 14px -8px rgba(68,83,240,.6);
+  }
+  .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); }
+  .btn.danger { color: #b42318; border-color: #efcfcb; background: var(--btn-bg); }
+
+  /* ---- figure strip ---- */
+  .strip {
     display: grid; grid-template-columns: repeat(4, minmax(0,1fr));
-    border: 1px solid var(--n-line); border-radius: 12px; background: var(--n-card);
-    overflow: hidden; margin-bottom: 18px;
+    border: 1px solid var(--line); border-radius: var(--r-card);
+    background: var(--card); box-shadow: var(--card-shadow); overflow: hidden; margin-bottom: 16px;
   }
-  .n-stat { padding: 14px 16px 13px; border-right: 1px solid var(--n-line); }
-  .n-stat:last-child { border-right: 0; }
-  .n-stat p { margin: 0 0 7px; font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--n-muted); font-weight: 620; }
-  .n-stat strong { display: block; font-size: 25px; line-height: 1; font-weight: 620; letter-spacing: -0.026em; font-variant-numeric: tabular-nums; color: var(--n-ink); }
-  .n-stat small { display: block; margin-top: 6px; font-size: 11.5px; color: var(--n-muted); }
-  .n-stat--alert strong { color: #b42318; }
-
-  .n-card { background: var(--n-card); border: 1px solid var(--n-line); border-radius: 12px; }
-  .n-card-head { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--n-line); }
-  .n-card-head h4 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--n-ink); letter-spacing: -0.006em; }
-  .n-card-head p { margin: 0; font-size: 12px; color: var(--n-muted); }
-  .n-card-head .n-btn { margin-left: auto; }
-
-  table.n-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .n-table th {
-    text-align: left; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--n-muted); font-weight: 640; padding: 9px 16px;
-    border-bottom: 1px solid var(--n-line); background: #fbfcfe; white-space: nowrap;
+  .stat { padding: 16px 18px 15px; border-right: 1px solid var(--line); }
+  .stat:last-child { border-right: 0; }
+  .stat p {
+    margin: 0 0 9px; font-size: 9.5px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--muted); font-weight: 620;
   }
-  .n-table th.num { text-align: right; }
-  .n-table td { padding: 0 16px; height: 46px; border-bottom: 1px solid #eef0f5; color: var(--n-ink-2); }
-  .n-table tbody tr:last-child td { border-bottom: 0; }
-  .n-table tbody tr:hover td { background: #f8f9fc; }
-  .n-table td.ref { font-family: var(--mono); font-size: 11.5px; color: var(--n-muted); letter-spacing: -0.01em; }
-  .n-table td.strong { color: var(--n-ink); font-weight: 550; }
-  .n-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--n-ink); font-weight: 550; white-space: nowrap; }
-  .n-table td.dim { color: var(--n-muted); }
+  .stat strong {
+    display: block; font-size: 28px; line-height: 1; font-weight: 600;
+    letter-spacing: -0.04em; font-variant-numeric: tabular-nums; color: var(--ink);
+  }
+  .stat small { display: block; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+  .stat.bad strong { color: var(--danger-ink); }
 
-  .n-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 570; letter-spacing: 0.005em; white-space: nowrap; }
-  .n-chip i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; display: inline-block; flex: none; }
-  .n-chip--go { background: #eaf2ff; color: #134fb8; }
-  .n-chip--wait { background: #fdf3e3; color: #8a5606; }
-  .n-chip--ok { background: #e8f7f0; color: #0a7449; }
-  .n-chip--stop { background: #fdecea; color: #b42318; }
-  .n-chip--quiet { background: #f1f3f7; color: #4b5568; }
-  .n-foot { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-top: 1px solid var(--n-line); font-size: 11.5px; color: var(--n-muted); }
-  .n-foot b { color: var(--n-ink); font-weight: 550; font-variant-numeric: tabular-nums; }
+  /* ---- cards + table ---- */
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
+    box-shadow: var(--card-shadow); overflow: hidden;
+  }
+  .card + .card { margin-top: 16px; }
+  .card-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .card-head h4 { margin: 0; font-size: 13.5px; font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }
+  .card-head p { margin: 0; font-size: 12px; color: var(--muted); }
+  .card-head .btn { margin-left: auto; }
 
-  /* the pieces */
-  .n-tile { background: var(--n-canvas); padding: 18px; border-radius: 12px; }
-  .n-field { margin-bottom: 16px; }
-  .n-field:last-child { margin-bottom: 0; }
-  .n-field label { display: block; font-size: 12px; font-weight: 570; color: var(--n-ink); margin-bottom: 5px; letter-spacing: -0.004em; }
-  .n-input { width: 100%; font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--n-line-2); border-radius: 8px; background: #fff; color: var(--n-ink); }
-  .n-input--bad { border-color: #d92d20; box-shadow: 0 0 0 3px #fdecea; }
-  .n-hint { font-size: 11.5px; color: var(--n-muted); margin: 5px 0 0; }
-  .n-err { display: flex; gap: 5px; font-size: 11.5px; color: #b42318; margin: 5px 0 0; font-weight: 500; }
-  .n-notice { display: flex; gap: 9px; background: #fdf3e3; border-left: 2px solid #b8730b; border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 12.5px; color: #6f4505; }
-  .n-empty { background: #fff; border: 1px solid var(--n-line); border-radius: 12px; padding: 26px 20px; text-align: center; }
-  .n-empty .glyph { width: 30px; height: 30px; border: 1px solid var(--n-line-2); border-radius: 8px; margin: 0 auto 10px; position: relative; }
-  .n-empty .glyph::before, .n-empty .glyph::after { content: ""; position: absolute; background: var(--n-line-2); }
-  .n-empty .glyph::before { left: 7px; right: 7px; top: 11px; height: 1px; }
-  .n-empty .glyph::after { left: 7px; right: 7px; top: 17px; height: 1px; }
-  .n-empty strong { display: block; font-size: 13.5px; color: var(--n-ink); font-weight: 600; margin-bottom: 4px; }
-  .n-empty span { font-size: 12.5px; color: var(--n-muted); }
-  .n-money { font-size: 27px; font-weight: 630; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--n-ink); }
-  .n-money small { font-family: var(--mono); font-size: 11px; font-weight: 400; letter-spacing: 0.04em; color: var(--n-muted); margin-left: 7px; vertical-align: 6px; }
+  table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .t th {
+    text-align: left; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 640; padding: 10px 18px; white-space: nowrap;
+    border-bottom: 1px solid var(--line); background: var(--thead);
+  }
+  .t th.num, .t td.num { text-align: right; }
+  .t td { height: 50px; padding: 0 18px; border-bottom: 1px solid var(--row-line); color: var(--text); }
+  .t tbody tr:last-child td { border-bottom: 0; }
+  .t tbody tr:hover td { background: var(--row-hover); }
+  .t td.ref { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted); letter-spacing: -0.01em; }
+  .t td.strong { color: var(--ink); font-weight: 570; }
+  .t td.dim { color: var(--muted); }
+  .t td.num { font-variant-numeric: tabular-nums; font-weight: 570; color: var(--ink); white-space: nowrap; }
+  .card-foot {
+    display: flex; align-items: center; gap: 16px; padding: 12px 18px;
+    border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted);
+  }
+  .card-foot b { color: var(--ink); font-weight: 570; font-variant-numeric: tabular-nums; }
 
-  /* the whole workspace */
-  .workspace { display: grid; grid-template-columns: 226px minmax(0,1fr); min-height: 560px; background: var(--n-canvas); font-family: "Inter Variable", Inter, system-ui, sans-serif; font-size: 13px; color: #2c3547; }
-  .ws-rail { background: #eef0f5; border-right: 1px solid #e2e6ee; padding: 14px 10px 16px; display: flex; flex-direction: column; }
-  .ws-brand { display: flex; align-items: center; gap: 9px; padding: 2px 6px 16px; }
-  .ws-mark { width: 26px; height: 26px; border-radius: 7px; background: #4453f0; color: #fff; font-size: 12.5px; font-weight: 650; display: grid; place-items: center; }
-  .ws-brand b { font-size: 12.5px; font-weight: 620; color: #0b1220; display: block; letter-spacing: -0.01em; }
-  .ws-brand span { font-size: 10.5px; color: #59637a; display: block; }
-  .ws-group { margin-bottom: 14px; }
-  .ws-group p { margin: 0 0 5px; padding: 0 8px; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #8791a5; font-weight: 640; }
-  .ws-item { position: relative; display: flex; align-items: center; gap: 9px; padding: 6px 8px 6px 9px; border-radius: 7px; color: #38415a; font-size: 12.5px; font-weight: 500; }
-  .ws-item .dot { width: 13px; height: 13px; border: 1.5px solid #a2abbb; border-radius: 4px; flex: none; }
-  .ws-item .count { margin-left: auto; font-size: 10.5px; font-weight: 620; color: #4b5568; background: #dfe3ec; border-radius: 5px; padding: 0 5px; font-variant-numeric: tabular-nums; }
-  .ws-item--on { background: #fff; color: #0b1220; font-weight: 600; border: 1px solid #e2e6ee; padding: 5px 7px 5px 8px; }
-  .ws-item--on::before { content: ""; position: absolute; left: -1px; top: 6px; bottom: 6px; width: 2px; background: #4453f0; border-radius: 2px; }
-  .ws-item--on .dot { border-color: #4453f0; background: #eef0ff; }
-  .ws-item--on .count { background: #eef0ff; color: #3542cf; }
-  .ws-foot { margin-top: auto; border-top: 1px solid #dfe3ec; padding-top: 10px; }
-  .ws-user { display: flex; align-items: center; gap: 8px; padding: 4px 8px; }
-  .ws-avatar { width: 22px; height: 22px; border-radius: 50%; background: #dfe3ec; color: #38415a; font-size: 9.5px; font-weight: 650; display: grid; place-items: center; }
-  .ws-user b { display: block; font-size: 11.5px; color: #0b1220; font-weight: 570; }
-  .ws-user span { display: block; font-size: 10.5px; color: #59637a; }
-  .ws-main { display: flex; flex-direction: column; }
-  .ws-top { display: flex; align-items: center; gap: 14px; padding: 0 22px; height: 48px; background: #fff; border-bottom: 1px solid #e2e6ee; }
-  .ws-crumb { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #8791a5; }
-  .ws-crumb b { color: #2c3547; font-weight: 500; }
-  .ws-search { margin-left: auto; display: flex; align-items: center; gap: 8px; border: 1px solid #e2e6ee; border-radius: 7px; padding: 5px 9px; color: #8791a5; font-size: 11.5px; background: #fbfcfe; min-width: 220px; }
-  .ws-search kbd { margin-left: auto; font-family: var(--mono); font-size: 9.5px; border: 1px solid #e2e6ee; border-radius: 4px; padding: 0 4px; color: #59637a; }
-  .ws-avatar-lg { width: 24px; height: 24px; border-radius: 50%; background: #eef0ff; color: #3542cf; font-size: 9.5px; font-weight: 650; display: grid; place-items: center; }
-  .ws-body { padding: 20px 22px 24px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+    padding: 3px 10px 3px 8px; font-size: 11px; font-weight: 570; white-space: nowrap;
+    box-shadow: inset 0 0 0 1px var(--chip-ring);
+  }
+  .chip i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
+  .chip.go { background: var(--blue-soft); color: var(--blue-ink); }
+  .chip.wait { background: var(--amber-soft); color: var(--amber-ink); }
+  .chip.ok { background: var(--green-soft); color: var(--green-ink); }
+  .chip.stop { background: var(--red-soft); color: var(--red-ink); }
+  .chip.quiet { background: var(--quiet-soft); color: var(--quiet-ink); }
 
-  .detail { display: grid; grid-template-columns: minmax(0,1fr) 264px; gap: 18px; align-items: start; }
-  .facts { border: 1px solid #e2e6ee; border-radius: 12px; background: #fff; }
-  .facts h5 { margin: 0; padding: 11px 14px; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #59637a; font-weight: 640; border-bottom: 1px solid #e2e6ee; }
-  .facts dl { margin: 0; padding: 4px 14px 10px; }
-  .facts div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid #f1f3f7; font-size: 12px; }
-  .facts div:last-child { border-bottom: 0; }
-  .facts dt { color: #59637a; }
-  .facts dd { margin: 0; color: #0b1220; font-weight: 550; text-align: right; }
-  .charge { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid #eef0f5; }
-  .charge b { font-size: 12.5px; color: #0b1220; font-weight: 570; display: block; }
-  .charge span { font-size: 11.5px; color: #59637a; }
-  .charge .amt { font-size: 13px; font-weight: 580; font-variant-numeric: tabular-nums; color: #0b1220; text-align: right; }
-  .timeline { list-style: none; margin: 0; padding: 4px 16px 12px; }
-  .timeline li { display: grid; grid-template-columns: 62px minmax(0,1fr); gap: 12px; padding: 8px 0; font-size: 12px; border-bottom: 1px solid #f4f5f9; }
-  .timeline li:last-child { border-bottom: 0; }
-  .timeline time { font-family: var(--mono); font-size: 10.5px; color: #8791a5; padding-top: 2px; }
-  .timeline span { color: #2c3547; }
-  .timeline b { color: #0b1220; font-weight: 570; }
+  /* ---- detail rows inside a card ---- */
+  .charge { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 14px; align-items: center; padding: 13px 18px; border-bottom: 1px solid var(--row-line); }
+  .charge b { display: block; font-size: 12.5px; font-weight: 580; color: var(--ink); }
+  .charge span.s { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); }
+  .charge .amt { font-size: 13.5px; font-weight: 580; font-variant-numeric: tabular-nums; color: var(--ink); text-align: right; }
+
+  /* ---- component bench ---- */
+  .bench {
+    display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px;
+    padding: 18px; background: var(--canvas); border-top: 1px solid var(--line);
+  }
+  @media (max-width: 1000px) { .bench { grid-template-columns: repeat(2, minmax(0,1fr)); } .strip { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 15px; box-shadow: var(--card-shadow); }
+  .tile h6 {
+    margin: 0 0 11px; font-size: 9px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--muted); font-weight: 640;
+  }
+  .tile .row { display: flex; flex-wrap: wrap; gap: 7px; }
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: block; font-size: 11.5px; font-weight: 560; color: var(--ink); margin-bottom: 5px; }
+  .inp {
+    width: 100%; font: inherit; font-size: 12.5px; padding: 8px 10px;
+    border: 1px solid var(--input-line); border-radius: 8px;
+    background: var(--input-bg); color: var(--ink); box-shadow: var(--input-shadow, none);
+  }
+  .inp.bad { border-color: #d92d20; box-shadow: 0 0 0 3px rgba(217,45,32,.12); }
+  .hint { margin: 5px 0 0; font-size: 11px; color: var(--muted); }
+  .err { margin: 5px 0 0; font-size: 11px; font-weight: 520; color: var(--danger-ink); }
+  .notice {
+    display: flex; gap: 9px; padding: 10px 12px; border-radius: 9px;
+    font-size: 12px; line-height: 1.5; background: var(--amber-soft); color: var(--amber-ink);
+    box-shadow: inset 0 0 0 1px var(--chip-ring);
+  }
+  .notice .g { font-weight: 700; flex: none; }
+  .empty { text-align: center; padding: 20px 12px 18px; }
+  .empty .glyph {
+    width: 32px; height: 32px; margin: 0 auto 10px; border-radius: 9px;
+    border: 1px solid var(--input-line); position: relative; background: var(--input-bg);
+  }
+  .empty .glyph::before, .empty .glyph::after {
+    content: ""; position: absolute; left: 8px; right: 8px; height: 1px; background: var(--input-line);
+  }
+  .empty .glyph::before { top: 12px; }
+  .empty .glyph::after { top: 18px; }
+  .empty strong { display: block; font-size: 12.5px; font-weight: 590; color: var(--ink); margin-bottom: 3px; }
+  .empty span { font-size: 11.5px; color: var(--muted); }
+  .money {
+    font-size: 29px; font-weight: 620; letter-spacing: -0.045em;
+    font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1;
+  }
+  .money small {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 400;
+    letter-spacing: 0.08em; color: var(--muted); margin-left: 7px; vertical-align: 7px;
+  }
+  .meter { height: 5px; border-radius: 999px; background: var(--quiet-soft); margin-top: 12px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 62%; background: var(--accent); border-radius: 999px; }
+
+  /* =========================================================================================
+     SKIN 1 — PORCELAIN. Warm white, layered depth, hairline edges, large quiet type.
+     ========================================================================================= */
+  [data-dir="porcelain"] {
+    --canvas: #f6f6f3;
+    --rail: #fbfbf9;
+    --rail-line: #e8e7e1;
+    --card: #ffffff;
+    --line: #e8e7e2;
+    --row-line: #f1f0ec;
+    --row-hover: #faf9f6;
+    --thead: #fbfbf8;
+    --ink: #0e1424;
+    --text: #2a3145;
+    --muted: #5b6478;
+    --faint: #a8adba;
+    --accent: #4453f0;
+    --accent-soft: #eef0ff;
+    --accent-ink: #3542cf;
+    --rail-ink: #0e1424;
+    --rail-text: #38415a;
+    --rail-muted: #7b8397;
+    --rail-icon: #b3b8c4;
+    --rail-chip: #ecebe5;
+    --rail-on: #ffffff;
+    --rail-on-ink: #0e1424;
+    --rail-on-shadow: 0 1px 2px rgba(16,24,40,.07), 0 8px 20px -14px rgba(16,24,40,.35);
+    --mark-bg: #4453f0;
+    --mark-ink: #ffffff;
+    --mark-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 2px 6px -1px rgba(68,83,240,.55);
+    --top: #ffffff;
+    --card-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(16,24,40,.04), 0 18px 34px -28px rgba(16,24,40,.45);
+    --btn-bg: #ffffff;
+    --btn-line: #dedcd4;
+    --btn-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(16,24,40,.07);
+    --input-bg: #ffffff;
+    --input-line: #dbd9d1;
+    --r-card: 16px;
+    --blue-soft: #eaf2ff; --blue-ink: #134fb8;
+    --amber-soft: #fbf1df; --amber-ink: #8a5606;
+    --green-soft: #e7f6ef; --green-ink: #0a7449;
+    --red-soft: #fdecea; --red-ink: #b42318;
+    --quiet-soft: #f0f0eb; --quiet-ink: #4b5568;
+    --danger-ink: #b42318;
+    --chip-ring: rgba(16,24,40,.04);
+  }
+
+  /* =========================================================================================
+     SKIN 2 — INK. A near-black rail, white work surface, high contrast, small bright accent.
+     ========================================================================================= */
+  [data-dir="ink"] {
+    --canvas: #f4f5f8;
+    --rail: #0c1018;
+    --rail-line: #1c2230;
+    --card: #ffffff;
+    --line: #e4e7ee;
+    --row-line: #eef0f5;
+    --row-hover: #f8f9fc;
+    --thead: #fbfcfe;
+    --ink: #0b1220;
+    --text: #2c3547;
+    --muted: #5b6478;
+    --faint: #a5acba;
+    --accent: #4453f0;
+    --accent-soft: #eef0ff;
+    --accent-ink: #3542cf;
+    --rail-ink: #ffffff;
+    --rail-text: #c6cdda;
+    --rail-muted: #8b93a5;
+    --rail-icon: #4d576b;
+    --rail-chip: #1b2130;
+    --rail-on: #1b2130;
+    --rail-on-ink: #ffffff;
+    --rail-on-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+    --mark-bg: #4453f0;
+    --mark-ink: #ffffff;
+    --mark-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 6px 16px -6px rgba(68,83,240,.8);
+    --top: #ffffff;
+    --card-shadow: 0 1px 2px rgba(16,24,40,.04), 0 14px 30px -26px rgba(16,24,40,.5);
+    --btn-bg: #ffffff;
+    --btn-line: #dcdfe8;
+    --btn-shadow: 0 1px 2px rgba(16,24,40,.05);
+    --input-bg: #ffffff;
+    --input-line: #d7dbe4;
+    --r-card: 14px;
+    --blue-soft: #eaf2ff; --blue-ink: #134fb8;
+    --amber-soft: #fdf3e3; --amber-ink: #8a5606;
+    --green-soft: #e8f7f0; --green-ink: #0a7449;
+    --red-soft: #fdecea; --red-ink: #b42318;
+    --quiet-soft: #f1f3f7; --quiet-ink: #4b5568;
+    --danger-ink: #b42318;
+    --chip-ring: rgba(16,24,40,.04);
+  }
+
+  /* =========================================================================================
+     SKIN 3 — STUDIO. Dark canvas, deep cards, a brighter accent. Striking; heavier for a day's work.
+     ========================================================================================= */
+  [data-dir="studio"] {
+    --canvas: #0a0c11;
+    --rail: #070910;
+    --rail-line: #191d27;
+    --card: #12151d;
+    --line: rgba(255,255,255,.075);
+    --row-line: rgba(255,255,255,.055);
+    --row-hover: rgba(255,255,255,.028);
+    --thead: rgba(255,255,255,.022);
+    --ink: #f2f3f8;
+    --text: #d7dae4;
+    --muted: #9aa2b6;
+    --faint: #667085;
+    --accent: #7c88ff;
+    --accent-soft: rgba(124,136,255,.14);
+    --accent-ink: #a9b1ff;
+    --rail-ink: #f4f5f9;
+    --rail-text: #b6bdcc;
+    --rail-muted: #767f92;
+    --rail-icon: #454e60;
+    --rail-chip: #161a24;
+    --rail-on: #161a24;
+    --rail-on-ink: #ffffff;
+    --rail-on-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    --mark-bg: #7c88ff;
+    --mark-ink: #0a0c11;
+    --mark-shadow: 0 6px 18px -8px rgba(124,136,255,.9);
+    --top: #0d1017;
+    --card-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 18px 40px -30px #000;
+    --btn-bg: #161a24;
+    --btn-line: rgba(255,255,255,.1);
+    --btn-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 1px 2px rgba(0,0,0,.4);
+    --input-bg: #0e1119;
+    --input-line: rgba(255,255,255,.11);
+    --r-card: 15px;
+    --blue-soft: rgba(94,142,255,.16); --blue-ink: #9ebdff;
+    --amber-soft: rgba(240,194,122,.13); --amber-ink: #f0c27a;
+    --green-soft: rgba(126,224,176,.12); --green-ink: #7ee0b0;
+    --red-soft: rgba(255,138,128,.12); --red-ink: #ff9f96;
+    --quiet-soft: rgba(255,255,255,.07); --quiet-ink: #c3c9d6;
+    --danger-ink: #ff9f96;
+    --chip-ring: rgba(255,255,255,.05);
+  }
+  /* the primary button keeps white text on the darker indigo, not the lightened one */
+  [data-dir="studio"] .btn.primary { background: #4453f0; border-color: #4b59f2; }
 </style>
 </head>
-<body data-mode="both">
+<body data-view="all">
 <div class="doc">
 
-  <header class="masthead">
-    <p class="kicker">Richie TMS · interface proposal · not yet applied to the app</p>
-    <h1>Daylight 2 — the same product, with its edges sharpened</h1>
-    <p class="lede">You said the interface looks plain. I agree, and I do not think the answer is a new
-      colour scheme — the diagnostics say the app already has a consistent palette and one accent. What it
-      lacks is <b>typographic confidence and hierarchy</b>: everything sits in a white box at the same
-      weight, at 12.5&nbsp;pixel text, so the eye has nowhere to land and the screen reads as grey.</p>
-    <p class="lede">This page shows the same screens twice — as they are, and as I propose they become.
-      Read it, then tell me which sections to keep and which to throw out. Nothing in the application has
-      been changed to produce it.</p>
+  <header class="mast">
+    <p class="kicker">Richie TMS · interface proposal v2 · not yet applied</p>
+    <h1>The same application, <em>made to feel expensive</em></h1>
+    <p class="lede">Three ways to give the workspace the finish you are asking for. All three keep the rules
+      the product already holds itself to — one accent, no gradients behind anything that carries meaning,
+      no glass, no motion, every pair above 5:1 contrast. What changes is <b>depth, weight and
+      contrast</b>: layered shadows, hairline edges, type that jumps between sizes instead of inching,
+      figures big enough to read across a desk.</p>
+    <p class="lede">Same screen, same records, same numbers in all three. Switch between them and tell me
+      which one you would be happy to open every morning — or say “take the rail from Ink, the cards from
+      Porcelain” and I will mix them.</p>
 
-    <div class="controls">
-      <span class="label">Show</span>
-      <div class="seg" role="group" aria-label="Which version to show">
-        <button type="button" data-set-mode="today" aria-pressed="false">Today</button>
-        <button type="button" data-set-mode="next" aria-pressed="false">Proposed</button>
-        <button type="button" data-set-mode="both" aria-pressed="true">Both, one above the other</button>
+    <div class="switcher">
+      <span class="lbl">Skin</span>
+      <div class="seg" role="group" aria-label="Choose a skin">
+        <button type="button" data-set-view="all" aria-pressed="true">All three</button>
+        <button type="button" data-set-view="porcelain" aria-pressed="false">Porcelain</button>
+        <button type="button" data-set-view="ink" aria-pressed="false">Ink</button>
+        <button type="button" data-set-view="studio" aria-pressed="false">Studio</button>
       </div>
     </div>
   </header>
 
-  <h2><span class="num">01</span>The screen you spend the day on</h2>
-  <p class="why">A register: four figures at the top, then the list. Both panes carry identical sample
-    content, so what you are judging is only the treatment. The sample rows are illustrations for this
-    page — they are not records and they are not in the database.</p>
-
-  <div class="compare">
-
-    <section class="pane" data-theme="today">
-      <p class="pane-label"><b>Today</b><span>Four floating cards, one paragraph of explanation, 12.5&nbsp;px body text.</span></p>
+  <h2><span class="num">01</span>Three finishes</h2>
+  <p class="why">Each panel is the real shape of a screen: the rail, the header, the figure strip, a register,
+    a record card and a bench of the six components the whole app is built from. The rows are illustrations
+    for this page — they are not records and they are not in the database.</p>
+<div class="panel-head" style="margin-top:34px"><b>Porcelain</b><span class="tag">Layer and light</span><span>Warm off-white canvas, pure white records, hairline edges and a soft two-part shadow. The most traditional premium: quiet, bright, expensive-looking, and the easiest to read all day.</span></div>
+<section class="panel" data-dir="porcelain">
       <div class="frame">
-        <div class="mock t">
-          <p class="t-crumbs">Service desk &nbsp;›&nbsp; <b>Rentals</b></p>
-          <div class="t-head">
-            <div>
-              <p class="t-eyebrow">Service desk</p>
-              <h3 class="t-title">Rentals</h3>
-              <p class="t-desc">Every hire from the first enquiry to the final invoice. A request is priced,
-                agreed by the customer, confirmed by a deposit, assigned to a vehicle and driver, then
-                completed and billed — each step recorded against the person who took it.</p>
-            </div>
-            <div class="t-actions">
-              <button class="t-btn" type="button">Export</button>
-              <button class="t-btn t-btn--primary" type="button">New request</button>
-            </div>
+      <div class="app">
+        <aside class="rail">
+          <div class="brand">
+            <div class="mark">R</div>
+            <div><b>Richie TMS</b><span>Transport Services</span></div>
           </div>
 
-          <div class="t-stats">
-            <div class="t-stat"><p>Waiting on us</p><strong>3</strong><small>priced or answered</small></div>
-            <div class="t-stat"><p>Out today</p><strong>2</strong><small>vehicles on hire</small></div>
-            <div class="t-stat"><p>To invoice</p><strong>1</strong><small>completed, unbilled</small></div>
-            <div class="t-stat"><p>Open value</p><strong>11,450</strong><small>GHS, quoted</small></div>
+          <div class="grp">
+            <p>Service desk</p>
+            <div class="item"><span class="ic"></span>Dashboard</div>
+            <div class="item"><span class="ic"></span>Money<span class="n">2</span></div>
+            <div class="item on"><span class="ic"></span>Rentals<span class="n">3</span></div>
+            <div class="item"><span class="ic"></span>Invoices</div>
+            <div class="item"><span class="ic"></span>Busing<span class="n">4</span></div>
+            <div class="item"><span class="ic"></span>Dispatch<span class="n">1</span></div>
           </div>
 
-          <div class="t-card">
-            <div class="t-card-head">
-              <h4>All hires</h4><span>24 records</span>
-              <button class="t-btn" type="button">Filter</button>
-            </div>
-            <table class="t-table">
-              <thead>
-                <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th style="text-align:right">Total</th></tr>
-              </thead>
-              <tbody>
-                <tr><td class="ref">RR-0004</td><td>Volta Star Logistics</td><td>02–04 Nov</td><td>Toyota Hiace · GT 4821-24</td><td><span class="t-pill t-pill--ok">Completed</span></td><td class="num">3,400.00</td></tr>
-                <tr><td class="ref">RR-0005</td><td>Akosua Boateng</td><td>05 Nov</td><td>Nissan Urvan · GW 1194-23</td><td><span class="t-pill t-pill--go">Waiting on you</span></td><td class="num">1,150.00</td></tr>
-                <tr><td class="ref">RR-0006</td><td>Ministry of Roads</td><td>06–08 Nov</td><td>Toyota Coaster · GR 5502-22</td><td><span class="t-pill t-pill--go">Dispatched</span></td><td class="num">6,900.00</td></tr>
-                <tr><td class="ref">RR-0007</td><td>Kofi Mensah</td><td>09 Nov</td><td>Hyundai Starex · GE 2201-25</td><td><span class="t-pill t-pill--quiet">Quoted</span></td><td class="num">980.00</td></tr>
-              </tbody>
-            </table>
-            <div class="t-foot"><span>Showing 4 of 24</span><span>Sorted by departure</span></div>
+          <div class="grp">
+            <p>Fleet &amp; clients</p>
+            <div class="item"><span class="ic"></span>Vehicles</div>
+            <div class="item"><span class="ic"></span>Compliance<span class="n">6</span></div>
+            <div class="item"><span class="ic"></span>Clients</div>
+            <div class="item"><span class="ic"></span>Contracts</div>
           </div>
-        </div>
-      </div>
-    </section>
 
-    <section class="pane" data-theme="next">
-      <p class="pane-label"><b>Proposed</b><span>One figure strip, a single meta line, 13.5&nbsp;px body and a table built to be read down a column.</span></p>
-      <div class="frame">
-        <div class="mock n">
-          <p class="n-crumbs">Service desk &nbsp;/&nbsp; <b>Rentals</b></p>
-          <div class="n-head">
-            <div>
-              <h3 class="n-title">Rentals</h3>
-              <p class="n-meta"><b>24</b> hires <i></i> <b>3</b> waiting on you <i></i> <b>1</b> completed and unbilled <i></i> <b>11,450.00</b> GHS open</p>
-            </div>
-            <div class="n-actions">
-              <button class="n-btn n-btn--quiet" type="button">Export</button>
-              <button class="n-btn n-btn--primary" type="button">New request</button>
+          <div class="grp">
+            <p>Administration</p>
+            <div class="item"><span class="ic"></span>Settings</div>
+            <div class="item"><span class="ic"></span>Audit log</div>
+          </div>
+
+          <div class="rail-foot">
+            <div class="who">
+              <div class="av">AB</div>
+              <div><b>Ama Boateng</b><span>Operations</span></div>
             </div>
           </div>
+        </aside>
 
-          <div class="n-strip">
-            <div class="n-stat"><p>Waiting on us</p><strong>3</strong><small>priced or answered</small></div>
-            <div class="n-stat"><p>Out today</p><strong>2</strong><small>vehicles on hire</small></div>
-            <div class="n-stat"><p>To invoice</p><strong>1</strong><small>completed, unbilled</small></div>
-            <div class="n-stat"><p>Open value</p><strong>11,450</strong><small>GHS, quoted</small></div>
+        <div class="work">
+          <div class="top">
+            <span class="crumb">Service desk &nbsp;/&nbsp; <b>Rentals</b></span>
+            <div class="search">Search or jump to a screen<kbd>Ctrl K</kbd></div>
+            <div class="av-lg">AB</div>
           </div>
 
-          <div class="n-card">
-            <div class="n-card-head">
-              <h4>All hires</h4><p>24 records</p>
-              <button class="n-btn" type="button">Filter</button>
-            </div>
-            <table class="n-table">
-              <thead>
-                <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th class="num">Total</th></tr>
-              </thead>
-              <tbody>
-                <tr><td class="ref">RR-0004</td><td class="strong">Volta Star Logistics</td><td class="dim">02–04 Nov</td><td class="dim">Toyota Hiace · GT 4821-24</td><td><span class="n-chip n-chip--ok"><i></i>Completed</span></td><td class="num">3,400.00</td></tr>
-                <tr><td class="ref">RR-0005</td><td class="strong">Akosua Boateng</td><td class="dim">05 Nov</td><td class="dim">Nissan Urvan · GW 1194-23</td><td><span class="n-chip n-chip--wait"><i></i>Waiting on you</span></td><td class="num">1,150.00</td></tr>
-                <tr><td class="ref">RR-0006</td><td class="strong">Ministry of Roads</td><td class="dim">06–08 Nov</td><td class="dim">Toyota Coaster · GR 5502-22</td><td><span class="n-chip n-chip--go"><i></i>Dispatched</span></td><td class="num">6,900.00</td></tr>
-                <tr><td class="ref">RR-0007</td><td class="strong">Kofi Mensah</td><td class="dim">09 Nov</td><td class="dim">Hyundai Starex · GE 2201-25</td><td><span class="n-chip n-chip--quiet"><i></i>Quoted</span></td><td class="num">980.00</td></tr>
-              </tbody>
-            </table>
-            <div class="n-foot"><span><b>4</b> of <b>24</b> shown</span><span>Sorted by departure</span><span style="margin-left:auto">Totals exclude voided invoices</span></div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <p class="note"><b>What changed here, and why.</b> The eyebrow above the title repeated the breadcrumb
-    directly above it, so it went; the paragraph moved into one line of real figures. Four shadowed cards
-    became one strip with hairline dividers — same four numbers, a third of the vertical space, and nothing
-    floating. The table lost its zebra-free-but-flat feel: an uppercase micro-label header, ledger-aligned
-    figures, and status chips that carry a dot <i>and</i> a word.</p>
-
-  <h2><span class="num">02</span>The pieces a screen is made of</h2>
-  <p class="why">The same six components, side by side. This is where most of the “plain” feeling comes
-    from: at 12.5&nbsp;px with grey labels, an input, a notice and a button all speak at the same volume.</p>
-
-  <div class="two">
-    <div>
-      <p class="pane-label"><b>Today</b></p>
-      <div class="t-tile mock t" style="background:#f5f6f9">
-        <div class="t-field">
-          <label>Total charged</label>
-          <input class="t-input" value="340.00" readonly />
-          <p class="t-hint">Quantity × unit amount, in whole pesewas.</p>
-        </div>
-        <div class="t-field">
-          <label>Reason the customer was given</label>
-          <input class="t-input t-input--bad" value="" readonly />
-          <p class="t-err">Say why the customer is being charged.</p>
-        </div>
-        <div style="display:flex;gap:8px;margin:16px 0">
-          <button class="t-btn t-btn--primary" type="button">Complete hire</button>
-          <button class="t-btn" type="button">Cancel</button>
-        </div>
-        <div class="t-notice" style="margin-bottom:14px">This hire is above your approval figure, so somebody else has to sign the charge before it is billed.</div>
-        <div class="t-empty"><strong>No hires yet</strong><span>Start with a rental request; the quotation follows.</span></div>
-        <div style="margin-top:16px"><span class="t-money">3,400.00<small>GHS</small></span></div>
-      </div>
-    </div>
-    <div>
-      <p class="pane-label"><b>Proposed</b></p>
-      <div class="n-tile n">
-        <div class="n-field">
-          <label for="p1">Total charged</label>
-          <input id="p1" class="n-input" value="340.00" readonly />
-          <p class="n-hint">Quantity × unit amount, in whole pesewas.</p>
-        </div>
-        <div class="n-field">
-          <label for="p2">Reason the customer was given</label>
-          <input id="p2" class="n-input n-input--bad" value="" readonly aria-invalid="true" aria-describedby="p2e" />
-          <p class="n-err" id="p2e"><span aria-hidden="true">▲</span> Say why the customer is being charged. It is printed on their invoice.</p>
-        </div>
-        <div style="display:flex;gap:8px;margin:18px 0">
-          <button class="n-btn n-btn--primary" type="button">Complete hire</button>
-          <button class="n-btn n-btn--quiet" type="button">Cancel</button>
-        </div>
-        <div class="n-notice" style="margin-bottom:16px"><span aria-hidden="true">!</span><span>Above your approval figure. Somebody other than you must sign the charge before it is billed.</span></div>
-        <div class="n-empty">
-          <div class="glyph" aria-hidden="true"></div>
-          <strong>No hires yet</strong><span>Start with a rental request; the quotation follows.</span>
-        </div>
-        <div style="margin-top:18px"><span class="n-money">3,400.00<small>GHS</small></span></div>
-      </div>
-    </div>
-  </div>
-
-  <p class="note"><b>What changed here.</b> Labels are sentence case and read at 12&nbsp;px in ink rather than
-    uppercase grey — uppercase micro-labels are kept for table headers and section counts, where they help
-    you scan, and taken off form labels, where they slow reading. The error names the consequence, not just
-    the rule. The primary action is the only filled control, everything else is quiet.</p>
-
-  <h2><span class="num">03</span>The whole workspace</h2>
-  <p class="why">The frame matters as much as the page inside it. The rail is tinted and the work surface is
-    light: the chrome recedes, the records come forward. The active destination is a white chip with a
-    2&nbsp;pixel indigo edge, and its outstanding count sits on the right of the row where a scan finds it.</p>
-
-  <div class="frame">
-    <div class="workspace n">
-      <aside class="ws-rail">
-        <div class="ws-brand">
-          <div class="ws-mark">R</div>
-          <div><b>Richie TMS</b><span>Transport Services</span></div>
-        </div>
-
-        <div class="ws-group">
-          <p>Service desk</p>
-          <div class="ws-item"><span class="dot"></span>Dashboard</div>
-          <div class="ws-item"><span class="dot"></span>Money<span class="count">2</span></div>
-          <div class="ws-item ws-item--on"><span class="dot"></span>Rentals<span class="count">3</span></div>
-          <div class="ws-item"><span class="dot"></span>Invoices</div>
-          <div class="ws-item"><span class="dot"></span>Busing<span class="count">4</span></div>
-          <div class="ws-item"><span class="dot"></span>Dispatch<span class="count">1</span></div>
-        </div>
-
-        <div class="ws-group">
-          <p>Fleet &amp; clients</p>
-          <div class="ws-item"><span class="dot"></span>Vehicles</div>
-          <div class="ws-item"><span class="dot"></span>Compliance<span class="count">6</span></div>
-          <div class="ws-item"><span class="dot"></span>Clients</div>
-          <div class="ws-item"><span class="dot"></span>Contracts</div>
-        </div>
-
-        <div class="ws-group">
-          <p>Administration</p>
-          <div class="ws-item"><span class="dot"></span>Settings</div>
-          <div class="ws-item"><span class="dot"></span>Audit log</div>
-        </div>
-
-        <div class="ws-foot">
-          <div class="ws-user">
-            <div class="ws-avatar">AB</div>
-            <div><b>Ama Boateng</b><span>Operations</span></div>
-          </div>
-        </div>
-      </aside>
-
-      <div class="ws-main">
-        <div class="ws-top">
-          <span class="ws-crumb">Service desk &nbsp;/&nbsp; <b>Rentals</b></span>
-          <div class="ws-search">Search or jump to a screen<kbd>Ctrl K</kbd></div>
-          <div class="ws-avatar-lg">AB</div>
-        </div>
-
-        <div class="ws-body">
-          <div class="n-head">
-            <div>
-              <h3 class="n-title">RR-0004 · Volta Star Logistics</h3>
-              <p class="n-meta"><span class="n-chip n-chip--ok"><i></i>Completed</span> <i></i> <b>2–4 Nov</b> <i></i> Toyota Hiace · GT 4821-24 <i></i> driven by <b>Kojo Mensah</b></p>
-            </div>
-            <div class="n-actions">
-              <button class="n-btn n-btn--quiet" type="button">Print</button>
-              <button class="n-btn n-btn--primary" type="button">Raise invoice</button>
-            </div>
-          </div>
-
-          <div class="detail">
-            <div>
-              <div class="n-card" style="margin-bottom:16px">
-                <div class="n-card-head"><h4>Charged after the price was agreed</h4><p>1 charge · 250.00 GHS</p></div>
-                <div class="charge">
-                  <div><b>Damaged seat cover</b><span>Seat cover torn on return · added by Ama Boateng, 4 Nov 16:20</span></div>
-                  <span class="n-chip n-chip--ok"><i></i>Signed by Fin</span>
-                  <div class="amt">250.00</div>
-                </div>
-                <div class="charge" style="border-bottom:0">
-                  <div><b>Fuel</b><span>Tank refilled before return · added by Ama Boateng, 4 Nov 16:18</span></div>
-                  <span class="n-chip n-chip--wait"><i></i>Needs a second name</span>
-                  <div class="amt">400.00</div>
-                </div>
-                <div class="n-foot"><span>Quoted <b>2,750.00</b></span><span>Charges <b>650.00</b></span><span style="margin-left:auto">Final invoice <b>3,400.00 GHS</b></span></div>
+          <div class="canvas">
+            <div class="head">
+              <div>
+                <h3>Rentals</h3>
+                <p class="meta">
+                  <b>24</b> hires <span class="sep"></span> <b>3</b> waiting on you
+                  <span class="sep"></span> <b>1</b> completed and unbilled
+                  <span class="sep"></span> <b>11,450.00</b> GHS open
+                </p>
               </div>
-
-              <div class="n-card">
-                <div class="n-card-head"><h4>What happened</h4><p>Every step is attributed</p></div>
-                <ul class="timeline">
-                  <li><time>28 Oct</time><span><b>Ama Boateng</b> quoted QUO-0011 — 2,750.00 GHS, agreed by the customer the same day</span></li>
-                  <li><time>29 Oct</time><span>Deposit of <b>687.50</b> recorded against the quotation</span></li>
-                  <li><time>2 Nov</time><span>Assigned to GT 4821-24 and <b>Kojo Mensah</b>; left the yard at 06:40</span></li>
-                  <li><time>4 Nov</time><span>Returned at 16:05, 1,204 km driven, two charges recorded</span></li>
-                </ul>
+              <div class="acts">
+                <button class="btn ghost" type="button">Export</button>
+                <button class="btn primary" type="button">New request</button>
               </div>
             </div>
 
-            <aside class="facts">
-              <h5>The hire</h5>
-              <dl>
-                <div><dt>Customer</dt><dd>Volta Star Logistics</dd></div>
-                <div><dt>Quotation</dt><dd>QUO-0011</dd></div>
-                <div><dt>Agreed</dt><dd>2,750.00</dd></div>
-                <div><dt>Charges</dt><dd>650.00</dd></div>
-                <div><dt>Invoice</dt><dd>INV-2026-0007</dd></div>
-                <div><dt>Payment</dt><dd>Part paid</dd></div>
-              </dl>
-            </aside>
+            <div class="strip">
+              <div class="stat"><p>Waiting on us</p><strong>3</strong><small>priced or answered</small></div>
+              <div class="stat"><p>Out today</p><strong>2</strong><small>vehicles on hire</small></div>
+              <div class="stat"><p>To invoice</p><strong>1</strong><small>completed, unbilled</small></div>
+              <div class="stat"><p>Open value</p><strong>11,450</strong><small>GHS, quoted</small></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h4>All hires</h4><p>24 records</p>
+                <button class="btn" type="button">Filter</button>
+              </div>
+              <table class="t">
+                <thead>
+                  <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th class="num">Total</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="ref">RR-0004</td><td class="strong">Volta Star Logistics</td><td class="dim">02–04 Nov</td><td class="dim">Toyota Hiace · GT 4821-24</td><td><span class="chip ok"><i></i>Completed</span></td><td class="num">3,400.00</td></tr>
+                  <tr><td class="ref">RR-0005</td><td class="strong">Akosua Boateng</td><td class="dim">05 Nov</td><td class="dim">Nissan Urvan · GW 1194-23</td><td><span class="chip wait"><i></i>Waiting on you</span></td><td class="num">1,150.00</td></tr>
+                  <tr><td class="ref">RR-0006</td><td class="strong">Ministry of Roads</td><td class="dim">06–08 Nov</td><td class="dim">Toyota Coaster · GR 5502-22</td><td><span class="chip go"><i></i>Dispatched</span></td><td class="num">6,900.00</td></tr>
+                  <tr><td class="ref">RR-0007</td><td class="strong">Kofi Mensah</td><td class="dim">09 Nov</td><td class="dim">Hyundai Starex · GE 2201-25</td><td><span class="chip quiet"><i></i>Quoted</span></td><td class="num">980.00</td></tr>
+                </tbody>
+              </table>
+              <div class="card-foot">
+                <span><b>4</b> of <b>24</b> shown</span><span>Sorted by departure</span>
+                <span style="margin-left:auto">Totals exclude voided invoices</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h4>Charged after the price was agreed</h4><p>RR-0004 · two charges</p>
+                <span class="chip wait" style="margin-left:auto"><i></i>One needs a second name</span>
+              </div>
+              <div class="charge">
+                <div><b>Damaged seat cover</b><span class="s">Seat cover torn on return · added by Ama Boateng, 4 Nov 16:20</span></div>
+                <span class="chip ok"><i></i>Signed by Fin</span>
+                <div class="amt">250.00</div>
+              </div>
+              <div class="charge" style="border-bottom:0">
+                <div><b>Fuel</b><span class="s">Tank refilled before return · added by Ama Boateng, 4 Nov 16:18</span></div>
+                <span class="chip wait"><i></i>Waiting for a name</span>
+                <div class="amt">400.00</div>
+              </div>
+              <div class="card-foot">
+                <span>Quoted <b>2,750.00</b></span><span>Charges <b>650.00</b></span>
+                <span style="margin-left:auto">Final invoice <b>3,400.00 GHS</b></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bench">
+            <div class="tile">
+              <h6>Actions</h6>
+              <div class="row">
+                <button class="btn primary" type="button">Raise invoice</button>
+                <button class="btn" type="button">Print</button>
+                <button class="btn ghost" type="button">Dismiss</button>
+              </div>
+              <div class="row" style="margin-top:8px"><button class="btn danger" type="button">Void</button></div>
+            </div>
+
+            <div class="tile">
+              <h6>Status</h6>
+              <div class="row">
+                <span class="chip ok"><i></i>Completed</span>
+                <span class="chip wait"><i></i>Waiting on you</span>
+                <span class="chip go"><i></i>Dispatched</span>
+                <span class="chip stop"><i></i>Overdue</span>
+                <span class="chip quiet"><i></i>Quoted</span>
+              </div>
+            </div>
+
+            <div class="tile">
+              <h6>Field</h6>
+              <div class="field">
+                <label for="f1">Reason the customer was given</label>
+                <input id="f1" class="inp bad" value="" aria-invalid="true" aria-describedby="f1e" readonly />
+                <p class="err" id="f1e">Say why they are being charged — it is printed on the invoice.</p>
+              </div>
+              <div class="field"><input class="inp" value="340.00" readonly aria-label="Amount" /></div>
+            </div>
+
+            <div class="tile">
+              <h6>Notices and totals</h6>
+              <div class="notice"><span class="g" aria-hidden="true">!</span><span>Above your approval figure: somebody else must sign this charge before it is billed.</span></div>
+              <div class="money" style="margin-top:14px">3,400.00<small>GHS</small></div>
+              <div class="meter" aria-hidden="true"><i></i></div>
+              <p class="hint">650.00 of it charged after the price was agreed.</p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
+      </div>
+    </section>
+<div class="panel-head" style="margin-top:34px"><b>Ink</b><span class="tag">Contrast and confidence</span><span>A near-black rail against a white work surface, one bright accent used in small doses. This is the BoardUI / Linear posture — the chrome is dark so the records are the only thing that glows.</span></div>
+<section class="panel" data-dir="ink">
+      <div class="frame">
+      <div class="app">
+        <aside class="rail">
+          <div class="brand">
+            <div class="mark">R</div>
+            <div><b>Richie TMS</b><span>Transport Services</span></div>
+          </div>
 
-  <p class="note"><b>Why a detail screen and not another list.</b> This is the shape the registers open into:
-    one record, the thing that needs a decision on the left, the facts you would otherwise scroll to find
-    pinned on the right. It is also where the newest piece of work lands — the charges added after the price
-    was agreed, each with the name that signed it.</p>
+          <div class="grp">
+            <p>Service desk</p>
+            <div class="item"><span class="ic"></span>Dashboard</div>
+            <div class="item"><span class="ic"></span>Money<span class="n">2</span></div>
+            <div class="item on"><span class="ic"></span>Rentals<span class="n">3</span></div>
+            <div class="item"><span class="ic"></span>Invoices</div>
+            <div class="item"><span class="ic"></span>Busing<span class="n">4</span></div>
+            <div class="item"><span class="ic"></span>Dispatch<span class="n">1</span></div>
+          </div>
 
-  <h2><span class="num">04</span>What actually changes</h2>
-  <ol class="decisions">
+          <div class="grp">
+            <p>Fleet &amp; clients</p>
+            <div class="item"><span class="ic"></span>Vehicles</div>
+            <div class="item"><span class="ic"></span>Compliance<span class="n">6</span></div>
+            <div class="item"><span class="ic"></span>Clients</div>
+            <div class="item"><span class="ic"></span>Contracts</div>
+          </div>
+
+          <div class="grp">
+            <p>Administration</p>
+            <div class="item"><span class="ic"></span>Settings</div>
+            <div class="item"><span class="ic"></span>Audit log</div>
+          </div>
+
+          <div class="rail-foot">
+            <div class="who">
+              <div class="av">AB</div>
+              <div><b>Ama Boateng</b><span>Operations</span></div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="work">
+          <div class="top">
+            <span class="crumb">Service desk &nbsp;/&nbsp; <b>Rentals</b></span>
+            <div class="search">Search or jump to a screen<kbd>Ctrl K</kbd></div>
+            <div class="av-lg">AB</div>
+          </div>
+
+          <div class="canvas">
+            <div class="head">
+              <div>
+                <h3>Rentals</h3>
+                <p class="meta">
+                  <b>24</b> hires <span class="sep"></span> <b>3</b> waiting on you
+                  <span class="sep"></span> <b>1</b> completed and unbilled
+                  <span class="sep"></span> <b>11,450.00</b> GHS open
+                </p>
+              </div>
+              <div class="acts">
+                <button class="btn ghost" type="button">Export</button>
+                <button class="btn primary" type="button">New request</button>
+              </div>
+            </div>
+
+            <div class="strip">
+              <div class="stat"><p>Waiting on us</p><strong>3</strong><small>priced or answered</small></div>
+              <div class="stat"><p>Out today</p><strong>2</strong><small>vehicles on hire</small></div>
+              <div class="stat"><p>To invoice</p><strong>1</strong><small>completed, unbilled</small></div>
+              <div class="stat"><p>Open value</p><strong>11,450</strong><small>GHS, quoted</small></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h4>All hires</h4><p>24 records</p>
+                <button class="btn" type="button">Filter</button>
+              </div>
+              <table class="t">
+                <thead>
+                  <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th class="num">Total</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="ref">RR-0004</td><td class="strong">Volta Star Logistics</td><td class="dim">02–04 Nov</td><td class="dim">Toyota Hiace · GT 4821-24</td><td><span class="chip ok"><i></i>Completed</span></td><td class="num">3,400.00</td></tr>
+                  <tr><td class="ref">RR-0005</td><td class="strong">Akosua Boateng</td><td class="dim">05 Nov</td><td class="dim">Nissan Urvan · GW 1194-23</td><td><span class="chip wait"><i></i>Waiting on you</span></td><td class="num">1,150.00</td></tr>
+                  <tr><td class="ref">RR-0006</td><td class="strong">Ministry of Roads</td><td class="dim">06–08 Nov</td><td class="dim">Toyota Coaster · GR 5502-22</td><td><span class="chip go"><i></i>Dispatched</span></td><td class="num">6,900.00</td></tr>
+                  <tr><td class="ref">RR-0007</td><td class="strong">Kofi Mensah</td><td class="dim">09 Nov</td><td class="dim">Hyundai Starex · GE 2201-25</td><td><span class="chip quiet"><i></i>Quoted</span></td><td class="num">980.00</td></tr>
+                </tbody>
+              </table>
+              <div class="card-foot">
+                <span><b>4</b> of <b>24</b> shown</span><span>Sorted by departure</span>
+                <span style="margin-left:auto">Totals exclude voided invoices</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h4>Charged after the price was agreed</h4><p>RR-0004 · two charges</p>
+                <span class="chip wait" style="margin-left:auto"><i></i>One needs a second name</span>
+              </div>
+              <div class="charge">
+                <div><b>Damaged seat cover</b><span class="s">Seat cover torn on return · added by Ama Boateng, 4 Nov 16:20</span></div>
+                <span class="chip ok"><i></i>Signed by Fin</span>
+                <div class="amt">250.00</div>
+              </div>
+              <div class="charge" style="border-bottom:0">
+                <div><b>Fuel</b><span class="s">Tank refilled before return · added by Ama Boateng, 4 Nov 16:18</span></div>
+                <span class="chip wait"><i></i>Waiting for a name</span>
+                <div class="amt">400.00</div>
+              </div>
+              <div class="card-foot">
+                <span>Quoted <b>2,750.00</b></span><span>Charges <b>650.00</b></span>
+                <span style="margin-left:auto">Final invoice <b>3,400.00 GHS</b></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bench">
+            <div class="tile">
+              <h6>Actions</h6>
+              <div class="row">
+                <button class="btn primary" type="button">Raise invoice</button>
+                <button class="btn" type="button">Print</button>
+                <button class="btn ghost" type="button">Dismiss</button>
+              </div>
+              <div class="row" style="margin-top:8px"><button class="btn danger" type="button">Void</button></div>
+            </div>
+
+            <div class="tile">
+              <h6>Status</h6>
+              <div class="row">
+                <span class="chip ok"><i></i>Completed</span>
+                <span class="chip wait"><i></i>Waiting on you</span>
+                <span class="chip go"><i></i>Dispatched</span>
+                <span class="chip stop"><i></i>Overdue</span>
+                <span class="chip quiet"><i></i>Quoted</span>
+              </div>
+            </div>
+
+            <div class="tile">
+              <h6>Field</h6>
+              <div class="field">
+                <label for="f1">Reason the customer was given</label>
+                <input id="f1" class="inp bad" value="" aria-invalid="true" aria-describedby="f1e" readonly />
+                <p class="err" id="f1e">Say why they are being charged — it is printed on the invoice.</p>
+              </div>
+              <div class="field"><input class="inp" value="340.00" readonly aria-label="Amount" /></div>
+            </div>
+
+            <div class="tile">
+              <h6>Notices and totals</h6>
+              <div class="notice"><span class="g" aria-hidden="true">!</span><span>Above your approval figure: somebody else must sign this charge before it is billed.</span></div>
+              <div class="money" style="margin-top:14px">3,400.00<small>GHS</small></div>
+              <div class="meter" aria-hidden="true"><i></i></div>
+              <p class="hint">650.00 of it charged after the price was agreed.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </section>
+<div class="panel-head" style="margin-top:34px"><b>Studio</b><span class="tag">Dark, editorial</span><span>The whole workspace dark, with a lightened indigo for legibility. The most dramatic of the three; striking in a screenshot and the heaviest to live in for eight hours.</span></div>
+<section class="panel" data-dir="studio">
+      <div class="frame">
+      <div class="app">
+        <aside class="rail">
+          <div class="brand">
+            <div class="mark">R</div>
+            <div><b>Richie TMS</b><span>Transport Services</span></div>
+          </div>
+
+          <div class="grp">
+            <p>Service desk</p>
+            <div class="item"><span class="ic"></span>Dashboard</div>
+            <div class="item"><span class="ic"></span>Money<span class="n">2</span></div>
+            <div class="item on"><span class="ic"></span>Rentals<span class="n">3</span></div>
+            <div class="item"><span class="ic"></span>Invoices</div>
+            <div class="item"><span class="ic"></span>Busing<span class="n">4</span></div>
+            <div class="item"><span class="ic"></span>Dispatch<span class="n">1</span></div>
+          </div>
+
+          <div class="grp">
+            <p>Fleet &amp; clients</p>
+            <div class="item"><span class="ic"></span>Vehicles</div>
+            <div class="item"><span class="ic"></span>Compliance<span class="n">6</span></div>
+            <div class="item"><span class="ic"></span>Clients</div>
+            <div class="item"><span class="ic"></span>Contracts</div>
+          </div>
+
+          <div class="grp">
+            <p>Administration</p>
+            <div class="item"><span class="ic"></span>Settings</div>
+            <div class="item"><span class="ic"></span>Audit log</div>
+          </div>
+
+          <div class="rail-foot">
+            <div class="who">
+              <div class="av">AB</div>
+              <div><b>Ama Boateng</b><span>Operations</span></div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="work">
+          <div class="top">
+            <span class="crumb">Service desk &nbsp;/&nbsp; <b>Rentals</b></span>
+            <div class="search">Search or jump to a screen<kbd>Ctrl K</kbd></div>
+            <div class="av-lg">AB</div>
+          </div>
+
+          <div class="canvas">
+            <div class="head">
+              <div>
+                <h3>Rentals</h3>
+                <p class="meta">
+                  <b>24</b> hires <span class="sep"></span> <b>3</b> waiting on you
+                  <span class="sep"></span> <b>1</b> completed and unbilled
+                  <span class="sep"></span> <b>11,450.00</b> GHS open
+                </p>
+              </div>
+              <div class="acts">
+                <button class="btn ghost" type="button">Export</button>
+                <button class="btn primary" type="button">New request</button>
+              </div>
+            </div>
+
+            <div class="strip">
+              <div class="stat"><p>Waiting on us</p><strong>3</strong><small>priced or answered</small></div>
+              <div class="stat"><p>Out today</p><strong>2</strong><small>vehicles on hire</small></div>
+              <div class="stat"><p>To invoice</p><strong>1</strong><small>completed, unbilled</small></div>
+              <div class="stat"><p>Open value</p><strong>11,450</strong><small>GHS, quoted</small></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h4>All hires</h4><p>24 records</p>
+                <button class="btn" type="button">Filter</button>
+              </div>
+              <table class="t">
+                <thead>
+                  <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th class="num">Total</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="ref">RR-0004</td><td class="strong">Volta Star Logistics</td><td class="dim">02–04 Nov</td><td class="dim">Toyota Hiace · GT 4821-24</td><td><span class="chip ok"><i></i>Completed</span></td><td class="num">3,400.00</td></tr>
+                  <tr><td class="ref">RR-0005</td><td class="strong">Akosua Boateng</td><td class="dim">05 Nov</td><td class="dim">Nissan Urvan · GW 1194-23</td><td><span class="chip wait"><i></i>Waiting on you</span></td><td class="num">1,150.00</td></tr>
+                  <tr><td class="ref">RR-0006</td><td class="strong">Ministry of Roads</td><td class="dim">06–08 Nov</td><td class="dim">Toyota Coaster · GR 5502-22</td><td><span class="chip go"><i></i>Dispatched</span></td><td class="num">6,900.00</td></tr>
+                  <tr><td class="ref">RR-0007</td><td class="strong">Kofi Mensah</td><td class="dim">09 Nov</td><td class="dim">Hyundai Starex · GE 2201-25</td><td><span class="chip quiet"><i></i>Quoted</span></td><td class="num">980.00</td></tr>
+                </tbody>
+              </table>
+              <div class="card-foot">
+                <span><b>4</b> of <b>24</b> shown</span><span>Sorted by departure</span>
+                <span style="margin-left:auto">Totals exclude voided invoices</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h4>Charged after the price was agreed</h4><p>RR-0004 · two charges</p>
+                <span class="chip wait" style="margin-left:auto"><i></i>One needs a second name</span>
+              </div>
+              <div class="charge">
+                <div><b>Damaged seat cover</b><span class="s">Seat cover torn on return · added by Ama Boateng, 4 Nov 16:20</span></div>
+                <span class="chip ok"><i></i>Signed by Fin</span>
+                <div class="amt">250.00</div>
+              </div>
+              <div class="charge" style="border-bottom:0">
+                <div><b>Fuel</b><span class="s">Tank refilled before return · added by Ama Boateng, 4 Nov 16:18</span></div>
+                <span class="chip wait"><i></i>Waiting for a name</span>
+                <div class="amt">400.00</div>
+              </div>
+              <div class="card-foot">
+                <span>Quoted <b>2,750.00</b></span><span>Charges <b>650.00</b></span>
+                <span style="margin-left:auto">Final invoice <b>3,400.00 GHS</b></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bench">
+            <div class="tile">
+              <h6>Actions</h6>
+              <div class="row">
+                <button class="btn primary" type="button">Raise invoice</button>
+                <button class="btn" type="button">Print</button>
+                <button class="btn ghost" type="button">Dismiss</button>
+              </div>
+              <div class="row" style="margin-top:8px"><button class="btn danger" type="button">Void</button></div>
+            </div>
+
+            <div class="tile">
+              <h6>Status</h6>
+              <div class="row">
+                <span class="chip ok"><i></i>Completed</span>
+                <span class="chip wait"><i></i>Waiting on you</span>
+                <span class="chip go"><i></i>Dispatched</span>
+                <span class="chip stop"><i></i>Overdue</span>
+                <span class="chip quiet"><i></i>Quoted</span>
+              </div>
+            </div>
+
+            <div class="tile">
+              <h6>Field</h6>
+              <div class="field">
+                <label for="f1">Reason the customer was given</label>
+                <input id="f1" class="inp bad" value="" aria-invalid="true" aria-describedby="f1e" readonly />
+                <p class="err" id="f1e">Say why they are being charged — it is printed on the invoice.</p>
+              </div>
+              <div class="field"><input class="inp" value="340.00" readonly aria-label="Amount" /></div>
+            </div>
+
+            <div class="tile">
+              <h6>Notices and totals</h6>
+              <div class="notice"><span class="g" aria-hidden="true">!</span><span>Above your approval figure: somebody else must sign this charge before it is billed.</span></div>
+              <div class="money" style="margin-top:14px">3,400.00<small>GHS</small></div>
+              <div class="meter" aria-hidden="true"><i></i></div>
+              <p class="hint">650.00 of it charged after the price was agreed.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </section>
+
+  <p class="note"><b>What makes these read as premium rather than just tidy.</b> A hairline edge plus a
+    soft, wide, very low-opacity shadow gives a card weight without a heavy outline. The primary button
+    carries a 1px inner highlight and a coloured shadow, so it sits <i>above</i> the surface. Figures are
+    28px with tight tracking and tabular numerals: two columns of money line up digit for digit. Section
+    labels are 9.5px uppercase with wide letter-spacing; page titles are 30px. Nothing sits at 12.5px
+    midway between them any more — that single change is most of the difference between “flat” and
+    “designed”.</p>
+
+  <h2><span class="num">02</span>What I would build, and in what order</h2>
+  <ol class="dec">
     <li>
       <div>
-        <b>Body text goes from 12.5 to 13.5–14 pixels, and greys get darker.</b>
-        <p>Small grey text at low contrast is the single biggest cause of “this looks cheap”. The muted ink
-          moves from <code>#667085</code> (4.97:1) to <code>#59637a</code> (6.02:1), and the ink itself to
-          near-black <code>#0b1220</code> (18.7:1). Everything stays AA; most of it moves to AAA.</p>
+        <b>Pick a skin, then the tokens.</b>
+        <p>Colour, radius, shadow and type scale go into <code class="inline">src/index.css</code> as
+          variables. Every one of the 30 screens draws from that file, so all of them step up at once —
+          no screen-by-screen redesign for the first visible win.</p>
       </div>
     </li>
     <li>
       <div>
-        <b>Titles get bigger and tighter; labels get smaller and quieter.</b>
-        <p>Page titles at 26&nbsp;px with −0.026em tracking, figures at 25&nbsp;px with tabular numerals,
-          table headers at 9.5&nbsp;px uppercase. A real jump between three sizes reads as designed; three
-          sizes one pixel apart reads as flat.</p>
+        <b>Rebuild the six pieces in <code class="inline">src/ui/primitives.tsx</code>.</b>
+        <p>Button, field, chip, notice, empty state and the figure strip. Fixing these six fixes every
+          form, every register and every dialog in the application, because they are all made of them.</p>
       </div>
     </li>
     <li>
       <div>
-        <b>Fewer boxes, more rule and space.</b>
-        <p>Four floating stat cards become one bordered strip with hairlines. Cards lose their shadow and
-          keep a 1&nbsp;px edge; the shadow is reserved for things that genuinely float above the page, like
-          a dialog. Nothing on the canvas competes for depth.</p>
+        <b>The frame, then the three screens you use most.</b>
+        <p>Rail, top bar, then dashboard, rentals and invoices. This is the step that changes how the
+          product feels on opening it.</p>
       </div>
     </li>
     <li>
       <div>
-        <b>Numbers are read down a column, not across a line.</b>
-        <p>Every amount, date and count is right-aligned with tabular numerals, so a glance down the total
-          column compares like with like. Currency sits in a small mono label rather than inside every
-          figure.</p>
-      </div>
-    </li>
-    <li>
-      <div>
-        <b>Status becomes a chip with a dot and a word, not a rounded pill.</b>
-        <p>Fully rounded pills read as 2020. A 6&nbsp;px radius with a 5&nbsp;px dot is quieter and scans
-          faster, and the word is still there — colour is never the only carrier of meaning.</p>
-      </div>
-    </li>
-    <li>
-      <div>
-        <b>The chrome recedes: tinted rail, light canvas, white records.</b>
-        <p>Today the rail and the work surface are the same white and the cards float on top. Inverting that
-          relationship gives the page a frame and makes the records the brightest thing on screen.</p>
-      </div>
-    </li>
-    <li>
-      <div>
-        <b>One place for the explanation, on demand.</b>
-        <p>Long “why this figure” paragraphs move behind a quiet link next to the figure they explain. The
-          sentence is still there, in full, for the person who needs it — it simply stops being the first
-          thing every reader meets.</p>
-      </div>
-    </li>
-    <li>
-      <div>
-        <b>The same treatment everywhere, in one pass.</b>
-        <p>The tokens and the six components are already shared, so this is a pass over the 30 screens, not a
-          rewrite: 485 leftover colour classes removed, sorting on every register, one header pattern, one
-          empty state. That is what makes it read as one product rather than thirty.</p>
+        <b>The sweep.</b>
+        <p>The remaining registers onto the shared table with sorting, the 485 leftover colour classes
+          removed, one header pattern and one empty state everywhere. Tests keep passing; where a test
+          asserts wording I change, I will say so.</p>
       </div>
     </li>
   </ol>
 
-  <h2><span class="num">05</span>The rules this keeps</h2>
+  <h2><span class="num">03</span>Measured, not asserted</h2>
+  <p class="why">Contrast is calculated, not eyeballed. Every pair below is from the actual values in the
+    skins above; AA needs 4.5:1 for body text and 3:1 for a graphic.</p>
+
   <div class="two">
     <div>
-      <ul class="rules">
-        <li><b>One accent, unchanged.</b> <code>#4453f0</code> is still the only action colour, at 5.6:1 on white.</li>
-        <li><b>No gradients, glass, 3D or shadow tricks.</b> Flat tints, one edge, one hairline.</li>
-        <li><b>No motion.</b> Nothing animates, nothing fades in; transitions stay off.</li>
-        <li><b>No colour-only meaning.</b> Every chip and notice carries its words; the dot is a second cue, not the cue.</li>
-        <li><b>No new dependency.</b> The same Inter and IBM Plex Mono files already in the app, the same CSS.</li>
-        <li><b>Nothing invented.</b> Empty states still say what is missing rather than showing a zero.</li>
-      </ul>
+      <table class="tokens">
+        <thead><tr><th>Porcelain</th><th>Ratio</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Ink on canvas</td><td><code>16.96:1</code></td><td>AAA</td></tr>
+          <tr><td>Body on a card</td><td><code>12.93:1</code></td><td>AAA</td></tr>
+          <tr><td>Muted on a card</td><td><code>5.93:1</code></td><td>AA</td></tr>
+          <tr><td>Accent on white</td><td><code>5.61:1</code></td><td>AA</td></tr>
+          <tr><td>White on the accent</td><td><code>5.61:1</code></td><td>AA</td></tr>
+        </tbody>
+      </table>
     </div>
     <div>
       <table class="tokens">
-        <thead>
-          <tr><th>Pair</th><th>Ratio</th><th>Standard</th></tr>
-        </thead>
+        <thead><tr><th>Ink</th><th>Ratio</th><th></th></tr></thead>
         <tbody>
-          <tr><td>Ink on white</td><td><code>18.72:1</code></td><td>AAA</td></tr>
-          <tr><td>Body on canvas</td><td><code>11.17:1</code></td><td>AAA</td></tr>
-          <tr><td>Muted on white</td><td><code>6.02:1</code></td><td>AA</td></tr>
+          <tr><td>Rail text on the dark rail</td><td><code>11.92:1</code></td><td>AAA</td></tr>
+          <tr><td>Rail muted on the dark rail</td><td><code>6.18:1</code></td><td>AA</td></tr>
+          <tr><td>Active row on its surface</td><td><code>16.07:1</code></td><td>AAA</td></tr>
+          <tr><td>Ink on canvas</td><td><code>16.84:1</code></td><td>AAA</td></tr>
           <tr><td>Accent on white</td><td><code>5.61:1</code></td><td>AA</td></tr>
-          <tr><td>White on accent</td><td><code>5.61:1</code></td><td>AA</td></tr>
-          <tr><td>Every status chip</td><td><code>5.2–6.6:1</code></td><td>AA</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <h2><span class="num">06</span>How it would land</h2>
-  <p class="why">Three steps, each one shippable on its own, so you can stop after any of them.</p>
-  <ol class="decisions">
-    <li>
-      <div>
-        <b>Step one — the tokens and the six components.</b>
-        <p>Colour, type scale, radii, row heights and the button/field/chip/notice/empty-state/stat strip
-          set in <code>src/index.css</code> and <code>src/ui/primitives.tsx</code>. Every screen improves at
-          once because they all draw from those files; nothing is redesigned screen by screen yet.</p>
-      </div>
-    </li>
-    <li>
-      <div>
-        <b>Step two — the frame and the three busiest screens.</b>
-        <p>The rail, the top bar, then dashboard, rentals and invoices. This is the step you would show
-          somebody.</p>
-      </div>
-    </li>
-    <li>
-      <div>
-        <b>Step three — the sweep.</b>
-        <p>The remaining registers onto the shared table with sorting, the leftover colour classes gone, and
-          every screen's empty state and error message brought to one voice. Existing tests should keep
-          passing; where a test asserts old wording I will change the test and say so.</p>
-      </div>
-    </li>
-  </ol>
+  <table class="tokens" style="margin-top:22px">
+    <thead><tr><th>Studio</th><th>Ratio</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>Text on the dark canvas</td><td><code>16.42:1</code></td><td>AAA</td></tr>
+      <tr><td>Text on a card</td><td><code>15.32:1</code></td><td>AAA</td></tr>
+      <tr><td>Muted on a card</td><td><code>7.14:1</code></td><td>AAA</td></tr>
+      <tr><td>Lightened accent on a card</td><td><code>7.16:1</code></td><td>AAA</td></tr>
+      <tr><td>White on the primary button</td><td><code>5.61:1</code></td><td>AA</td></tr>
+    </tbody>
+  </table>
 
-  <p class="foot">Preview page only — nothing here is wired into the application, and no dependency or
-    font was added. Open <code>docs/ui-proposal/index.html</code> in a browser to read it again later.
-    The application itself is unchanged on this branch apart from its documentation.</p>
+  <h2><span class="num">04</span>The rules none of this breaks</h2>
+  <div class="two">
+    <div>
+      <ol class="dec" style="margin-top:4px">
+        <li style="padding-top:4px">
+          <div>
+            <b>One accent.</b>
+            <p>Indigo <code class="inline">#4453f0</code> remains the only action colour. Studio lightens it
+              to <code class="inline">#7c88ff</code> only because the same indigo fails on a dark surface;
+              buttons stay on the original.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>No gradients at all.</b>
+            <p>Depth comes from a hairline edge, a 1px inner highlight on the top of a card and a wide
+              low-opacity shadow. The brand tile is solid indigo with a specular top edge, not a gradient.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>No motion.</b>
+            <p>Nothing animates. A shadow can suggest depth; it does not have to move to do it.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+    <div>
+      <ol class="dec" style="margin-top:4px">
+        <li style="padding-top:4px">
+          <div>
+            <b>Colour never carries meaning alone.</b>
+            <p>Every chip has a dot <i>and</i> a word; every notice has its sentence. The skin changes, the
+              vocabulary does not.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>No new dependency, no new font.</b>
+            <p>Inter and IBM Plex Mono are already bundled with the application. Nothing is installed for
+              this page either.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>Nothing invented.</b>
+            <p>Sample rows are labelled as illustrations here. In the application an unknown figure still
+              says “not recorded” rather than showing a zero.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <p class="foot">Preview page only — no file under <code class="inline">src/</code> has been changed and no
+    package was added. Reopen it any time at <code class="inline">docs/ui-proposal/index.html</code>; the
+    previous, quieter proposal is kept beside it as <code class="inline">v1-daylight-2.html</code>.</p>
 </div>
 
 <script>
   (function () {
-    var buttons = document.querySelectorAll("[data-set-mode]");
-    function set(mode) {
-      document.body.setAttribute("data-mode", mode);
+    var buttons = document.querySelectorAll("[data-set-view]");
+    function set(view) {
+      document.body.setAttribute("data-view", view);
       buttons.forEach(function (b) {
-        b.setAttribute("aria-pressed", String(b.getAttribute("data-set-mode") === mode));
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-set-view") === view));
       });
     }
     buttons.forEach(function (b) {
-      b.addEventListener("click", function () { set(b.getAttribute("data-set-mode")); });
+      b.addEventListener("click", function () { set(b.getAttribute("data-set-view")); });
     });
-    set("both");
+    set("all");
   })();
 </script>
 </body>

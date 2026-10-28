@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interface proposal · Richie TMS</title>
+<style>
+  @font-face {
+    font-family: "Inter Variable";
+    src: url("fonts/inter.woff2") format("woff2-variations");
+    font-weight: 100 900;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "IBM Plex Mono";
+    src: url("fonts/plex-mono-400.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "IBM Plex Mono";
+    src: url("fonts/plex-mono-500.woff2") format("woff2");
+    font-weight: 500;
+    font-display: swap;
+  }
+
+  /* ------------------------------------------------------------------------------------------
+     The document itself. Deliberately quiet: the mock screens are the subject, not this page.
+     ------------------------------------------------------------------------------------------ */
+  :root {
+    --doc-ink: #101828;
+    --doc-body: #38415a;
+    --doc-muted: #5b6577;
+    --doc-line: #e4e7ee;
+    --doc-canvas: #ffffff;
+    --doc-panel: #f7f8fb;
+    --doc-accent: #4453f0;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--doc-canvas);
+    color: var(--doc-body);
+    font-family: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    font-optical-sizing: auto;
+  }
+  .doc { max-width: 1240px; margin: 0 auto; padding: 40px 28px 96px; }
+  .doc a { color: var(--doc-accent); }
+  .doc :focus-visible { outline: 2px solid var(--doc-accent); outline-offset: 2px; border-radius: 4px; }
+
+  .masthead { border-bottom: 1px solid var(--doc-line); padding-bottom: 28px; margin-bottom: 12px; }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--doc-muted);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-size: 34px;
+    line-height: 1.14;
+    letter-spacing: -0.028em;
+    font-weight: 640;
+    color: var(--doc-ink);
+    margin: 0 0 14px;
+    max-width: 20ch;
+  }
+  .lede { font-size: 16.5px; line-height: 1.62; color: var(--doc-body); max-width: 68ch; margin: 0; }
+  .lede + .lede { margin-top: 12px; }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 24px 0 0;
+  }
+  .controls .label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--doc-muted); margin-right: 4px; }
+  .seg { display: inline-flex; border: 1px solid var(--doc-line); border-radius: 9px; overflow: hidden; }
+  .seg button {
+    appearance: none;
+    border: 0;
+    background: #fff;
+    color: var(--doc-body);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 550;
+    padding: 8px 15px;
+    cursor: pointer;
+    border-right: 1px solid var(--doc-line);
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: #0e1526; color: #fff; }
+
+  h2 {
+    font-size: 13px;
+    font-family: var(--mono);
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--doc-ink);
+    margin: 56px 0 6px;
+    padding-top: 18px;
+    border-top: 1px solid var(--doc-line);
+  }
+  h2 .num { color: var(--doc-muted); margin-right: 10px; }
+  .why { font-size: 14.5px; color: var(--doc-muted); max-width: 74ch; margin: 0 0 22px; }
+  h3 { font-size: 15.5px; font-weight: 620; color: var(--doc-ink); margin: 30px 0 10px; letter-spacing: -0.008em; }
+
+  .compare { display: grid; gap: 26px; }
+  body[data-mode="today"] .pane[data-theme="next"] { display: none; }
+  body[data-mode="next"] .pane[data-theme="today"] { display: none; }
+
+  .pane-label { display: flex; align-items: baseline; gap: 10px; margin: 0 0 9px; }
+  .pane-label b { font-size: 12px; font-weight: 650; letter-spacing: 0.09em; text-transform: uppercase; color: var(--doc-ink); }
+  .pane-label span { font-size: 13px; color: var(--doc-muted); }
+  .frame { border: 1px solid var(--doc-line); border-radius: 12px; overflow: hidden; background: #fff; }
+
+  .note {
+    margin: 26px 0 0;
+    padding: 14px 16px;
+    background: var(--doc-panel);
+    border-left: 2px solid var(--doc-accent);
+    border-radius: 0 8px 8px 0;
+    font-size: 13.5px;
+    color: var(--doc-body);
+  }
+  .note b { color: var(--doc-ink); }
+
+  table.tokens { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 8px 0 0; }
+  table.tokens th { text-align: left; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--doc-muted); font-weight: 500; padding: 0 12px 8px 0; border-bottom: 1px solid var(--doc-line); }
+  table.tokens td { padding: 9px 12px 9px 0; border-bottom: 1px solid #f0f2f6; vertical-align: middle; color: var(--doc-body); }
+  table.tokens td:first-child { color: var(--doc-ink); font-weight: 550; }
+  table.tokens code { font-family: var(--mono); font-size: 12px; color: #38415a; }
+  .sw { display: inline-block; width: 22px; height: 22px; border-radius: 5px; border: 1px solid rgba(16,24,40,0.12); vertical-align: middle; margin-right: 8px; }
+
+  ol.decisions { counter-reset: d; list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 2px; }
+  ol.decisions li {
+    counter-increment: d;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 4px 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f0f2f6;
+  }
+  ol.decisions li::before {
+    content: counter(d, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--doc-muted);
+    padding-top: 3px;
+  }
+  ol.decisions b { display: block; color: var(--doc-ink); font-weight: 600; font-size: 14.5px; margin-bottom: 3px; }
+  ol.decisions p { margin: 0; font-size: 13.5px; color: var(--doc-muted); max-width: 78ch; }
+
+  .two { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 30px; }
+  @media (max-width: 900px) { .two { grid-template-columns: minmax(0,1fr); } h1 { font-size: 27px; } }
+
+  ul.rules { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  ul.rules li { position: relative; padding-left: 20px; font-size: 13.5px; color: var(--doc-body); }
+  ul.rules li::before { content: ""; position: absolute; left: 2px; top: 9px; width: 6px; height: 1px; background: #8791a5; }
+  ul.rules li b { color: var(--doc-ink); font-weight: 600; }
+
+  .foot { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--doc-line); font-size: 13px; color: var(--doc-muted); }
+
+  /* ==========================================================================================
+     TODAY — an approximation of the shipped screen, built from src/index.css.
+     ========================================================================================== */
+  .mock { font-family: "Inter Variable", Inter, system-ui, sans-serif; }
+  .t { background: #f5f6f9; padding: 20px 22px 26px; color: #0f172a; font-size: 13px; }
+  .t-crumbs { font-size: 11.5px; color: #667085; margin-bottom: 14px; }
+  .t-crumbs b { color: #3d4759; }
+  .t-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+  .t-eyebrow { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #667085; margin: 0 0 5px; font-weight: 600; }
+  .t-title { font-size: 22px; font-weight: 620; letter-spacing: -0.012em; margin: 0; color: #0f172a; }
+  .t-desc { font-size: 12.5px; line-height: 1.55; color: #667085; margin: 5px 0 0; max-width: 72ch; }
+  .t-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
+  .t-btn { font-size: 12.5px; font-weight: 550; padding: 7px 13px; border-radius: 10px; border: 1px solid #e7e9ef; background: #fff; color: #3d4759; }
+  .t-btn--primary { background: #4453f0; border-color: #4453f0; color: #fff; }
+  .t-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+  .t-stat { background: #fff; border: 1px solid #eceef4; border-radius: 14px; padding: 13px 14px; box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 12px 28px -22px rgba(16,24,40,0.35); }
+  .t-stat p { margin: 0 0 6px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #667085; font-weight: 600; }
+  .t-stat strong { font-size: 24px; font-weight: 600; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; color: #0f172a; }
+  .t-stat small { display: block; font-size: 11.5px; color: #667085; margin-top: 3px; }
+  .t-card { background: #fff; border: 1px solid #eceef4; border-radius: 14px; box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 12px 28px -22px rgba(16,24,40,0.35); overflow: hidden; }
+  .t-card-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #eceef4; }
+  .t-card-head h4 { margin: 0; font-size: 13.5px; font-weight: 600; }
+  .t-card-head span { font-size: 12px; color: #667085; }
+  .t-card-head .t-btn { margin-left: auto; }
+  table.t-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .t-table th { text-align: left; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: #667085; font-weight: 600; padding: 10px 16px; border-bottom: 1px solid #eceef4; background: #fafbfc; }
+  .t-table td { padding: 11px 16px; border-bottom: 1px solid #f1f2f6; color: #3d4759; }
+  .t-table tr:last-child td { border-bottom: 0; }
+  .t-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: #0f172a; }
+  .t-table td.ref { font-family: var(--mono); font-size: 12px; color: #3d4759; }
+  .t-pill { display: inline-block; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 550; }
+  .t-pill--go { background: #eaf2ff; color: #134fb8; }
+  .t-pill--wait { background: #fdf3e3; color: #8a5606; }
+  .t-pill--ok { background: #e8f7f0; color: #0b7d4e; }
+  .t-pill--quiet { background: #f1f2f6; color: #4a5468; }
+  .t-foot { display: flex; gap: 14px; align-items: center; padding: 11px 16px; border-top: 1px solid #eceef4; font-size: 12px; color: #667085; }
+
+  /* component tiles for "today" */
+  .t-tile { background: #f5f6f9; padding: 18px; border-radius: 12px; }
+  .t-field { margin-bottom: 14px; }
+  .t-field label { display: block; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #667085; font-weight: 600; margin-bottom: 5px; }
+  .t-input { width: 100%; font-size: 13px; padding: 8px 10px; border: 1px solid #dfe3ea; border-radius: 10px; background: #fff; color: #0f172a; }
+  .t-input--bad { border-color: #d92d20; }
+  .t-hint { font-size: 12px; color: #667085; margin: 5px 0 0; }
+  .t-err { font-size: 12px; color: #b42318; margin: 5px 0 0; }
+  .t-notice { background: #fdf3e3; border: 1px solid #f3e0c2; border-radius: 12px; padding: 11px 13px; font-size: 12.5px; color: #8a5606; }
+  .t-empty { background: #fff; border: 1px dashed #dfe3ea; border-radius: 14px; padding: 22px; text-align: center; }
+  .t-empty strong { display: block; font-size: 13.5px; color: #0f172a; margin-bottom: 4px; }
+  .t-empty span { font-size: 12.5px; color: #667085; }
+  .t-money { font-size: 26px; font-weight: 600; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; color: #0f172a; }
+  .t-money small { font-size: 12px; color: #667085; font-weight: 500; letter-spacing: 0; margin-left: 4px; }
+
+  /* ==========================================================================================
+     PROPOSED — "Daylight 2".
+     ========================================================================================== */
+  .n {
+    --n-canvas: #f6f7fa;
+    --n-rail: #eef0f5;
+    --n-card: #ffffff;
+    --n-line: #e2e6ee;
+    --n-line-2: #d5dae5;
+    --n-ink: #0b1220;
+    --n-ink-2: #2c3547;
+    --n-muted: #59637a;
+    --n-faint: #8791a5;
+    --n-accent: #4453f0;
+    --n-accent-soft: #eef0ff;
+    --n-accent-line: #dfe3ff;
+    background: var(--n-canvas);
+    color: var(--n-ink-2);
+    font-size: 13.5px;
+    line-height: 1.55;
+    padding: 18px 20px 24px;
+  }
+  .n-crumbs { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--n-faint); margin-bottom: 16px; }
+  .n-crumbs b { color: var(--n-ink-2); font-weight: 500; }
+
+  .n-head { display: flex; align-items: flex-start; gap: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--n-line); margin-bottom: 16px; }
+  .n-title { font-size: 26px; line-height: 1.15; font-weight: 640; letter-spacing: -0.026em; margin: 0; color: var(--n-ink); }
+  .n-meta { display: flex; align-items: center; gap: 8px; margin: 7px 0 0; font-size: 12.5px; color: var(--n-muted); }
+  .n-meta i { width: 3px; height: 3px; border-radius: 50%; background: var(--n-faint); display: inline-block; }
+  .n-meta b { color: var(--n-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .n-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+  .n-btn {
+    font: inherit; font-size: 12.5px; font-weight: 560; letter-spacing: -0.004em;
+    padding: 7px 12px; border-radius: 8px; border: 1px solid var(--n-line-2);
+    background: var(--n-card); color: var(--n-ink-2); cursor: default;
+  }
+  .n-btn--primary { background: var(--n-accent); border-color: var(--n-accent); color: #fff; font-weight: 570; }
+  .n-btn--quiet { border-color: transparent; background: transparent; color: var(--n-muted); }
+  .n-btn--danger { color: #b42318; border-color: #f0cfcb; background: #fff; }
+
+  .n-strip {
+    display: grid; grid-template-columns: repeat(4, minmax(0,1fr));
+    border: 1px solid var(--n-line); border-radius: 12px; background: var(--n-card);
+    overflow: hidden; margin-bottom: 18px;
+  }
+  .n-stat { padding: 14px 16px 13px; border-right: 1px solid var(--n-line); }
+  .n-stat:last-child { border-right: 0; }
+  .n-stat p { margin: 0 0 7px; font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--n-muted); font-weight: 620; }
+  .n-stat strong { display: block; font-size: 25px; line-height: 1; font-weight: 620; letter-spacing: -0.026em; font-variant-numeric: tabular-nums; color: var(--n-ink); }
+  .n-stat small { display: block; margin-top: 6px; font-size: 11.5px; color: var(--n-muted); }
+  .n-stat--alert strong { color: #b42318; }
+
+  .n-card { background: var(--n-card); border: 1px solid var(--n-line); border-radius: 12px; }
+  .n-card-head { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--n-line); }
+  .n-card-head h4 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--n-ink); letter-spacing: -0.006em; }
+  .n-card-head p { margin: 0; font-size: 12px; color: var(--n-muted); }
+  .n-card-head .n-btn { margin-left: auto; }
+
+  table.n-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .n-table th {
+    text-align: left; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--n-muted); font-weight: 640; padding: 9px 16px;
+    border-bottom: 1px solid var(--n-line); background: #fbfcfe; white-space: nowrap;
+  }
+  .n-table th.num { text-align: right; }
+  .n-table td { padding: 0 16px; height: 46px; border-bottom: 1px solid #eef0f5; color: var(--n-ink-2); }
+  .n-table tbody tr:last-child td { border-bottom: 0; }
+  .n-table tbody tr:hover td { background: #f8f9fc; }
+  .n-table td.ref { font-family: var(--mono); font-size: 11.5px; color: var(--n-muted); letter-spacing: -0.01em; }
+  .n-table td.strong { color: var(--n-ink); font-weight: 550; }
+  .n-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--n-ink); font-weight: 550; white-space: nowrap; }
+  .n-table td.dim { color: var(--n-muted); }
+
+  .n-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 570; letter-spacing: 0.005em; white-space: nowrap; }
+  .n-chip i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; display: inline-block; flex: none; }
+  .n-chip--go { background: #eaf2ff; color: #134fb8; }
+  .n-chip--wait { background: #fdf3e3; color: #8a5606; }
+  .n-chip--ok { background: #e8f7f0; color: #0a7449; }
+  .n-chip--stop { background: #fdecea; color: #b42318; }
+  .n-chip--quiet { background: #f1f3f7; color: #4b5568; }
+  .n-foot { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-top: 1px solid var(--n-line); font-size: 11.5px; color: var(--n-muted); }
+  .n-foot b { color: var(--n-ink); font-weight: 550; font-variant-numeric: tabular-nums; }
+
+  /* the pieces */
+  .n-tile { background: var(--n-canvas); padding: 18px; border-radius: 12px; }
+  .n-field { margin-bottom: 16px; }
+  .n-field:last-child { margin-bottom: 0; }
+  .n-field label { display: block; font-size: 12px; font-weight: 570; color: var(--n-ink); margin-bottom: 5px; letter-spacing: -0.004em; }
+  .n-input { width: 100%; font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--n-line-2); border-radius: 8px; background: #fff; color: var(--n-ink); }
+  .n-input--bad { border-color: #d92d20; box-shadow: 0 0 0 3px #fdecea; }
+  .n-hint { font-size: 11.5px; color: var(--n-muted); margin: 5px 0 0; }
+  .n-err { display: flex; gap: 5px; font-size: 11.5px; color: #b42318; margin: 5px 0 0; font-weight: 500; }
+  .n-notice { display: flex; gap: 9px; background: #fdf3e3; border-left: 2px solid #b8730b; border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 12.5px; color: #6f4505; }
+  .n-empty { background: #fff; border: 1px solid var(--n-line); border-radius: 12px; padding: 26px 20px; text-align: center; }
+  .n-empty .glyph { width: 30px; height: 30px; border: 1px solid var(--n-line-2); border-radius: 8px; margin: 0 auto 10px; position: relative; }
+  .n-empty .glyph::before, .n-empty .glyph::after { content: ""; position: absolute; background: var(--n-line-2); }
+  .n-empty .glyph::before { left: 7px; right: 7px; top: 11px; height: 1px; }
+  .n-empty .glyph::after { left: 7px; right: 7px; top: 17px; height: 1px; }
+  .n-empty strong { display: block; font-size: 13.5px; color: var(--n-ink); font-weight: 600; margin-bottom: 4px; }
+  .n-empty span { font-size: 12.5px; color: var(--n-muted); }
+  .n-money { font-size: 27px; font-weight: 630; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--n-ink); }
+  .n-money small { font-family: var(--mono); font-size: 11px; font-weight: 400; letter-spacing: 0.04em; color: var(--n-muted); margin-left: 7px; vertical-align: 6px; }
+
+  /* the whole workspace */
+  .workspace { display: grid; grid-template-columns: 226px minmax(0,1fr); min-height: 560px; background: var(--n-canvas); font-family: "Inter Variable", Inter, system-ui, sans-serif; font-size: 13px; color: #2c3547; }
+  .ws-rail { background: #eef0f5; border-right: 1px solid #e2e6ee; padding: 14px 10px 16px; display: flex; flex-direction: column; }
+  .ws-brand { display: flex; align-items: center; gap: 9px; padding: 2px 6px 16px; }
+  .ws-mark { width: 26px; height: 26px; border-radius: 7px; background: #4453f0; color: #fff; font-size: 12.5px; font-weight: 650; display: grid; place-items: center; }
+  .ws-brand b { font-size: 12.5px; font-weight: 620; color: #0b1220; display: block; letter-spacing: -0.01em; }
+  .ws-brand span { font-size: 10.5px; color: #59637a; display: block; }
+  .ws-group { margin-bottom: 14px; }
+  .ws-group p { margin: 0 0 5px; padding: 0 8px; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #8791a5; font-weight: 640; }
+  .ws-item { position: relative; display: flex; align-items: center; gap: 9px; padding: 6px 8px 6px 9px; border-radius: 7px; color: #38415a; font-size: 12.5px; font-weight: 500; }
+  .ws-item .dot { width: 13px; height: 13px; border: 1.5px solid #a2abbb; border-radius: 4px; flex: none; }
+  .ws-item .count { margin-left: auto; font-size: 10.5px; font-weight: 620; color: #4b5568; background: #dfe3ec; border-radius: 5px; padding: 0 5px; font-variant-numeric: tabular-nums; }
+  .ws-item--on { background: #fff; color: #0b1220; font-weight: 600; border: 1px solid #e2e6ee; padding: 5px 7px 5px 8px; }
+  .ws-item--on::before { content: ""; position: absolute; left: -1px; top: 6px; bottom: 6px; width: 2px; background: #4453f0; border-radius: 2px; }
+  .ws-item--on .dot { border-color: #4453f0; background: #eef0ff; }
+  .ws-item--on .count { background: #eef0ff; color: #3542cf; }
+  .ws-foot { margin-top: auto; border-top: 1px solid #dfe3ec; padding-top: 10px; }
+  .ws-user { display: flex; align-items: center; gap: 8px; padding: 4px 8px; }
+  .ws-avatar { width: 22px; height: 22px; border-radius: 50%; background: #dfe3ec; color: #38415a; font-size: 9.5px; font-weight: 650; display: grid; place-items: center; }
+  .ws-user b { display: block; font-size: 11.5px; color: #0b1220; font-weight: 570; }
+  .ws-user span { display: block; font-size: 10.5px; color: #59637a; }
+  .ws-main { display: flex; flex-direction: column; }
+  .ws-top { display: flex; align-items: center; gap: 14px; padding: 0 22px; height: 48px; background: #fff; border-bottom: 1px solid #e2e6ee; }
+  .ws-crumb { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #8791a5; }
+  .ws-crumb b { color: #2c3547; font-weight: 500; }
+  .ws-search { margin-left: auto; display: flex; align-items: center; gap: 8px; border: 1px solid #e2e6ee; border-radius: 7px; padding: 5px 9px; color: #8791a5; font-size: 11.5px; background: #fbfcfe; min-width: 220px; }
+  .ws-search kbd { margin-left: auto; font-family: var(--mono); font-size: 9.5px; border: 1px solid #e2e6ee; border-radius: 4px; padding: 0 4px; color: #59637a; }
+  .ws-avatar-lg { width: 24px; height: 24px; border-radius: 50%; background: #eef0ff; color: #3542cf; font-size: 9.5px; font-weight: 650; display: grid; place-items: center; }
+  .ws-body { padding: 20px 22px 24px; }
+
+  .detail { display: grid; grid-template-columns: minmax(0,1fr) 264px; gap: 18px; align-items: start; }
+  .facts { border: 1px solid #e2e6ee; border-radius: 12px; background: #fff; }
+  .facts h5 { margin: 0; padding: 11px 14px; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #59637a; font-weight: 640; border-bottom: 1px solid #e2e6ee; }
+  .facts dl { margin: 0; padding: 4px 14px 10px; }
+  .facts div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid #f1f3f7; font-size: 12px; }
+  .facts div:last-child { border-bottom: 0; }
+  .facts dt { color: #59637a; }
+  .facts dd { margin: 0; color: #0b1220; font-weight: 550; text-align: right; }
+  .charge { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid #eef0f5; }
+  .charge b { font-size: 12.5px; color: #0b1220; font-weight: 570; display: block; }
+  .charge span { font-size: 11.5px; color: #59637a; }
+  .charge .amt { font-size: 13px; font-weight: 580; font-variant-numeric: tabular-nums; color: #0b1220; text-align: right; }
+  .timeline { list-style: none; margin: 0; padding: 4px 16px 12px; }
+  .timeline li { display: grid; grid-template-columns: 62px minmax(0,1fr); gap: 12px; padding: 8px 0; font-size: 12px; border-bottom: 1px solid #f4f5f9; }
+  .timeline li:last-child { border-bottom: 0; }
+  .timeline time { font-family: var(--mono); font-size: 10.5px; color: #8791a5; padding-top: 2px; }
+  .timeline span { color: #2c3547; }
+  .timeline b { color: #0b1220; font-weight: 570; }
+</style>
+</head>
+<body data-mode="both">
+<div class="doc">
+
+  <header class="masthead">
+    <p class="kicker">Richie TMS · interface proposal · not yet applied to the app</p>
+    <h1>Daylight 2 — the same product, with its edges sharpened</h1>
+    <p class="lede">You said the interface looks plain. I agree, and I do not think the answer is a new
+      colour scheme — the diagnostics say the app already has a consistent palette and one accent. What it
+      lacks is <b>typographic confidence and hierarchy</b>: everything sits in a white box at the same
+      weight, at 12.5&nbsp;pixel text, so the eye has nowhere to land and the screen reads as grey.</p>
+    <p class="lede">This page shows the same screens twice — as they are, and as I propose they become.
+      Read it, then tell me which sections to keep and which to throw out. Nothing in the application has
+      been changed to produce it.</p>
+
+    <div class="controls">
+      <span class="label">Show</span>
+      <div class="seg" role="group" aria-label="Which version to show">
+        <button type="button" data-set-mode="today" aria-pressed="false">Today</button>
+        <button type="button" data-set-mode="next" aria-pressed="false">Proposed</button>
+        <button type="button" data-set-mode="both" aria-pressed="true">Both, one above the other</button>
+      </div>
+    </div>
+  </header>
+
+  <h2><span class="num">01</span>The screen you spend the day on</h2>
+  <p class="why">A register: four figures at the top, then the list. Both panes carry identical sample
+    content, so what you are judging is only the treatment. The sample rows are illustrations for this
+    page — they are not records and they are not in the database.</p>
+
+  <div class="compare">
+
+    <section class="pane" data-theme="today">
+      <p class="pane-label"><b>Today</b><span>Four floating cards, one paragraph of explanation, 12.5&nbsp;px body text.</span></p>
+      <div class="frame">
+        <div class="mock t">
+          <p class="t-crumbs">Service desk &nbsp;›&nbsp; <b>Rentals</b></p>
+          <div class="t-head">
+            <div>
+              <p class="t-eyebrow">Service desk</p>
+              <h3 class="t-title">Rentals</h3>
+              <p class="t-desc">Every hire from the first enquiry to the final invoice. A request is priced,
+                agreed by the customer, confirmed by a deposit, assigned to a vehicle and driver, then
+                completed and billed — each step recorded against the person who took it.</p>
+            </div>
+            <div class="t-actions">
+              <button class="t-btn" type="button">Export</button>
+              <button class="t-btn t-btn--primary" type="button">New request</button>
+            </div>
+          </div>
+
+          <div class="t-stats">
+            <div class="t-stat"><p>Waiting on us</p><strong>3</strong><small>priced or answered</small></div>
+            <div class="t-stat"><p>Out today</p><strong>2</strong><small>vehicles on hire</small></div>
+            <div class="t-stat"><p>To invoice</p><strong>1</strong><small>completed, unbilled</small></div>
+            <div class="t-stat"><p>Open value</p><strong>11,450</strong><small>GHS, quoted</small></div>
+          </div>
+
+          <div class="t-card">
+            <div class="t-card-head">
+              <h4>All hires</h4><span>24 records</span>
+              <button class="t-btn" type="button">Filter</button>
+            </div>
+            <table class="t-table">
+              <thead>
+                <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th style="text-align:right">Total</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="ref">RR-0004</td><td>Volta Star Logistics</td><td>02–04 Nov</td><td>Toyota Hiace · GT 4821-24</td><td><span class="t-pill t-pill--ok">Completed</span></td><td class="num">3,400.00</td></tr>
+                <tr><td class="ref">RR-0005</td><td>Akosua Boateng</td><td>05 Nov</td><td>Nissan Urvan · GW 1194-23</td><td><span class="t-pill t-pill--go">Waiting on you</span></td><td class="num">1,150.00</td></tr>
+                <tr><td class="ref">RR-0006</td><td>Ministry of Roads</td><td>06–08 Nov</td><td>Toyota Coaster · GR 5502-22</td><td><span class="t-pill t-pill--go">Dispatched</span></td><td class="num">6,900.00</td></tr>
+                <tr><td class="ref">RR-0007</td><td>Kofi Mensah</td><td>09 Nov</td><td>Hyundai Starex · GE 2201-25</td><td><span class="t-pill t-pill--quiet">Quoted</span></td><td class="num">980.00</td></tr>
+              </tbody>
+            </table>
+            <div class="t-foot"><span>Showing 4 of 24</span><span>Sorted by departure</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane" data-theme="next">
+      <p class="pane-label"><b>Proposed</b><span>One figure strip, a single meta line, 13.5&nbsp;px body and a table built to be read down a column.</span></p>
+      <div class="frame">
+        <div class="mock n">
+          <p class="n-crumbs">Service desk &nbsp;/&nbsp; <b>Rentals</b></p>
+          <div class="n-head">
+            <div>
+              <h3 class="n-title">Rentals</h3>
+              <p class="n-meta"><b>24</b> hires <i></i> <b>3</b> waiting on you <i></i> <b>1</b> completed and unbilled <i></i> <b>11,450.00</b> GHS open</p>
+            </div>
+            <div class="n-actions">
+              <button class="n-btn n-btn--quiet" type="button">Export</button>
+              <button class="n-btn n-btn--primary" type="button">New request</button>
+            </div>
+          </div>
+
+          <div class="n-strip">
+            <div class="n-stat"><p>Waiting on us</p><strong>3</strong><small>priced or answered</small></div>
+            <div class="n-stat"><p>Out today</p><strong>2</strong><small>vehicles on hire</small></div>
+            <div class="n-stat"><p>To invoice</p><strong>1</strong><small>completed, unbilled</small></div>
+            <div class="n-stat"><p>Open value</p><strong>11,450</strong><small>GHS, quoted</small></div>
+          </div>
+
+          <div class="n-card">
+            <div class="n-card-head">
+              <h4>All hires</h4><p>24 records</p>
+              <button class="n-btn" type="button">Filter</button>
+            </div>
+            <table class="n-table">
+              <thead>
+                <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th class="num">Total</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="ref">RR-0004</td><td class="strong">Volta Star Logistics</td><td class="dim">02–04 Nov</td><td class="dim">Toyota Hiace · GT 4821-24</td><td><span class="n-chip n-chip--ok"><i></i>Completed</span></td><td class="num">3,400.00</td></tr>
+                <tr><td class="ref">RR-0005</td><td class="strong">Akosua Boateng</td><td class="dim">05 Nov</td><td class="dim">Nissan Urvan · GW 1194-23</td><td><span class="n-chip n-chip--wait"><i></i>Waiting on you</span></td><td class="num">1,150.00</td></tr>
+                <tr><td class="ref">RR-0006</td><td class="strong">Ministry of Roads</td><td class="dim">06–08 Nov</td><td class="dim">Toyota Coaster · GR 5502-22</td><td><span class="n-chip n-chip--go"><i></i>Dispatched</span></td><td class="num">6,900.00</td></tr>
+                <tr><td class="ref">RR-0007</td><td class="strong">Kofi Mensah</td><td class="dim">09 Nov</td><td class="dim">Hyundai Starex · GE 2201-25</td><td><span class="n-chip n-chip--quiet"><i></i>Quoted</span></td><td class="num">980.00</td></tr>
+              </tbody>
+            </table>
+            <div class="n-foot"><span><b>4</b> of <b>24</b> shown</span><span>Sorted by departure</span><span style="margin-left:auto">Totals exclude voided invoices</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <p class="note"><b>What changed here, and why.</b> The eyebrow above the title repeated the breadcrumb
+    directly above it, so it went; the paragraph moved into one line of real figures. Four shadowed cards
+    became one strip with hairline dividers — same four numbers, a third of the vertical space, and nothing
+    floating. The table lost its zebra-free-but-flat feel: an uppercase micro-label header, ledger-aligned
+    figures, and status chips that carry a dot <i>and</i> a word.</p>
+
+  <h2><span class="num">02</span>The pieces a screen is made of</h2>
+  <p class="why">The same six components, side by side. This is where most of the “plain” feeling comes
+    from: at 12.5&nbsp;px with grey labels, an input, a notice and a button all speak at the same volume.</p>
+
+  <div class="two">
+    <div>
+      <p class="pane-label"><b>Today</b></p>
+      <div class="t-tile mock t" style="background:#f5f6f9">
+        <div class="t-field">
+          <label>Total charged</label>
+          <input class="t-input" value="340.00" readonly />
+          <p class="t-hint">Quantity × unit amount, in whole pesewas.</p>
+        </div>
+        <div class="t-field">
+          <label>Reason the customer was given</label>
+          <input class="t-input t-input--bad" value="" readonly />
+          <p class="t-err">Say why the customer is being charged.</p>
+        </div>
+        <div style="display:flex;gap:8px;margin:16px 0">
+          <button class="t-btn t-btn--primary" type="button">Complete hire</button>
+          <button class="t-btn" type="button">Cancel</button>
+        </div>
+        <div class="t-notice" style="margin-bottom:14px">This hire is above your approval figure, so somebody else has to sign the charge before it is billed.</div>
+        <div class="t-empty"><strong>No hires yet</strong><span>Start with a rental request; the quotation follows.</span></div>
+        <div style="margin-top:16px"><span class="t-money">3,400.00<small>GHS</small></span></div>
+      </div>
+    </div>
+    <div>
+      <p class="pane-label"><b>Proposed</b></p>
+      <div class="n-tile n">
+        <div class="n-field">
+          <label for="p1">Total charged</label>
+          <input id="p1" class="n-input" value="340.00" readonly />
+          <p class="n-hint">Quantity × unit amount, in whole pesewas.</p>
+        </div>
+        <div class="n-field">
+          <label for="p2">Reason the customer was given</label>
+          <input id="p2" class="n-input n-input--bad" value="" readonly aria-invalid="true" aria-describedby="p2e" />
+          <p class="n-err" id="p2e"><span aria-hidden="true">▲</span> Say why the customer is being charged. It is printed on their invoice.</p>
+        </div>
+        <div style="display:flex;gap:8px;margin:18px 0">
+          <button class="n-btn n-btn--primary" type="button">Complete hire</button>
+          <button class="n-btn n-btn--quiet" type="button">Cancel</button>
+        </div>
+        <div class="n-notice" style="margin-bottom:16px"><span aria-hidden="true">!</span><span>Above your approval figure. Somebody other than you must sign the charge before it is billed.</span></div>
+        <div class="n-empty">
+          <div class="glyph" aria-hidden="true"></div>
+          <strong>No hires yet</strong><span>Start with a rental request; the quotation follows.</span>
+        </div>
+        <div style="margin-top:18px"><span class="n-money">3,400.00<small>GHS</small></span></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note"><b>What changed here.</b> Labels are sentence case and read at 12&nbsp;px in ink rather than
+    uppercase grey — uppercase micro-labels are kept for table headers and section counts, where they help
+    you scan, and taken off form labels, where they slow reading. The error names the consequence, not just
+    the rule. The primary action is the only filled control, everything else is quiet.</p>
+
+  <h2><span class="num">03</span>The whole workspace</h2>
+  <p class="why">The frame matters as much as the page inside it. The rail is tinted and the work surface is
+    light: the chrome recedes, the records come forward. The active destination is a white chip with a
+    2&nbsp;pixel indigo edge, and its outstanding count sits on the right of the row where a scan finds it.</p>
+
+  <div class="frame">
+    <div class="workspace n">
+      <aside class="ws-rail">
+        <div class="ws-brand">
+          <div class="ws-mark">R</div>
+          <div><b>Richie TMS</b><span>Transport Services</span></div>
+        </div>
+
+        <div class="ws-group">
+          <p>Service desk</p>
+          <div class="ws-item"><span class="dot"></span>Dashboard</div>
+          <div class="ws-item"><span class="dot"></span>Money<span class="count">2</span></div>
+          <div class="ws-item ws-item--on"><span class="dot"></span>Rentals<span class="count">3</span></div>
+          <div class="ws-item"><span class="dot"></span>Invoices</div>
+          <div class="ws-item"><span class="dot"></span>Busing<span class="count">4</span></div>
+          <div class="ws-item"><span class="dot"></span>Dispatch<span class="count">1</span></div>
+        </div>
+
+        <div class="ws-group">
+          <p>Fleet &amp; clients</p>
+          <div class="ws-item"><span class="dot"></span>Vehicles</div>
+          <div class="ws-item"><span class="dot"></span>Compliance<span class="count">6</span></div>
+          <div class="ws-item"><span class="dot"></span>Clients</div>
+          <div class="ws-item"><span class="dot"></span>Contracts</div>
+        </div>
+
+        <div class="ws-group">
+          <p>Administration</p>
+          <div class="ws-item"><span class="dot"></span>Settings</div>
+          <div class="ws-item"><span class="dot"></span>Audit log</div>
+        </div>
+
+        <div class="ws-foot">
+          <div class="ws-user">
+            <div class="ws-avatar">AB</div>
+            <div><b>Ama Boateng</b><span>Operations</span></div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="ws-main">
+        <div class="ws-top">
+          <span class="ws-crumb">Service desk &nbsp;/&nbsp; <b>Rentals</b></span>
+          <div class="ws-search">Search or jump to a screen<kbd>Ctrl K</kbd></div>
+          <div class="ws-avatar-lg">AB</div>
+        </div>
+
+        <div class="ws-body">
+          <div class="n-head">
+            <div>
+              <h3 class="n-title">RR-0004 · Volta Star Logistics</h3>
+              <p class="n-meta"><span class="n-chip n-chip--ok"><i></i>Completed</span> <i></i> <b>2–4 Nov</b> <i></i> Toyota Hiace · GT 4821-24 <i></i> driven by <b>Kojo Mensah</b></p>
+            </div>
+            <div class="n-actions">
+              <button class="n-btn n-btn--quiet" type="button">Print</button>
+              <button class="n-btn n-btn--primary" type="button">Raise invoice</button>
+            </div>
+          </div>
+
+          <div class="detail">
+            <div>
+              <div class="n-card" style="margin-bottom:16px">
+                <div class="n-card-head"><h4>Charged after the price was agreed</h4><p>1 charge · 250.00 GHS</p></div>
+                <div class="charge">
+                  <div><b>Damaged seat cover</b><span>Seat cover torn on return · added by Ama Boateng, 4 Nov 16:20</span></div>
+                  <span class="n-chip n-chip--ok"><i></i>Signed by Fin</span>
+                  <div class="amt">250.00</div>
+                </div>
+                <div class="charge" style="border-bottom:0">
+                  <div><b>Fuel</b><span>Tank refilled before return · added by Ama Boateng, 4 Nov 16:18</span></div>
+                  <span class="n-chip n-chip--wait"><i></i>Needs a second name</span>
+                  <div class="amt">400.00</div>
+                </div>
+                <div class="n-foot"><span>Quoted <b>2,750.00</b></span><span>Charges <b>650.00</b></span><span style="margin-left:auto">Final invoice <b>3,400.00 GHS</b></span></div>
+              </div>
+
+              <div class="n-card">
+                <div class="n-card-head"><h4>What happened</h4><p>Every step is attributed</p></div>
+                <ul class="timeline">
+                  <li><time>28 Oct</time><span><b>Ama Boateng</b> quoted QUO-0011 — 2,750.00 GHS, agreed by the customer the same day</span></li>
+                  <li><time>29 Oct</time><span>Deposit of <b>687.50</b> recorded against the quotation</span></li>
+                  <li><time>2 Nov</time><span>Assigned to GT 4821-24 and <b>Kojo Mensah</b>; left the yard at 06:40</span></li>
+                  <li><time>4 Nov</time><span>Returned at 16:05, 1,204 km driven, two charges recorded</span></li>
+                </ul>
+              </div>
+            </div>
+
+            <aside class="facts">
+              <h5>The hire</h5>
+              <dl>
+                <div><dt>Customer</dt><dd>Volta Star Logistics</dd></div>
+                <div><dt>Quotation</dt><dd>QUO-0011</dd></div>
+                <div><dt>Agreed</dt><dd>2,750.00</dd></div>
+                <div><dt>Charges</dt><dd>650.00</dd></div>
+                <div><dt>Invoice</dt><dd>INV-2026-0007</dd></div>
+                <div><dt>Payment</dt><dd>Part paid</dd></div>
+              </dl>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note"><b>Why a detail screen and not another list.</b> This is the shape the registers open into:
+    one record, the thing that needs a decision on the left, the facts you would otherwise scroll to find
+    pinned on the right. It is also where the newest piece of work lands — the charges added after the price
+    was agreed, each with the name that signed it.</p>
+
+  <h2><span class="num">04</span>What actually changes</h2>
+  <ol class="decisions">
+    <li>
+      <div>
+        <b>Body text goes from 12.5 to 13.5–14 pixels, and greys get darker.</b>
+        <p>Small grey text at low contrast is the single biggest cause of “this looks cheap”. The muted ink
+          moves from <code>#667085</code> (4.97:1) to <code>#59637a</code> (6.02:1), and the ink itself to
+          near-black <code>#0b1220</code> (18.7:1). Everything stays AA; most of it moves to AAA.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <b>Titles get bigger and tighter; labels get smaller and quieter.</b>
+        <p>Page titles at 26&nbsp;px with −0.026em tracking, figures at 25&nbsp;px with tabular numerals,
+          table headers at 9.5&nbsp;px uppercase. A real jump between three sizes reads as designed; three
+          sizes one pixel apart reads as flat.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <b>Fewer boxes, more rule and space.</b>
+        <p>Four floating stat cards become one bordered strip with hairlines. Cards lose their shadow and
+          keep a 1&nbsp;px edge; the shadow is reserved for things that genuinely float above the page, like
+          a dialog. Nothing on the canvas competes for depth.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <b>Numbers are read down a column, not across a line.</b>
+        <p>Every amount, date and count is right-aligned with tabular numerals, so a glance down the total
+          column compares like with like. Currency sits in a small mono label rather than inside every
+          figure.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <b>Status becomes a chip with a dot and a word, not a rounded pill.</b>
+        <p>Fully rounded pills read as 2020. A 6&nbsp;px radius with a 5&nbsp;px dot is quieter and scans
+          faster, and the word is still there — colour is never the only carrier of meaning.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <b>The chrome recedes: tinted rail, light canvas, white records.</b>
+        <p>Today the rail and the work surface are the same white and the cards float on top. Inverting that
+          relationship gives the page a frame and makes the records the brightest thing on screen.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <b>One place for the explanation, on demand.</b>
+        <p>Long “why this figure” paragraphs move behind a quiet link next to the figure they explain. The
+          sentence is still there, in full, for the person who needs it — it simply stops being the first
+          thing every reader meets.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <b>The same treatment everywhere, in one pass.</b>
+        <p>The tokens and the six components are already shared, so this is a pass over the 30 screens, not a
+          rewrite: 485 leftover colour classes removed, sorting on every register, one header pattern, one
+          empty state. That is what makes it read as one product rather than thirty.</p>
+      </div>
+    </li>
+  </ol>
+
+  <h2><span class="num">05</span>The rules this keeps</h2>
+  <div class="two">
+    <div>
+      <ul class="rules">
+        <li><b>One accent, unchanged.</b> <code>#4453f0</code> is still the only action colour, at 5.6:1 on white.</li>
+        <li><b>No gradients, glass, 3D or shadow tricks.</b> Flat tints, one edge, one hairline.</li>
+        <li><b>No motion.</b> Nothing animates, nothing fades in; transitions stay off.</li>
+        <li><b>No colour-only meaning.</b> Every chip and notice carries its words; the dot is a second cue, not the cue.</li>
+        <li><b>No new dependency.</b> The same Inter and IBM Plex Mono files already in the app, the same CSS.</li>
+        <li><b>Nothing invented.</b> Empty states still say what is missing rather than showing a zero.</li>
+      </ul>
+    </div>
+    <div>
+      <table class="tokens">
+        <thead>
+          <tr><th>Pair</th><th>Ratio</th><th>Standard</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Ink on white</td><td><code>18.72:1</code></td><td>AAA</td></tr>
+          <tr><td>Body on canvas</td><td><code>11.17:1</code></td><td>AAA</td></tr>
+          <tr><td>Muted on white</td><td><code>6.02:1</code></td><td>AA</td></tr>
+          <tr><td>Accent on white</td><td><code>5.61:1</code></td><td>AA</td></tr>
+          <tr><td>White on accent</td><td><code>5.61:1</code></td><td>AA</td></tr>
+          <tr><td>Every status chip</td><td><code>5.2–6.6:1</code></td><td>AA</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2><span class="num">06</span>How it would land</h2>
+  <p class="why">Three steps, each one shippable on its own, so you can stop after any of them.</p>
+  <ol class="decisions">
+    <li>
+      <div>
+        <b>Step one — the tokens and the six components.</b>
+        <p>Colour, type scale, radii, row heights and the button/field/chip/notice/empty-state/stat strip
+          set in <code>src/index.css</code> and <code>src/ui/primitives.tsx</code>. Every screen improves at
+          once because they all draw from those files; nothing is redesigned screen by screen yet.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <b>Step two — the frame and the three busiest screens.</b>
+        <p>The rail, the top bar, then dashboard, rentals and invoices. This is the step you would show
+          somebody.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <b>Step three — the sweep.</b>
+        <p>The remaining registers onto the shared table with sorting, the leftover colour classes gone, and
+          every screen's empty state and error message brought to one voice. Existing tests should keep
+          passing; where a test asserts old wording I will change the test and say so.</p>
+      </div>
+    </li>
+  </ol>
+
+  <p class="foot">Preview page only — nothing here is wired into the application, and no dependency or
+    font was added. Open <code>docs/ui-proposal/index.html</code> in a browser to read it again later.
+    The application itself is unchanged on this branch apart from its documentation.</p>
+</div>
+
+<script>
+  (function () {
+    var buttons = document.querySelectorAll("[data-set-mode]");
+    function set(mode) {
+      document.body.setAttribute("data-mode", mode);
+      buttons.forEach(function (b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-set-mode") === mode));
+      });
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () { set(b.getAttribute("data-set-mode")); });
+    });
+    set("both");
+  })();
+</script>
+</body>
+</html>
