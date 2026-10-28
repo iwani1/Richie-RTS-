@@ -194,7 +194,7 @@ describe("the dispatch board", () => {
     expect(screen.getByText("TR-0001")).toBeTruthy();
     expect(screen.getByText("TR-0002")).toBeTruthy();
     expect(screen.getByText("TR-0003")).toBeTruthy();
-    const unassigned = screen.getByText("Waiting on a crew").closest(".rts-stat") as HTMLElement;
+    const unassigned = screen.getByText("Waiting on a crew").closest('[data-slot="stat"]') as HTMLElement;
     expect(unassigned.textContent).toContain("1");
 
     // The warning leads with the two runs that cannot leave, and says why in the reason's own words.
@@ -237,7 +237,7 @@ describe("the dispatch board", () => {
     setDate("2026-06-05");
     expect(screen.getByText("No runs on this date")).toBeTruthy();
     // No figure is invented for a day with nothing on it.
-    const departures = screen.getByText("Departures").closest(".rts-stat") as HTMLElement;
+    const departures = screen.getByText("Departures").closest('[data-slot="stat"]') as HTMLElement;
     expect(departures.textContent).toContain("0");
   });
 

@@ -1,0 +1,103 @@
+/* ------------------------------------------------------------------------------------------
+   Design tokens. The only place a colour is written down.
+   Base: shadcn/ui "neutral"; accent: one indigo. Everything in the application is expressed as a
+   Tailwind utility over these tokens (bg-card, text-muted-foreground, border-border, bg-primary),
+   so a component never names a colour of its own.
+   ------------------------------------------------------------------------------------------ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* Neutral, cool-leaning. Nothing here is tinted except the accent. */
+  --background: #f7f7f8;
+  --foreground: #0c1016;
+  --card: #ffffff;
+  --card-foreground: #0c1016;
+  --popover: #ffffff;
+  --popover-foreground: #0c1016;
+  --secondary: #f1f2f4;
+  --secondary-foreground: #1c2230;
+  --muted: #f1f2f4;
+  --muted-foreground: #5c6472;
+  --accent: #eff0f2;
+  --accent-foreground: #11151d;
+  --destructive: #c4271b;
+  --border: #e5e6ea;
+  --input: #d9dbe1;
+  --ring: #4453f0;
+
+  /* The single accent. Two steps: the colour, and the ink that sits on it. */
+  --primary: #4453f0;
+  --primary-foreground: #ffffff;
+
+  /* The rail. A near-black neutral, so the records are the only bright surface. */
+  --sidebar: #0c1016;
+  --sidebar-foreground: #c9cdd6;
+  --sidebar-accent: #1a1f29;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1c222c;
+}
+
+/* The pre-migration screens read Tailwind's stone/red/emerald scales; point them at the same
+   neutral and destructive values so no second palette exists while they are converted. */
+@theme {
+  --color-stone-50: #fafafa;
+  --color-stone-100: #f4f4f5;
+  --color-stone-200: #e5e6ea;
+  --color-stone-300: #d4d6dc;
+  --color-stone-400: #9aa0ac;
+  --color-stone-500: #6b7280;
+  --color-stone-600: #4b5563;
+  --color-stone-700: #3a4150;
+  --color-stone-800: #262c38;
+  --color-stone-900: #0c1016;
+  --color-red-700: #a51f15;
+  --color-red-600: #c4271b;
+  --color-emerald-700: #0a7449;
+  --color-amber-700: #8a5606;
+  --color-lime-50: #eef0ff;
+  --color-lime-300: var(--primary);
+  --color-lime-600: var(--primary);
+  --color-lime-900: #0c1016;
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}

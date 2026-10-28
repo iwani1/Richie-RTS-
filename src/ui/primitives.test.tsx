@@ -46,7 +46,7 @@ describe("password reveal", () => {
     render(<Field label="Password" error="Too short."><PasswordInput invalid defaultValue="x" /></Field>);
     // The error text is part of the label, so the field's accessible name carries it too.
     const field = screen.getByLabelText(/^Password/) as HTMLInputElement;
-    expect(field.className).toContain("rts-input--invalid");
+    expect(field.className).toContain("aria-invalid:border-destructive");
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(screen.getByRole("alert").textContent).toBe("Too short.");
   });

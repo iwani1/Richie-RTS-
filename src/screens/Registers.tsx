@@ -371,7 +371,9 @@ export function ClientsPage() {
       {panel && panel.mode === "import" && <ImportPanel kind="clients" onClose={() => setPanel(null)} />}
       {panel && panel.mode === "history" && <ClientHistory client={panel.client} onClose={() => setPanel(null)} />}
       {panel && panel.mode === "branches" && <ClientBranches client={panel.client} onClose={() => setPanel(null)} />}
-      {panel && panel.mode !== "import" && (
+      {/* Only the create and edit modes are a form: history and branches are records, and rendering
+          the form for them put two panels on top of one another. */}
+      {panel && (panel.mode === "create" || panel.mode === "edit") && (
           <ClientForm key={panel.mode === "edit" ? panel.client.id : "create"} title={panel.mode === "edit" ? `Edit ${panel.client.name}` : "Add client"} initial={panel.mode === "edit" ? clientToInput(panel.client) : emptyClient()} onClose={() => setPanel(null)} onSubmit={handle} />
       )}
     </div>

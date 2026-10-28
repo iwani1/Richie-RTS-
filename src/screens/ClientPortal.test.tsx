@@ -205,7 +205,7 @@ function seed(options: { bills?: boolean; quote?: boolean } = {}): { userId: str
 const stat = (label: string) => {
   const tile = screen
     .getAllByText(label)
-    .map((element) => element.closest(".rts-stat"))
+    .map((element) => element.closest('[data-slot="stat"]'))
     .find(Boolean) as HTMLElement | undefined;
   if (!tile) throw new Error(`No figure labelled ${label}`);
   return tile;

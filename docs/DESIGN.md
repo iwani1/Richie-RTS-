@@ -275,6 +275,31 @@ white work surface, and shadows reserved for things that genuinely float.
 A decision is awaited, including which of the three skins to take. Until it is taken, §4 and §5
 describe the interface as built, not as proposed.
 
+## 6b. The component system: shadcn/ui, Tailwind tokens, Lucide
+
+The interface is being rebuilt on a standard stack rather than a bespoke stylesheet:
+
+- **Components** are shadcn/ui (new-york), vendored under `src/components/ui/` — the same files the
+  registry ships, with `cn` re-pointed at `@/lib/utils`. Buttons, cards, badges, inputs, tables,
+  dialogs, sheets, dropdowns, selects, tabs, alerts, tooltips, command and skeletons all come from there.
+- **Colour** exists only in `src/styles/tokens.css`, as Tailwind v4 tokens: a neutral palette and one
+  accent (`--primary`, indigo). No component names a colour; it asks for `bg-card`,
+  `text-muted-foreground` or `border-border` and the token decides.
+- **Icons** are Lucide (`lucide-react`), the icon set shadcn/ui pairs with. The hand-drawn icon module
+  is still used by the not-yet-migrated screens.
+- **Type** is Inter (variable), already bundled for offline use, with IBM Plex Mono for references and
+  figures.
+
+**Converted so far:** the token layer, `src/ui/primitives.tsx` (so every screen that uses the shared
+Button/Field/Card/Band/TableCard/DataTable/Panel/Notice/Badge/Stat draws the new system at once), the
+application shell (rail, top bar, skip link, mobile sheet, jump-to-screen palette) and the dashboard,
+which is laid out as a board of unequal cards.
+
+**Still on the old classes:** twenty-eight screens carry `rts-*` classes served from
+`src/styles/legacy.css`, marked temporary in the file itself. That file shrinks screen by screen and is
+deleted when the last one is converted; nothing new may be added to it. Until then these screens are
+consistent with each other but not yet with the new components.
+
 ## 7. What was verified
 
 - `tsc --noEmit` and `eslint .` are clean; `npm test` is **1305 passed, 28 skipped** across 105 files

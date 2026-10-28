@@ -1,3 +1,4 @@
+import { ArrowRight, CalendarClock, CircleAlert, CircleCheck, ClipboardList, Gauge, Sparkles, TriangleAlert } from "lucide-react";
 import { dueReminders, reminderCounts, reminderTiming } from "../tms/documentReminders";
 import { awaitingCustomer, isActiveRental } from "../tms/rentalWorkflow";
 import { readinessReport } from "../tms/maintenance";
@@ -13,7 +14,9 @@ import {
 } from "../tms/types";
 import { formatAmount, fromMinor, sumAmounts, toMinor } from "../tms/money";
 import { Badge, Button, todayYmd } from "../ui/primitives";
-import { Icon } from "../ui/icons";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import type { Route } from "../routes";
 
 function money(amount: number, currency: string | null) {
@@ -46,12 +49,12 @@ function lastSevenDays(today: string): string[] {
 function Spark({ values, labels }: { values: number[]; labels: string[] }) {
   const max = Math.max(...values, 1);
   return (
-    <div className="rts-spark" aria-hidden="true">
+    <div className="mt-3 flex items-end gap-1" aria-hidden="true">
       {values.map((value, index) => (
         <i
           key={labels[index] ?? index}
-          className={index === values.length - 1 ? "is-hi" : undefined}
-          style={{ height: `${Math.max(8, Math.round((value / max) * 100))}%` }}
+          className={cn("flex-1 rounded-sm", index === values.length - 1 ? "bg-primary" : "bg-primary/20")}
+          style={{ height: `${Math.max(10, Math.round((value / max) * 100))}%`, minHeight: 6 }}
           title={String(value)}
         />
       ))}
@@ -59,14 +62,60 @@ function Spark({ values, labels }: { values: number[]; labels: string[] }) {
   );
 }
 
-const RING_RADIUS = 40;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+/** A card in the board: the title row every card shares, and a quiet action on the right. */
+function BoardCard({
+  title,
+  note,
+  action,
+  children,
+  className,
+  id,
+}: {
+  title: string;
+  note?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  id?: string;
+}) {
+  return (
+    <Card className={cn("gap-0 py-0 shadow-xs", className)} aria-labelledby={id}>
+      <CardHeader className="flex flex-row items-start gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <h2 id={id} className="text-[13.5px] font-semibold tracking-[-0.01em] text-foreground">
+            {title}
+          </h2>
+          {note && <p className="text-xs text-muted-foreground">{note}</p>}
+        </div>
+        {action}
+      </CardHeader>
+      <CardContent className="px-4 pb-4">{children}</CardContent>
+    </Card>
+  );
+}
+
+function LinkAction({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button variant="ghost" size="sm" className="-mr-1 shrink-0 text-muted-foreground hover:text-foreground" onClick={onClick}>
+      {label}
+      <ArrowRight aria-hidden="true" />
+    </Button>
+  );
+}
+
+const TONE_MARK = {
+  error: "bg-destructive",
+  warning: "bg-amber-700",
+  info: "bg-primary",
+} as const;
 
 /**
- * The operations overview: four recorded figures, the work that needs a decision, today's runs and
- * the state of the fleet. Every number below is counted from the database on this request — there is
- * no seeded trend, no target and no invented comparison. Where the data cannot answer, the card says
- * so in words.
+ * The operations board.
+ *
+ * Laid out as a board rather than a stack: cards of different sizes, each holding one kind of thing —
+ * a figure with its qualifier, a list of runs, a list of decisions, a progress bar. Every number is
+ * counted from the database on this request; there is no seeded trend, no target and no invented
+ * comparison. Where the data cannot answer, the card says so in words.
  */
 export function DashboardPage({ navigate }: { navigate: (route: Route) => void }) {
   const { db, actor, currentUser, allowed } = useTms();
@@ -82,21 +131,13 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
 
   // ---- exceptions ------------------------------------------------------------------------------
   const expiredLicences = db.drivers.filter((d) => d.status === "active" && d.licenceExpiry < today);
-  // FLT-03, D-110: the papers that are about to lapse, and the ones nobody has taken on. A reminder
-  // that lives only on the compliance screen is one nobody reads; this is the screen everybody opens.
   const papers = dueReminders(db, db.settings.documentReminderLeadDays, today);
   const paperCounts = reminderCounts(db, db.settings.documentReminderLeadDays, today);
   const readiness = readinessReport(db, today);
-  // What the office can chase today: a price to answer, or a deposit now that the customer has said
-  // yes (D-120). Requests nobody has priced yet belong on the rentals screen, not on this list.
   const awaitingConfirmation = db.rentals.filter((r) => awaitingCustomer(r.status));
   const activeRentals = db.rentals.filter((r) => isActiveRental(r.status));
-  // Added in whole pesewas: these two numbers sit side by side with the invoice figures, and float
-  // addition can leave them a pesewa apart (audit D-04).
   const depositsHeld = sumAmounts(activeRentals.map((r) => r.deposit?.amount ?? 0));
-  const billed = sumAmounts(
-    db.rentals.filter((r) => r.status === "completed" && r.finalInvoice).map((r) => r.finalInvoice?.total ?? 0),
-  );
+  const billed = sumAmounts(db.rentals.filter((r) => r.status === "completed" && r.finalInvoice).map((r) => r.finalInvoice?.total ?? 0));
 
   // ---- today's work ----------------------------------------------------------------------------
   const startTimes = new Map<string, string>(
@@ -195,49 +236,104 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
     });
   }
 
-  // ---- fleet ring: three readiness states plus the vehicles nothing is known about ------------
+  // ---- fleet: three readiness states plus the vehicles nothing is known about ------------------
   const readinessConfigured = readiness.status === "ok";
-  const ringSegments = [
-    { key: "ok", label: "Ready", value: readiness.counts.ok, tone: "success" as const },
-    { key: "due", label: "Due soon", value: readiness.counts.due, tone: "warning" as const },
-    { key: "overdue", label: "Overdue", value: readiness.counts.overdue, tone: "error" as const },
-    { key: "no_data", label: "No reading", value: readiness.counts.no_data, tone: "neutral" as const },
+  const segments = [
+    { key: "ok", label: "Ready", value: readiness.counts.ok, bar: "bg-primary" },
+    { key: "due", label: "Due soon", value: readiness.counts.due, bar: "bg-amber-700" },
+    { key: "overdue", label: "Overdue", value: readiness.counts.overdue, bar: "bg-destructive" },
+    { key: "no_data", label: "No reading", value: readiness.counts.no_data, bar: "bg-muted-foreground/40" },
   ].filter((segment) => segment.value > 0);
-  const ringTotal = ringSegments.reduce((sum, segment) => sum + segment.value, 0);
-  let ringOffset = 0;
+  const segmentTotal = segments.reduce((sum, segment) => sum + segment.value, 0);
 
   const canSeeMaster = allowed("vehicles:read") || allowed("drivers:read") || allowed("clients:read");
   const go = (route: Route | undefined) => (route ? () => navigate(route) : undefined);
 
   const quickActions = [
-    allowed("trips:generate") && { label: "Generate today's runs", icon: "busing" as const, route: "busing" as Route },
-    allowed("rentals:create") && { label: "New rental", icon: "rental" as const, route: "rentals" as Route },
-    allowed("fleet:record") && { label: "Record odometer", icon: "readiness" as const, route: "fleetReadiness" as Route },
-    allowed("incidents:create") && { label: "Report an issue", icon: "alert" as const, route: "logistics" as Route },
-  ].filter((action): action is { label: string; icon: "busing" | "rental" | "readiness" | "alert"; route: Route } => Boolean(action));
+    allowed("trips:generate") && { label: "Generate today's runs", icon: CalendarClock, route: "busing" as Route },
+    allowed("rentals:create") && { label: "New rental", icon: ClipboardList, route: "rentals" as Route },
+    allowed("fleet:record") && { label: "Record odometer", icon: Gauge, route: "fleetReadiness" as Route },
+    allowed("incidents:create") && { label: "Report an issue", icon: TriangleAlert, route: "logistics" as Route },
+  ].filter((action): action is { label: string; icon: typeof CalendarClock; route: Route } => Boolean(action));
+
+  const figures = [
+    {
+      label: "Runs today",
+      chip: undispatched.length > 0 ? `${undispatched.length} waiting` : todaysTrips.length === 0 ? "none planned" : "all dispatched",
+      chipTone: undispatched.length > 0 ? "warning" : "neutral",
+      value: todaysTrips.length,
+      unit: `run${todaysTrips.length === 1 ? "" : "s"} today`,
+      caption:
+        todaysTrips.length === 0
+          ? "No trip is scheduled for today."
+          : `Earliest departure ${departureTime(todaysTrips[0], startTimes) || "—"} · ${todaysTrips.length - undispatched.length} dispatched`,
+      spark: runsRecorded > 0 ? <Spark values={runsByDay} labels={days} /> : null,
+    },
+    {
+      label: "Fleet ready",
+      chip:
+        readiness.status === "not_configured"
+          ? "not configured"
+          : readiness.counts.overdue > 0
+            ? `${readiness.counts.overdue} overdue`
+            : db.vehicles.length === 0
+              ? "no vehicles"
+              : "within interval",
+      chipTone: readiness.counts.overdue > 0 && readiness.status === "ok" ? "error" : "neutral",
+      value: readiness.counts.ok,
+      unit: `of ${readiness.total} in the fleet`,
+      caption:
+        readiness.status === "not_configured"
+          ? "Service intervals are not set, so readiness cannot be computed."
+          : readiness.coverage === null
+            ? "No vehicle has a recorded service basis yet."
+            : `${readiness.counts.due} due soon · ${readiness.counts.overdue} overdue · coverage ${Math.round(readiness.coverage * 100)}%`,
+      spark: null,
+    },
+    {
+      label: "Rentals awaiting",
+      chip: awaitingConfirmation.length > 0 ? `${awaitingConfirmation.length} open` : "clear",
+      chipTone: awaitingConfirmation.length > 0 ? "warning" : "neutral",
+      value: allowed("rentals:read") ? awaitingConfirmation.length : "—",
+      unit: "draft or quoted",
+      caption: !allowed("rentals:read")
+        ? "Your role cannot read rental records."
+        : `${money(depositsHeld, s.currencyCode)} in deposits held across ${activeRentals.length} active rental${activeRentals.length === 1 ? "" : "s"}.`,
+      spark: null,
+    },
+    {
+      label: "Licences expired",
+      chip: !allowed("drivers:read") ? "restricted" : expiredLicences.length > 0 ? "not dispatchable" : "all current",
+      chipTone: allowed("drivers:read") && expiredLicences.length > 0 ? "error" : "neutral",
+      value: allowed("drivers:read") ? expiredLicences.length : "—",
+      unit: `of ${db.drivers.filter((d) => d.status === "active").length} active drivers`,
+      caption: !allowed("drivers:read")
+        ? "Your role cannot read driver records."
+        : expiredLicences.length === 0
+          ? "A driver past expiry cannot be assigned to a run."
+          : expiredLicences.map((d) => d.fullName).slice(0, 2).join(", "),
+      spark: null,
+    },
+  ];
 
   return (
-    <>
-      {/* ---- page header: who is on the desk, what day it is, what it looks like ---------------- */}
-      <header className="rts-page-head">
-        <div className="min-w-0">
-          <p className="rts-eyebrow">
-            Overview · {todayLabel}
-          </p>
-          <h1 className="rts-title">
+    <div className="space-y-4">
+      {/* ---- the header: who is on the desk, the day, and what it looks like --------------------- */}
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
+        <div className="min-w-0 space-y-1">
+          <p className="font-mono text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">Overview · {todayLabel}</p>
+          <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
             Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"},{" "}
             {currentUser?.fullName?.split(" ")[0] ?? "operator"}
-            <span className="rts-title-sub">{s.companyName ?? "Richie Transport Services"}</span>
+            <span className="ml-2 text-[13px] font-normal text-muted-foreground">{s.companyName ?? "Richie Transport Services"}</span>
           </h1>
-          <p className="rts-page-desc">
+          <p className="max-w-[78ch] text-[13px] leading-relaxed text-muted-foreground">
             {actor ? ROLE_LABELS[actor.role] : "Signed in"} —{" "}
-            {todaysTrips.length === 0
-              ? "no runs are scheduled for today"
-              : `${todaysTrips.length} run${todaysTrips.length === 1 ? "" : "s"} scheduled today`}
+            {todaysTrips.length === 0 ? "no runs are scheduled for today" : `${todaysTrips.length} run${todaysTrips.length === 1 ? "" : "s"} scheduled today`}
             {attention.length === 0 ? ", and nothing is waiting on a decision." : `, ${attention.length} item${attention.length === 1 ? "" : "s"} need${attention.length === 1 ? "s" : ""} a decision.`}
           </p>
         </div>
-        <div className="rts-page-actions">
+        <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => navigate("fleetReadiness")}>Check readiness</Button>
           <Button variant="primary" onClick={() => navigate("busing")}>
             Open dispatch
@@ -246,423 +342,318 @@ export function DashboardPage({ navigate }: { navigate: (route: Route) => void }
       </header>
 
       {!canSeeMaster && (
-        <div className="rts-notice rts-notice--info" role="status">
-          <p className="rts-notice-title">No screens are enabled for your role yet</p>
-          The {actor ? ROLE_LABELS[actor.role] : ""} role gains record-scoped features (trips, boarding,
-          bookings) in later phases. Nothing is hidden behind this message — there is simply nothing to show yet.
+        <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm" role="status">
+          <p className="font-medium text-foreground">No screens are enabled for your role yet</p>
+          <p className="mt-1 text-muted-foreground">
+            The {actor ? ROLE_LABELS[actor.role] : ""} role gains record-scoped features (trips, boarding, bookings) in later phases.
+            Nothing is hidden behind this message — there is simply nothing to show yet.
+          </p>
         </div>
       )}
 
-      {/* ---- four recorded figures, each with the sentence that qualifies it --------------------- */}
-      <section className="rts-stat-grid" aria-label="Today at a glance">
-        <article className="rts-stat">
-          <div className="rts-stat-top">
-            <span className="rts-stat-label">Runs today</span>
-            {undispatched.length > 0 ? (
-              <span className="rts-stat-chip rts-stat-chip--warn">{undispatched.length} waiting</span>
-            ) : todaysTrips.length === 0 ? (
-              <span className="rts-stat-chip rts-stat-chip--info">none planned</span>
-            ) : (
-              <span className="rts-stat-chip">all dispatched</span>
-            )}
-          </div>
-          <p className="rts-stat-value">
-            {todaysTrips.length}
-            <span className="rts-stat-unit">run{todaysTrips.length === 1 ? "" : "s"} today</span>
-          </p>
-          <p className="rts-stat-caption">
-            {todaysTrips.length === 0
-              ? "No trip is scheduled for today."
-              : `Earliest departure ${departureTime(todaysTrips[0], startTimes) || "—"} · ${todaysTrips.length - undispatched.length} dispatched`}
-          </p>
-          {runsRecorded > 0 && <Spark values={runsByDay} labels={days} />}
-        </article>
-
-        <article className="rts-stat">
-          <div className="rts-stat-top">
-            <span className="rts-stat-label">Fleet ready</span>
-            {readiness.status === "not_configured" ? (
-              <span className="rts-stat-chip rts-stat-chip--info">not configured</span>
-            ) : readiness.counts.overdue > 0 ? (
-              <span className="rts-stat-chip rts-stat-chip--alert">{readiness.counts.overdue} overdue</span>
-            ) : db.vehicles.length === 0 ? (
-              <span className="rts-stat-chip rts-stat-chip--info">no vehicles</span>
-            ) : (
-              <span className="rts-stat-chip">within interval</span>
-            )}
-          </div>
-          <p className="rts-stat-value">
-            {readiness.counts.ok}
-            <span className="rts-stat-unit">of {readiness.total} in the fleet</span>
-          </p>
-          <p className="rts-stat-caption">
-            {readiness.status === "not_configured"
-              ? "Service intervals are not set, so readiness cannot be computed."
-              : readiness.coverage === null
-                ? "No vehicle has a recorded service basis yet."
-                : `${readiness.counts.due} due soon · ${readiness.counts.overdue} overdue · coverage ${Math.round(readiness.coverage * 100)}%`}
-          </p>
-        </article>
-
-        <article className="rts-stat">
-          <div className="rts-stat-top">
-            <span className="rts-stat-label">Rentals awaiting</span>
-            {awaitingConfirmation.length > 0 ? (
-              <span className="rts-stat-chip rts-stat-chip--warn">{awaitingConfirmation.length} open</span>
-            ) : (
-              <span className="rts-stat-chip">clear</span>
-            )}
-          </div>
-          <p className="rts-stat-value">
-            {allowed("rentals:read") ? awaitingConfirmation.length : "—"}
-            <span className="rts-stat-unit">draft or quoted</span>
-          </p>
-          <p className="rts-stat-caption">
-            {!allowed("rentals:read")
-              ? "Your role cannot read rental records."
-              : `${money(depositsHeld, s.currencyCode)} in deposits held across ${activeRentals.length} active rental${activeRentals.length === 1 ? "" : "s"}.`}
-          </p>
-        </article>
-
-        <article className="rts-stat">
-          <div className="rts-stat-top">
-            <span className="rts-stat-label">Licences expired</span>
-            {!allowed("drivers:read") ? (
-              <span className="rts-stat-chip rts-stat-chip--info">restricted</span>
-            ) : expiredLicences.length > 0 ? (
-              <span className="rts-stat-chip rts-stat-chip--alert">not dispatchable</span>
-            ) : (
-              <span className="rts-stat-chip">all current</span>
-            )}
-          </div>
-          <p className="rts-stat-value">
-            {allowed("drivers:read") ? expiredLicences.length : "—"}
-            <span className="rts-stat-unit">of {db.drivers.filter((d) => d.status === "active").length} active drivers</span>
-          </p>
-          <p className="rts-stat-caption">
-            {!allowed("drivers:read")
-              ? "Your role cannot read driver records."
-              : expiredLicences.length === 0
-                ? "A driver past expiry cannot be assigned to a run."
-                : expiredLicences.map((d) => d.fullName).slice(0, 2).join(", ")}
-          </p>
-        </article>
+      {/* ---- four recorded figures, one strip ---------------------------------------------------- */}
+      <section aria-label="Today at a glance" className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card shadow-xs sm:grid-cols-2 xl:grid-cols-4">
+        {figures.map((figure, index) => (
+          <article key={figure.label} className={cn("space-y-2 p-4", index > 0 && "border-t border-border sm:border-t-0 sm:border-l")}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">{figure.label}</span>
+              <Badge tone={figure.chipTone === "error" ? "error" : figure.chipTone === "warning" ? "warning" : "neutral"}>{figure.chip}</Badge>
+            </div>
+            <p className="flex items-baseline gap-1.5 text-[28px] leading-none font-semibold tracking-[-0.04em] text-foreground tabular-nums">
+              {figure.value}
+              <span className="text-[11.5px] font-medium tracking-normal text-muted-foreground">{figure.unit}</span>
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">{figure.caption}</p>
+            {figure.spark}
+          </article>
+        ))}
       </section>
 
-      {/* ---- the working surface: decisions and runs beside the fleet and the rules -------------- */}
-      <div className="rts-spread">
-        <div className="rts-col">
-          <section className="rts-card" aria-labelledby="attention-heading">
-            <div className="rts-card-head">
-              <div className="rts-head-text">
-                <h2 id="attention-heading" className="rts-card-title">Needs attention</h2>
-                <p className="rts-card-desc">Everything below is counted from records on this screen.</p>
-              </div>
-              <span className={attention.length === 0 ? "rts-stamp" : "rts-stamp rts-stamp--warn"}>
-                {attention.length === 0 ? "All clear" : `${attention.length} item${attention.length === 1 ? "" : "s"}`}
-              </span>
-            </div>
-            <div className="rts-card-body">
-              {attention.length === 0 ? (
-                <div className="rts-check">
-                  <span className="rts-check-mark rts-check-mark--success" aria-hidden="true" />
-                  <div>
-                    <b>Nothing is waiting on you</b>
-                    <small>No expiries, no overdue service, no unconfirmed rentals.</small>
-                  </div>
-                  <Icon name="clock" className="rts-check-go rts-check-icon" />
-                </div>
-              ) : (
-                attention.map((row) => (
-                  <div className="rts-check" key={row.key}>
-                    <span className={`rts-check-mark rts-check-mark--${row.tone}`} aria-hidden="true" />
-                    <div>
-                      <b>{row.label}</b>
-                      <small>{row.detail}</small>
-                    </div>
-                    {row.action ? (
-                      <Button variant="ghost" className="rts-check-go" onClick={go(row.action)}>
-                        Review
-                      </Button>
-                    ) : (
-                      <span className="rts-check-go rts-check-note">Admin only</span>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section className="rts-card" aria-labelledby="departures-heading">
-            <div className="rts-card-head">
-              <div className="rts-head-text">
-                <h2 id="departures-heading" className="rts-card-title">Today&apos;s departures</h2>
-                <p className="rts-card-desc">
-                  {todaysTrips.length === 0
-                    ? "No trips scheduled."
-                    : `${todaysTrips.length} scheduled · earliest ${departureTime(todaysTrips[0], startTimes) || "—"}`}
-                </p>
-              </div>
-              <button type="button" className="rts-link" onClick={() => navigate("busing")}>
-                Run sheet <Icon name="chevron" className="rts-link-icon" />
-              </button>
-            </div>
-            {todaysTrips.length === 0 ? (
-              <div className="rts-card-body">
-                <p className="rts-band-empty">
-                  Trips appear here once a staff route generates one for today.{" "}
-                  <button type="button" className="rts-link" onClick={() => navigate("busing")}>
-                    Open staff busing <Icon name="chevron" className="rts-link-icon" />
-                  </button>
-                </p>
-              </div>
+      {/* ---- the board ------------------------------------------------------------------------- */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <BoardCard
+          id="attention-heading"
+          className="lg:col-span-5"
+          title="Needs attention"
+          note="Everything below is counted from records on this screen."
+          action={
+            attention.length === 0 ? (
+              <Badge tone="success">All clear</Badge>
             ) : (
-              <div className="rts-card-body rts-card-body--flush">
-                <div className="rts-runs" role="table" aria-label="Today's departures">
-                  <div className="rts-runs-head" role="row">
-                    <span role="columnheader">Dep</span>
-                    <span role="columnheader">Route</span>
-                    <span role="columnheader">Crew</span>
-                    <span role="columnheader">State</span>
+              <Badge tone="warning">
+                {attention.length} item{attention.length === 1 ? "" : "s"}
+              </Badge>
+            )
+          }
+        >
+          {attention.length === 0 ? (
+            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 px-3 py-3">
+              <CircleCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+              <div>
+                <p className="text-[13px] font-medium text-foreground">Nothing is waiting on you</p>
+                <p className="text-xs text-muted-foreground">No expiries, no overdue service, no unconfirmed rentals.</p>
+              </div>
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {attention.map((row) => (
+                <li key={row.key} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <span className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", TONE_MARK[row.tone])} aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium text-foreground">{row.label}</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">{row.detail}</p>
                   </div>
+                  {row.action ? (
+                    <Button variant="ghost" size="sm" className="-mr-1 text-muted-foreground hover:text-foreground" onClick={go(row.action)}>
+                      Review
+                    </Button>
+                  ) : (
+                    <span className="mt-1 shrink-0 text-[11px] text-muted-foreground">Admin only</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </BoardCard>
+
+        <BoardCard
+          id="departures-heading"
+          className="lg:col-span-7"
+          title="Today's departures"
+          note={
+            todaysTrips.length === 0
+              ? "No trips scheduled."
+              : `${todaysTrips.length} scheduled · earliest ${departureTime(todaysTrips[0], startTimes) || "—"}`
+          }
+          action={<LinkAction label="Run sheet" onClick={() => navigate("busing")} />}
+        >
+          {todaysTrips.length === 0 ? (
+            <p className="text-[13px] text-muted-foreground">
+              Trips appear here once a staff route generates one for today.{" "}
+              <button type="button" className="font-medium text-primary underline-offset-4 hover:underline" onClick={() => navigate("busing")}>
+                Open staff busing
+              </button>
+            </p>
+          ) : (
+            <div className="-mx-4 -mb-4 overflow-x-auto">
+              <Table aria-label="Today's departures">
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-8 bg-muted/40 pl-4 font-mono text-[10px] tracking-[0.1em] uppercase">Dep</TableHead>
+                    <TableHead className="h-8 bg-muted/40 font-mono text-[10px] tracking-[0.1em] uppercase">Route</TableHead>
+                    <TableHead className="h-8 bg-muted/40 font-mono text-[10px] tracking-[0.1em] uppercase">Crew</TableHead>
+                    <TableHead className="h-8 bg-muted/40 pr-4 font-mono text-[10px] tracking-[0.1em] uppercase">State</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {todaysTrips.map((trip) => {
                     const route = routesById.get(trip.routeId);
                     const vehicle = trip.vehicleId ? vehiclesById.get(trip.vehicleId) : null;
                     const driver = trip.driverId ? driversById.get(trip.driverId) : null;
                     return (
-                      <div className="rts-run" role="row" key={trip.id}>
-                        <div className="rts-run-time" role="cell">
-                          <b>{departureTime(trip, startTimes) || "—"}</b>
-                          <span>{trip.reference}</span>
-                        </div>
-                        <div role="cell" className="min-w-0">
-                          <p className="rts-run-route">
-                            {route?.name ?? "Unknown route"} <span className="rts-run-ref">{route?.reference ?? "—"}</span>
-                          </p>
-                          <p className="rts-run-meta">
+                      <TableRow key={trip.id}>
+                        <TableCell className="pl-4">
+                          <span className="block font-mono text-[12.5px] font-medium tabular-nums text-foreground">{departureTime(trip, startTimes) || "—"}</span>
+                          <span className="block font-mono text-[10.5px] text-muted-foreground">{trip.reference}</span>
+                        </TableCell>
+                        <TableCell className="min-w-0">
+                          <span className="block text-[13px] font-medium text-foreground">{route?.name ?? "Unknown route"}</span>
+                          <span className="block text-[11.5px] text-muted-foreground">
                             {route ? DIRECTION_LABELS[route.direction] : "—"}
                             {route?.stops.length ? ` · ${route.stops.length} stop${route.stops.length === 1 ? "" : "s"}` : ""}
-                          </p>
-                        </div>
-                        <div className="rts-run-crew" role="cell">
-                          <span>{vehicle ? vehicle.registration : <em className="rts-unset">not assigned</em>}</span>
-                          <span>{driver ? driver.fullName : <em className="rts-unset">not assigned</em>}</span>
-                        </div>
-                        <div className="rts-run-state" role="cell">
-                          <span className={`rts-flag rts-flag--${trip.status}`}>{TRIP_STATUS_LABELS[trip.status]}</span>
-                        </div>
-                      </div>
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="block text-[12px] text-foreground">{vehicle ? vehicle.registration : <em className="text-muted-foreground">not assigned</em>}</span>
+                          <span className="block text-[11.5px] text-muted-foreground">{driver ? driver.fullName : <em>not assigned</em>}</span>
+                        </TableCell>
+                        <TableCell className="pr-4">
+                          <Badge tone={trip.status === "planned" ? "warning" : trip.status === "dispatched" ? "info" : "success"}>{TRIP_STATUS_LABELS[trip.status]}</Badge>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </BoardCard>
+
+        {allowed("vehicles:read") && (
+          <BoardCard
+            id="fleet-heading"
+            className="lg:col-span-4"
+            title="Fleet readiness"
+            note={db.vehicles.length === 0 ? "Nothing registered yet." : readiness.asOf}
+          >
+            {db.vehicles.length === 0 ? (
+              <p className="text-[13px] text-muted-foreground">
+                No vehicles are registered, so there is no readiness to report.{" "}
+                <button type="button" className="font-medium text-primary underline-offset-4 hover:underline" onClick={() => navigate("vehicles")}>
+                  Register the first vehicle
+                </button>
+              </p>
+            ) : !readinessConfigured ? (
+              <p className="text-[13px] text-muted-foreground">
+                Service intervals are not configured, so readiness cannot be computed.{" "}
+                <button type="button" className="font-medium text-primary underline-offset-4 hover:underline" onClick={() => navigate("fleetReadiness")}>
+                  Review readiness
+                </button>
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <p className="flex items-baseline gap-1.5 text-[28px] leading-none font-semibold tracking-[-0.04em] text-foreground tabular-nums">
+                  {readiness.counts.ok}/{readiness.total}
+                  <span className="text-[11.5px] font-medium tracking-normal text-muted-foreground">ready</span>
+                </p>
+                <div
+                  className="flex h-2 overflow-hidden rounded-full bg-muted"
+                  role="img"
+                  aria-label={`Readiness: ${readiness.counts.overdue} overdue, ${readiness.counts.due} due, ${readiness.counts.ok} ready, ${readiness.counts.no_data} without a reading`}
+                >
+                  {segments.map((segment) => (
+                    <span key={segment.key} className={segment.bar} style={{ width: `${(segment.value / segmentTotal) * 100}%` }} />
+                  ))}
                 </div>
+                <ul className="space-y-1.5">
+                  {segments.map((segment) => (
+                    <li key={segment.key} className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                      <span className={cn("size-2 rounded-sm", segment.bar)} aria-hidden="true" />
+                      <span className="flex-1">{segment.label}</span>
+                      <b className="font-medium tabular-nums text-foreground">{segment.value}</b>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {readiness.coverage === null
+                    ? "No vehicle has a recorded service basis yet."
+                    : `Coverage ${Math.round(readiness.coverage * 100)}% · ${readiness.evaluable} of ${readiness.total} vehicles evaluable.`}
+                </p>
               </div>
             )}
-          </section>
+          </BoardCard>
+        )}
 
-          {allowed("rentals:read") && (
-            <section className="rts-card" aria-labelledby="rentals-heading">
-              <div className="rts-card-head">
-                <div className="rts-head-text">
-                  <h2 id="rentals-heading" className="rts-card-title">Bus rentals</h2>
-                  <p className="rts-card-desc">Money figures sum recorded amounts only. Not a margin.</p>
-                </div>
-                <button type="button" className="rts-link" onClick={() => navigate("rentals")}>
-                  Open rentals <Icon name="chevron" className="rts-link-icon" />
+        {allowed("rentals:read") && (
+          <BoardCard
+            id="rentals-heading"
+            className="lg:col-span-4"
+            title="Bus rentals"
+            note="Money figures sum recorded amounts only. Not a margin."
+            action={<LinkAction label="Open rentals" onClick={() => navigate("rentals")} />}
+          >
+            {db.rentals.length === 0 ? (
+              <p className="text-[13px] text-muted-foreground">
+                No rental requests yet. Money appears here only once an amount is recorded against a request.{" "}
+                <button type="button" className="font-medium text-primary underline-offset-4 hover:underline" onClick={() => navigate("rentals")}>
+                  Open rentals
                 </button>
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    {
+                      label: "Billed to date",
+                      value: money(billed, s.currencyCode),
+                      caption: `${db.rentals.filter((r) => r.status === "completed").length} completed rental${db.rentals.filter((r) => r.status === "completed").length === 1 ? "" : "s"}`,
+                    },
+                    { label: "Deposits held", value: money(depositsHeld, s.currencyCode), caption: `${activeRentals.length} active rental${activeRentals.length === 1 ? "" : "s"}` },
+                  ].map((figure) => (
+                    <div key={figure.label} className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                      <p className="font-mono text-[9.5px] font-medium tracking-[0.1em] text-muted-foreground uppercase">{figure.label}</p>
+                      <p className="mt-1 text-[17px] leading-none font-semibold tracking-[-0.02em] text-foreground tabular-nums">{figure.value}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{figure.caption}</p>
+                    </div>
+                  ))}
+                </div>
+                <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
+                  {RENTAL_STATUSES.map((status) => {
+                    const count = db.rentals.filter((r) => r.status === status).length;
+                    return (
+                      <li key={status} className="flex items-baseline gap-1.5 text-[11.5px]">
+                        <b className={cn("text-[12.5px] tabular-nums", count === 0 ? "text-muted-foreground" : "text-foreground")}>{count}</b>
+                        <span className="truncate text-muted-foreground">{RENTAL_STATUS_LABELS[status]}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {!s.currencyCode && <p className="text-xs text-muted-foreground">Billing currency is not set, so amounts are shown without a currency symbol.</p>}
               </div>
-              <div className="rts-card-body">
-                {db.rentals.length === 0 ? (
-                  <p className="rts-band-empty">
-                    No rental requests yet. Money appears here only once an amount is recorded against a
-                    request.{" "}
-                    <button type="button" className="rts-link" onClick={() => navigate("rentals")}>
-                      Open rentals <Icon name="chevron" className="rts-link-icon" />
-                    </button>
-                  </p>
-                ) : (
-                  <>
-                    <div className="rts-stat-split">
-                      <div>
-                        <span className="rts-stat-label">Billed to date</span>
-                        <p className="rts-stat-value rts-stat-value--sm">{money(billed, s.currencyCode)}</p>
-                        <p className="rts-stat-caption">
-                          {db.rentals.filter((r) => r.status === "completed").length} completed rental
-                          {db.rentals.filter((r) => r.status === "completed").length === 1 ? "" : "s"}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="rts-stat-label">Deposits held</span>
-                        <p className="rts-stat-value rts-stat-value--sm">{money(depositsHeld, s.currencyCode)}</p>
-                        <p className="rts-stat-caption">
-                          {activeRentals.length} active rental{activeRentals.length === 1 ? "" : "s"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="rts-statusline rts-statusline--boxed">
-                      {RENTAL_STATUSES.map((status) => {
-                        const count = db.rentals.filter((r) => r.status === status).length;
-                        return (
-                          <span key={status} className={count === 0 ? "rts-statusline-cell is-zero" : "rts-statusline-cell"}>
-                            <b>{count}</b>
-                            <span>{RENTAL_STATUS_LABELS[status]}</span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                    {!s.currencyCode && (
-                      <p className="rts-band-empty">Billing currency is not set, so amounts are shown without a currency symbol.</p>
+            )}
+          </BoardCard>
+        )}
+
+        {allowed("settings:read") && (
+          <BoardCard
+            id="setup-heading"
+            className="lg:col-span-4"
+            title="Setup"
+            note={outstanding === 0 ? "All rules supplied" : `${outstanding} outstanding`}
+            action={
+              allowed("settings:update") ? (
+                <Button size="sm" variant="primary" onClick={() => navigate("settings")}>
+                  Open settings
+                </Button>
+              ) : undefined
+            }
+          >
+            <div className="space-y-3">
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${done} of ${checklist.length} setup items complete`}>
+                <span className="block h-full rounded-full bg-primary" style={{ width: `${setup.percent}%` }} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {done} of {checklist.length} complete{outstanding > 0 && ` — ${outstanding} still needed`}
+              </p>
+              <ul className="space-y-1.5">
+                {checklist.map((item) => (
+                  <li key={item.label} className="flex items-center gap-2 text-[12.5px]">
+                    {item.done ? (
+                      <CircleCheck className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                    ) : (
+                      <CircleAlert className="size-3.5 shrink-0 text-amber-700" aria-hidden="true" />
                     )}
-                  </>
-                )}
-              </div>
-            </section>
-          )}
-        </div>
+                    <span className={cn("min-w-0 flex-1 truncate", item.done ? "text-foreground" : "text-muted-foreground")}>{item.label}</span>
+                    <Badge tone={item.done ? "success" : "warning"}>{item.done ? "Set" : "Not set"}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </BoardCard>
+        )}
 
-        <div className="rts-rail">
-          {allowed("vehicles:read") && (
-            <section className="rts-card" aria-labelledby="fleet-heading">
-              <div className="rts-card-head">
-                <div className="rts-head-text">
-                  <h2 id="fleet-heading" className="rts-card-title">Fleet readiness</h2>
-                  <p className="rts-card-desc">{db.vehicles.length === 0 ? "Nothing registered yet." : readiness.asOf}</p>
-                </div>
-              </div>
-              <div className="rts-card-body">
-                {db.vehicles.length === 0 ? (
-                  <p className="rts-band-empty">
-                    No vehicles are registered, so there is no readiness to report.{" "}
-                    <button type="button" className="rts-link" onClick={() => navigate("vehicles")}>
-                      Register the first vehicle <Icon name="chevron" className="rts-link-icon" />
-                    </button>
-                  </p>
-                ) : !readinessConfigured ? (
-                  <p className="rts-band-empty">
-                    Service intervals are not configured, so readiness cannot be computed.{" "}
-                    <button type="button" className="rts-link" onClick={() => navigate("fleetReadiness")}>
-                      Review readiness <Icon name="chevron" className="rts-link-icon" />
-                    </button>
-                  </p>
-                ) : (
-                  <>
-                    <div className="rts-donut">
-                      <svg
-                        className="rts-ring"
-                        viewBox="0 0 104 104"
-                        role="img"
-                        aria-label={`Readiness: ${readiness.counts.overdue} overdue, ${readiness.counts.due} due, ${readiness.counts.ok} ready, ${readiness.counts.no_data} without a reading`}
-                      >
-                        <circle className="rts-ring-track" cx="52" cy="52" r={RING_RADIUS} />
-                        {ringSegments.map((segment) => {
-                          const length = (segment.value / ringTotal) * RING_CIRCUMFERENCE;
-                          const dashOffset = ringOffset;
-                          ringOffset += length;
-                          return (
-                            <circle
-                              key={segment.key}
-                              className={`rts-ring-seg rts-ring-seg--${segment.tone}`}
-                              cx="52"
-                              cy="52"
-                              r={RING_RADIUS}
-                              strokeDasharray={`${Math.max(length - 3, 1)} ${RING_CIRCUMFERENCE}`}
-                              strokeDashoffset={-dashOffset}
-                              transform="rotate(-90 52 52)"
-                            />
-                          );
-                        })}
-                        <text className="rts-ring-value" x="52" y="51" textAnchor="middle">
-                          {readiness.counts.ok}/{readiness.total}
-                        </text>
-                        <text className="rts-ring-label" x="52" y="66" textAnchor="middle">
-                          ready
-                        </text>
-                      </svg>
-                      <div className="rts-legend">
-                        {ringSegments.map((segment) => (
-                          <span key={segment.key}>
-                            <i className={`rts-dot rts-dot--${segment.tone}`} />
-                            {segment.label}
-                            <b>{segment.value}</b>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <p className="rts-stat-caption rts-donut-note">
-                      {readiness.coverage === null
-                        ? "No vehicle has a recorded service basis yet."
-                        : `Coverage ${Math.round(readiness.coverage * 100)}% · ${readiness.evaluable} of ${readiness.total} vehicles evaluable.`}
-                    </p>
-                  </>
-                )}
-              </div>
-            </section>
-          )}
-
-          {allowed("settings:read") && (
-            <section className="rts-card" aria-labelledby="setup-heading">
-              <div className="rts-card-head">
-                <div className="rts-head-text">
-                  <h2 id="setup-heading" className="rts-card-title">Setup</h2>
-                  <p className="rts-card-desc">{outstanding === 0 ? "All rules supplied" : `${outstanding} outstanding`}</p>
-                </div>
-              </div>
-              <div className="rts-card-body">
-                <div className="rts-progress" role="img" aria-label={`${done} of ${checklist.length} setup items complete`}>
-                  <span className="rts-progress-fill" style={{ width: `${setup.percent}%` }} />
-                </div>
-                <p className="rts-progress-caption">
-                  {done} of {checklist.length} complete
-                  {outstanding > 0 && ` — ${outstanding} still needed`}
-                </p>
-                <div className="rts-checklist">
-                  {checklist.map((item) => (
-                    <div className="rts-check" key={item.label}>
-                      <span className={`rts-check-mark rts-check-mark--${item.done ? "success" : "warning"}`} aria-hidden="true" />
-                      <div>
-                        <b>{item.label}</b>
-                        <small>{item.done ? "Supplied by management." : "Dependent features stay blocked."}</small>
-                      </div>
-                      <span className="rts-check-go">
-                        <Badge tone={item.done ? "success" : "warning"}>{item.done ? "Set" : "Not set"}</Badge>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                {allowed("settings:update") && (
-                  <div className="rts-card-actions">
-                    <Button variant="primary" onClick={() => navigate("settings")}>Open settings</Button>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-
-          {quickActions.length > 0 && (
-            <section className="rts-card" aria-labelledby="quick-heading">
-              <div className="rts-card-head">
-                <h2 id="quick-heading" className="rts-card-title">Quick actions</h2>
-              </div>
-              <div className="rts-card-body">
-                <div className="rts-quick">
-                  {quickActions.map((action) => (
-                    <button key={action.route + action.label} type="button" onClick={() => navigate(action.route)}>
-                      <Icon name={action.icon} />
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
-          )}
-        </div>
+        {quickActions.length > 0 && (
+          <BoardCard id="quick-heading" className="lg:col-span-4" title="Quick actions">
+            <div className="grid gap-1.5">
+              {quickActions.map((action) => {
+                const Glyph = action.icon;
+                return (
+                  <button
+                    key={action.route + action.label}
+                    type="button"
+                    onClick={() => navigate(action.route)}
+                    className="group flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-left text-[12.5px] font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    <Glyph className="size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
+                    <span className="flex-1">{action.label}</span>
+                    <ArrowRight className="size-3.5 text-muted-foreground/60 group-hover:text-primary" aria-hidden="true" />
+                  </button>
+                );
+              })}
+              <p className="flex items-start gap-1.5 pt-1 text-[11px] leading-relaxed text-muted-foreground">
+                <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+                Every action here is one this role is allowed to take. Nothing is offered that the server would refuse.
+              </p>
+            </div>
+          </BoardCard>
+        )}
       </div>
 
-      <p className="rts-footnote">
-        On-time rate (RPT-01) is computed on Staff busing, with its reporting period and data coverage.
-        RPT-02 (fleet utilisation) and RPT-03 (cost per trip) are not configured because no fleet-hours
-        or cost inputs exist yet — <span className="rts-footnote-ref">docs/KPIS.md</span>.
+      <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+        On-time rate (RPT-01) is computed on Staff busing, with its reporting period and data coverage. RPT-02 (fleet utilisation) and RPT-03 (cost per trip) are
+        not configured because no fleet-hours or cost inputs exist yet — <span className="font-mono">docs/KPIS.md</span>.
       </p>
-    </>
+    </div>
   );
 }
 

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NAV_ITEMS, type Route } from "../routes";
 import type { Permission } from "../tms/permissions";
-import { Icon } from "./icons";
+import { CornerDownLeft, Search, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
  * Keyboard navigation for the whole workspace: Ctrl-K / ⌘K, type a few letters, Enter.
@@ -85,14 +86,24 @@ export function CommandPalette({
   };
 
   return (
-    <div className="rts-palette-wrap">
-      <button type="button" className="rts-palette-scrim" aria-label="Close the command palette" onClick={onClose} />
-      <div className="rts-palette" role="dialog" aria-modal="true" aria-label="Jump to a screen">
-        <div className="rts-palette-field">
-          <Icon name="search" className="rts-palette-icon" />
+    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[12vh]">
+      <button
+        type="button"
+        className="absolute inset-0 bg-foreground/40"
+        aria-label="Close the command palette"
+        onClick={onClose}
+      />
+      <div
+        className="relative w-full max-w-lg overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Jump to a screen"
+      >
+        <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3">
+          <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <input
             ref={inputRef}
-            className="rts-palette-input"
+            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -108,41 +119,51 @@ export function CommandPalette({
             autoComplete="off"
             spellCheck={false}
           />
-          <kbd className="rts-kbd">Esc</kbd>
+          <kbd className="rounded border border-border px-1.5 font-mono text-[9.5px] text-muted-foreground">Esc</kbd>
         </div>
 
-        <ul className="rts-palette-list" id="rts-palette-list" role="listbox" aria-label="Screens" ref={listRef}>
+        <ul className="max-h-[52vh] overflow-y-auto p-1.5" id="rts-palette-list" role="listbox" aria-label="Screens" ref={listRef}>
           {results.map((item, index) => (
             <li
               key={item.route}
               id={`rts-palette-${item.route}`}
               role="option"
               aria-selected={index === active}
-              className="rts-palette-option"
+              className={cn(
+                "flex cursor-default items-baseline justify-between gap-3 rounded-md px-2.5 py-2 text-[13px]",
+                index === active ? "bg-primary/10 text-foreground" : "text-foreground/90",
+              )}
               onMouseEnter={() => setActive(index)}
               onMouseDown={(event) => {
                 event.preventDefault();
                 choose(index);
               }}
             >
-              <span className="rts-palette-option-label">{item.label}</span>
-              <span className="rts-palette-option-caption">{item.caption}</span>
+              <span className="font-medium">{item.label}</span>
+              <span className="truncate text-[11.5px] text-muted-foreground">{item.caption}</span>
             </li>
           ))}
         </ul>
 
         {results.length === 0 && (
-          <p className="rts-palette-empty">
+          <p className="px-3.5 py-4 text-[13px] text-muted-foreground">
             Nothing matches “{query}”. Screens you can reach here are limited to your role.
           </p>
         )}
 
-        <div className="rts-palette-foot">
-          <span>
-            <kbd className="rts-kbd">↑</kbd> <kbd className="rts-kbd">↓</kbd> to move
+        <div className="flex items-center gap-4 border-t border-border bg-muted/40 px-3.5 py-2 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <kbd className="rounded border border-border px-1 font-mono text-[9.5px]">↑</kbd>
+            <kbd className="rounded border border-border px-1 font-mono text-[9.5px]">↓</kbd>
+            to move
           </span>
-          <span>
-            <kbd className="rts-kbd">Enter</kbd> to open
+          <span className="flex items-center gap-1">
+            <CornerDownLeft className="size-3" aria-hidden="true" />
+            to open
+          </span>
+          <span className="ml-auto flex items-center gap-1">
+            <X className="size-3" aria-hidden="true" />
+            Esc to close
           </span>
         </div>
       </div>

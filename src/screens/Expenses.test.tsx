@@ -142,9 +142,9 @@ describe("the expenses screen", () => {
 
     expect(screen.getByText("EXP-2026-0001")).toBeTruthy();
     expect(screen.getByText("EXP-2026-0002")).toBeTruthy();
-    const recorded = screen.getByText("Recorded in the period").closest(".rts-stat") as HTMLElement;
+    const recorded = screen.getByText("Recorded in the period").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(recorded).getByText("GHS 337.50")).toBeTruthy();
-    const biggest = screen.getByText("Biggest category").closest(".rts-stat") as HTMLElement;
+    const biggest = screen.getByText("Biggest category").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(biggest).getByText("Fuel")).toBeTruthy();
   });
 
@@ -158,7 +158,7 @@ describe("the expenses screen", () => {
 
     expect(screen.getByText("EXP-2026-0002")).toBeTruthy();
     expect(screen.getByText("Void: Receipt already recorded")).toBeTruthy();
-    const recorded = screen.getByText("Recorded in the period").closest(".rts-stat") as HTMLElement;
+    const recorded = screen.getByText("Recorded in the period").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(recorded).getByText("GHS 320.50")).toBeTruthy();
     expect(within(recorded).getByText("1 entry in the period")).toBeTruthy();
   });
@@ -166,17 +166,17 @@ describe("the expenses screen", () => {
   it("says how much spending has no receipt number on it", () => {
     openJune(base([expense(), expense({ id: "ex2", reference: "EXP-2026-0002", amount: 79.5, receiptReference: "", receiptHeld: false })]));
 
-    const noReceipt = screen.getByText("No receipt number").closest(".rts-stat") as HTMLElement;
+    const noReceipt = screen.getByText("No receipt number").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(noReceipt).getByText("1")).toBeTruthy();
     expect(within(noReceipt).getByText("GHS 79.50 of spending with no number on it")).toBeTruthy();
-    const held = screen.getByText("Receipt held").closest(".rts-stat") as HTMLElement;
+    const held = screen.getByText("Receipt held").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(held).getByText("1")).toBeTruthy();
   });
 
   it("files nothing outside the chosen period and says so", () => {
     openJune(base([expense({ incurredOn: "2026-05-20" })]));
     expect(screen.getByText("No expenses recorded")).toBeTruthy();
-    const recorded = screen.getByText("Recorded in the period").closest(".rts-stat") as HTMLElement;
+    const recorded = screen.getByText("Recorded in the period").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(recorded).getByText("GHS 0.00")).toBeTruthy();
   });
 
@@ -244,7 +244,7 @@ describe("the expenses screen", () => {
 
     expect(screen.getByText("No company currency is configured")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Record an expense/ })).toHaveProperty("disabled", true);
-    const recorded = screen.getByText("Recorded in the period").closest(".rts-stat") as HTMLElement;
+    const recorded = screen.getByText("Recorded in the period").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(recorded).getByText("Not configured")).toBeTruthy();
   });
 
@@ -273,7 +273,7 @@ describe("the scanned copy of a receipt (Q-51, D-100)", () => {
     expect(screen.getByRole("button", { name: "File a scan for EXP-2026-0002" })).toBeTruthy();
 
     // And the gap is counted for the whole period, with the count agreeing with the rows.
-    const stat = screen.getByText("No scan on file").closest(".rts-stat") as HTMLElement;
+    const stat = screen.getByText("No scan on file").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(stat).getByText("1")).toBeTruthy();
   });
 

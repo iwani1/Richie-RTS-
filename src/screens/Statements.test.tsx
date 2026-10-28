@@ -192,13 +192,13 @@ describe("the statements screen", () => {
 
     expect(screen.getByText("Brought forward")).toBeTruthy();
     // June for Acme: 4,600 invoiced, 1,000 received, 575 credited, nothing carried in.
-    const invoiced = screen.getByText("Invoiced").closest(".rts-stat") as HTMLElement;
+    const invoiced = screen.getByText("Invoiced").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(invoiced).getByText("GHS 4600.00")).toBeTruthy();
-    const received = screen.getByText("Received").closest(".rts-stat") as HTMLElement;
+    const received = screen.getByText("Received").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(received).getByText("GHS 1000.00")).toBeTruthy();
-    const credited = screen.getByText("Credited").closest(".rts-stat") as HTMLElement;
+    const credited = screen.getByText("Credited").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(credited).getByText("GHS 575.00")).toBeTruthy();
-    const closing = screen.getByText("Balance due").closest(".rts-stat") as HTMLElement;
+    const closing = screen.getByText("Balance due").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(closing).getByText("GHS 3025.00")).toBeTruthy();
 
     // The rows are the documents, each with its own date and number. An invoice appears twice — once
@@ -230,7 +230,7 @@ describe("the statements screen", () => {
     openCustomer(/Harbour Logistics/);
     // Harbour's only invoice is dated 5 June, so a July statement has no rows and carries the debt in.
     expect(screen.getByText("Nothing moved")).toBeTruthy();
-    const broughtForward = screen.getByText("Brought forward").closest(".rts-stat") as HTMLElement;
+    const broughtForward = screen.getByText("Brought forward").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(broughtForward).getByText("GHS 900.00")).toBeTruthy();
   });
 
@@ -253,7 +253,7 @@ describe("the statements screen", () => {
     openJuneStatement(/Acme Ltd/);
     // The cancelled payment is not the customer's money, so neither the row nor the total carries it.
     expect(screen.queryByText("PAY-2026-0002")).toBeNull();
-    const received = screen.getByText("Received").closest(".rts-stat") as HTMLElement;
+    const received = screen.getByText("Received").closest('[data-slot="stat"]') as HTMLElement;
     expect(within(received).getByText("GHS 1000.00")).toBeTruthy();
   });
 

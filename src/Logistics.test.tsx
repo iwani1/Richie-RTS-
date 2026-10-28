@@ -179,6 +179,11 @@ describe("Staff logistics end-to-end (jsdom)", () => {
     await screen.findByText(/is now closed/i);
     await screen.findByText(/set to available/i);
 
+    // The panel is modal: close it before reaching the page behind it, which is exactly what a
+    // person would have to do.
+    fireEvent.click(within(orderDialog).getByRole("button", { name: /^Close$/i }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
     // The cost report shows the recorded amount with its period and coverage.
     fireEvent.click(screen.getByRole("tab", { name: /Cost report/i }));
     // The figure appears in the total and in the entry list.
