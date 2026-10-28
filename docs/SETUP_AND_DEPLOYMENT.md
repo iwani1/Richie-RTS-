@@ -516,6 +516,39 @@ rental to a paid invoice, the release control, the reports reconciled by hand, t
 restart. Run it against a copy of the database first (`pg_dump` + `pg_restore` into
 `richie_tms_trial`), then once against the real one.
 
+## 12b. Demonstration data (presentations only)
+
+`scripts/seed.ts` fills an **empty** database with a fictional but complete transport company for a
+presentation: customers, branches, contracts, buses, drivers, compliance papers, routes, riders, a
+fortnight of completed runs and a week ahead, bookings, rentals at every stage of the workflow,
+invoices, payments, a credit note, a refund, expenses, incidents, workshop orders, odometer readings,
+public enquiries and portal accounts.
+
+```bash
+npm run db:seed            # on an empty, migrated database
+npm run db:reset           # to remove it: drops the records
+npm run db:migrate         # and gives you an empty system again
+```
+
+Three things make it safe to demo and easy to remove:
+
+- **It refuses a database with records in it.** If any vehicle, driver, client, rental, trip or invoice
+  exists, the script prints what it found and stops. Demonstration rows cannot be mixed into real work.
+- **It writes through the ordinary commands.** Each record goes through `runCommand` →
+  `loadDatabase` → `executeCommand` → `saveDatabase`, under the same advisory lock and audit trail as a
+  change made on screen: references are allocated, cross-checks run, the database's own constraints
+  hold. A seed that wrote INSERTs directly could create records the application itself would refuse.
+- **Its dates follow the day it runs.** Completed runs and hires are behind today, future runs and
+  hires are ahead of it, and the compliance list always holds one paper expiring inside the reminder
+  lead time and one already expired — so the screens look current whenever the demo is given.
+
+It prints a summary table of what it wrote and the accounts it created. All of those accounts use the
+password `Demo-Ghana-2026`; the administrator account is **not** reset — if the database already had
+one, its password stays as it was.
+
+> **Never run this against a database that holds real work.** The guard above is a stop sign, not a
+> sandbox: `npm run db:reset` drops the records it finds.
+
 ## 13. What was verified, and what was not
 
 Verified by running:

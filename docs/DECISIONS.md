@@ -3439,3 +3439,50 @@ classes), `src/app/globals.css` (paper tokens, print-overlay rules), `src/styles
 and 141 selectors removed), `src/screens/Documents.test.tsx` (two class selectors replaced with the
 `data-` hooks). Fourteen of thirty screens are now clear of the old stylesheet; the compiled stylesheet
 is 92.5 KB, down from 101.8.
+
+## D-133 - Demonstration data is written through the command layer, and refuses a database with records
+
+**The problem.** The product has no dossier of records to show. Every screen is honest about an empty
+database, which is right for an installation and useless at a presentation: a board with no runs, a
+register with no buses and a statement with no money demonstrate nothing at all. What was needed was a
+company that could be walked through — but the earlier rule (D-36, "no demo data, no invented facts")
+existed for a reason, and it does not stop being a reason because a meeting is on Thursday.
+
+**Decision 1: the rule is narrowed, not deleted.** Invented business records are permitted **only** in a
+database that was empty, **only** through `scripts/seed.ts`, and **only** under names, companies, phone
+numbers and TINs that are plainly invented and labelled as such wherever they are described. Nothing
+about a real customer's data changes; the product's own defaults are still blank, and an installation
+that never runs the script is exactly as it was.
+
+**Decision 2: it seeds the way the application writes.** A seed that INSERTs rows can produce a
+database the application would refuse — a rental with no quotation behind its deposit, an invoice for
+a hire that never ran, a reference counter that does not know about the numbers it just gained, an
+audit log that does not mention any of it. So the script drives `runCommand` → `loadDatabase` →
+`executeCommand` → `saveDatabase`, the same path a screen takes: the advisory lock, the permission
+checks, the cross-record validation, the reference series and the audit entries all apply. The point of
+the demonstration is that the figures on the screens are figures the system itself stands behind.
+
+**Decision 3: it refuses to run over records.** If any vehicle, driver, client, rental, trip or invoice
+already exists, the script stops and prints what it found. Demonstration rows therefore cannot be mixed
+into real work by accident, and the guard's message names the two ways forward — restore a backup, or
+reset and start again. `npm run db:reset` is the undo, and the script says so in its header.
+
+**Decision 4: the dates are relative, and the gaps are deliberate.** Completed runs and hires sit behind
+the day the script runs; planned runs and accepted hires sit ahead of it; one compliance paper expires
+inside the reminder lead time and one has already expired. That keeps the demonstration current
+whenever it is given rather than freezing it to the day it was written, and it means the screens that
+exist to warn about something — readiness, reminders, overdue service, aged debt — have something real
+to warn about.
+
+**Decision 5: what it cannot honestly show, it does not invent.** No GPS trace (the product has no
+integration), no two-factor challenge (not built), no email or SMS marked "sent" (there is no provider),
+and no invoice claimed as paid that has no payment behind it. The one place the demonstration shows a
+degraded condition — the expired roadworthy on the bus that is in the workshop — is real data about a
+state the product is supposed to surface.
+
+**Consequence.** `scripts/seed.ts` (new, ~1,050 lines, 190-odd commands), `package.json` (`db:seed`),
+`README.md` ("Try it with demonstration data"), `docs/SETUP_AND_DEPLOYMENT.md` §12b. The database it
+produces: 6 users, 6 clients, 5 branches, 4 contracts, 8 vehicles, 8 drivers, 23 documents, 5 routes,
+18 riders, 80 trips, 5 bookings, 7 rental requests, 2 invoices, 3 payments, 1 credit note, 1 refund, 9
+expenses, 2 incidents, 2 work orders, 13 odometer readings and an audit trail of the whole thing. It
+runs in about four seconds against an empty database.

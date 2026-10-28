@@ -17,6 +17,7 @@
     "db:backup": "tsx scripts/backup.ts",
     "db:restore": "tsx scripts/restore.ts",
     "db:reset": "tsx scripts/reset.ts",
+    "db:seed": "tsx scripts/seed.ts",
     "user:password": "tsx scripts/set-password.ts",
     "audit:dev": "npm audit --audit-level=high",
     "e2e": "tsx scripts/e2e-workflow-c.ts"
@@ -64,7 +65,7 @@
     "vite-plugin-singlefile": "2.3.4",
     "vitest": "5.0.5"
   },
-  "description": "Richie Transport Services — transport management system (Next.js + PostgreSQL)",
+  "description": "Richie Transport Services \u2014 transport management system (Next.js + PostgreSQL)",
   "overrides": {
     "postcss": "8.5.31"
   },

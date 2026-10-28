@@ -32,8 +32,10 @@ your own, change the password in `DATABASE_URL` to match it. The two are indepen
 password in `.env` does not set it on the database, and the server says so on screen when they
 disagree.
 
-There is no seed step. The database starts empty on purpose: the first screen asks for the
-administrator account, and Settings asks for the company's own rules.
+The database starts empty on purpose: the first screen asks for the administrator account, and
+Settings asks for the company's own rules. Nothing is pre-filled, and dependent features stay blocked
+until you supply them. A separate script can fill a database with **demonstration** records for a
+presentation — see [Try it with demonstration data](#try-it-with-demonstration-data).
 
 Open <http://localhost:3000>. The first page asks you to create the administrator account. Then open
 **Settings** and supply the business rules — nothing is pre-filled, and dependent features stay
@@ -68,6 +70,36 @@ database and no sign-in, and they contain no records:
 
 Every figure on both is **sample data**, written as such on the page. The live application is still
 `/`, signed in, and it is the only place that reads or writes a record.
+
+### Try it with demonstration data
+
+For a presentation, one command fills an empty database with a working Ghanaian transport company:
+six customers, eight buses and drivers, five routes with a fortnight of runs behind them and a week
+ahead, rentals at every stage from enquiry to a paid, credited and refunded invoice, compliance papers
+(current, expiring and expired), incidents and workshop orders, expenses, and a handful of portal
+accounts.
+
+```bash
+npm run db:seed
+```
+
+It refuses to run over a database that already holds records, so it cannot mix demonstration rows into
+real work. The records are written through the same commands the screens use, which means references
+are allocated, cross-checks run and the audit log is filled exactly as it would be by hand.
+
+The accounts it creates all use the password `Demo-Ghana-2026`:
+
+| Sign in as | Role |
+|---|---|
+| `ama.boateng@adinkratransit.com.gh` | administrator (only created if the database had none) |
+| `nana.ofori@adinkratransit.com.gh` | operations / dispatch |
+| `gifty.amoako@adinkratransit.com.gh` | finance |
+| `yaw.boakye@adinkratransit.com.gh` | driver |
+| `ama.nyarko@voltastarmining.com.gh` | client contact (Volta Star Mining) |
+| `akosua.mensah@voltastarmining.com.gh` | passenger |
+
+Every company, person, phone number and TIN in it is invented. To remove it, drop the data and start
+again: `npm run db:reset && npm run db:migrate`. Never run it against a database that holds real work.
 
 Exact commands for every step, including backups and deployment notes:
 **`docs/SETUP_AND_DEPLOYMENT.md`**.

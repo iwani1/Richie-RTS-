@@ -1964,3 +1964,21 @@ portal's incident form and the two sheet screens (Documents, PrintableReport) ar
 **Next piece:** the money desk — `FinanceHome`, `Invoices`, `Statements` (62 legacy classes between them).
 `Invoices` and `Statements` can now use the sheet vocabulary rather than their own print layouts, which is
 exactly why the sheet family was taken first.
+
+## Phase 83 - A company to walk through: demonstration data through the command layer (D-133)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| A Ghanaian company, end to end | Done (verified) | `scripts/seed.ts` writes Adinkra Transit Services Ltd of Accra: six customers with branches and TINs, four corporate agreements, eight buses plated `GT`/`GE`/`AS`/`WR`, eight drivers with DVLA classes and expiry dates, twenty-three compliance papers, five routes and eighteen riders |
+| Written, not inserted | Done (verified) | Every record goes through `runCommand` → `executeCommand` → `saveDatabase`: references allocated, cross-checks run, the audit log written, the database's own constraints enforced. 192 audit entries for 190-odd commands, and no direct INSERT anywhere in the script |
+| Every workflow at a realistic stage | Done (verified) | Rentals: two completed and invoiced (one part-paid then settled, one credited and refunded), one out on the road, one quoted and waiting for the customer, one taken in and not yet priced. Runs: a fortnight completed with boardings, one on the road with a delay, the next week planned and dispatched |
+| The states that exist to warn | Done (verified) | One roadworthy expiring inside the 30-day lead time, one already expired on the bus in the workshop; a suspended clinic route and its suspended agreement; a driver with a lapsed licence and a suspended record; two incidents (one closed through a work order, one open), two un-receipted expenses, one outstanding invoice |
+| Dates that follow the day it runs | Done (verified) | Relative to the run, not frozen: history behind today, work ahead of it. The first draft used fixed weekdays and was refused by the product itself when a booking landed on a Sunday — the script now finds the next run the route actually operates, which is the same rule dispatch uses |
+| Safe by construction | Done (verified) | Refuses a database holding any vehicle, driver, client, rental, trip or invoice, naming what it found; the undo (`db:reset`) is printed in its header and the docs. The administrator's password is never reset |
+| Gates | Pass | `tsc` clean, `eslint` clean, the script runs end to end against a fresh database (22 migrations) in ~4 s, `/api/health` and a seeded sign-in return the full company through `/api/session` |
+
+**Still queued for "every part":** the sixteen screens that still carry `rts-*` classes — `StaffBusing`
+(65), `StaffLogistics` (42), `FinanceHome` (25), `Invoices` (24), `PublicEnquiry` (23), `Settings` (16),
+`Reports` (16), `Vehicles` (14), `Statements` (13), `Expenses` (13), `Registers` (12), `Fleet` (10),
+`Contracts` (8), `FleetReadiness` (7), `Rentals` (6), `Compliance` (5). The money desk
+(`FinanceHome`, `Invoices`, `Statements`) is next, and `legacy.css` goes when the last one is clean.
