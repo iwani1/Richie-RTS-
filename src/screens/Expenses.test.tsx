@@ -338,7 +338,7 @@ describe("copying a receipt number (D-111)", () => {
     });
 
     expect(writeText).toHaveBeenCalledWith("RCPT-0091");
-    const wrapper = copy.closest(".rts-copy") as HTMLElement;
+    const wrapper = copy.parentElement as HTMLElement;
     expect(within(wrapper).getByRole("status").textContent).toBe("Receipt number RCPT-0091 copied.");
   });
 

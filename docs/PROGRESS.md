@@ -2052,3 +2052,21 @@ clear.
 neither is a coding one: whether a document may be sent at all (no mail server), and how long a scanned
 file is kept.
 
+## Phase 88 - The last two screens, and the temporary stylesheet deleted (D-138)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| The public form, rebuilt | Done (verified) | `PublicEnquiry` loses all 22 classes: brand mark, title, intro, one column on a phone and two from `sm`, wide fields spanning both, `TextArea` for the notes, the off-screen honeypot still off-screen. Embedded it is a block with no border or page padding; opened directly it is a card on the canvas |
+| The setup meter, rebuilt | Done (verified) | `Settings` loses its 14: the "Rules to supply" band becomes the layer's `Panel` with the count as its action, the bar keeps `role="img"` and its label, and each rule keeps its consequence and its Set/Not set pill |
+| The copy button stops speaking `rts-` | Done (verified) | `.rts-copy` → `inline-flex`, `.rts-copy-note` → `sr-only`; the fixed width that stopped the cell jumping is `min-w-[62px]` on the button. Three tests now find the live region through the button's own parent |
+| Two stragglers | Done (verified) | `ImportPanel`'s file input and numeric cell use the same token classes as every other; the palette's `rts-palette-*` ids became `palette-*` |
+| `legacy.css` deleted | Done (verified) | 28,162 bytes, its `@import` removed, and with it the IBM Plex Mono faces nothing else named (`layout.tsx`, `package.json`, lock file). The dead Vite scaffold it hid behind — `src/main.tsx`, `src/index.css`, `index.html` — went too, and `vitest.config.ts` lost the exclusion for a file that no longer exists |
+| One stylesheet | Done (verified) | Compiled CSS is now a single file of 82,841 bytes, down from 86,933 + 10,903. No `rts-` string is left anywhere in `src/` |
+| Docs that had drifted | Done (verified) | `ARCHITECTURE.md`'s interface summary still described the light Daylight palette and named `src/index.css`; it now describes Studio, the token file and the layer. `DESIGN.md`'s three "still on the old classes" passages are past tense |
+| Tests | Done (verified) | **1,386 passed, 28 skipped**, unchanged in number: this phase changed no behaviour, which is why the count did not move |
+| Gates | Pass | `tsc` clean, `eslint` clean, `next build` 15.0 s, one CSS file of 82,841 bytes, `/enquiry` renders 200 with no `rts-` class in the HTML |
+
+**"Every part" of the interface layer is now done:** thirty of thirty screens, one stylesheet, one
+component layer. What is left in the product is not a screen: two decisions (whether a document may be
+sent, and how long a scanned file is kept) and the working-day trial on the live database.
+

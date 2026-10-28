@@ -77,11 +77,13 @@ export function CopyButton({ value, what, className }: { value: string; what: st
   };
 
   return (
-    <span className={cn("rts-copy", className)}>
-      <Button variant="ghost" onClick={copy} aria-label={`Copy ${what} ${value}`}>
+    <span className={cn("inline-flex items-center", className)}>
+      {/* Fixed width, so a table cell does not jump when it reads "Copied". */}
+      <Button variant="ghost" size="sm" className="min-w-[62px]" onClick={copy} aria-label={`Copy ${what} ${value}`}>
         {state === "copied" ? "Copied" : state === "failed" ? "Not copied" : "Copy"}
       </Button>
-      <span className="rts-copy-note" role="status" aria-live="polite">
+      {/* Announced rather than shown: the button's own label is the visible confirmation. */}
+      <span className="sr-only" role="status" aria-live="polite">
         {state === "copied"
           ? `${what.charAt(0).toUpperCase()}${what.slice(1)} ${value} copied.`
           : state === "failed"

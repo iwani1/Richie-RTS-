@@ -5,6 +5,7 @@ import { useTms } from "../tms/useTms";
 import type { Settings } from "../tms/types";
 import { PRICING_BASES, PRICING_BASIS_LABELS, REQUOTE_POLICIES, TAX_POSITIONS, TAX_POSITION_LABELS } from "../tms/types";
 import { Badge, Band, Button, Field, Notice, PageHeader, Select, TextArea, TextInput } from "../ui/primitives";
+import { Panel as SurfacePanel } from "../components/tms/Panel";
 
 export function SettingsPage() {
   const { db, allowed, dispatch, setFlash } = useTms();
@@ -54,38 +55,41 @@ export function SettingsPage() {
 
       {!editable && <Notice tone="info">You can view settings but only administrators can change them.</Notice>}
 
-      <section className="rts-band" aria-labelledby="rules-heading">
-        <div className="rts-band-label">
-          <div className="rts-head-text">
-            <h2 id="rules-heading" className="rts-band-title">Rules to supply</h2>
-            <p className="rts-band-note">Straight from the saved record. A rule counts only once it is stored.</p>
-          </div>
-          <span className={setup.complete ? "rts-stamp" : "rts-stamp rts-stamp--warn"}>
-            {setup.done} of {setup.items.length} set
-          </span>
+      <SurfacePanel
+        kicker="Setup"
+        title="Rules to supply"
+        description="Straight from the saved record. A rule counts only once it is stored."
+        action={<Badge tone={setup.complete ? "success" : "warning"}>{setup.done} of {setup.items.length} set</Badge>}
+        bodyClassName="px-4 pb-4"
+      >
+        {/* Decorative bar, named for a screen reader: the same count the badge carries, in words. */}
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-border"
+          role="img"
+          aria-label={`${setup.done} of ${setup.items.length} rules supplied`}
+        >
+          <span className="block h-full rounded-full bg-primary transition-[width] duration-500 ease-glide" style={{ width: `${setup.percent}%` }} />
         </div>
-        <div className="rts-band-body">
-          <div className="rts-progress" role="img" aria-label={`${setup.done} of ${setup.items.length} rules supplied`}>
-            <span className="rts-progress-fill" style={{ width: `${setup.percent}%` }} />
-          </div>
-          <p className="rts-progress-caption">
-            {setup.complete
-              ? "Every rule this build needs is stored."
-              : `${setup.outstanding} rule${setup.outstanding === 1 ? "" : "s"} still missing — dependent features stay blocked until they are supplied.`}
-          </p>
-          <ul className="rts-rules">
-            {setup.items.map((item) => (
-              <li key={item.key} className="rts-rule">
-                <span className="rts-rule-label">
-                  {item.label}
-                  <span className="rts-rule-consequence">{item.consequence}</span>
-                </span>
-                <Badge tone={item.done ? "success" : "warning"}>{item.done ? "Set" : "Not set"}</Badge>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          {setup.complete
+            ? "Every rule this build needs is stored."
+            : `${setup.outstanding} rule${setup.outstanding === 1 ? "" : "s"} still missing — dependent features stay blocked until they are supplied.`}
+        </p>
+        <ul className="mt-3 grid gap-x-5 sm:grid-cols-2">
+          {setup.items.map((item) => (
+            <li
+              key={item.key}
+              className="flex items-center gap-2.5 border-b border-divider py-1.5 text-[11.5px] last:border-b-0"
+            >
+              <span className="min-w-0 flex-1 text-foreground">
+                {item.label}
+                <span className="block text-[10.5px] leading-snug text-muted-foreground">{item.consequence}</span>
+              </span>
+              <Badge tone={item.done ? "success" : "warning"}>{item.done ? "Set" : "Not set"}</Badge>
+            </li>
+          ))}
+        </ul>
+      </SurfacePanel>
 
       <Band label="Company" note="Shown on screens and, later, on quotations and invoices.">
         <div className="grid gap-4 sm:grid-cols-2">

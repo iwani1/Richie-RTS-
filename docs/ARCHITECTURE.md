@@ -43,23 +43,29 @@
 
 ## Interface system
 
-The interface is the **Daylight** direction (`docs/DESIGN.md` §4, which superseded D-41): a light operations workspace, not a component-kit
-default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
+The interface is the **Studio** direction: a dark operations console, not a component-kit default.
+`docs/DESIGN.md` is the record; this is the summary a developer needs.
 
-- **Type.** Inter Variable for every word and figure; IBM Plex Mono only for machine data —
-  references, plates, times, money in tables. Figures are tabular.
-- **Palette.** Canvas `#f5f6f9`, card `#ffffff`, hairline `#e7e9ef`, ink `#0f172a`, muted `#4a5468`,
-  and **one** accent, indigo `#4453f0`. State colours (green, amber, red) appear only as a pill with
-  its word, never as the sole carrier of meaning.
-- **Form.** One elevation level: anything on the canvas casts the same soft shadow, anything inside a
-  card casts none. Cards have one head, one line of qualifying text and one action. Corners are 8–14px.
-  There is no per-destination colour: the accent marks the active destination and the primary action.
-- **Implementation.** `src/ui/primitives.tsx` is the single component seam; `src/index.css` holds the
-  tokens and the layout classes. Shell and navigation are in `src/App.tsx`; authentication in
-  `src/screens/Auth.tsx`. The source-document viewer keeps its own document styling.
+- **Type.** Inter Variable for every word and figure; JetBrains Mono for machine data — references,
+  plates, times, money in tables. Figures are tabular. Both are self-hosted; no font is fetched from a
+  third party.
+- **Palette.** Canvas `#0A0C11`, cards `#12151D`, ink `#7C88FF` for anything that has to be read and
+  `#4453F0` under white ink for the action you press. One indigo family and one accent; state colours
+  (green, amber, red) appear only as a pill with its word, never as the sole carrier of meaning.
+- **Form.** One elevation level: a 1px edge and a 1px inset top highlight, no drop shadows on cards. A
+  card has one kicker, one line of qualifying text and at most one action. Corners are 14px for cards
+  and 10px for controls. There is no per-destination colour: the accent marks the active destination
+  and the primary action.
+- **Implementation.** `src/app/globals.css` is the only stylesheet: it holds every colour, radius,
+  size and easing as a token, and three utilities (`tms-mono`, `tms-num`, `tms-unset`) for the shapes
+  Tailwind does not name. `src/components/tms/` is the component layer (DataTable, Panel, StatCard,
+  SectionTabs, FigureStrip, KeylineList, IntervalBar, States). `src/ui/primitives.tsx` holds the form
+  controls the commands are built from. `src/App.tsx` is the client shell and the screen switch;
+  authentication is in `src/screens/Auth.tsx`. The last temporary stylesheet, `src/styles/legacy.css`,
+  was deleted in Phase 88 with the last screen that read it.
 - **Verification.** Accessible names on every control, a skip link, a 2px focus ring with 2px offset,
   state never carried by colour alone, and no decorative motion, glass or gradient. Contrast is held
-  at 4.5:1 for text; the accent measures 5.61 on white.
+  at 4.5:1 for text; the faint ink was lightened to `#7E879E` (5.08:1) to clear it.
 
 ## Modules
 

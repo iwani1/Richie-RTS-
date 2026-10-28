@@ -114,19 +114,19 @@ export function CommandPalette({
             aria-label="Search screens"
             role="combobox"
             aria-expanded="true"
-            aria-controls="rts-palette-list"
-            aria-activedescendant={results[active] ? `rts-palette-${results[active].route}` : undefined}
+            aria-controls="palette-list"
+            aria-activedescendant={results[active] ? `palette-${results[active].route}` : undefined}
             autoComplete="off"
             spellCheck={false}
           />
           <kbd className="rounded border border-border px-1.5 font-mono text-[9.5px] text-muted-foreground">Esc</kbd>
         </div>
 
-        <ul className="max-h-[52vh] overflow-y-auto p-1.5" id="rts-palette-list" role="listbox" aria-label="Screens" ref={listRef}>
+        <ul className="max-h-[52vh] overflow-y-auto p-1.5" id="palette-list" role="listbox" aria-label="Screens" ref={listRef}>
           {results.map((item, index) => (
             <li
               key={item.route}
-              id={`rts-palette-${item.route}`}
+              id={`palette-${item.route}`}
               role="option"
               aria-selected={index === active}
               className={cn(

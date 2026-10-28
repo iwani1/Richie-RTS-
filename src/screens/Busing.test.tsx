@@ -280,7 +280,7 @@ describe("copying a trip reference (D-111)", () => {
 
     expect(writeText).toHaveBeenCalledWith("TR-0001");
     // The page has other live regions; read the one that belongs to this button.
-    const wrapper = copy.closest(".rts-copy") as HTMLElement;
+    const wrapper = copy.parentElement as HTMLElement;
     expect(within(wrapper).getByRole("status").textContent).toBe("Trip reference TR-0001 copied.");
   });
 });

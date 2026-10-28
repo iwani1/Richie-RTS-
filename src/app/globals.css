@@ -9,11 +9,6 @@
 @source not "../../README.md";
 @source not "../../audit";
 
-/* TEMPORARY — the screens written before the design-system migration read these classes.
-   Every converted screen removes its rules from this file; it is deleted when the last one is
-   gone. Nothing new may be added to it. */
-@import "../styles/legacy.css";
-
 /* ============================================================================================
    RICHIE TMS — design tokens
    The only place a colour, radius, type size or easing is written down. Components ask for

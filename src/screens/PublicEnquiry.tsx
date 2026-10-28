@@ -7,7 +7,7 @@
 // database snapshot and no navigation into the application. It talks to one endpoint, which answers
 // with a reference and a sentence and nothing else.
 import { useEffect, useState, type FormEvent } from "react";
-import { Button, Field, Notice, Select, TextInput } from "../ui/primitives";
+import { Button, Field, Notice, Select, TextArea, TextInput } from "../ui/primitives";
 
 type Category = { id: string; name: string };
 
@@ -130,15 +130,28 @@ export function PublicEnquiry({ embedded = false }: { embedded?: boolean }) {
     }
   };
 
+  // Two frames for one page. Embedded, it is a block inside the company's own website: no border, no
+  // card, no page padding, because the host page already has those. Opened directly, it is a page and
+  // needs to look like one. The difference is the wrapper's classes and nothing else, so a rule cannot
+  // drift away from the markup that relies on it.
+  const shell = embedded
+    ? "flex justify-center bg-background py-1"
+    : "flex min-h-dvh justify-center bg-background px-4 py-12 sm:px-6";
+  const card = embedded
+    ? "w-full max-w-[640px] px-1 pb-2"
+    : "w-full max-w-[640px] self-start rounded-card border border-border bg-card p-6 shadow-card sm:p-8";
+
   if (reference) {
     return (
-      <div className="rts-public" data-embedded={embedded || undefined}>
-        <div className="rts-public-card">
-          <p className="rts-public-eyebrow">Request received</p>
-          <h1 className="rts-public-title">Thank you — the office will call you.</h1>
-          <p className="rts-public-intro">
-            Your request is recorded as <strong className="rts-mono">{reference}</strong>. Nothing is booked yet: the
-            office will telephone the number you gave to confirm the vehicle, the dates and the price.
+      <div className={shell}>
+        <div className={card}>
+          <p className="tms-mono mb-2 text-primary">Request received</p>
+          <h1 className="mb-2.5 text-[clamp(1.5rem,3.4vw,1.875rem)] leading-[1.14] font-semibold tracking-[-0.03em] text-foreground">
+            Thank you — the office will call you.
+          </h1>
+          <p className="mb-5 max-w-[62ch] text-[13.5px] leading-relaxed text-muted-foreground">
+            Your request is recorded as <strong className="tms-num font-semibold text-foreground">{reference}</strong>. Nothing is
+            booked yet: the office will telephone the number you gave to confirm the vehicle, the dates and the price.
           </p>
           <Notice tone="info">
             If your plans change before the office calls, telephone them with this reference and they will update or
@@ -150,22 +163,25 @@ export function PublicEnquiry({ embedded = false }: { embedded?: boolean }) {
   }
 
   return (
-    <div className="rts-public" data-embedded={embedded || undefined}>
-      <div className="rts-public-card">
-        <header className="rts-public-head">
-          <div className="rts-mark" aria-hidden="true">
+    <div className={shell}>
+      <div className={card}>
+        <header className="mb-6 flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary text-[15px] font-bold text-primary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.35)]"
+          >
             R
-          </div>
-          <div>
-            <p className="rts-wordmark">
-              Richie
-              <span>TRANSPORT SERVICES · GHANA</span>
-            </p>
+          </span>
+          <div className="min-w-0">
+            <p className="text-[13.5px] leading-tight font-semibold tracking-[-0.01em] text-foreground">Richie</p>
+            <p className="tms-mono mt-0.5 text-[10px] text-dim">Transport services · Ghana</p>
           </div>
         </header>
 
-        <h1 className="rts-public-title">Request a vehicle</h1>
-        <p className="rts-public-intro">
+        <h1 className="mb-2.5 text-[clamp(1.5rem,3.4vw,1.875rem)] leading-[1.14] font-semibold tracking-[-0.03em] text-foreground">
+          Request a vehicle
+        </h1>
+        <p className="mb-5 max-w-[62ch] text-[13.5px] leading-relaxed text-muted-foreground">
           Tell us when you need a vehicle and where it is going. The office will call you back to confirm availability
           and the price — this form does not book anything and takes no payment.
         </p>
@@ -176,7 +192,7 @@ export function PublicEnquiry({ embedded = false }: { embedded?: boolean }) {
           </Notice>
         )}
 
-        <form className="rts-public-form" onSubmit={submit} noValidate>
+        <form className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2" onSubmit={submit} noValidate>
           <Field label="Your name" error={errors.customerName}>
             <TextInput
               value={values.customerName}
@@ -248,30 +264,26 @@ export function PublicEnquiry({ embedded = false }: { embedded?: boolean }) {
             <TextInput type="date" value={values.endDate} onChange={set("endDate")} invalid={!!errors.endDate} required />
           </Field>
 
-          <Field label="Pickup point" hint="Optional." error={errors.pickupLocation} className="rts-public-wide">
+          <Field label="Pickup point" hint="Optional." error={errors.pickupLocation} className="sm:col-span-2">
             <TextInput value={values.pickupLocation} onChange={set("pickupLocation")} invalid={!!errors.pickupLocation} maxLength={160} />
           </Field>
 
-          <Field label="Destination" hint="Optional." error={errors.dropoffLocation} className="rts-public-wide">
+          <Field label="Destination" hint="Optional." error={errors.dropoffLocation} className="sm:col-span-2">
             <TextInput value={values.dropoffLocation} onChange={set("dropoffLocation")} invalid={!!errors.dropoffLocation} maxLength={160} />
           </Field>
 
-          <Field label="What is the vehicle for?" hint="Optional." error={errors.purpose} className="rts-public-wide">
+          <Field label="What is the vehicle for?" hint="Optional." error={errors.purpose} className="sm:col-span-2">
             <TextInput value={values.purpose} onChange={set("purpose")} invalid={!!errors.purpose} maxLength={300} />
           </Field>
 
-          <Field label="Anything else the office should know?" hint="Optional." error={errors.notes} className="rts-public-wide">
-            <textarea
-              className="rts-input rts-public-textarea"
-              value={values.notes}
-              onChange={set("notes")}
-              maxLength={1000}
-              rows={3}
-            />
+          <Field label="Anything else the office should know?" hint="Optional." error={errors.notes} className="sm:col-span-2">
+            <TextArea value={values.notes} onChange={set("notes")} invalid={!!errors.notes} maxLength={1000} rows={3} />
           </Field>
 
-          {/* Hidden from people and from assistive technology; only a script fills it in. */}
-          <div className="rts-honeypot" aria-hidden="true">
+          {/* Off-screen rather than hidden: `display: none` is a signal to a form-filling script that
+              the field is not worth completing. Hidden from people and from assistive technology;
+              only a script fills it in. */}
+          <div className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden="true">
             <label>
               Website
               <input
@@ -285,11 +297,11 @@ export function PublicEnquiry({ embedded = false }: { embedded?: boolean }) {
             </label>
           </div>
 
-          <div className="rts-public-actions">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 sm:col-span-2">
             <Button type="submit" variant="primary" disabled={busy || opening}>
               {busy ? "Sending..." : "Send request"}
             </Button>
-            <p className="rts-public-foot">
+            <p className="text-[11.5px] leading-relaxed text-muted-foreground">
               Sent straight to the office. Nothing is stored in this browser.
             </p>
           </div>

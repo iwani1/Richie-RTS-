@@ -120,7 +120,7 @@ describe("copying a rental reference (D-111)", () => {
     expect(writeText).toHaveBeenCalledWith("RR-0007");
     // The screen already has a role="status" filter note, so the confirmation is read from the
     // button's own live region rather than the first status on the page.
-    const wrapper = screen.getByRole("button", { name: /^Copy rental reference/ }).closest(".rts-copy") as HTMLElement;
+    const wrapper = screen.getByRole("button", { name: /^Copy rental reference/ }).parentElement as HTMLElement;
     expect(within(wrapper).getByRole("status").textContent).toBe("Rental reference RR-0007 copied.");
   });
 });

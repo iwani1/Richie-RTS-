@@ -27,7 +27,6 @@ export default defineConfig({
       reporter: ["text", "json-summary", "lcov"],
       include: ["src/**/*.{ts,tsx}"],
       // What is excluded, and why:
-      //   src/main.tsx            — a mount call, no logic.
       //   src/test/**             — the fake API used by the UI tests.
       //   src/server/{db,repository,commands,session,api}.ts and src/app/** — these need a live
       //     PostgreSQL or a Next request context. They are covered by the integration suite
@@ -35,7 +34,6 @@ export default defineConfig({
       //     smoke test in docs/SETUP_AND_DEPLOYMENT.md, not by jsdom unit tests.
       //   src/tms/clientCommand.ts — types only; it erases to an empty module.
       exclude: [
-        "src/main.tsx",
         "src/**/*.test.{ts,tsx}",
         "src/test/**",
         "src/tms/clientCommand.ts",

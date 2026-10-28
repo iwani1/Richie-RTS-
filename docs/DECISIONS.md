@@ -3680,3 +3680,46 @@ assertion that both figures stay unconfigured became an assertion that both prin
 `docs/OPEN_QUESTIONS.md` (Q-29 closed), `docs/KPIS.md` (where each figure prints). No migration and no
 schema change: this was a screen declining to show what it already had.
 
+## D-138 - The last two screens, and the temporary stylesheet goes (Phase 88)
+
+`PublicEnquiry` (22 classes) and `Settings` (14) were the last two screens reading `legacy.css`, and
+`CopyButton` plus two panels held the few names the stylesheet still had to answer for.
+
+**Decision 1: the public form keeps its own shape, from the tokens rather than from the layer.** It is
+the one page outside the app frame: embedded in the company's own website, no session, no navigation,
+no `Panel`, no `PageHeader`. Borrowing the dashboard's cards would have made the office's website look
+like the office's back office. So it is built from the same tokens — `bg-background`, `bg-card`,
+`rounded-card`, `border-border`, `text-primary`, `tms-mono` — with two wrappers and nothing else
+different: embedded, a block with no border and no page padding, because the host page already supplies
+both; opened directly, a card on the canvas. The switch is two class strings in one component, not a
+`data-` attribute read by a stylesheet rule, so what the page looks like cannot drift away from what
+the markup says.
+
+**Decision 2: the setup meter is a card with a bar, not a band.** `Settings` opens with "Rules to
+supply": a count, a bar, and a two-column list of rules each with its consequence and a Set/Not set
+pill. That is exactly the layer's `Panel` (kicker, title, description, one action) with the count as
+the action, so it became one. The bar keeps `role="img"` and its `aria-label` because it is decorative:
+the same count is in the pill and in the sentence under it.
+
+**Decision 3: the copy button stops speaking the old language.** Its wrapper was `.rts-copy` and its
+live region `.rts-copy-note`; both are now `inline-flex` and `sr-only`, and the three tests that found
+the live region by that class name find it by the button's own parent instead — which is what the
+tests were really asserting: *this* status belongs to *this* button, not the first status on the page.
+
+**Decision 4: the file goes, and what only it named goes with it.** `legacy.css` was deleted, its
+`@import` removed from `globals.css`, and the IBM Plex Mono faces dropped from `layout.tsx` and from
+`package.json`: nothing else named that family. Two leftovers went at the same time because deleting
+the stylesheet exposed them — `src/main.tsx`, `src/index.css` (a wrapper that only re-exported
+`globals.css`) and the `index.html` that loaded them were a Vite scaffold the Next build never used,
+and `ImportPanel` still asked for `rts-input` and `rts-num` where every other file input and numeric
+cell already used tokens. The ids the command palette had carried since the same era (`rts-palette-*`)
+were renamed to `palette-*`: an id is not a style, but a prefix that means "temporary" outliving the
+temporariness is how a codebase teaches the next reader something untrue.
+
+**Consequence.** `src/screens/PublicEnquiry.tsx`, `src/screens/Settings.tsx`, `src/ui/CopyButton.tsx`,
+`src/ui/ImportPanel.tsx`, `src/ui/CommandPalette.tsx`, `src/app/{globals.css,layout.tsx}`,
+`src/{main.tsx,index.css}` and `index.html` deleted, `src/styles/legacy.css` deleted (28,162 bytes),
+`@fontsource/ibm-plex-mono` removed from `package.json` (and the lock file regenerated), `vitest.config.ts`
+(one exclusion removed with the file it excluded), three screen tests (the copy button's live region
+found by its parent). Compiled CSS: one file, 82,841 bytes, down from 86,933 + 10,903.
+

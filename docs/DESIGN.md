@@ -188,10 +188,10 @@ labels.
 **Spacing** — 4/8/12/16/18/24/32px; 16px between cards, 18px inside one, 28px page gutter.
 **Shadows** — one level: `0 1px 2px rgba(16,24,40,.04), 0 1px 1px rgba(16,24,40,.03), 0 12px 28px -22px rgba(16,24,40,.35)`.
 
-**Compatibility.** Screens written in earlier passes use Tailwind's `stone`, `red`, `emerald` and
-`lime` scales and the `--rts-*` aliases; `@theme` re-points those at the Daylight greys and indigo, and
-the stylesheet re-skins every legacy `rts-*` class (`rts-band`, `rts-board`, `rts-meter`, `rts-steps`,
-`rts-lead`…), so no screen renders an off-palette colour or an editorial radius.
+**Compatibility — closed in Phase 88.** Screens written in earlier passes used the `rts-*` classes and
+the `--rts-*` aliases; that temporary stylesheet (`src/styles/legacy.css`) was re-pointed to the dark
+values, then pruned screen by screen as each was rebuilt, and finally deleted. No screen, form or
+component names an `rts-*` class today, so there is no compatibility layer left to reason about.
 
 **Sorting a register** — a sortable column is a button inside its own header, and the button inherits
 the header's 10px small caps so a sortable column and a plain one sit on the same baseline. Two
@@ -302,11 +302,10 @@ application shell (rail, top bar, skip link, mobile sheet, jump-to-screen palett
 is laid out as a board of unequal cards, and — since Phase 78, the first of the working screens —
 **the audit log**, which is now built from `components/tms` alone.
 
-**Still on the old classes:** twenty-six working screens carry `rts-*` classes served from
-`src/styles/legacy.css`, marked temporary in the file itself. That file shrinks screen by screen (the
-audit log's `.rts-code` rule was the first to go) and is deleted when the last one is converted; nothing
-new may be added to it. Until then these screens are consistent with each other but not yet with the new
-components.
+**Nothing is on the old classes.** Thirty of thirty screens were converted one at a time, each losing
+its rules from `src/styles/legacy.css` as it went; the file reached zero in Phase 88 and was deleted,
+with `src/index.css` (a wrapper that only re-exported it) and the IBM Plex Mono faces that only it
+named. One stylesheet is left: `src/app/globals.css`.
 
 **What a converted screen looks like.** The audit log is the reference: `PageHeader` with a kicker and
 no period (an append-only log has no "this week"), a strip of three counted figures, one `Panel`
@@ -357,10 +356,10 @@ value changes — never on load. The vocabulary is inspired by kinetics.colorion
 animatedbuttons.colorion.co and deliberately stops short of what those libraries offer: a dispatcher
 works in a table for hours, so nothing moves away from the pointer.
 
-**One palette for every screen.** `legacy.css` keeps its selectors and was re-pointed to the dark values
-(canvas, card, ink, muted, lines, accent, and 13% status tints), and 494 leftover `stone-*` utilities were
-remapped to semantic tokens. The built stylesheet now contains no light background and no dark text
-colour, so every screen — converted or not — sits on the same surface inside the same frame.
+**One palette for every screen.** The dark values live once, as tokens in `src/app/globals.css` (canvas,
+card, ink, muted, lines, the two indigos, and the status tints), and 494 leftover `stone-*` utilities
+were remapped to semantic tokens. The built stylesheet contains no light background and no dark text
+colour, so every screen sits on the same surface inside the same frame.
 
 **The board's shape (D-130).** The overview is one twelve-column field: map 8, utilisation 4, trip table
 8, activity 4. A card that holds a table earns its width; a card that holds one figure does not. The

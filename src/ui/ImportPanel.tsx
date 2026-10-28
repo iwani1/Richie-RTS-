@@ -89,7 +89,7 @@ export function ImportPanel({ kind, onClose }: { kind: ImportKind; onClose: () =
           <input
             type="file"
             accept=".csv,text/csv,text/plain"
-            className="rts-input"
+            className="w-full rounded-md border border-input bg-secondary px-3 py-2 text-[13px] text-foreground placeholder:text-dim focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
             aria-label="CSV file"
             onChange={(event) => void readFile(event.target.files?.[0])}
           />
@@ -132,7 +132,7 @@ export function ImportPanel({ kind, onClose }: { kind: ImportKind; onClose: () =
               rowKey={(row) => String(row.line)}
               emptyState={<p className="text-sm text-muted-foreground">No data rows were found below the header.</p>}
               columns={[
-                { key: "line", header: "Line", className: "rts-num", render: (row) => row.line },
+                { key: "line", header: "Line", className: "text-right tabular-nums", render: (row) => row.line },
                 { key: "row", header: "Row", render: (row) => <span className="font-mono text-xs break-all">{row.values.filter(Boolean).slice(0, 4).join(" · ")}</span> },
                 {
                   key: "outcome",

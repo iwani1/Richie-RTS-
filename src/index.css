@@ -1,3 +1,0 @@
-/* The single stylesheet entry. Tokens, motion and the temporary legacy import all live in
-   `app/globals.css`; this file exists so the non-Next entry point (`src/main.tsx`) keeps working. */
-@import "./app/globals.css";
