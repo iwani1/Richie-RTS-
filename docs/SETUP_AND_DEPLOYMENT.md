@@ -246,7 +246,13 @@ Open <http://localhost:3000>. The first page asks you to create the administrato
 and open **Settings** to supply the business rules. Nothing is pre-filled, and dependent features
 stay blocked until you do.
 
-For development with hot reload: `npm run dev`.
+For development with hot reload: `npm run dev`. Both commands serve the same app on port 3000.
+
+**Looking at the interface without a database.** The two review pages — `/dashboard` (the operations
+board) and `/design` (every component in every state) — read a sample payload and never touch
+PostgreSQL, so they load on a checkout with no `.env` at all: `npm ci && npm run dev`, then open
+<http://localhost:3000/dashboard>. They are labelled as sample data on screen. Everything else is the
+working application and needs the database below.
 
 **Reaching the app from another machine over plain HTTP.** The session cookie is `Secure` in
 production, so a browser will not store it over `http://` — sign-in appears to succeed and returns
