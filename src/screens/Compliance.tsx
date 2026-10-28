@@ -141,7 +141,7 @@ export function CompliancePage() {
                 render: (entry) => (
                   <span className="block">
                     <span className="font-medium">{typeName(entry.document)}</span>
-                    <span className="block text-xs text-stone-600">{ownerName(entry.document)}</span>
+                    <span className="block text-xs text-muted-foreground">{ownerName(entry.document)}</span>
                   </span>
                 ),
               },
@@ -151,7 +151,7 @@ export function CompliancePage() {
                 render: (entry) => (
                   <span className="block">
                     <span className={entry.status === "expired" ? "text-red-700" : undefined}>{formatDate(entry.document.expiryDate)}</span>
-                    <span className="block text-xs text-stone-600">{reminderTiming(entry.days)}</span>
+                    <span className="block text-xs text-muted-foreground">{reminderTiming(entry.days)}</span>
                   </span>
                 ),
               },
@@ -160,7 +160,7 @@ export function CompliancePage() {
                 header: "Taken on",
                 render: (entry) =>
                   entry.takenOn ? (
-                    <span className="text-xs text-stone-600">{reminderLine(entry.takenOn)}</span>
+                    <span className="text-xs text-muted-foreground">{reminderLine(entry.takenOn)}</span>
                   ) : (
                     <span className="text-xs rts-unset">Nobody has taken it on</span>
                   ),
@@ -217,17 +217,17 @@ export function CompliancePage() {
         columns={[
           { key: "owner", header: "Owner", render: (r) => <span className="font-medium">{ownerName(r.doc)}</span> },
           { key: "type", header: "Document type", render: (r) => typeName(r.doc) },
-          { key: "number", header: "Number", render: (r) => (r.doc.documentNumber || <span className="text-stone-400">-</span>) },
-          { key: "issued", header: "Issued", render: (r) => (r.doc.issuedDate ? formatDate(r.doc.issuedDate) : <span className="text-stone-400">-</span>) },
+          { key: "number", header: "Number", render: (r) => (r.doc.documentNumber || <span className="text-dim">-</span>) },
+          { key: "issued", header: "Issued", render: (r) => (r.doc.issuedDate ? formatDate(r.doc.issuedDate) : <span className="text-dim">-</span>) },
           { key: "expiry", header: "Expires", render: (r) => formatDate(r.doc.expiryDate) },
           {
             key: "days",
             header: "Timing",
             render: (r) => {
               const days = daysUntil(r.doc.expiryDate, today);
-              if (days === null) return <span className="text-stone-500">unreadable date</span>;
+              if (days === null) return <span className="text-muted-foreground">unreadable date</span>;
               const label = days === 0 ? "expires today" : days > 0 ? `in ${days} day${days === 1 ? "" : "s"}` : `${Math.abs(days)} day${days === -1 ? "" : "s"} overdue`;
-              return <span className={`rts-mono ${days < 0 ? "text-red-700" : "text-stone-600"}`}>{label}</span>;
+              return <span className={`rts-mono ${days < 0 ? "text-red-700" : "text-muted-foreground"}`}>{label}</span>;
             },
           },
           { key: "status", header: "Status", render: (r) => <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Badge> },
@@ -327,7 +327,7 @@ function CreateDocumentForm({
           </Select>
         </Field>
         {applicableTypes.find((t) => t.id === values.documentTypeId)?.required && (
-          <p className="text-xs text-stone-600">
+          <p className="text-xs text-muted-foreground">
             The company requires this document: a {values.ownerType} cannot be assigned while it is missing or has expired on the day of the work. A record entered today with a past expiry date will not clear that block.
           </p>
         )}

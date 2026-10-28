@@ -192,7 +192,7 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                           render: (row) => (
                             <span className="flex flex-col">
                               <span>{row.customerName}</span>
-                              <span className="text-xs text-stone-600">
+                              <span className="text-xs text-muted-foreground">
                                 {row.openInvoices} invoice{row.openInvoices === 1 ? "" : "s"}
                                 {row.oldestDaysOverdue > 0 ? ` · oldest ${row.oldestDaysOverdue} days late` : " · nothing late"}
                               </span>
@@ -232,7 +232,7 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                 rowKey={(row) => row.id}
                 emptyState={<EmptyState title="Nothing is overdue" body="No invoice is past its due date with money still owed." />}
                 columns={[
-                  { key: "ref", header: "Invoice", render: (row) => <span className="font-mono text-xs font-semibold text-stone-900">{row.reference}</span> },
+                  { key: "ref", header: "Invoice", render: (row) => <span className="font-mono text-xs font-semibold text-foreground">{row.reference}</span> },
                   { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="rts-unset">no name recorded</em> },
                   { key: "due", header: "Due", render: (row) => formatDate(row.dueOn) },
                   {
@@ -253,7 +253,7 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                   rowKey={(row) => row.rentalId}
                   emptyState={<EmptyState title="Every completed hire is billed" body="Nothing is waiting for an invoice." />}
                   columns={[
-                    { key: "ref", header: "Hire", render: (row) => <span className="font-mono text-xs font-semibold text-stone-900">{row.reference}</span> },
+                    { key: "ref", header: "Hire", render: (row) => <span className="font-mono text-xs font-semibold text-foreground">{row.reference}</span> },
                     { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="rts-unset">no name recorded</em> },
                     { key: "done", header: "Completed", render: (row) => formatDate(row.completedOn) },
                     {
@@ -279,11 +279,11 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                   rowKey={(row) => row.id}
                   emptyState={<EmptyState title="Nothing paid back" body="No refund was recorded in this period." />}
                   columns={[
-                    { key: "ref", header: "Refund", render: (row) => <span className="font-mono text-xs font-semibold text-stone-900">{row.reference}</span> },
+                    { key: "ref", header: "Refund", render: (row) => <span className="font-mono text-xs font-semibold text-foreground">{row.reference}</span> },
                     { key: "invoice", header: "Against", render: (row) => <span className="font-mono text-xs">{row.invoiceReference}</span> },
                     { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="rts-unset">no name recorded</em> },
                     { key: "paid", header: "Paid back", render: (row) => formatDate(row.paidOn) },
-                    { key: "reason", header: "Why", render: (row) => <span className="text-xs text-stone-600">{row.reason}</span> },
+                    { key: "reason", header: "Why", render: (row) => <span className="text-xs text-muted-foreground">{row.reason}</span> },
                     { key: "amount", header: "Amount", className: "text-right rts-mono", render: (row) => money(currency, row.amount) },
                   ]}
                 />
@@ -295,14 +295,14 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                   rowKey={(row) => row.id}
                   emptyState={<EmptyState title="Nothing to check" body="Every recorded payment has been reconciled." />}
                   columns={[
-                    { key: "ref", header: "Payment", render: (row) => <span className="font-mono text-xs font-semibold text-stone-900">{row.reference}</span> },
+                    { key: "ref", header: "Payment", render: (row) => <span className="font-mono text-xs font-semibold text-foreground">{row.reference}</span> },
                     { key: "invoice", header: "Against", render: (row) => <span className="font-mono text-xs">{row.invoiceReference}</span> },
                     { key: "paid", header: "Paid on", render: (row) => formatDate(row.paidOn) },
                     {
                       key: "next",
                       header: "Status · next step",
                       render: (row) => (
-                        <span className="text-xs text-stone-700">
+                        <span className="text-xs text-foreground">
                           {PAYMENT_STATUS_LABELS[row.status]} · <b>{row.nextStep === "verify" ? "verify" : "reconcile"}</b>
                         </span>
                       ),
@@ -342,7 +342,7 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
               </TableCard>
             </div>
 
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-muted-foreground">
               Coverage: {home.coverage.invoicesInPeriod} invoices in the period
               {home.coverage.invoicesWithoutCustomer > 0 && `, ${home.coverage.invoicesWithoutCustomer} with no customer name`}
               {home.coverage.uncategorisedExpenseLines > 0 && `, ${home.coverage.uncategorisedExpenseLines} cost lines with no category`}. A hire that was

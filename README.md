@@ -126,10 +126,10 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | A reference you can copy instead of typing — invoice, rental, run and receipt numbers | Works; one quiet button beside the number, a word of confirmation, and an honest "Not copied" when the browser refuses. Nothing is sent anywhere and no new dependency was added |
 | A photograph of each vehicle, plus what it runs on, whose it is and its usual driver | Works; one picture per vehicle in a folder of its own, added or replaced from the register, removed with a reason that is recorded, and counted when nobody has filed one. The folder is copied with the nightly backup |
 | Management report as an A4 document, printed or saved as a PDF by the browser | Works; the figures are the report's own, a figure it cannot state is printed as withheld, and no file is stored or emailed |
-| Design system and app shell: dark by default, one amber accent, tokens in one file, shared components that take their data | Works at `/design`, which shows every component in every state. The operations overview at `/dashboard` is built from nothing else — **with sample data**, and it says so. The working screens have not been converted yet |
+| Design system and app shell: dark by default, one amber accent, tokens in one file, shared components that take their data | Works at `/design`, which shows every component in every state. The operations overview at `/dashboard` is built from nothing else — **with sample data**, and it says so. Every working screen now reads the same dark palette inside the same frame; their layouts and tables are still the older ones and are being rebuilt one at a time |
 | Notifications (SMS or email), offline driver app, GPS tracking, card/mobile-money gateway, payroll | **Not built** — see `docs/PROGRESS.md` |
 
-1336 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+1340 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

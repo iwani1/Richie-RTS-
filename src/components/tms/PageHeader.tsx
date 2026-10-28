@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { GlidingTabs } from "./GlidingTabs";
 import type { RangeKey } from "@/lib/mock/types";
 
 const RANGES: Array<{ key: RangeKey; label: string }> = [
@@ -39,29 +40,15 @@ export function PageHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div role="radiogroup" aria-label="Reporting period" className="inline-flex items-center gap-0.5 rounded-control border border-border bg-card p-0.5">
-          {RANGES.map((option) => {
-            const active = range === option.key;
-            return (
-              <button
-                key={option.key}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => onRangeChange(option.key)}
-                className={cn(
-                  "rounded-[7px] px-3 py-1.5 text-[12px] font-medium transition-colors focus-visible:outline-none",
-                  active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-row-hover hover:text-foreground",
-                )}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
+        <GlidingTabs
+          options={RANGES.map((option) => ({ key: option.key, label: option.label }))}
+          value={range}
+          onChange={(key) => onRangeChange(key as RangeKey)}
+          ariaLabel="Reporting period"
+        />
 
         {onNewBooking && (
-          <Button size="default" className="tms-press h-9 gap-1.5 rounded-control px-3.5 font-medium" onClick={onNewBooking}>
+          <Button size="default" className="tms-press tms-sheen h-9 gap-1.5 rounded-control px-3.5 font-medium" onClick={onNewBooking}>
             <Plus className="size-4" aria-hidden="true" />
             New booking
           </Button>

@@ -120,7 +120,7 @@ export function SettingsPage() {
       >
         {errors.vehicleCategories && <Notice tone="error" className="mb-3">{errors.vehicleCategories}</Notice>}
         {draft.vehicleCategories.length === 0 ? (
-          <p className="text-xs text-stone-500">No categories configured. Vehicle registration is blocked until at least one exists.</p>
+          <p className="text-xs text-muted-foreground">No categories configured. Vehicle registration is blocked until at least one exists.</p>
         ) : (
           <ul className="space-y-2">
             {draft.vehicleCategories.map((cat, i) => (
@@ -175,7 +175,7 @@ export function SettingsPage() {
         actions={editable ? <Button onClick={() => update({ shifts: [...draft.shifts, { id: "", name: "", startTime: "", endTime: "" }] })}>Add shift</Button> : undefined}
       >
         {draft.shifts.length === 0 ? (
-          <p className="text-xs text-stone-500">No shifts configured.</p>
+          <p className="text-xs text-muted-foreground">No shifts configured.</p>
         ) : (
           <ul className="space-y-3">
             {draft.shifts.map((shift, i) => (
@@ -205,7 +205,7 @@ export function SettingsPage() {
         actions={editable ? <Button onClick={() => update({ workTypes: [...draft.workTypes, ""] })}>Add work type</Button> : undefined}
       >
         {draft.workTypes.length === 0 ? (
-          <p className="text-xs text-stone-500">No work types configured. A work order cannot be raised until at least one exists.</p>
+          <p className="text-xs text-muted-foreground">No work types configured. A work order cannot be raised until at least one exists.</p>
         ) : (
           <ul className="space-y-2">
             {draft.workTypes.map((name, i) => (
@@ -235,7 +235,7 @@ export function SettingsPage() {
         actions={editable ? <Button onClick={() => update({ costCategories: [...draft.costCategories, ""] })}>Add cost category</Button> : undefined}
       >
         {draft.costCategories.length === 0 ? (
-          <p className="text-xs text-stone-500">No cost categories configured. Costs can still be recorded, and are counted as uncategorised.</p>
+          <p className="text-xs text-muted-foreground">No cost categories configured. Costs can still be recorded, and are counted as uncategorised.</p>
         ) : (
           <ul className="space-y-2">
             {draft.costCategories.map((name, i) => (
@@ -332,12 +332,12 @@ export function SettingsPage() {
         </div>
         <div className="mt-4">
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">Payment methods</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Payment methods</span>
             {editable && <Button onClick={() => update({ rental: { ...draft.rental, paymentMethods: [...draft.rental.paymentMethods, ""] } })}>Add method</Button>}
           </div>
           {errors["rental.paymentMethods"] && <Notice tone="error" className="mb-2">{errors["rental.paymentMethods"]}</Notice>}
           {draft.rental.paymentMethods.length === 0 ? (
-            <p className="text-xs text-stone-500">None configured. Deposit recording is blocked until at least one method exists.</p>
+            <p className="text-xs text-muted-foreground">None configured. Deposit recording is blocked until at least one method exists.</p>
           ) : (
             <ul className="space-y-2">
               {draft.rental.paymentMethods.map((method, i) => (
@@ -366,7 +366,7 @@ export function SettingsPage() {
             />
           </Field>
           {draft.rental.quotationTerms.trim() === "" && (
-            <p className="mt-1 text-xs text-stone-600">No terms have been written, so quotations are blocked. Nothing is filled in for you.</p>
+            <p className="mt-1 text-xs text-muted-foreground">No terms have been written, so quotations are blocked. Nothing is filled in for you.</p>
           )}
         </div>
       </Band>
@@ -407,7 +407,7 @@ export function SettingsPage() {
         {draft.taxPosition === "registered" && (
           <div className="mt-4">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">Tax lines</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tax lines</span>
               {editable && (
                 <Button onClick={() => update({ taxLines: [...draft.taxLines, { id: "", name: "", ratePercent: 0 }] })}>
                   Add tax line
@@ -416,7 +416,7 @@ export function SettingsPage() {
             </div>
             {errors.taxLines && <Notice tone="error" className="mb-2">{errors.taxLines}</Notice>}
             {draft.taxLines.length === 0 ? (
-              <p className="text-xs text-stone-500">
+              <p className="text-xs text-muted-foreground">
                 None configured. Invoices cannot be issued while the company is marked VAT registered without at least one line.
               </p>
             ) : (
@@ -471,7 +471,7 @@ export function SettingsPage() {
       >
         {errors.documentTypes && <Notice tone="error" className="mb-3">{errors.documentTypes}</Notice>}
         {draft.documentTypes.length === 0 ? (
-          <p className="text-xs text-stone-500">No document types configured. Document recording is blocked until at least one exists.</p>
+          <p className="text-xs text-muted-foreground">No document types configured. Document recording is blocked until at least one exists.</p>
         ) : (
           <ul className="space-y-2">
             {draft.documentTypes.map((docType, i) => {
@@ -561,7 +561,7 @@ export function SettingsPage() {
         }
       >
         {draft.maintenance.schedules.length === 0 ? (
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-muted-foreground">
             {draft.vehicleCategories.length === 0
               ? "Add a vehicle category first, then schedule it here."
               : "No schedules configured. Fleet readiness reports this as not configured rather than estimating intervals."}
@@ -569,7 +569,7 @@ export function SettingsPage() {
         ) : (
           <ul className="space-y-3">
             {draft.maintenance.schedules.map((schedule, index) => (
-              <li key={schedule.categoryId} className="grid gap-2 rounded-sm border border-stone-200 p-3 sm:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto]">
+              <li key={schedule.categoryId} className="grid gap-2 rounded-sm border border-border p-3 sm:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto]">
                 <Field label="Category">
                   <Select value={schedule.categoryId} disabled>
                     {draft.vehicleCategories.filter((c) => c.id === schedule.categoryId).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -596,7 +596,7 @@ export function SettingsPage() {
             ))}
           </ul>
         )}
-        <div className="mt-3 rounded-sm border border-stone-200 p-3">
+        <div className="mt-3 rounded-sm border border-border p-3">
           <label className="flex items-start gap-2 text-sm">
             <input
               type="checkbox"
@@ -607,7 +607,7 @@ export function SettingsPage() {
             />
             <span>
               <span className="font-medium">Block work on an overdue routine service</span>
-              <span className="mt-1 block text-xs text-stone-600">
+              <span className="mt-1 block text-xs text-muted-foreground">
                 Off by default. While it is off, a vehicle past its interval still goes out and the office is
                 told in the message after assignment or dispatch. While it is on, that vehicle cannot be
                 assigned, dispatched, started or hired until the service is recorded. A safety defect stops
@@ -616,7 +616,7 @@ export function SettingsPage() {
             </span>
           </label>
         </div>
-        <p className="mt-3 text-xs text-stone-500">
+        <p className="mt-3 text-xs text-muted-foreground">
           A service counts as &ldquo;done&rdquo; only when a work order is completed and marked as resetting the interval. The system never infers that from a repair.
         </p>
       </Band>
@@ -687,17 +687,17 @@ export function SettingsPage() {
             />
           </Field>
         </div>
-        <p className="mt-3 text-xs text-stone-500">
+        <p className="mt-3 text-xs text-muted-foreground">
           A cut-off applies to booked seats, not to the standing roster. Neither setting changes the audit trail: every booking
           keeps its own history of who asked, who confirmed and who cancelled.
         </p>
       </Band>
 
       <Band label="Planned settings (not yet modelled)" note="These are open questions for management and will become settings in the phases that need them.">
-        <ul className="grid gap-1 text-xs text-stone-600 sm:grid-cols-2">
+        <ul className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
           {["Refund rules", "VAT, levies and GRA e-VAT", "Retention periods", "Boarding-code policy", "Contract billing frequency and payment terms"].map((q) => (
             <li key={q} className="flex items-center gap-2">
-              <span className="h-1 w-1 rounded-full bg-stone-400" />
+              <span className="h-1 w-1 rounded-full bg-dim" />
               {q}
             </li>
           ))}

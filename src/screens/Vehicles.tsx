@@ -194,7 +194,7 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
                 <span className="text-xs rts-unset">none</span>
               ),
           },
-          { key: "reg", header: "Registration", render: (v) => <span className="font-mono text-xs font-semibold text-stone-900">{v.registration}</span> },
+          { key: "reg", header: "Registration", render: (v) => <span className="font-mono text-xs font-semibold text-foreground">{v.registration}</span> },
           { key: "cat", header: "Category", render: (v) => categoryName(v.categoryId) },
           {
             key: "mm",
@@ -202,9 +202,9 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
             // The vehicle's own line, under the name: what it runs on and whose it is (D-106).
             render: (v) => (
               <>
-                <span className="block">{[v.make, v.model].filter(Boolean).join(" ") || <span className="text-stone-400">-</span>}</span>
+                <span className="block">{[v.make, v.model].filter(Boolean).join(" ") || <span className="text-dim">-</span>}</span>
                 {vehicleDetailLine(v) ? (
-                  <span className="block text-xs text-stone-600">{vehicleDetailLine(v)}</span>
+                  <span className="block text-xs text-muted-foreground">{vehicleDetailLine(v)}</span>
                 ) : (
                   <span className="block text-xs rts-unset">fuel and ownership not recorded</span>
                 )}
@@ -249,7 +249,7 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
               );
             },
           },
-          { key: "upd", header: "Updated", render: (v) => <span className="text-xs text-stone-500">{formatDateTime(v.updatedAt)}</span> },
+          { key: "upd", header: "Updated", render: (v) => <span className="text-xs text-muted-foreground">{formatDateTime(v.updatedAt)}</span> },
           {
             key: "actions",
             header: "",
@@ -371,8 +371,8 @@ function VehicleForm({ initial, title, onClose, onSubmit }: { initial: VehicleIn
 
         {/* FLT-01, D-106: the vehicle itself. Everything here may be left blank — a register that
             refuses to record a bus because nobody knows its fuel is worse than one that says so. */}
-        <fieldset className="space-y-4 rounded-sm border border-stone-200 p-3">
-          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-stone-500">The vehicle itself</legend>
+        <fieldset className="space-y-4 rounded-sm border border-border p-3">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">The vehicle itself</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Fuel type" hint="As the office says it: Diesel, Petrol." error={errors.fuelType}>
               <TextInput value={values.fuelType ?? ""} onChange={(e) => set({ fuelType: e.target.value })} invalid={!!errors.fuelType} />
@@ -437,7 +437,7 @@ function TransitionForm({ vehicle, onClose, onSubmit }: { vehicle: Vehicle; onCl
           )}
         </Notice>
       )}
-      <p className="mt-3 text-xs text-stone-600">
+      <p className="mt-3 text-xs text-muted-foreground">
         Available, in the workshop, off the road and retired are this register's own words, and this panel is where they change.
         On trip, assigned, reserved and pending inspection are read from the runs, the hires and the work orders — they change when
         those records do, never by a status change here.
@@ -527,7 +527,7 @@ function VehiclePhotoForm({ vehicle, onClose }: { vehicle: Vehicle; onClose: () 
             alt={`Photograph of ${vehicle.registration}`}
             className="rts-photo"
           />
-          <figcaption className="mt-2 text-xs text-stone-600">
+          <figcaption className="mt-2 text-xs text-muted-foreground">
             {vehicle.photo.originalName} · {megabytes(vehicle.photo.byteSize)} · {vehiclePhotoLine(vehicle.photo)}
           </figcaption>
         </figure>
@@ -561,7 +561,7 @@ function VehiclePhotoForm({ vehicle, onClose }: { vehicle: Vehicle; onClose: () 
       </form>
 
       {vehicle.photo && (
-        <form onSubmit={remove} className="mt-6 space-y-3 border-t border-stone-200 pt-4">
+        <form onSubmit={remove} className="mt-6 space-y-3 border-t border-border pt-4">
           {!removing ? (
             <div className="flex justify-end">
               <Button variant="danger" onClick={() => setRemoving(true)}>

@@ -167,7 +167,7 @@ export function StatementsPage() {
                           it, so it does not depend on noticing a colour change. */}
                       {customer.name === customerName && <Badge tone="info">Showing</Badge>}
                     </span>
-                    <span className="text-xs text-stone-600">
+                    <span className="text-xs text-muted-foreground">
                       {customer.invoiceCount} invoice{customer.invoiceCount === 1 ? "" : "s"}
                       {customer.oldestDaysOverdue > 0 ? ` · ${customer.oldestDaysOverdue} days late` : " · up to date"}
                     </span>
@@ -180,7 +180,7 @@ export function StatementsPage() {
                 className: "text-right rts-mono",
                 render: (customer) =>
                   customer.currencyCode ? (
-                    <span className={customer.outstanding > 0 ? "font-medium" : "text-stone-500"}>
+                    <span className={customer.outstanding > 0 ? "font-medium" : "text-muted-foreground"}>
                       {money(customer.currencyCode, customer.outstanding)}
                     </span>
                   ) : (
@@ -250,7 +250,7 @@ export function StatementsPage() {
                               <Badge tone={KIND_TONE[row.kind]}>{KIND_LABEL[row.kind]}</Badge>
                               <span className="rts-mono text-xs">{row.reference}</span>
                             </span>
-                            <span className="text-xs text-stone-600">{row.description}</span>
+                            <span className="text-xs text-muted-foreground">{row.description}</span>
                           </span>
                         ),
                       },

@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Command, Plus } from "lucide-react";
+import { Command, Plus, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/tms/AppShell";
 import { CommandPalette } from "@/components/tms/CommandPalette";
 import { PageHeader } from "@/components/tms/PageHeader";
+import { GlidingTabs } from "@/components/tms/GlidingTabs";
 import { StatCard, StatGrid } from "@/components/tms/StatCard";
 import { Panel } from "@/components/tms/Panel";
 import { RingGauge } from "@/components/tms/RingGauge";
@@ -96,6 +97,8 @@ export function DesignGallery() {
   const [range, setRange] = useState<RangeKey>("today");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [motionTab, setMotionTab] = useState("today");
+  const [spotValue, setSpotValue] = useState(18);
 
   const demoColumns = useMemo<TmsColumn<DemoRow>[]>(
     () => [
@@ -163,6 +166,60 @@ export function DesignGallery() {
             <Button size="icon" aria-label="Open the command palette" onClick={() => setPaletteOpen(true)}>
               <Command aria-hidden="true" />
             </Button>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Motion" note="Borrowed from kinetics.colorion.co and animatedbuttons.colorion.co, cut to four moves. All of it stops for reduced motion.">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <div className="tms-surface p-4">
+            <p className="tms-mono text-dim">Sheen</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+              One diagonal highlight crosses the primary action on hover, once. Never loops, never moves a label.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <Button className="tms-press tms-sheen h-9">
+                <Sparkles aria-hidden="true" />
+                Primary with sheen
+              </Button>
+              <Button variant="outline" className="tms-press h-9">
+                Plain press
+              </Button>
+            </div>
+          </div>
+          <div className="tms-surface p-4">
+            <p className="tms-mono text-dim">Gliding pill</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+              The highlight measures the chosen option and travels to it; the labels underneath are the real radio group.
+            </p>
+            <div className="mt-3">
+              <GlidingTabs
+                ariaLabel="Motion sample period"
+                value={motionTab}
+                onChange={setMotionTab}
+                options={[
+                  { key: "today", label: "Today" },
+                  { key: "week", label: "Week" },
+                  { key: "month", label: "Month" },
+                ]}
+              />
+            </div>
+          </div>
+          <div className="tms-surface p-4 xl:col-span-2">
+            <p className="tms-mono text-dim">Spotlight and figure bump</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+              A card warms under the pointer and follows it; a figure that changes says so once with a small spring.
+              Hover a card below and press the button to change a number.
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <StatCard kpi={{ key: "spot", label: "Spotlight sample", value: String(spotValue), delta: { value: "1", trend: "up", caption: "press to add one" } }} />
+              <div className="tms-surface tms-spotlight flex flex-col items-start justify-center gap-2 p-4">
+                <p className="text-[13px] text-muted-foreground">Every card that carries the class follows the pointer.</p>
+                <Button size="sm" variant="outline" onClick={() => setSpotValue((value) => value + 1)}>
+                  Add one
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </Section>

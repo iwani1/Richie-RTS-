@@ -4,28 +4,21 @@ import {
   Building2,
   CalendarClock,
   ChartColumn,
-  ChevronRight,
   CircleUser,
   ClipboardList,
   Gauge,
-  LogOut,
-  Menu,
   type LucideIcon,
   PanelsTopLeft,
   Receipt,
   Route as RouteIcon,
-  Search,
   Settings2,
   ShieldCheck,
   Truck,
   Users,
   Wallet,
 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { AppFrame, type FrameGroup } from "@/components/tms/AppFrame";
 import { AuditPage } from "./screens/Audit";
 import { SetupPage, SignInPage } from "./screens/Auth";
 import { DashboardPage } from "./screens/Dashboard";
@@ -61,7 +54,6 @@ import { ROLE_LABELS } from "./tms/types";
 import { TmsContext, useTms, useTmsState } from "./tms/useTms";
 import { Notice } from "./ui/primitives";
 import { CommandPalette } from "./ui/CommandPalette";
-import { cn } from "@/lib/utils";
 
 const NAV_GROUPS: { label: string; routes: Route[] }[] = [
   { label: "My desk", routes: ["driver_portal", "client_portal", "passenger_portal"] },
@@ -97,16 +89,6 @@ const ROUTE_ICONS: Record<Route, LucideIcon> = {
   client_portal: Building2,
   passenger_portal: BusFront,
 };
-
-function initialsOf(name: string | undefined): string {
-  if (!name) return "RT";
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 export default function App() {
   const tms = useTmsState();
@@ -184,7 +166,6 @@ function Shell() {
   const homeRoute: Route = actor?.role === "finance" ? "finance" : (portalRoute ?? "dashboard");
   const bound = actor ? isRecordBound(actor.role) : false;
   const [requestedRoute, setRoute] = useState<Route>(homeRoute);
-  const [navOpen, setNavOpen] = useState(false);
   // The board carries a clock because a dispatcher reads this screen against the wall clock. It is
   // rendered only after mount, so the server and the first client render cannot disagree.
   const [clock, setClock] = useState<string | null>(null);
@@ -200,7 +181,6 @@ function Shell() {
 
   const navigate = (next: Route) => {
     setRoute(next);
-    setNavOpen(false);
     window.scrollTo({ top: 0 });
   };
 
@@ -264,7 +244,6 @@ function Shell() {
       .filter((item): item is (typeof items)[number] => Boolean(item)),
   })).filter((group) => group.items.length > 0);
 
-  const todayLabel = new Date().toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 
   // Counts beside the destinations. Each one is a number the section can back up: rentals waiting
   // on us, runs not yet dispatched today, vehicles past their service interval, warnings on
@@ -292,187 +271,57 @@ function Shell() {
   const currentLabel = items.find((item) => item.route === route)?.label ?? "Dashboard";
   const currentGroup = visibleGroups.find((group) => group.items.some((item) => item.route === route))?.label ?? "Operations";
 
-  // One sidebar, rendered once and used twice: fixed on a desk, inside a sheet on a phone.
-  const rail = (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2.5 px-4 py-4">
-        <span className="grid size-8 place-items-center rounded-lg bg-primary text-[13px] font-semibold text-primary-foreground">R</span>
-        <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-sidebar-accent-foreground">Richie TMS</p>
-          <p className="truncate text-[11px] text-sidebar-foreground/70" title={db.settings.companyName ?? "Richie Transport Services"}>
-            {db.settings.companyName ?? "Richie Transport Services"}
-          </p>
-        </div>
-      </div>
+  const groups: FrameGroup[] = visibleGroups.map((group) => ({
+    label: group.label,
+    items: group.items.map((item) => ({
+      key: item.route,
+      label: item.label,
+      caption: item.caption,
+      icon: ROUTE_ICONS[item.route],
+      count: counts[item.route] ?? 0,
+    })),
+  }));
 
-      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2" aria-label="Sections">
-        {visibleGroups.map((group) => (
-          <div key={group.label} className="mb-4">
-            <p className="px-2 pb-1.5 font-mono text-[9.5px] font-medium tracking-[0.13em] text-sidebar-foreground/55 uppercase">{group.label}</p>
-            <ul className="space-y-0.5">
-              {group.items.map((item) => {
-                const active = route === item.route;
-                const count = counts[item.route] ?? 0;
-                const Glyph = ROUTE_ICONS[item.route];
-                return (
-                  <li key={item.route}>
-                    <button
-                      type="button"
-                      onClick={() => navigate(item.route)}
-                      aria-current={active ? "page" : undefined}
-                      title={`${item.label} — ${item.caption}`}
-                      className={cn(
-                        "group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] transition-colors",
-                        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                        active
-                          ? "bg-primary/12 font-semibold text-sidebar-accent-foreground"
-                          : "font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                      )}
-                    >
-                      <Glyph className={cn("size-4 shrink-0", active ? "text-primary" : "text-sidebar-foreground/60")} aria-hidden="true" />
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      {count > 0 && (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "h-5 min-w-5 justify-center rounded-md border-transparent px-1.5 font-mono text-[10px] tabular-nums",
-                            active ? "bg-primary text-primary-foreground" : "bg-sidebar-accent text-sidebar-accent-foreground",
-                          )}
-                        >
-                          {count}
-                        </Badge>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
-
-      <div className="mt-auto space-y-2 border-t border-sidebar-border px-2 py-3">
-        <button
-          type="button"
-          onClick={openPalette}
-          aria-keyshortcuts="Control+K Meta+K"
-          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[12.5px] font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-          <Search className="size-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
-          <span className="flex-1 text-left">Jump to a screen</span>
-          <kbd className="rounded border border-sidebar-border px-1 font-mono text-[9.5px] text-sidebar-foreground/70">Ctrl K</kbd>
-        </button>
-
-        <div className="flex items-center justify-between px-2">
-          <span className="font-mono text-[13px] tabular-nums text-sidebar-accent-foreground" aria-label={clock ? `Current time ${clock}` : undefined}>
-            {clock ?? "--:--"}
-          </span>
-          <span className="text-[10.5px] text-sidebar-foreground/60">{todayLabel}</span>
-        </div>
-
-        <Separator className="bg-sidebar-border" />
-
-        <div className="flex items-center gap-2.5 px-2">
-          <Avatar className="size-7">
-            <AvatarFallback className="bg-sidebar-accent text-[10px] font-semibold text-sidebar-accent-foreground">
-              {initialsOf(actor?.fullName)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] font-medium text-sidebar-accent-foreground">{actor?.fullName}</p>
-            <p className="truncate text-[10.5px] text-sidebar-foreground/60">{actor ? ROLE_LABELS[actor.role] : "Unknown role"}</p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => void signOut()}
-            aria-label="Sign out"
-            title="Sign out"
-            className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <LogOut aria-hidden="true" />
+  const banner = (
+    <>
+      {connectionError && (
+        <Notice tone="error" className="mb-4">
+          {connectionError}
+        </Notice>
+      )}
+      {flash && (
+        <div className="mb-4 flex items-start gap-2">
+          <Notice tone={flash.tone} className="flex-1">
+            {flash.message}
+          </Notice>
+          <Button variant="ghost" onClick={() => setFlash(null)} aria-label="Dismiss">
+            Dismiss
           </Button>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 
   return (
-    <div className="min-h-dvh bg-background" data-route={route}>
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:shadow-md"
+    <>
+      <AppFrame
+        groups={groups}
+        activeKey={route}
+        onNavigate={(key) => navigate(key as Route)}
+        crumbs={[currentGroup, currentLabel]}
+        user={{ name: actor?.fullName ?? "Signed in", role: actor ? ROLE_LABELS[actor.role] : "Unknown role" }}
+        onSignOut={() => void signOut()}
+        onOpenPalette={openPalette}
+        busy={busy}
+        clock={clock}
+        company={db.settings.companyName ?? "Richie Transport Services"}
+        banner={banner}
+        dataRoute={route}
       >
-        Skip to content
-      </a>
-
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-sidebar-border lg:block" aria-label="Main">
-        {rail}
-      </aside>
-
-      <Sheet open={navOpen} onOpenChange={setNavOpen}>
-        <SheetContent side="left" className="w-72 border-sidebar-border bg-sidebar p-0" aria-label="Main">
-          <SheetTitle className="sr-only">Sections</SheetTitle>
-          {rail}
-        </SheetContent>
-      </Sheet>
-
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-card/95 px-4 backdrop-blur-none lg:px-7">
-          <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={() => setNavOpen(true)} aria-label="Open navigation" aria-expanded={navOpen}>
-            <Menu aria-hidden="true" />
-          </Button>
-
-          <div className="flex min-w-0 items-center gap-1.5 font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-            <span className="hidden sm:inline">{currentGroup}</span>
-            <ChevronRight className="hidden size-3 sm:inline" aria-hidden="true" />
-            <span className="truncate text-foreground">{currentLabel}</span>
-          </div>
-
-          <div className="ml-auto flex items-center gap-2">
-            {busy && (
-              <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-muted-foreground" role="status">
-                <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden="true" />
-                Saving
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={openPalette}
-              aria-keyshortcuts="Control+K Meta+K"
-              className="hidden items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-[12px] text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:flex"
-            >
-              <Search className="size-3.5" aria-hidden="true" />
-              <span>Search or jump to a screen</span>
-              <kbd className="rounded border border-border px-1 font-mono text-[9.5px]">Ctrl K</kbd>
-            </button>
-            <Avatar className="size-7" title={actor ? `${actor.fullName} — ${ROLE_LABELS[actor.role]}` : "Signed in"}>
-              <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">{initialsOf(actor?.fullName)}</AvatarFallback>
-            </Avatar>
-            <span className="sr-only">Signed in as {actor?.fullName ?? "an operator"}</span>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-[1440px] px-4 py-5 pb-10 lg:px-7" id="main-content">
-          {connectionError && <Notice tone="error" className="mb-4">{connectionError}</Notice>}
-          {flash && (
-            <div className="mb-4 flex items-start gap-2">
-              <Notice tone={flash.tone} className="flex-1">{flash.message}</Notice>
-              <Button variant="ghost" onClick={() => setFlash(null)} aria-label="Dismiss">
-                Dismiss
-              </Button>
-            </div>
-          )}
-          <div className="min-h-[40vh]">{page}</div>
-          <footer className="mt-10 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-4 text-[11.5px] text-muted-foreground">
-            <span>Richie Transport Services · Operations workspace</span>
-            <span>Every change is attributed and audit-logged</span>
-            <span className="font-mono">build {process.env.NEXT_PUBLIC_BUILD ?? "unknown"}</span>
-          </footer>
-        </main>
-      </div>
+        {page}
+      </AppFrame>
 
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} onNavigate={navigate} allowed={allowed} />}
-    </div>
+    </>
   );
 }

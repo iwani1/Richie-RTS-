@@ -256,7 +256,7 @@ export function ExpensesPage() {
                   />
                 }
                 columns={[
-                  { key: "ref", header: "Expense", render: (expense) => <span className="rts-mono text-xs font-semibold text-stone-900">{expense.reference}</span> },
+                  { key: "ref", header: "Expense", render: (expense) => <span className="rts-mono text-xs font-semibold text-foreground">{expense.reference}</span> },
                   { key: "date", header: "Spent", render: (expense) => formatDate(expense.incurredOn) },
                   { key: "category", header: "Category", render: (expense) => expense.category || <em className="rts-unset">Uncategorised</em> },
                   {
@@ -264,9 +264,9 @@ export function ExpensesPage() {
                     header: "What for",
                     render: (expense) => (
                       <span className="flex flex-col">
-                        <span className="text-xs font-medium text-stone-800">{expense.description}</span>
-                        {expense.payee && <span className="text-xs text-stone-600">paid to {expense.payee}</span>}
-                        {expense.status === "void" && <span className="text-xs text-stone-600">Void: {expense.voidReason ?? "no reason recorded"}</span>}
+                        <span className="text-xs font-medium text-foreground">{expense.description}</span>
+                        {expense.payee && <span className="text-xs text-muted-foreground">paid to {expense.payee}</span>}
+                        {expense.status === "void" && <span className="text-xs text-muted-foreground">Void: {expense.voidReason ?? "no reason recorded"}</span>}
                       </span>
                     ),
                   },
@@ -280,7 +280,7 @@ export function ExpensesPage() {
                             <span className="rts-mono text-xs">{expense.receiptReference}</span>
                             <CopyButton value={expense.receiptReference} what="receipt number" />
                           </span>
-                          <span className="text-xs text-stone-600">{expense.receiptHeld ? "paper held" : "paper not held"}</span>
+                          <span className="text-xs text-muted-foreground">{expense.receiptHeld ? "paper held" : "paper not held"}</span>
                         </span>
                       ) : (
                         <em className="rts-unset">no number</em>
@@ -305,7 +305,7 @@ export function ExpensesPage() {
                                   >
                                     Open scan
                                   </a>
-                                  <span className="text-xs text-stone-600">{scan.originalName}</span>
+                                  <span className="text-xs text-muted-foreground">{scan.originalName}</span>
                                 </span>
                               );
                             }
@@ -329,7 +329,7 @@ export function ExpensesPage() {
                     className: "text-right rts-mono",
                     render: (expense) =>
                       expense.status === "void" ? (
-                        <span className="text-stone-500 line-through">{money(expense.currencyCode, expense.amount)}</span>
+                        <span className="text-muted-foreground line-through">{money(expense.currencyCode, expense.amount)}</span>
                       ) : (
                         money(expense.currencyCode, expense.amount)
                       ),
@@ -366,7 +366,7 @@ export function ExpensesPage() {
               />
             </TableCard>
 
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-muted-foreground">
               Costs recorded against an incident or a work order live in Staff logistics and are entered there. Both kinds are added into the money report's
               cost figure and into cost per trip, so the two screens cannot tell different stories.
               {mayReadScans
@@ -495,7 +495,7 @@ function RecordExpenseForm({
             <TextInput value={values.receiptReference} onChange={(event) => setValues({ ...values, receiptReference: event.target.value })} invalid={!!errors.receiptReference} />
           </Field>
         </div>
-        <label className="flex items-start gap-2 text-sm text-stone-700">
+        <label className="flex items-start gap-2 text-sm text-foreground">
           <input
             type="checkbox"
             className="mt-0.5"

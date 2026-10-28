@@ -1,5 +1,9 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSpotlight } from "./useSpotlight";
 import type { Kpi } from "@/lib/mock/types";
 
 const TREND = {
@@ -34,14 +38,28 @@ export function StatCard({ kpi, index = 0, className }: { kpi: Kpi; index?: numb
   const delta = kpi.delta;
   const trend = delta ? TREND[delta.trend] : null;
   const TrendIcon = trend?.icon;
+  const spotlight = useSpotlight<HTMLElement>();
+
+  // A figure that changes says so once: the value is re-keyed so the bump replays, and the first
+  // render is silent — nothing bounces just because a page opened.
+  const firstValue = useRef(kpi.value);
+  const [pulse, setPulse] = useState(0);
+  useEffect(() => {
+    if (firstValue.current === kpi.value) return;
+    firstValue.current = kpi.value;
+    setPulse((count) => count + 1);
+  }, [kpi.value]);
 
   return (
     <article
-      className={cn("tms-surface tms-lift tms-stagger animate-fade-up group relative overflow-hidden p-4", className)}
+      className={cn("tms-surface tms-lift tms-spotlight tms-stagger animate-fade-up group relative overflow-hidden p-4", className)}
       style={{ ["--stagger" as string]: index }}
+      onPointerMove={spotlight.onPointerMove}
     >
       <p className="tms-mono text-muted-foreground">{kpi.label}</p>
-      <p className="mt-2 text-[30px] leading-none font-semibold tracking-[-0.03em] text-foreground tabular-nums">{kpi.value}</p>
+      <p key={pulse} className={cn("mt-2 inline-block text-[30px] leading-none font-semibold tracking-[-0.03em] text-foreground tabular-nums", pulse > 0 && "animate-bump")}>
+        {kpi.value}
+      </p>
       <div className="mt-2.5 flex min-h-5 items-center gap-2">
         {delta && trend && TrendIcon && (
           <>

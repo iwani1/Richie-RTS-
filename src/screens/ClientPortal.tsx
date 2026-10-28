@@ -210,7 +210,7 @@ export function ClientPortalPage() {
                     { key: "date", header: "Date", render: (row: ClientPaymentRow) => <span className="text-xs">{formatDate(row.paidOn)}</span> },
                     { key: "ref", header: "Payment", render: (row: ClientPaymentRow) => <span className="font-mono text-xs">{row.reference}</span> },
                     { key: "against", header: "Against", render: (row: ClientPaymentRow) => <span className="font-mono text-xs">{row.invoiceReference}</span> },
-                    { key: "method", header: "Method", render: (row: ClientPaymentRow) => row.method || <span className="text-stone-400">not recorded</span> },
+                    { key: "method", header: "Method", render: (row: ClientPaymentRow) => row.method || <span className="text-dim">not recorded</span> },
                     { key: "amount", header: "Amount", render: (row: ClientPaymentRow) => <span className="font-medium">{money(row.currencyCode, row.amount)}</span> },
                   ]}
                 />
@@ -235,7 +235,7 @@ export function ClientPortalPage() {
                       render: (row: ClientAdjustmentRow) => (
                         <span>
                           <span className="font-mono text-xs">{row.reference}</span>{" "}
-                          <span className="text-xs text-stone-600">{row.kind === "creditNote" ? "credit note" : "refund"}</span>
+                          <span className="text-xs text-muted-foreground">{row.kind === "creditNote" ? "credit note" : "refund"}</span>
                         </span>
                       ),
                     },
@@ -260,15 +260,15 @@ export function ClientPortalPage() {
                   .map((contract) => {
                     const state = contractStateOf(contract, todayYmd());
                     return (
-                      <li key={contract.id} className="rounded-sm border border-stone-200 p-3">
+                      <li key={contract.id} className="rounded-sm border border-border p-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rts-mono text-xs font-semibold">{contract.reference}</span>
                           <Badge tone={state === "active" ? "success" : state === "draft" || state === "terminated" ? "neutral" : "warning"}>
                             {CONTRACT_STATUS_LABELS[state]}
                           </Badge>
-                          <span className="text-xs text-stone-600">{CONTRACT_SERVICE_LABELS[contract.serviceType]}</span>
+                          <span className="text-xs text-muted-foreground">{CONTRACT_SERVICE_LABELS[contract.serviceType]}</span>
                         </div>
-                        <p className="mt-1 text-sm text-stone-700">
+                        <p className="mt-1 text-sm text-foreground">
                           {contract.endDate ? `${formatDate(contract.startDate)} to ${formatDate(contract.endDate)}` : `From ${formatDate(contract.startDate)}, open-ended`}
                         </p>
                       </li>
@@ -293,16 +293,16 @@ export function ClientPortalPage() {
                     const route = view.routes.find((candidate) => candidate.id === trip.routeId);
                     const late = liveDelay(trip);
                     return (
-                      <li key={trip.id} className="rounded-sm border border-stone-200 px-3 py-2">
+                      <li key={trip.id} className="rounded-sm border border-border px-3 py-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-xs font-semibold">{trip.reference}</span>
                           <span className="text-sm font-medium">{route?.name ?? "Route"}</span>
-                          <span className="text-xs text-stone-500">leaves {route?.stops[0]?.scheduledTime ?? "—"}</span>
+                          <span className="text-xs text-muted-foreground">leaves {route?.stops[0]?.scheduledTime ?? "—"}</span>
                           <Badge tone={TRIP_TONE[trip.status]}>{TRIP_STATUS_LABELS[trip.status]}</Badge>
                         </div>
-                        {late && <p className="mt-1 text-sm text-stone-700">{delayNote(late)}</p>}
+                        {late && <p className="mt-1 text-sm text-foreground">{delayNote(late)}</p>}
                         {trip.status === "cancelled" && trip.cancelReason && (
-                          <p className="mt-1 text-sm text-stone-700">Cancelled: {trip.cancelReason}.</p>
+                          <p className="mt-1 text-sm text-foreground">Cancelled: {trip.cancelReason}.</p>
                         )}
                       </li>
                     );
@@ -319,25 +319,25 @@ export function ClientPortalPage() {
             ) : (
               <ul className="space-y-3">
                 {view.routes.map((route) => (
-                  <li key={route.id} className="rounded-sm border border-stone-200 p-3">
+                  <li key={route.id} className="rounded-sm border border-border p-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-semibold">{route.reference}</span>
                       <span className="font-semibold">{route.name}</span>
                       <Badge tone="neutral">{DIRECTION_LABELS[route.direction]}</Badge>
                       <Badge tone={route.status === "active" ? "success" : route.status === "suspended" ? "warning" : "neutral"}>{route.status}</Badge>
-                      <span className="text-xs text-stone-500">{dayList(route.weekdays)}</span>
+                      <span className="text-xs text-muted-foreground">{dayList(route.weekdays)}</span>
                     </div>
                     <ol className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
                       {route.stops.map((stop, index) => (
                         <li key={stop.id} className="flex items-baseline gap-2 text-sm">
-                          <span className="w-5 text-right font-mono text-xs text-stone-400">{index + 1}.</span>
+                          <span className="w-5 text-right font-mono text-xs text-dim">{index + 1}.</span>
                           <span className="flex-1">
                             {stop.name}
                             {/* RTE-01: the customer should recognise the place its staff are collected
                                 from. Only the directions travel; coordinates are the office's business. */}
-                            {stopDetailLine(stop) && <span className="block text-xs text-stone-600">{stopDetailLine(stop)}</span>}
+                            {stopDetailLine(stop) && <span className="block text-xs text-muted-foreground">{stopDetailLine(stop)}</span>}
                           </span>
-                          <span className="font-mono text-xs text-stone-500">{stop.scheduledTime}</span>
+                          <span className="font-mono text-xs text-muted-foreground">{stop.scheduledTime}</span>
                         </li>
                       ))}
                     </ol>
@@ -362,7 +362,7 @@ export function ClientPortalPage() {
                     {
                       key: "route",
                       header: "Route",
-                      render: (p: Passenger) => (p.routeId ? view.routes.find((r) => r.id === p.routeId)?.name ?? "-" : <span className="text-stone-400">not on a route</span>),
+                      render: (p: Passenger) => (p.routeId ? view.routes.find((r) => r.id === p.routeId)?.name ?? "-" : <span className="text-dim">not on a route</span>),
                     },
                     {
                       key: "stop",
@@ -404,7 +404,7 @@ export function ClientPortalPage() {
                             sum of the lines with the tax and the discount left to be discovered later. */}
                         <span className="font-medium">{money(r.quote.currencyCode, r.quote.total)}</span>
                         {(r.quote.discountAmount > 0 || r.quote.taxLines.length > 0) && (
-                          <span className="block text-[11px] text-stone-600">
+                          <span className="block text-[11px] text-muted-foreground">
                             {r.quote.discountAmount > 0 ? `${money(r.quote.currencyCode, r.quote.discountAmount)} discount` : ""}
                             {r.quote.discountAmount > 0 && r.quote.taxLines.length > 0 ? " · " : ""}
                             {r.quote.taxLines.map((line) => `${line.name} ${money(r.quote!.currencyCode, line.amount)}`).join(" · ")}
@@ -412,17 +412,17 @@ export function ClientPortalPage() {
                         )}
                         {/* D-117: the number the customer can quote back, and how long the price holds. */}
                         {quotationIsNumbered(r.quote) && (
-                          <span className="block font-mono text-[11px] text-stone-600">
+                          <span className="block font-mono text-[11px] text-muted-foreground">
                             {r.quote.number} · revision {r.quote.revision}
                           </span>
                         )}
-                        <span className="block text-xs text-stone-600">
+                        <span className="block text-xs text-muted-foreground">
                           Deposit {money(r.quote.currencyCode, r.quote.depositRequired)} · {validityLine(r.quote.validUntil, nowIso)}
                         </span>
-                        {acceptanceLine(r, nowIso) && <span className="block text-xs text-stone-700">{acceptanceLine(r, nowIso)}</span>}
+                        {acceptanceLine(r, nowIso) && <span className="block text-xs text-foreground">{acceptanceLine(r, nowIso)}</span>}
                       </span>
                     ) : (
-                      <span className="text-stone-500">No quotation yet</span>
+                      <span className="text-muted-foreground">No quotation yet</span>
                     ),
                 },
                 {
@@ -506,40 +506,40 @@ function AcceptQuotation({
     <Panel title={`Accept the quotation for ${rental.reference}`} description="This records your agreement to the price below. The office still confirms the vehicle and the deposit." onClose={onClose}>
       <div className="space-y-4">
         <dl className="grid grid-cols-[140px_1fr] gap-y-2 text-sm">
-          <dt className="text-stone-500">Hire</dt>
-          <dd className="text-stone-800">{rental.purpose}</dd>
-          <dt className="text-stone-500">Dates</dt>
-          <dd className="text-stone-800">{formatDate(rental.startDate)} – {formatDate(rental.endDate)}</dd>
+          <dt className="text-muted-foreground">Hire</dt>
+          <dd className="text-foreground">{rental.purpose}</dd>
+          <dt className="text-muted-foreground">Dates</dt>
+          <dd className="text-foreground">{formatDate(rental.startDate)} – {formatDate(rental.endDate)}</dd>
           {/* D-121: the figure the customer is agreeing to, which is the total after discount and tax. */}
-          <dt className="text-stone-500">Total</dt>
-          <dd className="font-semibold text-stone-900">{money(quote.currencyCode, quote.total)}</dd>
+          <dt className="text-muted-foreground">Total</dt>
+          <dd className="font-semibold text-foreground">{money(quote.currencyCode, quote.total)}</dd>
           {quote.discountAmount > 0 && (
             <>
-              <dt className="text-stone-500">Discount</dt>
-              <dd className="text-stone-800">{money(quote.currencyCode, quote.discountAmount)}</dd>
+              <dt className="text-muted-foreground">Discount</dt>
+              <dd className="text-foreground">{money(quote.currencyCode, quote.discountAmount)}</dd>
             </>
           )}
           {quote.taxLines.map((line) => (
             <span key={line.name} className="contents">
-              <dt className="text-stone-500">{line.name} at {line.ratePercent}%</dt>
-              <dd className="text-stone-800">{money(quote.currencyCode, line.amount)}</dd>
+              <dt className="text-muted-foreground">{line.name} at {line.ratePercent}%</dt>
+              <dd className="text-foreground">{money(quote.currencyCode, line.amount)}</dd>
             </span>
           ))}
-          <dt className="text-stone-500">Deposit</dt>
-          <dd className="text-stone-800">{money(quote.currencyCode, quote.depositRequired)} ({quote.depositPercent}%)</dd>
-          <dt className="text-stone-500">Held until</dt>
-          <dd className="text-stone-800">{formatDateTime(quote.validUntil)} ({validityLine(quote.validUntil, new Date().toISOString()).toLowerCase()})</dd>
+          <dt className="text-muted-foreground">Deposit</dt>
+          <dd className="text-foreground">{money(quote.currencyCode, quote.depositRequired)} ({quote.depositPercent}%)</dd>
+          <dt className="text-muted-foreground">Held until</dt>
+          <dd className="text-foreground">{formatDateTime(quote.validUntil)} ({validityLine(quote.validUntil, new Date().toISOString()).toLowerCase()})</dd>
           {quotationIsNumbered(quote) && (
             <>
-              <dt className="text-stone-500">Quotation</dt>
-              <dd className="font-mono text-xs text-stone-800">{quote.number} · revision {quote.revision}</dd>
+              <dt className="text-muted-foreground">Quotation</dt>
+              <dd className="font-mono text-xs text-foreground">{quote.number} · revision {quote.revision}</dd>
             </>
           )}
         </dl>
         {quote.terms && (
           <div>
-            <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Terms</h3>
-            <p className="whitespace-pre-line text-xs text-stone-700">{quote.terms}</p>
+            <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Terms</h3>
+            <p className="whitespace-pre-line text-xs text-foreground">{quote.terms}</p>
           </div>
         )}
         <Field label="Anything to add? (optional)" error={errors.note} hint="For example a pickup time, or who will travel.">

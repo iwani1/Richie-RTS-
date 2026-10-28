@@ -128,17 +128,17 @@ function CostSection({
   };
 
   return (
-    <section className="border-t border-stone-200 pt-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">{title}</h3>
+    <section className="border-t border-border pt-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
       {entries.length === 0 ? (
-        <p className="mt-2 text-sm text-stone-500">No costs recorded. An empty list means nothing was entered, not that the cost was zero.</p>
+        <p className="mt-2 text-sm text-muted-foreground">No costs recorded. An empty list means nothing was entered, not that the cost was zero.</p>
       ) : (
         <ul className="mt-2 space-y-2">
           {entries.map((cost) => (
-            <li key={cost.id} className="flex items-start justify-between gap-3 rounded-sm border border-stone-200 px-3 py-2">
+            <li key={cost.id} className="flex items-start justify-between gap-3 rounded-sm border border-border px-3 py-2">
               <div>
-                <p className="text-sm font-medium text-stone-900">{cost.description}</p>
-                <p className="text-xs text-stone-500">
+                <p className="text-sm font-medium text-foreground">{cost.description}</p>
+                <p className="text-xs text-muted-foreground">
                   {cost.category ? `${cost.category} · ` : "Uncategorised · "}
                   {formatDate(cost.incurredDate)} · recorded by {cost.recordedBy}
                 </p>
@@ -153,7 +153,7 @@ function CostSection({
       )}
 
       {canRecord && !disabled && (
-        <form onSubmit={submit} className="mt-3 rounded-sm bg-stone-50 p-3">
+        <form onSubmit={submit} className="mt-3 rounded-sm bg-muted p-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="What was the cost for?" error={errors.description}>
               <TextInput value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} invalid={!!errors.description} />
@@ -234,13 +234,13 @@ function IncidentsTab({ onRaiseWorkOrder }: { onRaiseWorkOrder: () => void }) {
         rowKey={(i) => i.id}
         emptyState={<EmptyState title={db.incidents.length ? "No incidents match" : "No incidents reported"} body="Report a breakdown, accident, damage or safety concern so that the response and its cost can be tracked." />}
         columns={[
-          { key: "ref", header: "Ref", render: (i) => <span className="font-mono text-xs font-semibold text-stone-900">{i.reference}</span> },
+          { key: "ref", header: "Ref", render: (i) => <span className="font-mono text-xs font-semibold text-foreground">{i.reference}</span> },
           { key: "type", header: "Type", render: (i) => <span className="font-medium">{INCIDENT_TYPE_LABELS[i.type]}</span> },
           { key: "vehicle", header: "Vehicle", render: (i) => vehicleReg(i.vehicleId) },
           { key: "date", header: "Reported", render: (i) => formatDate(i.reportedDate) },
           { key: "severity", header: "Severity", render: (i) => <Badge tone={i.severity === "critical" || i.severity === "high" ? "error" : i.severity === "medium" ? "warning" : "neutral"}>{INCIDENT_SEVERITY_LABELS[i.severity]}</Badge> },
           { key: "status", header: "Status", render: (i) => <Badge tone={INCIDENT_TONE[i.status]}>{INCIDENT_STATUS_LABELS[i.status]}</Badge> },
-          { key: "costs", header: "Costs", render: (i) => (i.costEntries.length ? <span className="tabular-nums">{i.costEntries.length}</span> : <span className="text-stone-400">none recorded</span>) },
+          { key: "costs", header: "Costs", render: (i) => (i.costEntries.length ? <span className="tabular-nums">{i.costEntries.length}</span> : <span className="text-dim">none recorded</span>) },
           {
             key: "actions",
             header: "",
@@ -408,11 +408,11 @@ function IncidentForm({ incident, onClose }: { incident: Incident | null; onClos
         <Field label="Responding to this (optional)" hint="Name of the person or team handling it." error={errors.assignedTo}>
           <TextInput value={values.assignedTo} onChange={(e) => setValues({ ...values, assignedTo: e.target.value })} invalid={!!errors.assignedTo} />
         </Field>
-        <label className="flex items-start gap-2 rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm">
+        <label className="flex items-start gap-2 rounded-sm border border-border bg-muted p-3 text-sm">
           <input type="checkbox" className="mt-0.5" checked={values.takeVehicleOutOfService} onChange={(e) => setValues({ ...values, takeVehicleOutOfService: e.target.checked })} />
           <span>
             <span className="font-medium">Take the vehicle out of service now</span>
-            <span className="mt-0.5 block text-xs text-stone-500">
+            <span className="mt-0.5 block text-xs text-muted-foreground">
               This removes it from trip and rental assignment immediately. Choose it when the vehicle should not be dispatched. You decide again when the incident is resolved.
             </span>
           </span>
@@ -472,17 +472,17 @@ function IncidentDetail({ incident, onClose, onRaiseWorkOrder }: { incident: Inc
           {current.vehicleRestoredTo && <Badge tone="neutral">Vehicle: {current.vehicleRestoredTo.replace("_", " ")}</Badge>}
         </div>
 
-        <p className="text-sm text-stone-700">{current.description}</p>
+        <p className="text-sm text-foreground">{current.description}</p>
         {current.resolutionNote && (
-          <p className="rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm"><span className="font-medium">Resolution: </span>{current.resolutionNote}</p>
+          <p className="rounded-sm border border-border bg-muted p-3 text-sm"><span className="font-medium">Resolution: </span>{current.resolutionNote}</p>
         )}
 
         {linked.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Linked work orders</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Linked work orders</h3>
             <ul className="mt-2 space-y-1">
               {linked.map((w) => (
-                <li key={w.id} className="flex items-center justify-between rounded-sm border border-stone-200 px-3 py-2 text-sm">
+                <li key={w.id} className="flex items-center justify-between rounded-sm border border-border px-3 py-2 text-sm">
                   <span className="font-mono text-xs">{w.reference}</span>
                   <span className="flex-1 px-2">{w.title}</span>
                   <Badge tone={WORK_ORDER_TONE[w.status]}>{WORK_ORDER_STATUS_LABELS[w.status]}</Badge>
@@ -493,13 +493,13 @@ function IncidentDetail({ incident, onClose, onRaiseWorkOrder }: { incident: Inc
         )}
 
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Response log</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Response log</h3>
           <ol className="mt-2 space-y-2">
             {current.log.map((entry) => (
-              <li key={entry.id} className="border-l-2 border-stone-200 pl-3">
-                <p className="text-xs text-stone-500">{formatDateTime(entry.at)} · {entry.actorName}</p>
+              <li key={entry.id} className="border-l-2 border-border pl-3">
+                <p className="text-xs text-muted-foreground">{formatDateTime(entry.at)} · {entry.actorName}</p>
                 <p className="text-sm">{entry.note}</p>
-                {entry.fromStatus && <p className="text-xs text-stone-400">{entry.fromStatus} → {entry.toStatus}</p>}
+                {entry.fromStatus && <p className="text-xs text-dim">{entry.fromStatus} → {entry.toStatus}</p>}
               </li>
             ))}
           </ol>
@@ -520,8 +520,8 @@ function IncidentDetail({ incident, onClose, onRaiseWorkOrder }: { incident: Inc
         />
 
         {allowedTransitions.length > 0 ? (
-          <form onSubmit={advance} className="border-t border-stone-200 pt-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Move to</h3>
+          <form onSubmit={advance} className="border-t border-border pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Move to</h3>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               <Field label="New status" error={errors.to}>
                 <Select value={to} onChange={(e) => setTo(e.target.value as IncidentStatus)} invalid={!!errors.to}>
@@ -557,7 +557,7 @@ function IncidentDetail({ incident, onClose, onRaiseWorkOrder }: { incident: Inc
             </div>
           </form>
         ) : (
-          <p className="border-t border-stone-200 pt-4 text-sm text-stone-500">This incident is closed. No further status changes are allowed.</p>
+          <p className="border-t border-border pt-4 text-sm text-muted-foreground">This incident is closed. No further status changes are allowed.</p>
         )}
       </div>
     </Panel>
@@ -606,12 +606,12 @@ function MaintenanceTab() {
         rowKey={(w) => w.id}
         emptyState={<EmptyState title={db.workOrders.length ? "No work orders match" : "No work orders"} body="Raise a work order to coordinate maintenance and to record what it cost." />}
         columns={[
-          { key: "ref", header: "Ref", render: (w) => <span className="font-mono text-xs font-semibold text-stone-900">{w.reference}</span> },
-          { key: "title", header: "Work", render: (w) => <div><p className="font-medium">{w.title}</p><p className="text-xs text-stone-500">{w.workType}{w.workshop ? ` · ${w.workshop}` : ""}</p></div> },
+          { key: "ref", header: "Ref", render: (w) => <span className="font-mono text-xs font-semibold text-foreground">{w.reference}</span> },
+          { key: "title", header: "Work", render: (w) => <div><p className="font-medium">{w.title}</p><p className="text-xs text-muted-foreground">{w.workType}{w.workshop ? ` · ${w.workshop}` : ""}</p></div> },
           { key: "vehicle", header: "Vehicle", render: (w) => vehicleReg(w.vehicleId) },
-          { key: "planned", header: "Planned", render: (w) => (w.plannedDate ? formatDate(w.plannedDate) : <span className="text-stone-400">not set</span>) },
+          { key: "planned", header: "Planned", render: (w) => (w.plannedDate ? formatDate(w.plannedDate) : <span className="text-dim">not set</span>) },
           { key: "status", header: "Status", render: (w) => <Badge tone={WORK_ORDER_TONE[w.status]}>{WORK_ORDER_STATUS_LABELS[w.status]}</Badge> },
-          { key: "costs", header: "Costs", render: (w) => (w.costEntries.length ? <span className="tabular-nums">{w.costEntries.length}</span> : <span className="text-stone-400">none recorded</span>) },
+          { key: "costs", header: "Costs", render: (w) => (w.costEntries.length ? <span className="tabular-nums">{w.costEntries.length}</span> : <span className="text-dim">none recorded</span>) },
           {
             key: "actions",
             header: "",
@@ -758,11 +758,11 @@ function WorkOrderForm({ defaults, order, onClose }: { defaults: { vehicleId: st
             <TextInput type="date" value={values.plannedDate} onChange={(e) => setValues({ ...values, plannedDate: e.target.value })} invalid={!!errors.plannedDate} />
           </Field>
         </div>
-        <label className="flex items-start gap-2 rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm">
+        <label className="flex items-start gap-2 rounded-sm border border-border bg-muted p-3 text-sm">
           <input type="checkbox" className="mt-0.5" checked={Boolean(values.resetsServiceInterval)} onChange={(e) => setValues({ ...values, resetsServiceInterval: e.target.checked })} />
           <span>
             <span className="font-medium">This work resets the service interval</span>
-            <span className="mt-0.5 block text-xs text-stone-500">
+            <span className="mt-0.5 block text-xs text-muted-foreground">
               Tick only when this job is a service that restarts the schedule for the vehicle&apos;s category. You make that call; the system never infers it.
             </span>
           </span>
@@ -821,27 +821,27 @@ function WorkOrderDetail({ order, onClose }: { order: WorkOrder; onClose: () => 
           {current.workshop && <Badge tone="neutral">{current.workshop}</Badge>}
           {incident && <Badge tone="info">from {incident.reference}</Badge>}
         </div>
-        {current.description && <p className="text-sm text-stone-700">{current.description}</p>}
+        {current.description && <p className="text-sm text-foreground">{current.description}</p>}
         <div className="grid gap-3 text-sm sm:grid-cols-3">
-          <div><p className="text-xs text-stone-500">Odometer</p><p className="font-medium">{current.reportedOdometer === null ? "not recorded" : `${current.reportedOdometer} km`}</p></div>
-          <div><p className="text-xs text-stone-500">Planned</p><p className="font-medium">{current.plannedDate ? formatDate(current.plannedDate) : "not set"}</p></div>
-          <div><p className="text-xs text-stone-500">Cost position</p><p className="font-medium">{current.costsConfirmedComplete ? "confirmed complete" : "not confirmed"}</p></div>
+          <div><p className="text-xs text-muted-foreground">Odometer</p><p className="font-medium">{current.reportedOdometer === null ? "not recorded" : `${current.reportedOdometer} km`}</p></div>
+          <div><p className="text-xs text-muted-foreground">Planned</p><p className="font-medium">{current.plannedDate ? formatDate(current.plannedDate) : "not set"}</p></div>
+          <div><p className="text-xs text-muted-foreground">Cost position</p><p className="font-medium">{current.costsConfirmedComplete ? "confirmed complete" : "not confirmed"}</p></div>
         </div>
-        {current.holdReason && <p className="rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm"><span className="font-medium">On hold: </span>{current.holdReason}</p>}
-        {current.completionNote && <p className="rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm"><span className="font-medium">Work done: </span>{current.completionNote}</p>}
+        {current.holdReason && <p className="rounded-sm border border-border bg-muted p-3 text-sm"><span className="font-medium">On hold: </span>{current.holdReason}</p>}
+        {current.completionNote && <p className="rounded-sm border border-border bg-muted p-3 text-sm"><span className="font-medium">Work done: </span>{current.completionNote}</p>}
         {current.releasedBy && (
-          <p className="rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm">
+          <p className="rounded-sm border border-border bg-muted p-3 text-sm">
             <span className="font-medium">Released for service by </span>{current.releasedBy}
             {current.releasedAt ? ` · ${formatDateTime(current.releasedAt)}` : ""}
           </p>
         )}
 
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Activity log</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Activity log</h3>
           <ol className="mt-2 space-y-2">
             {current.log.map((entry) => (
-              <li key={entry.id} className="border-l-2 border-stone-200 pl-3">
-                <p className="text-xs text-stone-500">{formatDateTime(entry.at)} · {entry.actorName}</p>
+              <li key={entry.id} className="border-l-2 border-border pl-3">
+                <p className="text-xs text-muted-foreground">{formatDateTime(entry.at)} · {entry.actorName}</p>
                 <p className="text-sm">{entry.note}</p>
               </li>
             ))}
@@ -867,8 +867,8 @@ function WorkOrderDetail({ order, onClose }: { order: WorkOrder; onClose: () => 
         />
 
         {allowedTransitions.length > 0 ? (
-          <form onSubmit={advance} className="border-t border-stone-200 pt-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Move to</h3>
+          <form onSubmit={advance} className="border-t border-border pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Move to</h3>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               <Field label="New status" error={errors.to}>
                 <Select value={to} onChange={(e) => setTo(e.target.value as WorkOrderStatus)} invalid={!!errors.to}>
@@ -887,11 +887,11 @@ function WorkOrderDetail({ order, onClose }: { order: WorkOrder; onClose: () => 
               <TextArea value={note} onChange={(e) => setNote(e.target.value)} invalid={!!errors.note} />
             </Field>
             {to === "completed" && (
-              <label className="mt-3 flex items-start gap-2 rounded-sm border border-stone-200 bg-stone-50 p-3 text-sm">
+              <label className="mt-3 flex items-start gap-2 rounded-sm border border-border bg-muted p-3 text-sm">
                 <input type="checkbox" className="mt-0.5" checked={costsConfirmed} onChange={(e) => setCostsConfirmed(e.target.checked)} />
                 <span>
                   <span className="font-medium">The cost position is complete</span>
-                  <span className="mt-0.5 block text-xs text-stone-500">
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
                     Tick this once every cost has been recorded. If there was no cost, ticking it is the explicit zero confirmation the workflow requires.
                   </span>
                 </span>
@@ -899,7 +899,7 @@ function WorkOrderDetail({ order, onClose }: { order: WorkOrder; onClose: () => 
             )}
             {errors.costsConfirmedComplete && <p className="mt-2 text-xs font-medium text-red-700">{errors.costsConfirmedComplete}</p>}
             {to === "closed" && (
-              <p className="mt-2 text-xs text-stone-500">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Closing the work order returns the vehicle to service and records your name as the person who released it.
               </p>
             )}
@@ -908,7 +908,7 @@ function WorkOrderDetail({ order, onClose }: { order: WorkOrder; onClose: () => 
             </div>
           </form>
         ) : (
-          <p className="border-t border-stone-200 pt-4 text-sm text-stone-500">
+          <p className="border-t border-border pt-4 text-sm text-muted-foreground">
             {current.status === "closed"
               ? "This work order is closed. No further status changes are allowed."
               : "The work is complete. Releasing the vehicle back into service is a separate control: an administrator or operations user must close the work order and sign the release."}
@@ -1045,7 +1045,7 @@ function CostsTab() {
                 columns={[
                   { key: "date", header: "Date", render: (l) => formatDate(l.incurredDate) },
                   { key: "desc", header: "Description", render: (l) => <span className="font-medium">{l.description}</span> },
-                  { key: "cat", header: "Category", render: (l) => (l.category || <span className="text-stone-400">Uncategorised</span>) },
+                  { key: "cat", header: "Category", render: (l) => (l.category || <span className="text-dim">Uncategorised</span>) },
                   { key: "source", header: "Source", render: (l) => <span className="font-mono text-xs">{l.sourceReference}</span> },
                   { key: "amount", header: "Amount", className: "text-right", render: (l) => <span className="tabular-nums font-semibold">{money(l.amount, report.currencyCode)}</span> },
                   { key: "by", header: "Recorded by", render: (l) => l.recordedBy },

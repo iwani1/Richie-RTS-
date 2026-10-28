@@ -21,10 +21,10 @@ export function AuditPage() {
   // window is taken afterwards — sorting only the visible page would claim "oldest first" while
   // hiding the older entries it was supposed to bring to the top.
   const auditColumns: Column<AuditEntry>[] = [
-    { key: "at", header: "When", className: "whitespace-nowrap", sortValue: (a) => a.at, render: (a) => <span className="rts-mono text-stone-600">{formatDateTime(a.at)}</span> },
+    { key: "at", header: "When", className: "whitespace-nowrap", sortValue: (a) => a.at, render: (a) => <span className="rts-mono text-muted-foreground">{formatDateTime(a.at)}</span> },
     { key: "actor", header: "Actor", sortValue: (a) => a.actorName, render: (a) => a.actorName },
     { key: "action", header: "Action", sortValue: (a) => a.action, render: (a) => <code className="rts-code">{a.action}</code> },
-    { key: "entity", header: "Record", sortValue: (a) => a.entity, render: (a) => <span className="text-stone-600">{a.entity}</span> },
+    { key: "entity", header: "Record", sortValue: (a) => a.entity, render: (a) => <span className="text-muted-foreground">{a.entity}</span> },
     { key: "summary", header: "Summary", sortValue: (a) => a.summary, render: (a) => <span className="text-xs">{a.summary}</span> },
   ];
   const { rows: sorted, sort, onSortChange } = useTableSort(matching, auditColumns);

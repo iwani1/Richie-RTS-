@@ -173,14 +173,14 @@ export function ContractsPage() {
             />
           }
           columns={[
-            { key: "ref", header: "Contract", render: (row) => <span className="rts-mono text-xs font-semibold text-stone-900">{row.contract.reference}</span> },
+            { key: "ref", header: "Contract", render: (row) => <span className="rts-mono text-xs font-semibold text-foreground">{row.contract.reference}</span> },
             {
               key: "client",
               header: "Client",
               render: (row) => (
                 <span className="flex flex-col">
-                  <span className="text-xs font-medium text-stone-800">{row.contract.clientName}</span>
-                  <span className="text-xs text-stone-600">{CONTRACT_SERVICE_LABELS[row.contract.serviceType]}</span>
+                  <span className="text-xs font-medium text-foreground">{row.contract.clientName}</span>
+                  <span className="text-xs text-muted-foreground">{CONTRACT_SERVICE_LABELS[row.contract.serviceType]}</span>
                 </span>
               ),
             },
@@ -201,7 +201,7 @@ export function ContractsPage() {
         />
       </TableCard>
 
-      <p className="mt-4 text-xs text-stone-500">
+      <p className="mt-4 text-xs text-muted-foreground">
         Expiry is worked out from the end date rather than stored, because a date passing is not something a person records. A client
         whose contract has ended or been suspended keeps its history; the booking rules refuse a new seat on a date the agreement does not
         cover, and say which contract is in the way.
@@ -302,11 +302,11 @@ function ContractForm({ contract, onClosed }: { contract?: Contract; onClosed: (
 
         <Field label="Routes in scope" error={errors.routeIds} hint={values.clientId ? undefined : "Choose the client first"}>
           {clientRoutes.length === 0 ? (
-            <p className="text-xs text-stone-600">This client has no routes yet. A contract may still be entered; the routes can be added when they exist.</p>
+            <p className="text-xs text-muted-foreground">This client has no routes yet. A contract may still be entered; the routes can be added when they exist.</p>
           ) : (
             <div className="flex flex-wrap gap-3">
               {clientRoutes.map((route) => (
-                <label key={route.id} className="flex items-center gap-2 text-sm text-stone-700">
+                <label key={route.id} className="flex items-center gap-2 text-sm text-foreground">
                   <input type="checkbox" checked={routeIds.includes(route.id)} onChange={() => toggle(routeIds, route.id, setRouteIds)} />
                   <span>
                     {route.reference} {route.name}
@@ -321,7 +321,7 @@ function ContractForm({ contract, onClosed }: { contract?: Contract; onClosed: (
           <Field label="Service days" error={errors.weekdays} hint="Leave every box clear if the contract does not name days">
             <div className="flex flex-wrap gap-2">
               {WEEKDAYS.map((name, index) => (
-                <label key={name} className="flex items-center gap-1 text-xs text-stone-700">
+                <label key={name} className="flex items-center gap-1 text-xs text-foreground">
                   <input type="checkbox" checked={weekdays.includes(index)} onChange={() => toggle(weekdays, index, setWeekdays)} />
                   <span>{name.slice(0, 3)}</span>
                 </label>
@@ -330,11 +330,11 @@ function ContractForm({ contract, onClosed }: { contract?: Contract; onClosed: (
           </Field>
           <Field label="Shifts covered" error={errors.shiftIds} hint={db.settings.shifts.length === 0 ? "No shifts are configured in Settings" : "From the shifts in Settings"}>
             {db.settings.shifts.length === 0 ? (
-              <p className="text-xs text-stone-600">None configured. The contract can be entered without them.</p>
+              <p className="text-xs text-muted-foreground">None configured. The contract can be entered without them.</p>
             ) : (
               <div className="flex flex-wrap gap-3">
                 {db.settings.shifts.map((shift) => (
-                  <label key={shift.id} className="flex items-center gap-2 text-sm text-stone-700">
+                  <label key={shift.id} className="flex items-center gap-2 text-sm text-foreground">
                     <input type="checkbox" checked={shiftIds.includes(shift.id)} onChange={() => toggle(shiftIds, shift.id, setShiftIds)} />
                     <span>{shift.name}</span>
                   </label>
@@ -419,8 +419,8 @@ function ContractDetail({ contract, onClosed, onEdit }: { contract: Contract; on
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={STATE_TONE[state]}>{CONTRACT_STATUS_LABELS[state]}</Badge>
-          <span className="text-xs text-stone-600">{CONTRACT_SERVICE_LABELS[contract.serviceType]}</span>
-          {contract.replacesId && <span className="text-xs text-stone-600">Replaces {db.contracts.find((entry) => entry.id === contract.replacesId)?.reference ?? "an earlier contract"}</span>}
+          <span className="text-xs text-muted-foreground">{CONTRACT_SERVICE_LABELS[contract.serviceType]}</span>
+          {contract.replacesId && <span className="text-xs text-muted-foreground">Replaces {db.contracts.find((entry) => entry.id === contract.replacesId)?.reference ?? "an earlier contract"}</span>}
         </div>
 
         {state === "expired" && (
@@ -450,18 +450,18 @@ function ContractDetail({ contract, onClosed, onEdit }: { contract: Contract; on
         {contract.serviceLevelTargets && (
           <div>
             <p className="rts-label">Service-level targets</p>
-            <p className="whitespace-pre-line text-sm text-stone-700">{contract.serviceLevelTargets}</p>
+            <p className="whitespace-pre-line text-sm text-foreground">{contract.serviceLevelTargets}</p>
           </div>
         )}
         {contract.notes && (
           <div>
             <p className="rts-label">Notes</p>
-            <p className="whitespace-pre-line text-sm text-stone-700">{contract.notes}</p>
+            <p className="whitespace-pre-line text-sm text-foreground">{contract.notes}</p>
           </div>
         )}
 
         {steps.length > 0 && allowed("contracts:advance") && (
-          <div className="rounded-md border border-stone-200 p-3">
+          <div className="rounded-md border border-border p-3">
             <p className="rts-label">What happens next</p>
             <TextInput
               placeholder="Reason (required to suspend, terminate or send back)"
@@ -495,9 +495,9 @@ function ContractDetail({ contract, onClosed, onEdit }: { contract: Contract; on
           <p className="rts-label">History</p>
           <ol className="space-y-2">
             {contract.history.map((event, index) => (
-              <li key={`${event.at}-${index}`} className="text-xs text-stone-700">
+              <li key={`${event.at}-${index}`} className="text-xs text-foreground">
                 <span className="rts-mono">{new Date(event.at).toLocaleString()}</span> · {event.actor} · {CONTRACT_STATUS_LABELS[event.from]} → {CONTRACT_STATUS_LABELS[event.to]}
-                {event.note && <span className="text-stone-600"> — {event.note}</span>}
+                {event.note && <span className="text-muted-foreground"> — {event.note}</span>}
               </li>
             ))}
           </ol>
@@ -511,7 +511,7 @@ function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="rts-label">{label}</dt>
-      <dd className="text-stone-800">{value}</dd>
+      <dd className="text-foreground">{value}</dd>
     </div>
   );
 }

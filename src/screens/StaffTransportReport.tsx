@@ -111,7 +111,7 @@ export function StaffTransportReport() {
                   { key: "value", header: "Seats", className: "text-right rts-mono", render: (row) => row.value },
                 ]}
               />
-              <p className="mt-3 text-xs text-stone-500">
+              <p className="mt-3 text-xs text-muted-foreground">
                 {report.seatsNotHeld} seat(s) were asked for and are not held now — refused, cancelled, waiting, or still unanswered. On the
                 roster table below, a rider counted as carried was recorded as boarding at the door, not assumed from the roster.
               </p>
@@ -146,7 +146,7 @@ export function StaffTransportReport() {
                 { key: "occupancy", header: "Occupancy", className: "text-right rts-mono", render: (row) => percent(row.occupancy) },
               ]}
             />
-            <p className="mt-3 text-xs text-stone-500">
+            <p className="mt-3 text-xs text-muted-foreground">
               Occupancy is riders carried divided by the seat capacity of the bus on each worked run, not the roster size. A route whose runs
               were all cancelled stays on the list with zero worked runs, because that is the thing worth seeing.
             </p>
@@ -169,12 +169,12 @@ export function StaffTransportReport() {
             </TableCard>
 
             <TableCard title="What this report cannot say" summary="Named, so nothing here is read as a zero">
-              <ul className="space-y-2 text-sm text-stone-700">
+              <ul className="space-y-2 text-sm text-foreground">
                 {STAFF_REPORT_LIMITS.map((limit) => (
                   <li key={limit}>{limit}</li>
                 ))}
               </ul>
-              <ul className="mt-4 space-y-2 border-t border-stone-200 pt-3 text-sm text-stone-700">
+              <ul className="mt-4 space-y-2 border-t border-border pt-3 text-sm text-foreground">
                 <li className="flex justify-between gap-4">
                   <span>Runs with no vehicle assigned</span>
                   <span className="rts-mono">{report.coverage.runsWithoutVehicle}</span>

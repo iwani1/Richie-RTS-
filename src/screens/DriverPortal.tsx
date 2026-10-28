@@ -82,10 +82,10 @@ export function DriverPortalPage() {
         <>
           <Card title="My licence" description="Kept by operations. Raise it with them if anything here is wrong.">
             <div className="grid gap-3 sm:grid-cols-4">
-              <div><p className="text-xs text-stone-500">Licence number</p><p className="font-medium">{driver.licenceNumber}</p></div>
-              <div><p className="text-xs text-stone-500">Phone</p><p className="font-medium">{driver.phone || "not recorded"}</p></div>
-              <div><p className="text-xs text-stone-500">Expires</p><p className="font-medium">{formatDate(driver.licenceExpiry)}</p></div>
-              <div><p className="text-xs text-stone-500">Status</p><Badge tone={driver.status === "active" ? "success" : driver.status === "suspended" ? "warning" : "neutral"}>{driver.status}</Badge></div>
+              <div><p className="text-xs text-muted-foreground">Licence number</p><p className="font-medium">{driver.licenceNumber}</p></div>
+              <div><p className="text-xs text-muted-foreground">Phone</p><p className="font-medium">{driver.phone || "not recorded"}</p></div>
+              <div><p className="text-xs text-muted-foreground">Expires</p><p className="font-medium">{formatDate(driver.licenceExpiry)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Status</p><Badge tone={driver.status === "active" ? "success" : driver.status === "suspended" ? "warning" : "neutral"}>{driver.status}</Badge></div>
             </div>
           </Card>
 
@@ -133,7 +133,7 @@ export function DriverPortalPage() {
                           const directions = stopDetailLine(next);
                           const map = stopMapLink(next);
                           return (
-                            <span className="mt-1 block text-xs text-stone-600">
+                            <span className="mt-1 block text-xs text-muted-foreground">
                               Next: {next.name} · {next.scheduledTime}
                               {directions ? <span className="block">{directions}</span> : <span className="block rts-unset">no directions recorded</span>}
                               {map && (
@@ -184,7 +184,7 @@ export function DriverPortalPage() {
                         setFlash({ tone: result.ok ? "success" : "error", message: result.message });
                       }}>Complete run</Button>;
                     }
-                    if (t.status === "completed") return <span className="text-xs text-stone-500">Recorded</span>;
+                    if (t.status === "completed") return <span className="text-xs text-muted-foreground">Recorded</span>;
                     return null;
                   },
                 },
@@ -199,12 +199,12 @@ export function DriverPortalPage() {
               ) : (
                 <ul className="space-y-2">
                   {view.incidents.map((incident: Incident) => (
-                    <li key={incident.id} className="flex flex-wrap items-center gap-2 rounded-sm border border-stone-200 px-3 py-2">
+                    <li key={incident.id} className="flex flex-wrap items-center gap-2 rounded-sm border border-border px-3 py-2">
                       <span className="font-mono text-xs font-semibold">{incident.reference}</span>
                       <span className="text-sm">{INCIDENT_TYPE_LABELS[incident.type]}</span>
                       <Badge tone={incident.severity === "high" || incident.severity === "critical" ? "error" : "neutral"}>{INCIDENT_SEVERITY_LABELS[incident.severity]}</Badge>
                       <Badge tone="neutral">{INCIDENT_STATUS_LABELS[incident.status]}</Badge>
-                      <span className="text-xs text-stone-500">{formatDate(incident.reportedDate)}</span>
+                      <span className="text-xs text-muted-foreground">{formatDate(incident.reportedDate)}</span>
                     </li>
                   ))}
                 </ul>
@@ -223,10 +223,10 @@ export function DriverPortalPage() {
                       const typeName = db.settings.documentTypes.find((t) => t.id === doc.documentTypeId)?.name ?? "Document";
                       const status = documentStatus(doc.expiryDate, db.settings.documentReminderLeadDays, today);
                       return (
-                        <li key={doc.id} className="flex flex-wrap items-center gap-2 rounded-sm border border-stone-200 px-3 py-2">
+                        <li key={doc.id} className="flex flex-wrap items-center gap-2 rounded-sm border border-border px-3 py-2">
                           <span className="font-medium text-sm">{typeName}</span>
                           <Badge tone={doc.ownerType === "driver" ? "neutral" : "info"}>{doc.ownerType === "driver" ? "You" : vehicleReg(doc.ownerId)}</Badge>
-                          <span className="text-xs text-stone-500">Expires {formatDate(doc.expiryDate)}</span>
+                          <span className="text-xs text-muted-foreground">Expires {formatDate(doc.expiryDate)}</span>
                           <Badge tone={status === "expired" ? "error" : status === "expiring_soon" ? "warning" : status === "valid" ? "success" : "neutral"}>
                             {status === "expired" ? "Expired" : status === "expiring_soon" ? "Expiring soon" : status === "valid" ? "Valid" : "Unknown"}
                           </Badge>

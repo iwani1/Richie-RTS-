@@ -3089,3 +3089,57 @@ badge, table, ring, activity feed, live dot, map, states, and the booking dialog
 `/dashboard` and `/design` — and 31 new tests: the suite moves from 1,305 to 1,336. **Not built:** no
 screen outside these two has been converted (27 still read `legacy.css`), booking intake has no form, and
 nothing here reads the database — the board is a review of an interface, not a second source of records.
+
+## D-125 - One palette for the whole application, and the motion that belongs to it
+
+**The problem.** Phase 74 built a dark design system and proved it on two new pages. The twenty-seven
+working screens were still painted from `legacy.css` — a white canvas (`#f5f6f9`), white cards, dark
+ink and an indigo accent — so the product had two design languages and a visible seam between them:
+a dark rail around a light page, and a sign-in screen that flashed white before the app appeared.
+
+**Decision 1: re-point the old palette, do not rewrite the old screens.** `legacy.css` keeps every
+selector it had; only the values inside `:root` changed — canvas, card, ink, muted, line, the accent and
+the five status families now read the same colours as `globals.css`, and the status "soft" backgrounds
+became 13% tints of the dark status colours. One edit, twenty-seven screens on the dark surface, no
+screen's markup touched, nothing left half-painted. The file remains temporary and still shrinks screen
+by screen as each is rebuilt structurally.
+
+**Decision 2: the leftover utilities were remapped, not left to chance.** 494 `stone-*` (and one
+`bg-white`) class tokens across 25 files became semantic ones — `text-stone-900` → `text-foreground`,
+`text-stone-500/600` → `text-muted-foreground`, `text-stone-400` → `text-dim`, `border-stone-200` →
+`border-border`, `bg-stone-50/100` → `bg-muted`. Text set in white was white-on-accent in the light
+theme; on the dark palette that rule becomes dark ink on amber, which is the same intent and 8.16:1
+rather than 2.6:1.
+
+**Decision 3: one frame for the working application.** `AppFrame` replaces the hand-built rail and
+header inside `App.tsx`: the current section is a filled accent tile instead of a pale one, each section
+carries the day's count, the rail collapses into a sheet on a phone, and the content arrives on the
+glide curve when the route changes. The frame is given groups, a current key and a callback, so it knows
+nothing about the screens it wraps — which is why one component can hold twenty-odd destinations while
+they are converted one at a time.
+
+**Decision 4: four moves, borrowed and cut down.** Two libraries were read for this — the spring
+vocabulary at kinetics.colorion.co and the pure-CSS button catalogue at animatedbuttons.colorion.co.
+What survived is what a dense work surface can carry: **sheen** (one diagonal highlight across a primary
+action, once, on hover), **a gliding pill** in the segmented control (it measures the chosen option and
+travels to it, while the buttons underneath stay a real radio group), **a spotlight** (a card warms
+towards the pointer, position written straight to a CSS variable so nothing re-renders), and **an
+arriving page** (content rises 6px on the glide curve when the screen changes). A figure that changes
+value bumps once, and only when it changes — nothing bounces merely because a page opened. Everything is
+CSS or a few lines of pointer handling; no animation library was added, and `prefers-reduced-motion`
+stops all of it without hiding anything.
+
+**Decision 5: what was rejected, and why.** Magnetic buttons that pull towards the cursor, tilt-on-hover,
+animated gradients, neon edges and cursor trails were all available and are all wrong here: a dispatcher
+works in a table for hours, and a control that moves away from the pointer costs accuracy. The credit
+line is the honest one — the motion vocabulary is inspired by those libraries, not copied from them.
+
+**Consequence.** `src/styles/legacy.css` (palette re-pointed), 25 screen files (utilities remapped),
+`src/components/tms/AppFrame.tsx` (new), `GlidingTabs.tsx` (new), `useSpotlight.ts` (new), `StatCard`
+(spotlight and bump), `PageHeader` (gliding pill and sheen), `src/screens/Auth.tsx` (first-run and sign-in
+rebuilt on the dark surface, with the brand half as a statement), `globals.css` (interaction layer:
+`--ease-overshoot`, `page-in`, `bump`, `toast-in`, `.tms-page`, `.tms-sheen`, `.tms-spotlight`,
+`.tms-aurora`), and four new tests — the suite moves from 1,336 to 1,340. **Not built:** the working
+screens' own layouts, tables and forms are still the pre-migration ones; they read the new palette but
+have not been rebuilt on the new components, which continues screen by screen. No screen gained a
+feature, a fact or a figure in this pass.

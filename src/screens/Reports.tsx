@@ -106,8 +106,8 @@ function HireReport() {
     <div>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-stone-800">Hire report</h2>
-          <p className="max-w-2xl text-sm text-stone-600">
+          <h2 className="text-base font-semibold text-foreground">Hire report</h2>
+          <p className="max-w-2xl text-sm text-muted-foreground">
             What came in, what was quoted, what was accepted, what was billed and what is still owed — counted from the rental, invoice and
             payment records, with the coverage stated.
           </p>
@@ -168,7 +168,7 @@ function HireReport() {
             </TableCard>
 
             <TableCard title="Coverage" summary="What the figures above do and do not include">
-              <ul className="space-y-2 text-sm text-stone-700">
+              <ul className="space-y-2 text-sm text-foreground">
                 <li className="flex justify-between gap-4">
                   <span>Requests in the period without a quotation</span>
                   <span className="rts-mono">{report.coverage.rentalsWithoutQuote}</span>
@@ -188,7 +188,7 @@ function HireReport() {
                   </span>
                 </li>
               </ul>
-              <p className="mt-3 text-xs text-stone-500">
+              <p className="mt-3 text-xs text-muted-foreground">
                 Accepted means confirmed, in progress or completed. Vehicle-days count confirmed, in-progress and completed rentals that have a
                 vehicle, divided by the acting fleet multiplied by the days in the period. A draft request reserves nothing.
               </p>
@@ -196,12 +196,12 @@ function HireReport() {
           </div>
 
           <section className="mt-6 space-y-4" aria-labelledby="financial-report">
-            <div className="flex flex-wrap items-end justify-between gap-3 border-t border-stone-200 pt-5">
+            <div className="flex flex-wrap items-end justify-between gap-3 border-t border-border pt-5">
               <div>
-                <h2 id="financial-report" className="text-sm font-semibold uppercase tracking-wider text-stone-500">
+                <h2 id="financial-report" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                   Money and cost (RPT-03)
                 </h2>
-                <p className="mt-1 max-w-2xl text-sm text-stone-600">
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                   Revenue by customer and service, what came in, what is still owed at the period end, and what the fleet cost to keep
                   running — grouped by the cost categories configured in Settings. Cost per trip is recorded costs divided by scheduled
                   runs completed in the period, the definition agreed with the owner (Q-29).
@@ -266,7 +266,7 @@ function HireReport() {
             </div>
 
             <TableCard title="Money coverage" summary="What the financial figures above do and do not include">
-              <ul className="space-y-2 text-sm text-stone-700">
+              <ul className="space-y-2 text-sm text-foreground">
                 <li className="flex justify-between gap-4">
                   <span>Uncategorised cost lines</span>
                   <span className="rts-mono">{moneyReport.coverage.uncategorisedExpenseLines}</span>
@@ -284,7 +284,7 @@ function HireReport() {
                   <span className="rts-mono">{moneyReport.revenueByService.map((row) => `${row.service}: ${money(moneyReport.currencyCode, row.invoiced)}`).join(" · ") || "nothing invoiced"}</span>
                 </li>
               </ul>
-              <p className="mt-3 text-xs text-stone-500">
+              <p className="mt-3 text-xs text-muted-foreground">
                 Outstanding is valued at the period end: a payment made later does not settle an invoice that was unpaid then. Only vehicle
                 hire is invoiced in this build, so revenue by service has one line — staff-transport contracts are not billed by this system yet.
               </p>

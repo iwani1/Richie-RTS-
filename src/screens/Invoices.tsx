@@ -155,7 +155,7 @@ export function InvoicesPage() {
       // reads as though something happened.
       render: (invoice) => {
         const credited = balanceOf(invoice).credited;
-        return credited > 0 ? money(invoice.currencyCode, credited) : <span className="text-stone-400">-</span>;
+        return credited > 0 ? money(invoice.currencyCode, credited) : <span className="text-dim">-</span>;
       },
     },
     { key: "paid", header: "Paid", className: "text-right rts-mono", sortValue: (invoice) => balanceOf(invoice).paid, render: (invoice) => money(invoice.currencyCode, balanceOf(invoice).paid) },
@@ -165,7 +165,7 @@ export function InvoicesPage() {
       className: "text-right rts-mono",
       sortValue: (invoice) => (invoice.status === "void" ? 0 : balanceOf(invoice).outstanding),
       render: (invoice) => {
-        if (invoice.status === "void") return <span className="text-stone-400">-</span>;
+        if (invoice.status === "void") return <span className="text-dim">-</span>;
         const balance = balanceOf(invoice);
         // Money owed back is stated on the row, not turned into a zero balance: the office has
         // a refund to make, and a dash here would hide it (D-86).
@@ -345,8 +345,8 @@ function IssueInvoiceForm({
         </Field>
         {rental?.finalInvoice && (
           <div className="rts-summary">
-            <p className="text-xs text-stone-600">Pre-tax amount from completion: {money(rental.finalInvoice.currencyCode, subtotal)}</p>
-            <ul className="mt-2 space-y-1 text-xs text-stone-600">
+            <p className="text-xs text-muted-foreground">Pre-tax amount from completion: {money(rental.finalInvoice.currencyCode, subtotal)}</p>
+            <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
               {rental.finalInvoice.lines.map((line) => (
                 <li key={line.id} className="flex justify-between gap-3">
                   <span>
@@ -536,7 +536,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             ]}
           />
           {invoice.taxLines.length > 0 && (
-            <ul className="mt-3 space-y-1 text-xs text-stone-600">
+            <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
               {invoice.taxLines.map((line) => (
                 <li key={line.name} className="flex justify-between gap-3">
                   <span>
@@ -563,7 +563,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
                 header: "Amount",
                 className: "text-right rts-mono",
                 render: (payment) => (
-                  <span className={payment.voidedAt ? "text-stone-500 line-through" : undefined}>{money(payment.currencyCode, payment.amount)}</span>
+                  <span className={payment.voidedAt ? "text-muted-foreground line-through" : undefined}>{money(payment.currencyCode, payment.amount)}</span>
                 ),
               },
               {
@@ -605,7 +605,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             ]}
           />
           {payments.some((payment) => payment.voidedAt) && (
-            <ul className="mt-3 space-y-1 text-xs text-stone-600">
+            <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
               {payments
                 .filter((payment) => payment.voidedAt)
                 .map((payment) => (
@@ -617,7 +617,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             </ul>
           )}
           {payments.some((payment) => payment.externalReference) && (
-            <ul className="mt-3 space-y-1 text-xs text-stone-600">
+            <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
               {payments
                 .filter((payment) => payment.externalReference)
                 .map((payment) => (
@@ -651,8 +651,8 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
                 // reason is why the office decided to give the money back.
                 render: (note) => (
                   <span className="flex flex-col">
-                    <span className="text-xs font-medium text-stone-800">{note.lines.map((line) => line.description).join(" · ")}</span>
-                    <span className="text-xs text-stone-600">{note.reason}</span>
+                    <span className="text-xs font-medium text-foreground">{note.lines.map((line) => line.description).join(" · ")}</span>
+                    <span className="text-xs text-muted-foreground">{note.reason}</span>
                   </span>
                 ),
               },
@@ -678,7 +678,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             ]}
           />
           {credits.some((note) => note.status === "void") && (
-            <ul className="mt-3 space-y-1 text-xs text-stone-600">
+            <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
               {credits
                 .filter((note) => note.status === "void")
                 .map((note) => (
@@ -710,14 +710,14 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             columns={[
               { key: "ref", header: "Refund", render: (refund) => <span className="rts-mono text-xs">{refund.reference}</span> },
               { key: "date", header: "Paid back", render: (refund) => formatDate(refund.paidOn) },
-              { key: "method", header: "How", render: (refund) => <span className="text-xs text-stone-700">{refund.method}</span> },
+              { key: "method", header: "How", render: (refund) => <span className="text-xs text-foreground">{refund.method}</span> },
               {
                 key: "reason",
                 header: "Why",
                 render: (refund) => (
                   <span className="flex flex-col">
-                    <span className="text-xs text-stone-800">{refund.reason}</span>
-                    {refund.voidReason && <span className="text-xs text-stone-600">Cancelled: {refund.voidReason}</span>}
+                    <span className="text-xs text-foreground">{refund.reason}</span>
+                    {refund.voidReason && <span className="text-xs text-muted-foreground">Cancelled: {refund.voidReason}</span>}
                   </span>
                 ),
               },
@@ -740,8 +740,8 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
       </div>
 
       {invoice.notes && (
-        <p className="mt-4 text-sm text-stone-600">
-          <span className="font-medium text-stone-800">Note on the invoice:</span> {invoice.notes}
+        <p className="mt-4 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">Note on the invoice:</span> {invoice.notes}
         </p>
       )}
 
@@ -1067,8 +1067,8 @@ function CreditNoteForm({
         </Field>
 
         <div className="rts-summary">
-          <p className="text-xs text-stone-600">Credit note total: {money(invoice.currencyCode, total)}</p>
-          <ul className="mt-2 space-y-1 text-xs text-stone-600">
+          <p className="text-xs text-muted-foreground">Credit note total: {money(invoice.currencyCode, total)}</p>
+          <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
             <li className="flex justify-between gap-3">
               <span>Before tax</span>
               <span className="rts-mono">{money(invoice.currencyCode, subtotal)}</span>
@@ -1082,7 +1082,7 @@ function CreditNoteForm({
               </li>
             ))}
           </ul>
-          {invoice.taxLines.length === 0 && <p className="mt-2 text-xs text-stone-600">This invoice carried no tax, so neither does its credit note.</p>}
+          {invoice.taxLines.length === 0 && <p className="mt-2 text-xs text-muted-foreground">This invoice carried no tax, so neither does its credit note.</p>}
         </div>
 
         {tooMuch && (

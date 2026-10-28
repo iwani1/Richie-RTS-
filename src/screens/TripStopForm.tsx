@@ -69,8 +69,8 @@ export function TripStopForm({
       {/* RTE-01: what the driver should be looking at, and a link to it. The form is opened at the
           stop, so this is a check that they are at the right one before anyone is marked as no-show. */}
       <div className="mb-4 rounded-sm border border-[color:var(--rts-line)] bg-[var(--rts-paper-2)] px-3 py-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">This stop</p>
-        <p className="text-sm text-stone-800">{stopDetailLine(stop) || <em className="rts-unset">no directions recorded</em>}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">This stop</p>
+        <p className="text-sm text-foreground">{stopDetailLine(stop) || <em className="rts-unset">no directions recorded</em>}</p>
         {stopMapLink(stop) && (
           <a className="text-xs underline" href={stopMapLink(stop)!} target="_blank" rel="noreferrer">
             Open in maps
@@ -84,12 +84,12 @@ export function TripStopForm({
           <ul className="mt-1 space-y-1 text-sm">
             {trip.rosterChanges.map((change) => (
               <li key={change.id}>
-                <span className="rts-mono text-xs text-stone-600">{formatDateTime(change.at)}</span> · {change.summary}{" "}
-                <span className="text-xs text-stone-500">({change.by})</span>
+                <span className="rts-mono text-xs text-muted-foreground">{formatDateTime(change.at)}</span> · {change.summary}{" "}
+                <span className="text-xs text-muted-foreground">({change.by})</span>
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-xs text-stone-600">
+          <p className="mt-2 text-xs text-muted-foreground">
             The list of riders below is the roster and the seats booked for this run, as they are now. Record an
             outcome for everyone still shown at this stop.
           </p>
@@ -100,9 +100,9 @@ export function TripStopForm({
           <TextInput type="time" value={actualTime} onChange={(event) => setActualTime(event.target.value)} invalid={!!errors.actualTime} autoFocus />
         </Field>
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Boarding at this stop ({passengers.length})</h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Boarding at this stop ({passengers.length})</h3>
           {passengers.length === 0 ? (
-            <p className="text-sm text-stone-500">Nobody is expected at this stop. Only the arrival time will be recorded.</p>
+            <p className="text-sm text-muted-foreground">Nobody is expected at this stop. Only the arrival time will be recorded.</p>
           ) : (
             <ul className="space-y-2">
               {passengers.map((entry) => (

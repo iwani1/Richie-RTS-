@@ -49,7 +49,7 @@ export function UsersPage() {
         rowKey={(u) => u.id}
         emptyState={<EmptyState title="No users" body="This should not happen after setup." />}
         columns={[
-          { key: "name", header: "Name", render: (u) => <span className="font-semibold text-stone-900">{u.fullName}{u.id === actor?.id && <span className="ml-1 text-[10px] font-normal text-stone-500">(you)</span>}</span> },
+          { key: "name", header: "Name", render: (u) => <span className="font-semibold text-foreground">{u.fullName}{u.id === actor?.id && <span className="ml-1 text-[10px] font-normal text-muted-foreground">(you)</span>}</span> },
           { key: "email", header: "Email", render: (u) => u.email },
           { key: "role", header: "Role", render: (u) => ROLE_LABELS[u.role] },
           {
@@ -58,36 +58,36 @@ export function UsersPage() {
             render: (u) => {
               if (u.role === "driver") {
                 const driver = db.drivers.find((d) => d.id === u.driverId);
-                return driver ? driver.fullName : <span className="text-stone-400">-</span>;
+                return driver ? driver.fullName : <span className="text-dim">-</span>;
               }
               if (u.role === "client_contact") {
                 const client = db.clients.find((c) => c.id === u.clientId);
-                if (!client) return <span className="text-stone-400">-</span>;
+                if (!client) return <span className="text-dim">-</span>;
                 return (
                   <span className="flex flex-wrap items-center gap-1">
                     {client.name}
                     {u.primaryContact && <Badge tone="info">Primary</Badge>}
-                    {u.primaryContact && !u.active && <span className="text-[11px] text-stone-600">(inactive - ring someone else)</span>}
+                    {u.primaryContact && !u.active && <span className="text-[11px] text-muted-foreground">(inactive - ring someone else)</span>}
                   </span>
                 );
               }
               if (u.role === "passenger") {
                 // A rider account is one employee, not a company: the name alone is the answer.
                 const rider = db.passengers.find((p) => p.id === u.passengerId);
-                if (!rider) return <span className="text-stone-400">-</span>;
+                if (!rider) return <span className="text-dim">-</span>;
                 const client = db.clients.find((c) => c.id === rider.clientId);
                 return (
                   <span>
                     {rider.fullName}
-                    <span className="block text-[11px] text-stone-500">{client ? `${client.name} · ${rider.employeeRef}` : rider.employeeRef}</span>
+                    <span className="block text-[11px] text-muted-foreground">{client ? `${client.name} · ${rider.employeeRef}` : rider.employeeRef}</span>
                   </span>
                 );
               }
-              return <span className="text-stone-400">Whole company</span>;
+              return <span className="text-dim">Whole company</span>;
             },
           },
           { key: "status", header: "Status", render: (u) => <Badge tone={u.active ? "success" : "neutral"}>{u.active ? "Active" : "Inactive"}</Badge> },
-          { key: "created", header: "Created", render: (u) => <span className="text-xs text-stone-500">{formatDateTime(u.createdAt)}</span> },
+          { key: "created", header: "Created", render: (u) => <span className="text-xs text-muted-foreground">{formatDateTime(u.createdAt)}</span> },
           {
             key: "actions",
             header: "",
@@ -107,18 +107,18 @@ export function UsersPage() {
       <Band label="Role permissions" note="resource:action strings enforced by the service layer. All Phase 1A permissions are company-scoped.">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-xs">
-            <thead className="text-[10px] uppercase tracking-wider text-stone-500">
+            <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
               <tr><th className="py-1 pr-3">Role</th><th className="py-1">Permissions</th></tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-divider">
               {ROLES.map((role) => (
                 <tr key={role}>
-                  <td className="py-2 pr-3 align-top font-semibold text-stone-800">{ROLE_LABELS[role]}</td>
-                  <td className="py-2 text-stone-600">
+                  <td className="py-2 pr-3 align-top font-semibold text-foreground">{ROLE_LABELS[role]}</td>
+                  <td className="py-2 text-muted-foreground">
                     {ROLE_PERMISSIONS[role].length ? (
-                      <span className="flex flex-wrap gap-1">{ROLE_PERMISSIONS[role].map((p) => <code key={p} className="rounded-sm bg-stone-100 px-1 py-0.5 font-mono text-[10px]">{p}</code>)}</span>
+                      <span className="flex flex-wrap gap-1">{ROLE_PERMISSIONS[role].map((p) => <code key={p} className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[10px]">{p}</code>)}</span>
                     ) : (
-                      <span className="italic text-stone-400">No master-data permissions in Phase 1A; record-scoped features planned.</span>
+                      <span className="italic text-dim">No master-data permissions in Phase 1A; record-scoped features planned.</span>
                     )}
                   </td>
                 </tr>

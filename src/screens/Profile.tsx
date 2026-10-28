@@ -68,21 +68,21 @@ export function ProfilePage() {
           description="The last ten times this account signed in. Recorded as part of the audit trail, which is append-only."
         >
           {historyError && <Notice tone="warning">{historyError}</Notice>}
-          {!historyError && signIns === null && <p className="text-sm text-stone-500">Reading your sign-in history…</p>}
+          {!historyError && signIns === null && <p className="text-sm text-muted-foreground">Reading your sign-in history…</p>}
           {!historyError && signIns !== null && signIns.length === 0 && (
-            <p className="text-sm text-stone-500">No sign-ins recorded yet. The first one is written the next time you sign in.</p>
+            <p className="text-sm text-muted-foreground">No sign-ins recorded yet. The first one is written the next time you sign in.</p>
           )}
           {!historyError && signIns !== null && signIns.length > 0 && (
             <>
-              <ol className="divide-y divide-stone-200">
+              <ol className="divide-y divide-divider">
                 {signIns.map((entry) => (
                   <li key={entry.at} className="flex items-baseline justify-between gap-4 py-2 text-sm">
-                    <span className="rts-mono text-stone-700">{formatDateTime(entry.at)}</span>
-                    <span className="text-xs text-stone-500">{entry.at === signIns[0].at ? "most recent" : ""}</span>
+                    <span className="rts-mono text-foreground">{formatDateTime(entry.at)}</span>
+                    <span className="text-xs text-muted-foreground">{entry.at === signIns[0].at ? "most recent" : ""}</span>
                   </li>
                 ))}
               </ol>
-              <p className="mt-3 text-xs text-stone-500">
+              <p className="mt-3 text-xs text-muted-foreground">
                 {db.users.length === 1
                   ? "Only account on this installation."
                   : "Address and device are not recorded, so a sign-in you do not recognise should be reported to an administrator rather than investigated here."}
@@ -140,7 +140,7 @@ function DetailsForm({
         <TextInput type="email" value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} invalid={!!errors.email} autoComplete="email" />
       </Field>
       <Field label="Role" hint="Only an administrator can change this.">
-        <p className="rts-mono text-sm capitalize text-stone-700">{roleLabel}</p>
+        <p className="rts-mono text-sm capitalize text-foreground">{roleLabel}</p>
       </Field>
       <div className="flex justify-end">
         <Button type="submit" variant="primary" disabled={busy}>

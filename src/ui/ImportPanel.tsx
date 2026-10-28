@@ -125,12 +125,12 @@ export function ImportPanel({ kind, onClose }: { kind: ImportKind; onClose: () =
 
         {preview && (
           <div className="space-y-3">
-            <p role="status" className="text-xs text-stone-600">{summary}</p>
+            <p role="status" className="text-xs text-muted-foreground">{summary}</p>
             {dirty && <Notice tone="warning" title="The file changed">Check it again before importing, so the counts match what will be saved.</Notice>}
             <DataTable
               rows={preview.rows.slice(0, SHOWN)}
               rowKey={(row) => String(row.line)}
-              emptyState={<p className="text-sm text-stone-600">No data rows were found below the header.</p>}
+              emptyState={<p className="text-sm text-muted-foreground">No data rows were found below the header.</p>}
               columns={[
                 { key: "line", header: "Line", className: "rts-num", render: (row) => row.line },
                 { key: "row", header: "Row", render: (row) => <span className="font-mono text-xs break-all">{row.values.filter(Boolean).slice(0, 4).join(" · ")}</span> },
@@ -150,7 +150,7 @@ export function ImportPanel({ kind, onClose }: { kind: ImportKind; onClose: () =
                   header: "Detail",
                   render: (row) =>
                     row.outcome === "create" ? (
-                      <div className="text-xs text-stone-500">
+                      <div className="text-xs text-muted-foreground">
                         <span>{row.message}</span>
                         {row.warning && <p className="mt-1 font-medium text-amber-800">{row.warning}</p>}
                       </div>
@@ -160,7 +160,7 @@ export function ImportPanel({ kind, onClose }: { kind: ImportKind; onClose: () =
                 },
               ]}
             />
-            {preview.rows.length > SHOWN && <p className="text-xs text-stone-500">Showing the first {SHOWN} of {preview.rows.length} rows.</p>}
+            {preview.rows.length > SHOWN && <p className="text-xs text-muted-foreground">Showing the first {SHOWN} of {preview.rows.length} rows.</p>}
           </div>
         )}
 

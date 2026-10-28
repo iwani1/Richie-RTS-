@@ -86,14 +86,14 @@ function ReadinessTab() {
           rowKey={(row) => row.vehicleId}
           emptyState={<EmptyState title={report.status === "not_configured" ? "Nothing to evaluate" : "No active vehicles"} body={report.status === "not_configured" ? "Configure service schedules in Settings." : "Retired vehicles are excluded."} />}
           columns={[
-            { key: "reg", header: "Vehicle", render: (row) => <div><p className="font-mono text-xs font-semibold text-stone-900">{row.registration}</p><p className="text-xs text-stone-500">{row.categoryName}</p></div> },
+            { key: "reg", header: "Vehicle", render: (row) => <div><p className="font-mono text-xs font-semibold text-foreground">{row.registration}</p><p className="text-xs text-muted-foreground">{row.categoryName}</p></div> },
             { key: "status", header: "Status", render: (row) => <Badge tone={STATUS_TONE[row.status]}>{STATUS_LABEL[row.status]}</Badge> },
             {
               key: "bases",
               header: "Consumed / interval",
               render: (row) =>
                 row.bases.length === 0 ? (
-                  <span className="text-xs text-stone-500">{row.reasons[0] ?? "Not evaluable"}</span>
+                  <span className="text-xs text-muted-foreground">{row.reasons[0] ?? "Not evaluable"}</span>
                 ) : (
                   <ul className="space-y-0.5 text-xs">
                     {row.bases.map((basis) => {
@@ -106,22 +106,22 @@ function ReadinessTab() {
                           <span className="rts-interval" aria-hidden="true">
                             <span className={`rts-interval-fill rts-interval-fill--${row.status}`} style={{ width: `${used}%` }} />
                           </span>
-                          {basis.dueDate ? <span className="text-stone-500"> due {formatDate(basis.dueDate)}</span> : null}
-                          {basis.lead !== null ? <span className="text-stone-500"> · warn {basis.lead} {basis.basis === "km" ? "km" : "days"} before</span> : null}
+                          {basis.dueDate ? <span className="text-muted-foreground"> due {formatDate(basis.dueDate)}</span> : null}
+                          {basis.lead !== null ? <span className="text-muted-foreground"> · warn {basis.lead} {basis.basis === "km" ? "km" : "days"} before</span> : null}
                         </li>
                       );
                     })}
                   </ul>
                 ),
             },
-            { key: "service", header: "Last service", render: (row) => (row.lastServiceDate ? <div className="text-xs">{formatDate(row.lastServiceDate)}<span className="block text-stone-500">{row.lastServiceWorkOrder}</span></div> : <span className="text-xs text-stone-400">none recorded</span>) },
-            { key: "odometer", header: "Odometer", render: (row) => (row.latestOdometerKm === null ? <span className="text-xs text-stone-400">no reading</span> : <span className="tabular-nums text-xs">{row.latestOdometerKm} km</span>) },
+            { key: "service", header: "Last service", render: (row) => (row.lastServiceDate ? <div className="text-xs">{formatDate(row.lastServiceDate)}<span className="block text-muted-foreground">{row.lastServiceWorkOrder}</span></div> : <span className="text-xs text-dim">none recorded</span>) },
+            { key: "odometer", header: "Odometer", render: (row) => (row.latestOdometerKm === null ? <span className="text-xs text-dim">no reading</span> : <span className="tabular-nums text-xs">{row.latestOdometerKm} km</span>) },
           ]}
         />
         {report.vehicles.some((row) => row.reasons.length > 0) && (
-          <div className="mt-4 border-t border-stone-200 pt-3">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Why some vehicles are not evaluable</h3>
-            <ul className="space-y-1 text-xs text-stone-600">
+          <div className="mt-4 border-t border-border pt-3">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Why some vehicles are not evaluable</h3>
+            <ul className="space-y-1 text-xs text-muted-foreground">
               {report.vehicles
                 .filter((row) => row.reasons.length > 0)
                 .map((row) => (
@@ -136,28 +136,28 @@ function ReadinessTab() {
 
       <Band label="Schedules in use" note="Service intervals are recorded per vehicle category in Settings.">
         {db.settings.maintenance.schedules.length === 0 ? (
-          <p className="text-sm text-stone-500">None configured.</p>
+          <p className="text-sm text-muted-foreground">None configured.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="text-[10px] uppercase tracking-wider text-stone-500">
+              <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr><th className="py-1">Category</th><th className="py-1 text-right">Interval km</th><th className="py-1 text-right">Interval days</th><th className="py-1 text-right">Warn lead km</th><th className="py-1 text-right">Warn lead days</th></tr>
               </thead>
-              <tbody className="divide-y divide-stone-100">
+              <tbody className="divide-y divide-divider">
                 {db.settings.maintenance.schedules.map((schedule) => (
                   <tr key={schedule.categoryId}>
                     <td className="py-1.5 font-medium">{db.settings.vehicleCategories.find((c) => c.id === schedule.categoryId)?.name ?? "Unknown"}</td>
-                    <td className="py-1.5 text-right tabular-nums">{schedule.intervalKm ?? <span className="text-stone-400">-</span>}</td>
-                    <td className="py-1.5 text-right tabular-nums">{schedule.intervalDays ?? <span className="text-stone-400">-</span>}</td>
-                    <td className="py-1.5 text-right tabular-nums">{schedule.remindLeadKm ?? <span className="text-stone-400">-</span>}</td>
-                    <td className="py-1.5 text-right tabular-nums">{schedule.remindLeadDays ?? <span className="text-stone-400">-</span>}</td>
+                    <td className="py-1.5 text-right tabular-nums">{schedule.intervalKm ?? <span className="text-dim">-</span>}</td>
+                    <td className="py-1.5 text-right tabular-nums">{schedule.intervalDays ?? <span className="text-dim">-</span>}</td>
+                    <td className="py-1.5 text-right tabular-nums">{schedule.remindLeadKm ?? <span className="text-dim">-</span>}</td>
+                    <td className="py-1.5 text-right tabular-nums">{schedule.remindLeadDays ?? <span className="text-dim">-</span>}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-        <p className="mt-3 text-xs text-stone-500">
+        <p className="mt-3 text-xs text-muted-foreground">
           A blank lead time means no &ldquo;due soon&rdquo; warning for that basis: only overdue is reported. No reminder is implied by an empty cell.
         </p>
       </Band>
@@ -193,14 +193,14 @@ function OdometerTab() {
           { key: "vehicle", header: "Vehicle", render: (reading) => db.vehicles.find((v) => v.id === reading.vehicleId)?.registration ?? "Unknown" },
           { key: "date", header: "Date", render: (reading) => formatDate(reading.readingDate) },
           { key: "km", header: "Reading", className: "rts-num", render: (reading) => <span className="tabular-nums font-semibold">{reading.readingKm} km</span> },
-          { key: "note", header: "Note", render: (reading) => reading.note || <span className="text-stone-400">-</span> },
+          { key: "note", header: "Note", render: (reading) => reading.note || <span className="text-dim">-</span> },
           { key: "by", header: "Recorded by", render: (reading) => <span className="text-xs">{reading.createdBy}</span> },
           {
             key: "status",
             header: "Status",
             render: (reading) =>
               reading.status === "void" ? (
-                <div><Badge tone="neutral">Void</Badge><p className="mt-1 text-xs text-stone-500">{reading.voidReason}</p></div>
+                <div><Badge tone="neutral">Void</Badge><p className="mt-1 text-xs text-muted-foreground">{reading.voidReason}</p></div>
               ) : (
                 <Badge tone="success">Current</Badge>
               ),

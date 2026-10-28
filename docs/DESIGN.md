@@ -333,13 +333,26 @@ shows the happy path has not decided what to show when the query fails. A row un
 row being read; hovering one KPI dims the other three; sorting is announced in `aria-sort`; every
 icon-only button has a name; a menu only links to screens that exist.
 
+**The interaction layer (D-125).** Four moves, all CSS: a **sheen** across a primary action once on
+hover, a **gliding pill** in the segmented controls (it measures the chosen option and travels to it while
+the buttons underneath stay a real radio group), a **spotlight** that warms a card towards the pointer,
+and **content that arrives** on the glide curve when the screen changes. A figure bumps once when its
+value changes — never on load. The vocabulary is inspired by kinetics.colorion.co and
+animatedbuttons.colorion.co and deliberately stops short of what those libraries offer: a dispatcher
+works in a table for hours, so nothing moves away from the pointer.
+
+**One palette for every screen.** `legacy.css` keeps its selectors and was re-pointed to the dark values
+(canvas, card, ink, muted, lines, accent, and 13% status tints), and 494 leftover `stone-*` utilities were
+remapped to semantic tokens. The built stylesheet now contains no light background and no dark text
+colour, so every screen — converted or not — sits on the same surface inside the same frame.
+
 **Where to see it.** `/dashboard` is the board; `/design` is every component in every state, including
 the four states of the table. Both are sample data and say so. The live application at `/` is untouched
 by this pass and still writes real records.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1336 passed, 28 skipped** across 106 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1340 passed, 28 skipped** across 106 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - The sortable header is tested at both ends: the pure ordering rules (`tableSort.test.ts`, including
   the tie that must not move and the third click that must restore) and the rendered control

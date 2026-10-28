@@ -92,7 +92,7 @@ export function FleetPage() {
             <Notice tone="info" className="mt-3">No vehicles are on the register, so there is nothing to measure.</Notice>
           )}
           {report && report.status !== "empty" && (
-            <p className="mt-3 text-xs text-stone-600">{report.message}</p>
+            <p className="mt-3 text-xs text-muted-foreground">{report.message}</p>
           )}
         </Band>
 
@@ -144,8 +144,8 @@ export function FleetPage() {
             >
               <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {FLEET_STATE_ORDER.map((state) => (
-                  <li key={state} className="flex items-center justify-between gap-2 rounded border border-stone-200 px-3 py-2">
-                    <span className="text-xs text-stone-700">{FLEET_STATE_LABELS[state]}</span>
+                  <li key={state} className="flex items-center justify-between gap-2 rounded border border-border px-3 py-2">
+                    <span className="text-xs text-foreground">{FLEET_STATE_LABELS[state]}</span>
                     <Badge tone={STATE_TONE[state]}>{report.today[state]}</Badge>
                   </li>
                 ))}
@@ -166,8 +166,8 @@ export function FleetPage() {
                 rowKey={(row) => row.key}
                 emptyState={<EmptyState title="No days in this period" body="Pick a start date on or before the end date." />}
                 columns={[
-                  { key: "bucket", header: "Bucket", render: (row) => <span className="font-semibold text-stone-900">{row.label}</span> },
-                  { key: "note", header: "What it means", render: (row) => <span className="text-xs text-stone-600">{row.note}</span> },
+                  { key: "bucket", header: "Bucket", render: (row) => <span className="font-semibold text-foreground">{row.label}</span> },
+                  { key: "note", header: "What it means", render: (row) => <span className="text-xs text-muted-foreground">{row.note}</span> },
                   { key: "days", header: "Vehicle-days", className: "rts-num", render: (row) => <span className="tabular-nums">{row.days}</span> },
                   {
                     key: "share",
@@ -188,12 +188,12 @@ export function FleetPage() {
                 ]}
               />
               {previous && previous.status !== "empty" && (
-                <p className="mt-3 text-xs text-stone-600">
+                <p className="mt-3 text-xs text-muted-foreground">
                   The period before this one ({formatDate(before!.from)} to {formatDate(before!.to)}) worked{" "}
                   {percent(previous.utilisation)} of its serviceable days, against {percent(report.utilisation)} here.
                 </p>
               )}
-              <p className="mt-2 text-xs text-stone-600">
+              <p className="mt-2 text-xs text-muted-foreground">
                 <strong>Utilisation</strong> is the figure agreed with management (Q-29): the days a run or hire held a vehicle,
                 over the days the fleet in service could have held one — {report.committedVehicleDays} of{" "}
                 {report.availableVehicleDays} here. <strong>Days worked</strong> is the stricter measure: only days a run
@@ -217,8 +217,8 @@ export function FleetPage() {
                     header: "Vehicle",
                     render: (row) => (
                       <div>
-                        <p className="font-mono text-xs font-semibold text-stone-900">{row.registration}</p>
-                        <p className="text-xs text-stone-500">{row.categoryName}</p>
+                        <p className="font-mono text-xs font-semibold text-foreground">{row.registration}</p>
+                        <p className="text-xs text-muted-foreground">{row.categoryName}</p>
                       </div>
                     ),
                   },
@@ -235,14 +235,14 @@ export function FleetPage() {
                       row.lastWorkedOn ? (
                         <span className="text-xs">{formatDate(row.lastWorkedOn)}</span>
                       ) : (
-                        <span className="text-xs text-stone-400">not in this period</span>
+                        <span className="text-xs text-dim">not in this period</span>
                       ),
                   },
                 ]}
               />
-              <div className="mt-4 border-t border-stone-200 pt-3">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">What the records cannot say</h3>
-                <ul className="space-y-1 text-xs text-stone-600">
+              <div className="mt-4 border-t border-border pt-3">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">What the records cannot say</h3>
+                <ul className="space-y-1 text-xs text-muted-foreground">
                   {report.coverage.retiredExcluded > 0 && (
                     <li>
                       {report.coverage.retiredExcluded} retired vehicle(s) are left out of every day: the program knows a

@@ -101,30 +101,30 @@ export function PassengerPortalPage() {
             {next ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <p className="text-xs text-stone-500">Leaves</p>
-                  <p className="text-lg font-semibold text-stone-800">{next.pickupTime ?? "time not set"}</p>
-                  <p className="text-xs text-stone-500">{formatDate(next.date)}</p>
+                  <p className="text-xs text-muted-foreground">Leaves</p>
+                  <p className="text-lg font-semibold text-foreground">{next.pickupTime ?? "time not set"}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(next.date)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Your stop</p>
-                  <p className="font-medium text-stone-800">{next.pickupStop?.name ?? "not recorded"}</p>
+                  <p className="text-xs text-muted-foreground">Your stop</p>
+                  <p className="font-medium text-foreground">{next.pickupStop?.name ?? "not recorded"}</p>
                   {/* RTE-01: where to wait, in the rider's own words — not the office's coordinates. */}
                   {next.pickupStop && stopDetailLine(next.pickupStop) && (
-                    <p className="text-xs text-stone-600">{stopDetailLine(next.pickupStop)}</p>
+                    <p className="text-xs text-muted-foreground">{stopDetailLine(next.pickupStop)}</p>
                   )}
-                  <p className="text-xs text-stone-500">{next.route.name}</p>
+                  <p className="text-xs text-muted-foreground">{next.route.name}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Bus</p>
-                  <p className="font-medium text-stone-800">{next.vehicle ?? "not assigned yet"}</p>
-                  <p className="text-xs text-stone-500">{next.trip.reference}</p>
+                  <p className="text-xs text-muted-foreground">Bus</p>
+                  <p className="font-medium text-foreground">{next.vehicle ?? "not assigned yet"}</p>
+                  <p className="text-xs text-muted-foreground">{next.trip.reference}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Status</p>
+                  <p className="text-xs text-muted-foreground">Status</p>
                   <p className="mt-1"><Badge tone={next.state.tone}>{next.state.label}</Badge></p>
-                  <p className="mt-1 text-xs text-stone-600">{next.booking ? `Reference ${next.booking.reference}` : "No booking — you travel on your route's roster."}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{next.booking ? `Reference ${next.booking.reference}` : "No booking — you travel on your route's roster."}</p>
                 </div>
-                <p className="text-sm text-stone-600 sm:col-span-2 lg:col-span-4">{next.state.detail}</p>
+                <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-4">{next.state.detail}</p>
               </div>
             ) : (
               <EmptyState
@@ -149,15 +149,15 @@ export function PassengerPortalPage() {
                 { key: "time", header: "Pickup", render: (j: Journey) => <span className="font-medium">{j.pickupTime ?? "-"}</span> },
                 { key: "stop", header: "Stop", render: (j: Journey) => j.pickupStop?.name ?? "not recorded" },
                 { key: "route", header: "Route", render: (j: Journey) => j.route.name },
-                { key: "bus", header: "Bus", render: (j: Journey) => j.vehicle ?? <span className="text-stone-400">not assigned</span> },
-                { key: "ref", header: "Reference", render: (j: Journey) => (j.booking ? <span className="font-mono text-xs">{j.booking.reference}</span> : <span className="text-xs text-stone-500">on roster</span>) },
+                { key: "bus", header: "Bus", render: (j: Journey) => j.vehicle ?? <span className="text-dim">not assigned</span> },
+                { key: "ref", header: "Reference", render: (j: Journey) => (j.booking ? <span className="font-mono text-xs">{j.booking.reference}</span> : <span className="text-xs text-muted-foreground">on roster</span>) },
                 {
                   key: "status",
                   header: "Status",
                   render: (j: Journey) => (
                     <div>
                       <Badge tone={j.state.tone}>{j.state.label}</Badge>
-                      <p className="mt-1 max-w-xs text-xs text-stone-600">{j.state.detail}</p>
+                      <p className="mt-1 max-w-xs text-xs text-muted-foreground">{j.state.detail}</p>
                     </div>
                   ),
                 },
@@ -170,7 +170,7 @@ export function PassengerPortalPage() {
                     return blocked === null && j.booking ? (
                       <Button onClick={() => setPanel({ mode: "cancel", journey: j })}>Cancel seat</Button>
                     ) : (
-                      <span className="text-xs text-stone-500">{blocked}</span>
+                      <span className="text-xs text-muted-foreground">{blocked}</span>
                     );
                   },
                 },
@@ -179,8 +179,8 @@ export function PassengerPortalPage() {
           </div>
 
           <div className="mt-8">
-            <h2 className="text-sm font-semibold text-stone-800">Where you have been</h2>
-            <p className="mb-3 text-xs text-stone-500">Finished and cancelled runs, newest first. These are the journeys the office would review if you queried a fare or a no-show.</p>
+            <h2 className="text-sm font-semibold text-foreground">Where you have been</h2>
+            <p className="mb-3 text-xs text-muted-foreground">Finished and cancelled runs, newest first. These are the journeys the office would review if you queried a fare or a no-show.</p>
             <DataTable
               rows={history}
               rowKey={(journey: Journey) => journey.trip.id}
@@ -189,14 +189,14 @@ export function PassengerPortalPage() {
                 { key: "date", header: "Date", render: (j: Journey) => formatDate(j.date) },
                 { key: "route", header: "Route", render: (j: Journey) => j.route.name },
                 { key: "stop", header: "Boarded at", render: (j: Journey) => j.pickupStop?.name ?? "not recorded" },
-                { key: "ref", header: "Reference", render: (j: Journey) => (j.booking ? <span className="font-mono text-xs">{j.booking.reference}</span> : <span className="text-xs text-stone-500">on roster</span>) },
+                { key: "ref", header: "Reference", render: (j: Journey) => (j.booking ? <span className="font-mono text-xs">{j.booking.reference}</span> : <span className="text-xs text-muted-foreground">on roster</span>) },
                 {
                   key: "status",
                   header: "What happened",
                   render: (j: Journey) => (
                     <div>
                       <Badge tone={j.state.tone}>{j.state.label}</Badge>
-                      <p className="mt-1 max-w-sm text-xs text-stone-600">{j.state.detail}</p>
+                      <p className="mt-1 max-w-sm text-xs text-muted-foreground">{j.state.detail}</p>
                     </div>
                   ),
                 },
@@ -208,37 +208,37 @@ export function PassengerPortalPage() {
             <Card title="Company transport policy" description="As the office has set it. Nothing here is a guess: an unset rule is shown as unset.">
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between gap-4">
-                  <dt className="text-stone-600">Ask for a seat</dt>
-                  <dd className="font-medium text-stone-800">
+                  <dt className="text-muted-foreground">Ask for a seat</dt>
+                  <dd className="font-medium text-foreground">
                     {policy.requestCutoffMinutes === null
                       ? "No cut-off set — ask any time before the run leaves"
                       : `At least ${policy.requestCutoffMinutes} minutes before departure`}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-stone-600">Cancel a seat</dt>
-                  <dd className="font-medium text-stone-800">
+                  <dt className="text-muted-foreground">Cancel a seat</dt>
+                  <dd className="font-medium text-foreground">
                     {policy.cancellationCutoffMinutes === null
                       ? "No cut-off set — cancel any time before the run leaves"
                       : `At least ${policy.cancellationCutoffMinutes} minutes before departure`}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-stone-600">Your route</dt>
-                  <dd className="font-medium text-stone-800">
+                  <dt className="text-muted-foreground">Your route</dt>
+                  <dd className="font-medium text-foreground">
                     {db.routes.find((route) => route.id === rider.routeId)?.name ?? "not assigned"}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-stone-600">Your stop</dt>
-                  <dd className="font-medium text-stone-800">
+                  <dt className="text-muted-foreground">Your stop</dt>
+                  <dd className="font-medium text-foreground">
                     {db.routes.flatMap((route) => route.stops).find((stop) => stop.id === rider.stopId)?.name ?? "not recorded"}
                   </dd>
                 </div>
               </dl>
-              <div className="mt-4 rounded-sm border border-stone-200 bg-stone-50 p-3">
-                <p className="text-xs font-semibold text-stone-700">What this page cannot tell you</p>
-                <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-stone-600">
+              <div className="mt-4 rounded-sm border border-border bg-muted p-3">
+                <p className="text-xs font-semibold text-foreground">What this page cannot tell you</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
                   {PASSENGER_LIMITS.map((limit) => <li key={limit}>{limit}</li>)}
                 </ul>
               </div>
@@ -246,15 +246,15 @@ export function PassengerPortalPage() {
 
             <Card title="What you have reported" description="Feedback goes to operations as an incident, on the same log they triage breakdowns from.">
               {myFeedback.length === 0 ? (
-                <p className="text-sm text-stone-600">Nothing reported. If a journey went wrong, say so — the office sees it against the run.</p>
+                <p className="text-sm text-muted-foreground">Nothing reported. If a journey went wrong, say so — the office sees it against the run.</p>
               ) : (
                 <ul className="space-y-3">
                   {myFeedback.map((incident: Incident) => (
-                    <li key={incident.id} className="border-l-2 border-stone-200 pl-3">
-                      <p className="text-sm font-medium text-stone-800">
-                        <span className="font-mono text-xs text-stone-500">{incident.reference}</span> · {incident.description}
+                    <li key={incident.id} className="border-l-2 border-border pl-3">
+                      <p className="text-sm font-medium text-foreground">
+                        <span className="font-mono text-xs text-muted-foreground">{incident.reference}</span> · {incident.description}
                       </p>
-                      <p className="text-xs text-stone-600">
+                      <p className="text-xs text-muted-foreground">
                         <Badge tone={incident.status === "resolved" || incident.status === "closed" ? "success" : "info"}>{INCIDENT_STATUS_LABELS[incident.status]}</Badge>{" "}
                         {formatDate(incident.reportedDate)}
                       </p>
@@ -338,12 +338,12 @@ function RequestForm({ riderId, onClose, onSubmit }: { riderId: string; onClose:
       ) : (
         <ul className="space-y-2">
           {runs.map((run) => (
-            <li key={run.trip.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
+            <li key={run.trip.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-divider pb-2">
               <div>
-                <p className="text-sm font-medium text-stone-800">
+                <p className="text-sm font-medium text-foreground">
                   {formatDate(run.date)} · {run.departureTime || "time not set"} · {run.route.name}
                 </p>
-                <p className="text-xs text-stone-600">
+                <p className="text-xs text-muted-foreground">
                   {run.bookable ? `${run.seatsFree} seat(s) free · ${run.trip.reference}` : run.why}
                 </p>
               </div>

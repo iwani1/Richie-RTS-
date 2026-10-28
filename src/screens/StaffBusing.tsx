@@ -129,8 +129,8 @@ function RoutesTab() {
         rowKey={(r) => r.id}
         emptyState={<EmptyState title="No routes yet" body="Create a route with its stops and scheduled times, then generate trips from it." />}
         columns={[
-          { key: "ref", header: "Ref", render: (r) => <span className="font-mono text-xs font-semibold text-stone-900">{r.reference}</span> },
-          { key: "name", header: "Route", render: (r) => <span className="font-semibold text-stone-900">{r.name}</span> },
+          { key: "ref", header: "Ref", render: (r) => <span className="font-mono text-xs font-semibold text-foreground">{r.reference}</span> },
+          { key: "name", header: "Route", render: (r) => <span className="font-semibold text-foreground">{r.name}</span> },
           { key: "client", header: "Client", render: (r) => clientName(r.clientId) },
           { key: "days", header: "Operates", render: (r) => <span className="text-xs">{dayList(r.weekdays)}</span> },
           {
@@ -144,7 +144,7 @@ function RoutesTab() {
                 <span className="whitespace-nowrap text-xs">
                   {r.stops[0]?.scheduledTime} - {r.stops[r.stops.length - 1]?.scheduledTime} ({r.stops.length} stops)
                   {bare > 0 && (
-                    <span className="block text-[11px] text-stone-600">
+                    <span className="block text-[11px] text-muted-foreground">
                       {bare} of {r.stops.length} without directions
                     </span>
                   )}
@@ -297,7 +297,7 @@ function RouteForm({ route, onClose }: { route: BusRoute | null; onClose: () => 
           </Field>
         </div>
         <div>
-          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-stone-500">Operating days</span>
+          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Operating days</span>
           <div className="flex flex-wrap gap-2">
             {DAY_LABELS.map((label, d) => (
               <label key={label} className="flex items-center gap-1 rounded-sm border border-[color:var(--rts-line-strong)] bg-[var(--rts-paper-2)] px-2 py-1 text-xs">
@@ -323,7 +323,7 @@ function RouteForm({ route, onClose }: { route: BusRoute | null; onClose: () => 
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">Stops in order</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Stops in order</span>
             <Button disabled={locked} onClick={() =>
               set({
                 stops: [...values.stops, { name: "", scheduledTime: "", landmark: "", digitalAddress: "", latitude: "", longitude: "" }],
@@ -464,10 +464,10 @@ function PassengersTab() {
         rowKey={(p) => p.id}
         emptyState={<EmptyState title={db.passengers.length ? "No passengers match" : "No passengers yet"} body="Add employees to a client's roster and assign each one a route and pickup stop." />}
         columns={[
-          { key: "name", header: "Name", render: (p) => <span className="font-semibold text-stone-900">{p.fullName}</span> },
-          { key: "ref", header: "Employee ref", render: (p) => p.employeeRef || <span className="text-stone-400">-</span> },
+          { key: "name", header: "Name", render: (p) => <span className="font-semibold text-foreground">{p.fullName}</span> },
+          { key: "ref", header: "Employee ref", render: (p) => p.employeeRef || <span className="text-dim">-</span> },
           { key: "client", header: "Client", render: (p) => clientName(p.clientId) },
-          { key: "route", header: "Route", render: (p) => (routeOf(p) ? `${routeOf(p)!.reference} ${routeOf(p)!.name}` : <span className="text-stone-400">Not on a route</span>) },
+          { key: "route", header: "Route", render: (p) => (routeOf(p) ? `${routeOf(p)!.reference} ${routeOf(p)!.name}` : <span className="text-dim">Not on a route</span>) },
           { key: "stop", header: "Pickup stop", render: (p) => stopName(p) },
           { key: "status", header: "Status", render: (p) => <Badge tone={p.status === "active" ? "success" : "neutral"}>{p.status}</Badge> },
           {
@@ -1163,7 +1163,7 @@ function CompleteForm({
     >
       <form onSubmit={submit} className="space-y-5">
         <section>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-stone-500">Actual stop times</h3>
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Actual stop times</h3>
           <div className="space-y-2">
             {route.stops.map((s, i) => (
               <Field key={s.id} label={`Actual time at ${s.name}`} hint={`Scheduled ${s.scheduledTime}`} error={errors[`stopTimes.${i}`]}>
@@ -1179,9 +1179,9 @@ function CompleteForm({
         </section>
 
         <section>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-stone-500">Riders ({manifest.length})</h3>
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Riders ({manifest.length})</h3>
           {manifest.length === 0 ? (
-            <p className="text-xs text-stone-500">Nobody is expected on this run. It can be completed with stop times only.</p>
+            <p className="text-xs text-muted-foreground">Nobody is expected on this run. It can be completed with stop times only.</p>
           ) : (
             <ul className="space-y-2">
               {manifest.map((entry) => {
@@ -1408,7 +1408,7 @@ function CorrectForm({
         </Field>
 
         {trip.corrections.length > 0 && (
-          <div className="rounded-sm border border-stone-200 p-3">
+          <div className="rounded-sm border border-border p-3">
             <p className="rts-kicker">Already corrected on this run</p>
             <ul className="mt-2 space-y-1 text-xs">
               {trip.corrections.map((correction) => (
@@ -1568,13 +1568,13 @@ function BookingsTab() {
                       header: "Rider",
                       render: (booking) => (
                         <div>
-                          <p className="font-medium text-stone-900">{riderName(booking.passengerId)}</p>
-                          <p className="text-xs text-stone-500">{riderOf(booking.passengerId)?.employeeRef || "no staff number"}</p>
+                          <p className="font-medium text-foreground">{riderName(booking.passengerId)}</p>
+                          <p className="text-xs text-muted-foreground">{riderOf(booking.passengerId)?.employeeRef || "no staff number"}</p>
                         </div>
                       ),
                     },
-                    { key: "ref", header: "Booking", render: (booking) => <span className="font-mono text-xs font-semibold text-stone-900">{booking.reference}</span> },
-                    { key: "kind", header: "Kind", render: (booking) => <span className="text-xs text-stone-600">{BOOKING_TYPE_LABELS[booking.type]}</span> },
+                    { key: "ref", header: "Booking", render: (booking) => <span className="font-mono text-xs font-semibold text-foreground">{booking.reference}</span> },
+                    { key: "kind", header: "Kind", render: (booking) => <span className="text-xs text-muted-foreground">{BOOKING_TYPE_LABELS[booking.type]}</span> },
                     { key: "status", header: "Status", render: (booking) => <Badge tone={BOOKING_TONE[booking.status]}>{BOOKING_STATUS_LABELS[booking.status]}</Badge> },
                     {
                       key: "last",
@@ -1583,8 +1583,8 @@ function BookingsTab() {
                         const last = booking.history[booking.history.length - 1];
                         return (
                           <div className="text-xs">
-                            <p className="text-stone-700">{last ? last.action : "Recorded"}</p>
-                            <p className="text-stone-500">{last ? `${last.by} · ${formatDateTime(last.at)}` : "—"}</p>
+                            <p className="text-foreground">{last ? last.action : "Recorded"}</p>
+                            <p className="text-muted-foreground">{last ? `${last.by} · ${formatDateTime(last.at)}` : "—"}</p>
                           </div>
                         );
                       },
@@ -1595,7 +1595,7 @@ function BookingsTab() {
               </TableCard>
             );
           })}
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-muted-foreground">
             A full run does not lose the request: confirming it puts the rider on the waiting list. When a seat is
             cancelled it is <em>offered</em> to the oldest waiter, and stays an offer until somebody confirms it.
           </p>

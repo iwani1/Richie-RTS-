@@ -23,6 +23,9 @@ import { AppShell } from "@/components/tms/AppShell";
 import { BookingIntakeDialog } from "@/components/tms/BookingIntakeDialog";
 import { DataTable, type TmsColumn } from "@/components/tms/DataTable";
 import { DesignGallery } from "@/components/tms/DesignGallery";
+import { GlidingTabs } from "@/components/tms/GlidingTabs";
+import { AppFrame } from "@/components/tms/AppFrame";
+import { BusFront, Receipt } from "lucide-react";
 import { FleetMap } from "@/components/tms/FleetMap";
 import { LiveDot } from "@/components/tms/LiveDot";
 import { OverviewScreen } from "@/components/tms/OverviewScreen";
@@ -284,7 +287,8 @@ describe("AppShell", () => {
         <p>Body</p>
       </AppShell>,
     );
-    // The rail is rendered twice (desktop column, phone strip); both must behave the same way.
+    // The review shell renders the rail twice — a desktop column and a phone strip — and both
+    // must behave the same way.
     const rails = screen.getAllByRole("navigation", { name: "Sections" });
     expect(rails.length).toBe(2);
     for (const rail of rails) {
@@ -382,5 +386,99 @@ describe("DesignGallery", () => {
     // The page header's action is the first one; the buttons section shows a second, as a specimen.
     fireEvent.click(screen.getAllByRole("button", { name: /new booking/i })[0]);
     expect(screen.getByRole("dialog", { name: "New booking" })).toBeTruthy();
+  });
+});
+
+describe("GlidingTabs", () => {
+  it("is one radio group, and the pill follows the choice", () => {
+    const onChange = vi.fn();
+    render(
+      <GlidingTabs
+        ariaLabel="Reporting period"
+        value="today"
+        onChange={onChange}
+        options={[
+          { key: "today", label: "Today" },
+          { key: "week", label: "Week" },
+          { key: "month", label: "Month" },
+        ]}
+      />,
+    );
+    const group = screen.getByRole("radiogroup", { name: "Reporting period" });
+    expect(within(group).getByRole("radio", { name: "Today" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(within(group).getByRole("radio", { name: "Month" }));
+    expect(onChange).toHaveBeenCalledWith("month");
+  });
+
+  it("steps with the arrow keys, so the pointer is not the only way", () => {
+    const onChange = vi.fn();
+    render(
+      <GlidingTabs
+        ariaLabel="Reporting period"
+        value="today"
+        onChange={onChange}
+        options={[
+          { key: "today", label: "Today" },
+          { key: "week", label: "Week" },
+        ]}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("radiogroup", { name: "Reporting period" }), { key: "ArrowRight" });
+    expect(onChange).toHaveBeenCalledWith("week");
+  });
+});
+
+describe("AppFrame", () => {
+  const groups = [
+    {
+      label: "Service desk",
+      items: [
+        { key: "dashboard", label: "Dashboard", caption: "The day", icon: BusFront },
+        { key: "invoices", label: "Invoices", caption: "Billing", icon: Receipt, count: 3 },
+      ],
+    },
+  ];
+
+  const frameProps = {
+    groups,
+    activeKey: "dashboard",
+    crumbs: ["Service desk", "Dashboard"],
+    user: { name: "Ama Boateng", role: "Administrator" },
+    company: "Richie Transport Services",
+    clock: "09:41",
+  };
+
+  it("marks the current screen, carries the day's counts and names the user", () => {
+    render(
+      <AppFrame {...frameProps} onNavigate={vi.fn()} onSignOut={vi.fn()} onOpenPalette={vi.fn()}>
+        <p>Screen body</p>
+      </AppFrame>,
+    );
+    // The phone copy lives inside a sheet, which mounts only when the menu is opened.
+    const rails = screen.getAllByRole("navigation", { name: "Sections" });
+    expect(rails.length).toBe(1);
+    for (const rail of rails) {
+      expect(within(rail).getByRole("button", { name: /Dashboard/ }).getAttribute("aria-current")).toBe("page");
+      expect(within(rail).getByText("3")).toBeTruthy();
+    }
+    expect(screen.getByText("Ama Boateng")).toBeTruthy();
+    expect(screen.getByText("Screen body")).toBeTruthy();
+  });
+
+  it("navigates, signs out and opens the palette", () => {
+    const onNavigate = vi.fn();
+    const onSignOut = vi.fn();
+    const onOpenPalette = vi.fn();
+    render(
+      <AppFrame {...frameProps} onNavigate={onNavigate} onSignOut={onSignOut} onOpenPalette={onOpenPalette}>
+        <p>Body</p>
+      </AppFrame>,
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: /Invoices/ })[0]);
+    expect(onNavigate).toHaveBeenCalledWith("invoices");
+    fireEvent.click(screen.getAllByRole("button", { name: "Sign out" })[0]);
+    expect(onSignOut).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Search or jump to a screen/ }));
+    expect(onOpenPalette).toHaveBeenCalled();
   });
 });

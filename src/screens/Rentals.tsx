@@ -118,8 +118,8 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
   // number rather than as the string "GHS 3,450.00", and a request with no price yet sorts to the
   // bottom of an ascending list instead of above a small one.
   const rentalColumns: Column<Rental>[] = [
-    { key: "ref", header: "Reference", sortValue: (r) => r.reference, render: (r) => <span className="font-mono text-xs font-semibold text-stone-900">{r.reference}</span> },
-    { key: "cust", header: "Customer", sortValue: (r) => r.customerName, render: (r) => <span className="font-semibold text-stone-900">{r.customerName}</span> },
+    { key: "ref", header: "Reference", sortValue: (r) => r.reference, render: (r) => <span className="font-mono text-xs font-semibold text-foreground">{r.reference}</span> },
+    { key: "cust", header: "Customer", sortValue: (r) => r.customerName, render: (r) => <span className="font-semibold text-foreground">{r.customerName}</span> },
     { key: "cat", header: "Category", sortValue: (r) => categoryName(r.vehicleCategoryId), render: (r) => categoryName(r.vehicleCategoryId) },
     { key: "dates", header: "Dates", sortValue: (r) => r.startDate, render: (r) => <span className="whitespace-nowrap text-xs">{formatDate(r.startDate)} - {formatDate(r.endDate)}</span> },
     {
@@ -127,7 +127,7 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
       header: "Quote",
       className: "rts-num",
       sortValue: (r) => r.quote?.total ?? -1,
-      render: (r) => (r.quote ? money(r.quote.total, r.quote.currencyCode) : <span className="text-stone-400">-</span>),
+      render: (r) => (r.quote ? money(r.quote.total, r.quote.currencyCode) : <span className="text-dim">-</span>),
     },
     { key: "status", header: "Status", sortValue: (r) => RENTAL_STATUS_LABELS[r.status], render: (r) => <Badge tone={statusTone[r.status]}>{RENTAL_STATUS_LABELS[r.status]}</Badge> },
     { key: "actions", header: "", className: "text-right", render: (r) => <Button variant="ghost" onClick={() => setSelectedId(r.id)}>Open</Button> },
@@ -295,7 +295,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
 
   return (
     <div>
-      <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-stone-500 hover:text-stone-800">&larr; Back to rentals</button>
+      <button type="button" onClick={onBack} className="mb-3 text-xs font-semibold text-muted-foreground hover:text-foreground">&larr; Back to rentals</button>
       <PageHeader
         eyebrow={`Rental ${rental.reference}`}
         title={rental.customerName}
@@ -336,21 +336,21 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Request details">
           <dl className="grid grid-cols-[130px_1fr] gap-y-2 text-sm">
-            <dt className="text-stone-500">Customer</dt><dd className="text-stone-800">{rental.customerName}</dd>
-            {client && <><dt className="text-stone-500">Linked client</dt><dd className="text-stone-800">{client.name}</dd></>}
-            <dt className="text-stone-500">Phone</dt><dd className="text-stone-800">{rental.customerPhone || "-"}</dd>
-            <dt className="text-stone-500">Email</dt><dd className="text-stone-800">{rental.customerEmail || "-"}</dd>
-            <dt className="text-stone-500">Purpose</dt><dd className="text-stone-800">{rental.purpose || "-"}</dd>
-            <dt className="text-stone-500">Pickup</dt><dd className="text-stone-800">{rental.pickupLocation || "-"}</dd>
-            <dt className="text-stone-500">Drop-off</dt><dd className="text-stone-800">{rental.dropoffLocation || "-"}</dd>
-            <dt className="text-stone-500">Driver</dt><dd className="text-stone-800">{needsDriver ? "Required" : "Not required"}</dd>
-            <dt className="text-stone-500">Journey</dt><dd className="text-stone-800">{planLine(rental)}</dd>
-            <dt className="text-stone-500">Stops</dt><dd className="text-stone-800">{stopsLine(rental)}</dd>
-            {rental.plan && rental.plan.luggage !== "" && <><dt className="text-stone-500">Luggage</dt><dd className="text-stone-800">{rental.plan.luggage}</dd></>}
-            {rental.plan && rental.plan.specialNeeds !== "" && <><dt className="text-stone-500">Special needs</dt><dd className="text-stone-800">{rental.plan.specialNeeds}</dd></>}
-            <dt className="text-stone-500">On the day</dt><dd className="text-stone-800">{tripContactLine(rental)}</dd>
-            <dt className="text-stone-500">Came in by</dt><dd className="text-stone-800">{sourceLabel(rental.plan?.source ?? "")}</dd>
-            {rental.notes && <><dt className="text-stone-500">Notes</dt><dd className="text-stone-800">{rental.notes}</dd></>}
+            <dt className="text-muted-foreground">Customer</dt><dd className="text-foreground">{rental.customerName}</dd>
+            {client && <><dt className="text-muted-foreground">Linked client</dt><dd className="text-foreground">{client.name}</dd></>}
+            <dt className="text-muted-foreground">Phone</dt><dd className="text-foreground">{rental.customerPhone || "-"}</dd>
+            <dt className="text-muted-foreground">Email</dt><dd className="text-foreground">{rental.customerEmail || "-"}</dd>
+            <dt className="text-muted-foreground">Purpose</dt><dd className="text-foreground">{rental.purpose || "-"}</dd>
+            <dt className="text-muted-foreground">Pickup</dt><dd className="text-foreground">{rental.pickupLocation || "-"}</dd>
+            <dt className="text-muted-foreground">Drop-off</dt><dd className="text-foreground">{rental.dropoffLocation || "-"}</dd>
+            <dt className="text-muted-foreground">Driver</dt><dd className="text-foreground">{needsDriver ? "Required" : "Not required"}</dd>
+            <dt className="text-muted-foreground">Journey</dt><dd className="text-foreground">{planLine(rental)}</dd>
+            <dt className="text-muted-foreground">Stops</dt><dd className="text-foreground">{stopsLine(rental)}</dd>
+            {rental.plan && rental.plan.luggage !== "" && <><dt className="text-muted-foreground">Luggage</dt><dd className="text-foreground">{rental.plan.luggage}</dd></>}
+            {rental.plan && rental.plan.specialNeeds !== "" && <><dt className="text-muted-foreground">Special needs</dt><dd className="text-foreground">{rental.plan.specialNeeds}</dd></>}
+            <dt className="text-muted-foreground">On the day</dt><dd className="text-foreground">{tripContactLine(rental)}</dd>
+            <dt className="text-muted-foreground">Came in by</dt><dd className="text-foreground">{sourceLabel(rental.plan?.source ?? "")}</dd>
+            {rental.notes && <><dt className="text-muted-foreground">Notes</dt><dd className="text-foreground">{rental.notes}</dd></>}
           </dl>
         </Card>
 
@@ -360,10 +360,10 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
               {/* D-117: the document a customer can name. The number is copied rather than read out
                   loud over a bad line, and the revision says which version of the price it is. */}
               {quotationIsNumbered(rental.quote) ? (
-                <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-stone-200 pb-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-border pb-2">
                   <span className="font-mono text-sm font-semibold">{quotationHeading(rental.quote)}</span>
                   <CopyButton value={rental.quote.number} what="quotation number" />
-                  <span className={`text-xs ${expired ? "text-red-700" : "text-stone-600"}`}>{validityLine(rental.quote.validUntil, nowIso)}</span>
+                  <span className={`text-xs ${expired ? "text-red-700" : "text-muted-foreground"}`}>{validityLine(rental.quote.validUntil, nowIso)}</span>
                 </div>
               ) : (
                 <Notice tone="warning" title="This quotation has no number" className="mb-3">
@@ -372,59 +372,59 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
                 </Notice>
               )}
               <table className="w-full text-left">
-                <thead className="text-[10px] uppercase tracking-wider text-stone-500"><tr><th className="pb-1">Description</th><th className="pb-1 text-right">Qty</th><th className="pb-1 text-right">Unit</th><th className="pb-1 text-right">Line</th></tr></thead>
-                <tbody className="divide-y divide-stone-100">
+                <thead className="text-[10px] uppercase tracking-wider text-muted-foreground"><tr><th className="pb-1">Description</th><th className="pb-1 text-right">Qty</th><th className="pb-1 text-right">Unit</th><th className="pb-1 text-right">Line</th></tr></thead>
+                <tbody className="divide-y divide-divider">
                   {rental.quote.lines.map((l) => (
                     <tr key={l.id}><td className="py-1 pr-2">{l.description}</td><td className="py-1 text-right">{l.quantity}</td><td className="py-1 text-right">{money(l.unitAmount, rental.quote!.currencyCode)}</td><td className="py-1 text-right">{money(lineAmount(l.quantity, l.unitAmount), rental.quote!.currencyCode)}</td></tr>
                   ))}
                 </tbody>
               </table>
-              <dl className="mt-3 space-y-1 border-t border-stone-200 pt-2 text-sm">
-                <div className="flex justify-between"><dt className="text-stone-500">Pricing basis</dt><dd>{PRICING_BASIS_LABELS[rental.quote.pricingBasis]}</dd></div>
-                <div className="flex justify-between"><dt className="text-stone-500">Lines</dt><dd>{money(rental.quote.subtotal, rental.quote.currencyCode)}</dd></div>
+              <dl className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
+                <div className="flex justify-between"><dt className="text-muted-foreground">Pricing basis</dt><dd>{PRICING_BASIS_LABELS[rental.quote.pricingBasis]}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">Lines</dt><dd>{money(rental.quote.subtotal, rental.quote.currencyCode)}</dd></div>
                 {/* D-121: the reduction and the levy, named on the document rather than folded into a
                     total the customer cannot check. */}
                 {rental.quote.discountAmount > 0 && (
-                  <div className="flex justify-between"><dt className="text-stone-500">Less discount{rental.quote.discountReason ? `: ${rental.quote.discountReason}` : ""}</dt><dd>-{money(rental.quote.discountAmount, rental.quote.currencyCode)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-muted-foreground">Less discount{rental.quote.discountReason ? `: ${rental.quote.discountReason}` : ""}</dt><dd>-{money(rental.quote.discountAmount, rental.quote.currencyCode)}</dd></div>
                 )}
                 {rental.quote.taxLines.map((line) => (
-                  <div key={line.name} className="flex justify-between"><dt className="text-stone-500">{line.name} at {line.ratePercent}%</dt><dd>{money(line.amount, rental.quote!.currencyCode)}</dd></div>
+                  <div key={line.name} className="flex justify-between"><dt className="text-muted-foreground">{line.name} at {line.ratePercent}%</dt><dd>{money(line.amount, rental.quote!.currencyCode)}</dd></div>
                 ))}
                 <div className="flex justify-between font-semibold"><dt>Total</dt><dd>{money(rental.quote.total, rental.quote.currencyCode)}</dd></div>
-                <div className="flex justify-between"><dt className="text-stone-500">Deposit ({rental.quote.depositPercent}%)</dt><dd>{money(rental.quote.depositRequired, rental.quote.currencyCode)}</dd></div>
-                <div className="flex justify-between"><dt className="text-stone-500">Driver included</dt><dd>{rental.quote.driverIncluded ? "Yes" : "No"}</dd></div>
-                <div className="flex justify-between"><dt className="text-stone-500">Valid until</dt><dd className={expired ? "text-red-700" : ""}>{formatDateTime(rental.quote.validUntil)}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">Deposit ({rental.quote.depositPercent}%)</dt><dd>{money(rental.quote.depositRequired, rental.quote.currencyCode)}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">Driver included</dt><dd>{rental.quote.driverIncluded ? "Yes" : "No"}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">Valid until</dt><dd className={expired ? "text-red-700" : ""}>{formatDateTime(rental.quote.validUntil)}</dd></div>
               </dl>
               {/* D-116: the customer's own answer, in their own record — and a warning when the
                   quotation has moved on since they gave it. */}
               {rental.acceptance && (
-                <p className={`mt-2 text-xs ${acceptanceStateOf(rental, nowIso) === "current" ? "text-stone-700" : "text-amber-800"}`}>
+                <p className={`mt-2 text-xs ${acceptanceStateOf(rental, nowIso) === "current" ? "text-foreground" : "text-amber-800"}`}>
                   {acceptanceLine(rental, nowIso)}
-                  {rental.acceptance.note && <span className="block text-stone-600">&ldquo;{rental.acceptance.note}&rdquo;</span>}
+                  {rental.acceptance.note && <span className="block text-muted-foreground">&ldquo;{rental.acceptance.note}&rdquo;</span>}
                 </p>
               )}
               {/* The conditions the customer agreed to, kept with the quotation they were printed on. */}
               {rental.quote.terms && (
-                <div className="mt-3 border-t border-stone-200 pt-2">
-                  <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Terms</h3>
-                  <p className="whitespace-pre-line text-xs text-stone-700">{rental.quote.terms}</p>
+                <div className="mt-3 border-t border-border pt-2">
+                  <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Terms</h3>
+                  <p className="whitespace-pre-line text-xs text-foreground">{rental.quote.terms}</p>
                 </div>
               )}
               {/* D-121: the second signature, in the office's words — including when nobody has asked
                   for one, which is a different statement from "approved". */}
               {approvalLine(rental.quote, db.settings.rental.quotationApprovalAbove) && (
-                <p className={`mt-2 text-xs ${approvalIsCurrent(rental.quote) ? "text-stone-700" : "text-amber-800"}`}>
+                <p className={`mt-2 text-xs ${approvalIsCurrent(rental.quote) ? "text-foreground" : "text-amber-800"}`}>
                   {approvalLine(rental.quote, db.settings.rental.quotationApprovalAbove)}
                 </p>
               )}
               {rental.quoteHistory.length > 0 && (
-                <div className="mt-4 border-t border-stone-200 pt-3">
-                  <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Previous quotations retained</h3>
+                <div className="mt-4 border-t border-border pt-3">
+                  <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Previous quotations retained</h3>
                   <ol className="space-y-2">
                     {rental.quoteHistory.map((previous, index) => (
-                      <li key={`${previous.quotedAt}-${index}`} className="rounded-sm bg-stone-50 px-3 py-2">
+                      <li key={`${previous.quotedAt}-${index}`} className="rounded-sm bg-muted px-3 py-2">
                         <div className="flex justify-between gap-2 text-xs"><span className="font-semibold">{quotationIsNumbered(previous) ? `Revision ${previous.revision}` : "Unnumbered"}</span><span>{money(previous.subtotal, previous.currencyCode)}</span></div>
-                        <p className="mt-0.5 text-[10px] text-stone-500">Quoted {formatDate(previous.quotedAt.slice(0, 10))} by {previous.quotedBy} · valid until {formatDateTime(previous.validUntil)}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">Quoted {formatDate(previous.quotedAt.slice(0, 10))} by {previous.quotedBy} · valid until {formatDateTime(previous.validUntil)}</p>
                       </li>
                     ))}
                   </ol>
@@ -432,16 +432,16 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
               )}
             </div>
           ) : (
-            <p className="text-sm text-stone-500">No quotation issued yet.</p>
+            <p className="text-sm text-muted-foreground">No quotation issued yet.</p>
           )}
         </Card>
 
         {rental.deposit && (
           <Card title="Deposit">
             <dl className="grid grid-cols-[130px_1fr] gap-y-2 text-sm">
-              <dt className="text-stone-500">Amount</dt><dd className="font-semibold text-stone-800">{money(rental.deposit.amount, rental.quote?.currencyCode ?? null)}</dd>
-              <dt className="text-stone-500">Method</dt><dd className="text-stone-800">{rental.deposit.method}</dd>
-              <dt className="text-stone-500">Reference</dt><dd className="text-stone-800">{rental.deposit.reference || "-"}</dd>
+              <dt className="text-muted-foreground">Amount</dt><dd className="font-semibold text-foreground">{money(rental.deposit.amount, rental.quote?.currencyCode ?? null)}</dd>
+              <dt className="text-muted-foreground">Method</dt><dd className="text-foreground">{rental.deposit.method}</dd>
+              <dt className="text-muted-foreground">Reference</dt><dd className="text-foreground">{rental.deposit.reference || "-"}</dd>
             </dl>
           </Card>
         )}
@@ -449,8 +449,8 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
         {(rental.assignedVehicleId || isActiveRental(rental.status)) && (
           <Card title="Assigned resources">
             <dl className="grid grid-cols-[130px_1fr] gap-y-2 text-sm">
-              <dt className="text-stone-500">Vehicle</dt><dd className="text-stone-800">{vehicle ? `${vehicle.registration}` : <span className="text-stone-400">Not assigned</span>}</dd>
-              <dt className="text-stone-500">Driver</dt><dd className="text-stone-800">{driver ? driver.fullName : <span className="text-stone-400">{needsDriver ? "Required - not assigned" : "Not required"}</span>}</dd>
+              <dt className="text-muted-foreground">Vehicle</dt><dd className="text-foreground">{vehicle ? `${vehicle.registration}` : <span className="text-dim">Not assigned</span>}</dd>
+              <dt className="text-muted-foreground">Driver</dt><dd className="text-foreground">{driver ? driver.fullName : <span className="text-dim">{needsDriver ? "Required - not assigned" : "Not required"}</span>}</dd>
             </dl>
           </Card>
         )}
@@ -459,24 +459,24 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
             field of the money, and a hire with nothing recorded says so rather than showing blanks. */}
         {(rental.run || rental.status === "completed" || rental.status === "dispatched") && (
           <Card title="What happened" className="lg:col-span-2">
-            <p className="text-sm text-stone-800">{runLine(rental.run)}</p>
+            <p className="text-sm text-foreground">{runLine(rental.run)}</p>
             <dl className="mt-3 grid grid-cols-[170px_1fr] gap-y-2 text-sm">
-              <dt className="text-stone-500">Distance</dt>
-              <dd className="text-stone-800">{rental.run ? distanceLine(rental.run) : null}{!rental.run?.distanceKm ? <span className="text-stone-400">Not recorded</span> : null}</dd>
-              <dt className="text-stone-500">Odometer</dt>
-              <dd className="text-stone-800">
+              <dt className="text-muted-foreground">Distance</dt>
+              <dd className="text-foreground">{rental.run ? distanceLine(rental.run) : null}{!rental.run?.distanceKm ? <span className="text-dim">Not recorded</span> : null}</dd>
+              <dt className="text-muted-foreground">Odometer</dt>
+              <dd className="text-foreground">
                 {rental.run && (rental.run.odometerStartKm !== null || rental.run.odometerEndKm !== null) ? (
                   `${rental.run.odometerStartKm !== null ? `${rental.run.odometerStartKm.toLocaleString("en-GB")} km` : "not read"} at departure · ${rental.run.odometerEndKm !== null ? `${rental.run.odometerEndKm.toLocaleString("en-GB")} km` : "not read"} at return`
                 ) : (
-                  <span className="text-stone-400">No odometer reading was taken</span>
+                  <span className="text-dim">No odometer reading was taken</span>
                 )}
               </dd>
-              <dt className="text-stone-500">Damage</dt>
-              <dd className={rental.run?.damageNotes ? "text-amber-800" : "text-stone-800"}>{damageLine(rental.run)}</dd>
-              {rental.run && rental.run.feedback && <><dt className="text-stone-500">What the customer said</dt><dd className="text-stone-800">{rental.run.feedback}</dd></>}
-              <dt className="text-stone-500">Money</dt>
-              <dd className="text-stone-800">{balanceLine(rentalBalance(db, rental)) ?? <span className="text-stone-400">No invoice has been raised for this hire yet</span>}</dd>
-              {rental.run && <><dt className="text-stone-500">Recorded by</dt><dd className="text-stone-800">{rental.run.recordedBy || "—"} · {formatDateTime(rental.run.recordedAt)}</dd></>}
+              <dt className="text-muted-foreground">Damage</dt>
+              <dd className={rental.run?.damageNotes ? "text-amber-800" : "text-foreground"}>{damageLine(rental.run)}</dd>
+              {rental.run && rental.run.feedback && <><dt className="text-muted-foreground">What the customer said</dt><dd className="text-foreground">{rental.run.feedback}</dd></>}
+              <dt className="text-muted-foreground">Money</dt>
+              <dd className="text-foreground">{balanceLine(rentalBalance(db, rental)) ?? <span className="text-dim">No invoice has been raised for this hire yet</span>}</dd>
+              {rental.run && <><dt className="text-muted-foreground">Recorded by</dt><dd className="text-foreground">{rental.run.recordedBy || "—"} · {formatDateTime(rental.run.recordedAt)}</dd></>}
             </dl>
           </Card>
         )}
@@ -484,15 +484,15 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
         {rental.finalInvoice && (
           <Card title="Final invoice" className="lg:col-span-2">
             <table className="w-full text-left text-sm">
-              <thead className="text-[10px] uppercase tracking-wider text-stone-500"><tr><th className="pb-1">Description</th><th className="pb-1 text-right">Qty</th><th className="pb-1 text-right">Unit</th><th className="pb-1 text-right">Line</th></tr></thead>
-              <tbody className="divide-y divide-stone-100">
+              <thead className="text-[10px] uppercase tracking-wider text-muted-foreground"><tr><th className="pb-1">Description</th><th className="pb-1 text-right">Qty</th><th className="pb-1 text-right">Unit</th><th className="pb-1 text-right">Line</th></tr></thead>
+              <tbody className="divide-y divide-divider">
                 {rental.finalInvoice.lines.map((l) => (
                   <tr key={l.id}><td className="py-1 pr-2">{l.description}</td><td className="py-1 text-right">{l.quantity}</td><td className="py-1 text-right">{money(l.unitAmount, rental.finalInvoice!.currencyCode)}</td><td className="py-1 text-right">{money(lineAmount(l.quantity, l.unitAmount), rental.finalInvoice!.currencyCode)}</td></tr>
                 ))}
               </tbody>
             </table>
-            <div className="mt-2 flex justify-between border-t border-stone-200 pt-2 text-sm font-semibold"><span>Total billed</span><span>{money(rental.finalInvoice.total, rental.finalInvoice.currencyCode)}</span></div>
-            {rental.deposit && <p className="mt-1 text-right text-xs text-stone-500">Deposit received: {money(rental.deposit.amount, rental.finalInvoice.currencyCode)} · Balance: {money(rental.finalInvoice.total - rental.deposit.amount, rental.finalInvoice.currencyCode)}</p>}
+            <div className="mt-2 flex justify-between border-t border-border pt-2 text-sm font-semibold"><span>Total billed</span><span>{money(rental.finalInvoice.total, rental.finalInvoice.currencyCode)}</span></div>
+            {rental.deposit && <p className="mt-1 text-right text-xs text-muted-foreground">Deposit received: {money(rental.deposit.amount, rental.finalInvoice.currencyCode)} · Balance: {money(rental.finalInvoice.total - rental.deposit.amount, rental.finalInvoice.currencyCode)}</p>}
           </Card>
         )}
 
@@ -508,15 +508,15 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
                 const billed = db.invoices.find((invoice) => invoice.rentalId === rental.id && invoice.status !== "void");
                 const canApprove = allowed("rentals:approve") && !chargeIsApproved(charge) && chargeNeedsApproval(chargeAmount(charge), threshold) && problem === null && !billed;
                 return (
-                  <li key={charge.id} className="rounded-sm bg-stone-50 px-3 py-2">
+                  <li key={charge.id} className="rounded-sm bg-muted px-3 py-2">
                     <div className="flex justify-between gap-2 text-sm">
-                      <span className="font-medium text-stone-900">{charge.description}</span>
+                      <span className="font-medium text-foreground">{charge.description}</span>
                       <span className="rts-mono">{money(chargeAmount(charge), currency)}</span>
                     </div>
-                    <p className="mt-0.5 text-xs text-stone-700">Reason given: {charge.reason}</p>
-                    <p className="mt-0.5 text-[10px] text-stone-500">Added by {charge.addedByName} · {formatDateTime(charge.addedAt)}</p>
+                    <p className="mt-0.5 text-xs text-foreground">Reason given: {charge.reason}</p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">Added by {charge.addedByName} · {formatDateTime(charge.addedAt)}</p>
                     {chargeApprovalLine(charge, threshold, currency ?? "") && (
-                      <p className={`mt-1 text-xs ${chargeIsApproved(charge) ? "text-stone-700" : "text-amber-800"}`}>{chargeApprovalLine(charge, threshold, currency ?? "")}</p>
+                      <p className={`mt-1 text-xs ${chargeIsApproved(charge) ? "text-foreground" : "text-amber-800"}`}>{chargeApprovalLine(charge, threshold, currency ?? "")}</p>
                     )}
                     {canApprove && (
                       <div className="mt-1 flex justify-end">
@@ -555,12 +555,12 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
         >
           <div className="space-y-4">
             <dl className="grid grid-cols-[140px_1fr] gap-y-2 text-sm">
-              <dt className="text-stone-500">Customer</dt>
-              <dd className="text-stone-800">{rental.customerName}</dd>
-              <dt className="text-stone-500">Quoted</dt>
-              <dd className="font-semibold text-stone-900">{money(rental.quote?.subtotal ?? 0, rental.quote?.currencyCode ?? null)}</dd>
-              <dt className="text-stone-500">Held until</dt>
-              <dd className="text-stone-800">{rental.quote ? formatDateTime(rental.quote.validUntil) : "—"}</dd>
+              <dt className="text-muted-foreground">Customer</dt>
+              <dd className="text-foreground">{rental.customerName}</dd>
+              <dt className="text-muted-foreground">Quoted</dt>
+              <dd className="font-semibold text-foreground">{money(rental.quote?.subtotal ?? 0, rental.quote?.currencyCode ?? null)}</dd>
+              <dt className="text-muted-foreground">Held until</dt>
+              <dd className="text-foreground">{rental.quote ? formatDateTime(rental.quote.validUntil) : "—"}</dd>
             </dl>
             <Field label="What they said (optional)" hint="For example: agreed on the phone with the transport officer, or the pickup time they asked for.">
               <TextArea value={acceptNote} onChange={(event) => setAcceptNote(event.target.value)} />
@@ -577,7 +577,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
       {panel === "approve" && (
         <Panel title={`Approve quotation ${rental.quote?.number ?? ""}`} description="A second signature on this price. It is recorded with your name and the figure you approved, and it does not change anything else." onClose={() => setPanel(null)}>
           <div className="space-y-4">
-            <p className="text-sm text-stone-800">
+            <p className="text-sm text-foreground">
               {rental.quote ? `${money(rental.quote.total, rental.quote.currencyCode)} for ${rental.reference}, quoted by ${rental.quote.quotedBy}.` : ""}
             </p>
             <Field label="Note (optional)" hint="Why it was approved, if there is anything worth saying at the time.">
@@ -602,12 +602,12 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
           >
             <div className="space-y-4">
               <dl className="grid grid-cols-[120px_1fr] gap-y-2 text-sm">
-                <dt className="text-stone-500">Amount</dt>
-                <dd className="font-semibold text-stone-900">{money(chargeAmount(charge), currency)}</dd>
-                <dt className="text-stone-500">Reason given</dt>
-                <dd className="text-stone-800">{charge.reason}</dd>
-                <dt className="text-stone-500">Added by</dt>
-                <dd className="text-stone-800">{charge.addedByName}</dd>
+                <dt className="text-muted-foreground">Amount</dt>
+                <dd className="font-semibold text-foreground">{money(chargeAmount(charge), currency)}</dd>
+                <dt className="text-muted-foreground">Reason given</dt>
+                <dd className="text-foreground">{charge.reason}</dd>
+                <dt className="text-muted-foreground">Added by</dt>
+                <dd className="text-foreground">{charge.addedByName}</dd>
               </dl>
               <Field label="Note (optional)" hint="Why it was approved, if there is anything worth saying at the time.">
                 <TextArea value={chargeNote} onChange={(event) => setChargeNote(event.target.value)} rows={3} />
@@ -680,8 +680,8 @@ function RequestForm({ initial, title, onClose, onSubmit }: { initial: RentalReq
           <Field label="Drop-off location"><TextInput value={values.dropoffLocation} onChange={(e) => set({ dropoffLocation: e.target.value })} /></Field>
         </div>
         <Field label="Purpose"><TextInput value={values.purpose} onChange={(e) => set({ purpose: e.target.value })} /></Field>
-        <fieldset className="space-y-3 rounded-sm border border-stone-200 p-3">
-          <legend className="px-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500">The journey asked for</legend>
+        <fieldset className="space-y-3 rounded-sm border border-border p-3">
+          <legend className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">The journey asked for</legend>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Departure time" hint="Leave blank if nobody said." error={errors.departureTime}>
               <TextInput type="time" value={values.departureTime ?? ""} onChange={(e) => set({ departureTime: e.target.value })} invalid={!!errors.departureTime} />
@@ -730,7 +730,7 @@ function LineItemsEditor({ lines, setLines, errors, currency }: { lines: QuoteLi
     <div>
       <div className="space-y-3">
         {lines.map((line, i) => (
-          <div key={i} className="rounded-sm border border-stone-200 p-2">
+          <div key={i} className="rounded-sm border border-border p-2">
             <Field label={`Line ${i + 1} description`} error={errors[`lines.${i}.description`]}><TextInput value={line.description} onChange={(e) => setLines(lines.map((l, j) => (j === i ? { ...l, description: e.target.value } : l)))} invalid={!!errors[`lines.${i}.description`]} /></Field>
             <div className="mt-2 grid grid-cols-[1fr_1fr_auto] items-start gap-2">
               <Field label="Qty" error={errors[`lines.${i}.quantity`]}><TextInput type="number" min={0} step="any" value={line.quantity} onChange={(e) => setLines(lines.map((l, j) => (j === i ? { ...l, quantity: e.target.value } : l)))} invalid={!!errors[`lines.${i}.quantity`]} /></Field>
@@ -808,14 +808,14 @@ function CompleteForm({
         className="space-y-4"
       >
         <LineItemsEditor lines={lines} setLines={setLines} errors={errors} currency={currency} />
-        <div className="border-t border-stone-200 pt-3">
-          <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Charges added after the quotation</h3>
-          <p className="mb-2 text-xs text-stone-600">
+        <div className="border-t border-border pt-3">
+          <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Charges added after the quotation</h3>
+          <p className="mb-2 text-xs text-muted-foreground">
             Fuel, damage, waiting, a stop nobody priced: anything the customer was not quoted for. Each charge is recorded with the reason they were given, and one at or above the company&apos;s figure needs a second signature before it can be billed.
           </p>
           <div className="space-y-2">
             {charges.map((row, index) => (
-              <div key={index} className="rounded-sm bg-stone-50 p-2">
+              <div key={index} className="rounded-sm bg-muted p-2">
                 <div className="grid gap-2 sm:grid-cols-[1fr_70px_110px]">
                   <Field label={`Charge ${index + 1}`} error={errors[`extraCharges.${index}.description`]}>
                     <TextInput value={row.description} onChange={setCharge(index, "description")} invalid={!!errors[`extraCharges.${index}.description`]} placeholder="e.g. Damaged seat cover" />
@@ -842,11 +842,11 @@ function CompleteForm({
           </div>
           <div className="mt-2 flex items-center justify-between">
             <Button onClick={() => setCharges([...charges, { description: "", quantity: "1", unitAmount: "", reason: "" }])}>Add another charge</Button>
-            {chargeTotal > 0 && <p className="text-xs text-stone-700">Charges total {money(chargeTotal, currency)}</p>}
+            {chargeTotal > 0 && <p className="text-xs text-foreground">Charges total {money(chargeTotal, currency)}</p>}
           </div>
         </div>
-        <div className="border-t border-stone-200 pt-3">
-          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500">The journey</h3>
+        <div className="border-t border-border pt-3">
+          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">The journey</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Left the yard" error={errors.departedAt} hint="Recorded when the hire started; correct it if the vehicle left at another time.">
               <TextInput type="datetime-local" value={run.departedAt} onChange={set("departedAt")} invalid={!!errors.departedAt} />
@@ -930,8 +930,8 @@ function QuoteForm({
       >
         {requoteMode && <Notice tone="warning">This creates a new quotation revision; the prior amounts, deposit requirement and expiry date remain in the history. Any approval has to be given again, because the figure has changed.</Notice>}
         <LineItemsEditor lines={lines} setLines={setLines} errors={errors} currency={currency} />
-        <div className="rounded-sm border border-stone-200 p-3">
-          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Reduction</h3>
+        <div className="rounded-sm border border-border p-3">
+          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Reduction</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Discount (optional)" hint={currency ? `In ${currency}` : "Set the currency in Settings"} error={errors.discountAmount}>
               <TextInput inputMode="decimal" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} invalid={!!errors.discountAmount} />
@@ -943,21 +943,21 @@ function QuoteForm({
             )}
           </div>
         </div>
-        <dl className="space-y-1 border-t border-stone-200 pt-2 text-sm">
-          <div className="flex justify-between"><dt className="text-stone-500">Lines</dt><dd>{money(subtotal, currency)}</dd></div>
+        <dl className="space-y-1 border-t border-border pt-2 text-sm">
+          <div className="flex justify-between"><dt className="text-muted-foreground">Lines</dt><dd>{money(subtotal, currency)}</dd></div>
           {preview.figures.discountAmount > 0 && (
-            <div className="flex justify-between"><dt className="text-stone-500">Less discount</dt><dd>-{money(preview.figures.discountAmount, currency)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted-foreground">Less discount</dt><dd>-{money(preview.figures.discountAmount, currency)}</dd></div>
           )}
           {preview.figures.taxLines.map((line) => (
-            <div key={line.name} className="flex justify-between"><dt className="text-stone-500">{line.name} at {line.ratePercent}%</dt><dd>{money(line.amount, currency)}</dd></div>
+            <div key={line.name} className="flex justify-between"><dt className="text-muted-foreground">{line.name} at {line.ratePercent}%</dt><dd>{money(line.amount, currency)}</dd></div>
           ))}
           <div className="flex justify-between font-semibold"><dt>Total</dt><dd>{money(preview.figures.total, currency)}</dd></div>
           {depositPercent !== null && depositPercent !== undefined && (
-            <div className="flex justify-between"><dt className="text-stone-500">Deposit at {depositPercent}%</dt><dd>{money(percentOf(preview.figures.total, depositPercent), currency)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted-foreground">Deposit at {depositPercent}%</dt><dd>{money(percentOf(preview.figures.total, depositPercent), currency)}</dd></div>
           )}
         </dl>
         {taxPosition !== "registered" && (
-          <p className="text-xs text-stone-600">No tax is added to this quotation: the company is not recorded as VAT registered.</p>
+          <p className="text-xs text-muted-foreground">No tax is added to this quotation: the company is not recorded as VAT registered.</p>
         )}
         <div className="flex justify-end gap-2 pt-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary">{requoteMode ? "Issue revised quotation" : "Issue quotation"}</Button></div>
       </form>

@@ -200,7 +200,7 @@ export function DispatchBoardPage({ navigate }: { navigate?: (route: Route) => v
                 render: (run: BoardRun) => (
                   <span className="font-mono text-xs">
                     {run.departsAt || "—"}
-                    {run.endsAt ? <span className="text-stone-400">–{run.endsAt}</span> : null}
+                    {run.endsAt ? <span className="text-dim">–{run.endsAt}</span> : null}
                   </span>
                 ),
               },
@@ -220,7 +220,7 @@ export function DispatchBoardPage({ navigate }: { navigate?: (route: Route) => v
                 render: (run: BoardRun) => (
                   <span>
                     <span className="font-medium">{run.routeName}</span>
-                    <span className="block text-xs text-stone-600">{run.routeReference}</span>
+                    <span className="block text-xs text-muted-foreground">{run.routeReference}</span>
                   </span>
                 ),
               },
@@ -232,29 +232,29 @@ export function DispatchBoardPage({ navigate }: { navigate?: (route: Route) => v
                   run.vehicleLabel ? (
                     <span>
                       <span className="font-mono text-xs">{run.vehicleLabel}</span>
-                      {run.vehicleState && <span className="block text-xs text-stone-600">{run.vehicleState}</span>}
+                      {run.vehicleState && <span className="block text-xs text-muted-foreground">{run.vehicleState}</span>}
                     </span>
                   ) : (
-                    <span className="text-stone-500">no vehicle</span>
+                    <span className="text-muted-foreground">no vehicle</span>
                   ),
               },
               {
                 key: "driver",
                 header: "Driver",
-                render: (run: BoardRun) => (run.driverLabel ? <span className="text-sm">{run.driverLabel}</span> : <span className="text-stone-500">no driver</span>),
+                render: (run: BoardRun) => (run.driverLabel ? <span className="text-sm">{run.driverLabel}</span> : <span className="text-muted-foreground">no driver</span>),
               },
               {
                 key: "seats",
                 header: "Seats",
                 render: (run: BoardRun) =>
                   run.seats === 0 ? (
-                    <span className="text-stone-500">no bus</span>
+                    <span className="text-muted-foreground">no bus</span>
                   ) : run.overCapacity > 0 ? (
                     <Badge tone="error">{`${run.riders} for ${run.seats}`}</Badge>
                   ) : (
                     <span className="text-sm">
                       {run.riders}/{run.seats}
-                      <span className="block text-xs text-stone-600">{run.free} spare</span>
+                      <span className="block text-xs text-muted-foreground">{run.free} spare</span>
                     </span>
                   ),
               },
@@ -268,13 +268,13 @@ export function DispatchBoardPage({ navigate }: { navigate?: (route: Route) => v
                 header: "Needs attention",
                 render: (run: BoardRun) =>
                   run.alerts.length === 0 ? (
-                    <span className="text-xs text-stone-400">—</span>
+                    <span className="text-xs text-dim">—</span>
                   ) : (
                     <ul className="space-y-1">
                       {run.alerts.map((alert) => (
                         <li key={alert.text}>
                           <Badge tone={alert.level === "blocker" ? "error" : "warning"}>{alert.level === "blocker" ? "Blocks" : "Late"}</Badge>{" "}
-                          <span className="text-xs text-stone-700">{alert.text}</span>
+                          <span className="text-xs text-foreground">{alert.text}</span>
                         </li>
                       ))}
                     </ul>
@@ -296,7 +296,7 @@ export function DispatchBoardPage({ navigate }: { navigate?: (route: Route) => v
 
       <div className="mt-5">
         <Card title="What this board cannot tell you" description="Limits of the records, not of the arithmetic. Each one is a fact nobody has entered.">
-          <ul className="space-y-2 text-sm text-stone-700">
+          <ul className="space-y-2 text-sm text-foreground">
             {board.limits.map((limit) => (
               <li key={limit}>{limit}</li>
             ))}

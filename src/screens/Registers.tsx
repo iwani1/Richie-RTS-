@@ -94,7 +94,7 @@ export function DriversPage() {
         rowKey={(d) => d.id}
         emptyState={<EmptyState title={db.drivers.length ? "No drivers match" : "No drivers registered"} body="Add drivers with their licence number and expiry date." />}
         columns={[
-          { key: "name", header: "Name", render: (d) => <span className="font-semibold text-stone-900">{d.fullName}</span> },
+          { key: "name", header: "Name", render: (d) => <span className="font-semibold text-foreground">{d.fullName}</span> },
           { key: "phone", header: "Phone", render: (d) => d.phone },
           {
             key: "lic",
@@ -102,7 +102,7 @@ export function DriversPage() {
             render: (d) => (
               <span className="flex flex-col">
                 <span className="font-mono text-xs">{d.licenceNumber}</span>
-                <span className="text-xs text-stone-600">
+                <span className="text-xs text-muted-foreground">
                   {(d.licenceClasses ?? []).length > 0 ? `Class ${(d.licenceClasses ?? []).join(", ")}` : <em className="rts-unset">class not recorded</em>}
                 </span>
               </span>
@@ -113,7 +113,7 @@ export function DriversPage() {
             header: "Qualifications",
             render: (d) =>
               (d.qualifications ?? []).length > 0 ? (
-                <span className="text-xs text-stone-700">{(d.qualifications ?? []).join(" · ")}</span>
+                <span className="text-xs text-foreground">{(d.qualifications ?? []).join(" · ")}</span>
               ) : (
                 <em className="rts-unset">none recorded</em>
               ),
@@ -121,7 +121,7 @@ export function DriversPage() {
           {
             key: "today",
             header: "Today",
-            render: (d) => <span className="text-xs text-stone-700">{driverAvailabilityLine(db, d.id, today)}</span>,
+            render: (d) => <span className="text-xs text-foreground">{driverAvailabilityLine(db, d.id, today)}</span>,
           },
           {
             key: "exp",
@@ -289,14 +289,14 @@ export function ClientsPage() {
             header: "Client",
             render: (c) => (
               <span className="flex flex-col">
-                <span className="font-semibold text-stone-900">{c.name}</span>
-                <span className="text-xs text-stone-600">
+                <span className="font-semibold text-foreground">{c.name}</span>
+                <span className="text-xs text-muted-foreground">
                   {c.reference ? <span className="rts-mono">{c.reference}</span> : <em className="rts-unset">no code</em>}
                   {" · "}
                   {c.type ? CLIENT_TYPE_LABELS[c.type] : <em className="rts-unset">type not recorded</em>}
                 </span>
                 {(c.registrationNumber || c.registeredOn) && (
-                  <span className="text-xs text-stone-600">
+                  <span className="text-xs text-muted-foreground">
                     {c.registrationNumber && <span className="rts-mono">Reg. {c.registrationNumber}</span>}
                     {c.registrationNumber && c.registeredOn ? " · " : ""}
                     {c.registeredOn ? `registered ${formatDate(c.registeredOn)}` : ""}
@@ -313,9 +313,9 @@ export function ClientsPage() {
               const primary = accounts.find((u) => u.primaryContact);
               return (
                 <div>
-                  {c.contactName || <span className="text-stone-400">-</span>}
+                  {c.contactName || <span className="text-dim">-</span>}
                   {accounts.length > 0 && (
-                    <div className="text-[11px] text-stone-500">
+                    <div className="text-[11px] text-muted-foreground">
                       {accounts.length} contact account{accounts.length === 1 ? "" : "s"}
                       {primary ? ` · ${primary.fullName} is primary` : " · none marked primary"}
                     </div>
@@ -324,16 +324,16 @@ export function ClientsPage() {
               );
             },
           },
-          { key: "phone", header: "Phone", render: (c) => c.contactPhone || <span className="text-stone-400">-</span> },
-          { key: "email", header: "Email", render: (c) => c.contactEmail || <span className="text-stone-400">-</span> },
+          { key: "phone", header: "Phone", render: (c) => c.contactPhone || <span className="text-dim">-</span> },
+          { key: "email", header: "Email", render: (c) => c.contactEmail || <span className="text-dim">-</span> },
           {
             key: "billing",
             header: "Billing",
             render: (c) =>
               c.billingAddress || c.tin ? (
                 <span className="flex flex-col text-xs">
-                  {c.billingAddress && <span className="text-stone-700">{c.billingAddress}</span>}
-                  {c.tin ? <span className="rts-mono text-stone-600">TIN {c.tin}</span> : <em className="rts-unset">no tax number</em>}
+                  {c.billingAddress && <span className="text-foreground">{c.billingAddress}</span>}
+                  {c.tin ? <span className="rts-mono text-muted-foreground">TIN {c.tin}</span> : <em className="rts-unset">no tax number</em>}
                 </span>
               ) : (
                 <em className="rts-unset">not recorded</em>
@@ -345,7 +345,7 @@ export function ClientsPage() {
             render: (c) => (
               <span className="flex flex-col gap-1">
                 <Badge tone={c.status === "active" ? "success" : "neutral"}>{c.status}</Badge>
-                <span className="text-[11px] text-stone-600">{clientAgreementLine(c.id, db.contracts, today)}</span>
+                <span className="text-[11px] text-muted-foreground">{clientAgreementLine(c.id, db.contracts, today)}</span>
               </span>
             ),
           },
@@ -466,11 +466,11 @@ function ClientHistory({ client, onClose }: { client: Client; onClose: () => voi
       ) : (
         <ol className="space-y-3">
           {entries.map((entry) => (
-            <li key={entry.id} className="border-b border-stone-200 pb-3 last:border-0 last:pb-0">
-              <p className="text-xs text-stone-600">
+            <li key={entry.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
+              <p className="text-xs text-muted-foreground">
                 <span className="rts-mono">{formatDate(entry.at.slice(0, 10))}</span> · {entry.actorName}
               </p>
-              <p className="text-sm text-stone-800">{entry.summary}</p>
+              <p className="text-sm text-foreground">{entry.summary}</p>
             </li>
           ))}
         </ol>
@@ -527,7 +527,7 @@ function ClientBranches({ client, onClose }: { client: Client; onClose: () => vo
         />
       ) : (
         <>
-          <p className="pb-3 text-sm text-stone-600">
+          <p className="pb-3 text-sm text-muted-foreground">
             {locations.length === 0
               ? "No branches recorded yet. The billing address above is where documents go; branches are the places themselves."
               : `${locations.length} recorded · ${open} open${locations.length - open ? ` · ${locations.length - open} closed` : ""}`}
@@ -535,13 +535,13 @@ function ClientBranches({ client, onClose }: { client: Client; onClose: () => vo
           {locations.length > 0 && (
             <ul className="space-y-3">
               {locations.map((location) => (
-                <li key={location.id} className="border-b border-stone-200 pb-3 last:border-0 last:pb-0">
+                <li key={location.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-semibold text-stone-900">{location.name}</span>
+                    <span className="font-semibold text-foreground">{location.name}</span>
                     <Badge tone={location.status === "active" ? "success" : "neutral"}>{location.status === "active" ? "open" : "closed"}</Badge>
                   </div>
-                  <p className="text-sm text-stone-700">{location.address || <em className="rts-unset">address not recorded</em>}</p>
-                  <p className="text-xs text-stone-600">
+                  <p className="text-sm text-foreground">{location.address || <em className="rts-unset">address not recorded</em>}</p>
+                  <p className="text-xs text-muted-foreground">
                     {location.contactName || "contact not recorded"}
                     {location.phone ? ` · ${location.phone}` : ""}
                   </p>

@@ -1838,3 +1838,24 @@ every component in every state a query can put it in.
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **1336 passed, 28 skipped** (101 files
 passed, 5 skipped), coverage 85.25 / 76.73 / 81.21 / 88.72, `build` succeeds (both routes static). No schema change, no migration.
+
+## Phase 75 - One product: the whole application on the dark palette (D-125)
+
+The design system existed on two review pages and nowhere else: the twenty-seven working screens were
+still white cards on a light canvas with an indigo accent, inside a dark rail. This phase ends the seam —
+every screen now reads one palette and one frame — and adds the interaction layer that makes the product
+feel built rather than assembled.
+
+| Item | Status | Evidence |
+|---|---|---|
+| The old screens read the dark palette | Done (verified) | `legacy.css` values re-pointed (selectors untouched); the compiled stylesheet contains no light background and no dark text colour — checked by scanning every `background`/`color` declaration in the built CSS |
+| The leftover utilities were remapped | Done (verified) | 494 `stone-*` and one `bg-white` token across 25 files; three tests on the sign-in and first-run screens still pass |
+| One frame for the working app | Done (verified) | `AppFrame`: filled accent active item, section counts, sheet on a phone, content arriving on the glide curve (\"marks the current screen, carries the day's counts and names the user\", \"navigates, signs out and opens the palette\") |
+| The first screen a new installation sees | Done (verified) | `/` first-run and sign-in rebuilt on the dark surface with the brand half as a statement; the end-to-end suite still runs first-time setup through it |
+| The motion layer | Done (verified) | Sheen, gliding pill, spotlight, figure bump, page arrival, aurora on the two screens that are not work surfaces — all CSS, all stopped by `prefers-reduced-motion` (\"is one radio group, and the pill follows the choice\", \"steps with the arrow keys\") |
+| Borrowed tastefully | Done (authored) | Four moves kept from kinetics.colorion.co and animatedbuttons.colorion.co; magnetic buttons, tilt, neon and cursor trails rejected as wrong for a dense desk |
+| The working screens rebuilt on the components | **Not built, and said so** | They read the new palette and sit in the new frame, but their tables, forms and layout are still the pre-migration ones. That conversion continues one screen per pass |
+| Tests | Done (verified) | 4 new in `src/components/tms/tms.test.tsx` — 35 in that file, 1,340 across the suite |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **1340 passed, 28 skipped** (101 files
+passed, 5 skipped), `build` succeeds. No schema change, no migration.
