@@ -248,6 +248,24 @@ eyebrow over the document type and a hairline at the top of the sheet; in print 
 toner is saved. Small print is darkened to stay above 4.5:1 on white. The preview is the same sheet at
 screen scale, so what is approved on screen is what goes on the paper.
 
+## 6a. A second pass, proposed and not yet applied
+
+`docs/ui-proposal/index.html` holds a review page — open it in a browser, no build needed — that shows
+the shipped screens beside a proposed tightening of the same language, called **Daylight 2** for the
+sake of the argument. It is a proposal: nothing in `src/` has been changed to produce it, and no
+dependency or font was added (the page reuses the same Inter and IBM Plex Mono files the app already
+bundles).
+
+The diagnosis behind it, measured on the code rather than guessed: the palette and the single accent are
+already consistent, but 30 screens finished one at a time have drifted — 485 leftover `stone` colour
+classes, sorting on 3 registers out of 22, 5 screens hand-rolling their own table, body text at 12.5px
+with the explanatory paragraph under every title. The proposal keeps every rule in §5 and changes the
+volume: ink at near-black, body at 13.5–14px, page titles at 26px, figures at 25px tabular, micro-labels
+at 9.5–10px uppercase, one bordered figure strip instead of four floating cards, a tinted rail with a
+white work surface, and shadows reserved for things that genuinely float.
+
+It is awaiting a decision. Until it is taken, §4 and §5 describe the interface as built, not as proposed.
+
 ## 7. What was verified
 
 - `tsc --noEmit` and `eslint .` are clean; `npm test` is **1305 passed, 28 skipped** across 105 files
