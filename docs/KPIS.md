@@ -60,6 +60,10 @@ The owner approved a definition in Q-29 (D-78), so the figure is no longer "unkn
 - **Consequence of the definition**: a day counts once per vehicle, so two rentals of the same vehicle
   on the same day are one vehicle-day, not two.
 
+**Where it prints.** On the **Fleet dashboard** (Phase 62), on the **hire report** as the rental-only
+half, and since Phase 87 on the **cost report** in Staff logistics, beside the cost per completed run —
+one function, three screens, so no two of them can quote different numbers.
+
 The rental report prints the rental-only half of this number under the label "Utilisation", and it
 says on screen that staff runs are not included. The fleet-wide figure is on the **Fleet dashboard**
 (`src/tms/fleetReport.ts`, screen `src/screens/Fleet.tsx`, Phase 62, D-112), with both numbers in the
@@ -154,7 +158,7 @@ prints it under the rental report, sharing the same period.
 | Credited | sum of `creditNote.total` | Credit notes **issued** in the period; a voided note counts for nothing. Money taken off a bill, never money received (D-86) |
 | Outstanding | sum over non-void invoices issued on or before the period end of (total − payments paid on or before the period end − credit notes issued on or before the period end), floored at zero | Valued **at the period end**: a payment or a credit note dated later does not settle an invoice that was unpaid then. The arithmetic is the one helper in `src/tms/creditNotes.ts`, so this figure, the hire report and the invoice screen cannot disagree |
 | Expenses by category | sum of recorded cost entries **and standalone expenses**, grouped by the configured category | Cost entries whose `incurredDate` is in the period on incidents reported or work orders raised in the period, plus live expenses whose `incurredOn` is in the period (D-93). Blank categories are shown as "Uncategorised". A voided expense counts for nothing; the cost report also states how many expenses carry no receipt number |
-| Cost per trip | recorded expenses ÷ scheduled runs completed in the period | Null ("Not available") when no run was completed. This is the Q-29 definition |
+| Cost per trip | recorded expenses ÷ scheduled runs completed in the period | Null ("Not available") when no run was completed. This is the Q-29 definition. Printed on the hire report's money figures and, since Phase 87, on the cost report in Staff logistics as "cost per completed run", from the same total |
 | Cost per passenger | recorded expenses ÷ riders recorded as boarded on those completed runs | A no-show is not a passenger carried. Null when nobody boarded |
 
 **What it deliberately does not do.** It does not compute profit or cost per vehicle. Fuel, tolls and

@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StaffLogisticsPage } from "./StaffLogistics";
 import { TmsContext, type Tms } from "../tms/useTms";
 import type { CommandResult } from "../tms/service";
-import { emptyDatabase, emptyRentalSettings, type Database, type Incident, type User, type Vehicle, type WorkOrder } from "../tms/types";
+import { emptyDatabase, emptyRentalSettings, type Database, type Incident, type Trip, type User, type Vehicle, type WorkOrder } from "../tms/types";
 
 afterEach(cleanup);
 
@@ -95,6 +95,35 @@ const order: WorkOrder = {
   releasedAt: null,
   log: [],
   createdAt: `${today}T09:00:00.000Z`,
+  updatedAt: at,
+};
+
+// A run the records say was completed, with one rider who did not board: the only fixture the two
+// derived figures need — cost per run divides by completed runs, and utilisation counts vehicle-days.
+const completedRun: Trip = {
+  id: "t1",
+  reference: "TR-0001",
+  routeId: "route1",
+  serviceDate: today,
+  status: "completed",
+  origin: "schedule",
+  originReason: null,
+  vehicleId: "v1",
+  driverId: null,
+  dispatchedAt: at,
+  startedAt: at,
+  completedAt: at,
+  cancelReason: null,
+  cancelledAt: null,
+  cancelledBy: null,
+  incidentId: null,
+  stopLogs: [],
+  boardings: [{ passengerId: "p1", stopId: "s1", outcome: "no_show" }],
+  onTimeThresholdMinutes: 5,
+  corrections: [],
+  delays: [],
+  rosterChanges: [],
+  createdAt: at,
   updatedAt: at,
 };
 
@@ -231,6 +260,40 @@ describe("the cost report", () => {
     expect(within(categories).getByText("Maintenance")).toBeTruthy();
     expect(within(categories).getByText("Total recorded")).toBeTruthy();
     expect(screen.getByText(/total recorded · 2 entries/)).toBeTruthy();
+  });
+
+  it("divides the total by the runs that were completed, and says when there were none", () => {
+    const { db, dispatch } = world();
+    open(db, dispatch);
+    fireEvent.click(screen.getByRole("tab", { name: "Cost report" }));
+
+    // No run in the period: the figure is absent, not zero, and the words say why.
+    const band = screen.getByRole("heading", { name: /Cost per completed run/i }).closest("section") as HTMLElement;
+    expect(within(band).getByText("Not available")).toBeTruthy();
+    expect(within(band).getByText(/no run was completed in this period/i)).toBeTruthy();
+    expect(within(band).getByText("Runs completed")).toBeTruthy();
+  });
+
+  it("prints the cost per completed run and how hard the fleet worked, from the same total", () => {
+    const { db, dispatch } = world({ trips: [completedRun] });
+    open(db, dispatch);
+    fireEvent.click(screen.getByRole("tab", { name: "Cost report" }));
+
+    const perRun = screen.getByRole("heading", { name: /Cost per completed run/i }).closest("section") as HTMLElement;
+    // GHS 10,450 of recorded cost over the one completed run — the same total the band above prints.
+    expect(within(perRun).getByText("GHS 10450.00")).toBeTruthy();
+    expect(within(perRun).getByText(/per completed run · 1 run/i)).toBeTruthy();
+    // One rider was recorded and did not board, so nobody was carried and the per-rider figure is absent.
+    expect(within(perRun).getByText("Riders boarded")).toBeTruthy();
+    expect(within(perRun).getByText("Cost per rider boarded")).toBeTruthy();
+    expect(within(perRun).getByText("—")).toBeTruthy();
+
+    const utilisation = screen.getByRole("heading", { name: /Fleet utilisation/i }).closest("section") as HTMLElement;
+    expect(within(utilisation).getByText("Utilisation")).toBeTruthy();
+    expect(within(utilisation).getByText(/^\d+%$/)).toBeTruthy();
+    expect(within(utilisation).getByText("Committed vehicle-days")).toBeTruthy();
+    // The gap is stated, not glossed: the figure is days, because no hours are recorded.
+    expect(within(utilisation).getByText(/Counted in days, not hours/i)).toBeTruthy();
   });
 
   it("refuses a period that runs backwards, and computes nothing", async () => {

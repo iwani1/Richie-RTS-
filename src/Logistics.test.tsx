@@ -190,7 +190,11 @@ describe("Staff logistics end-to-end (jsdom)", () => {
     expect((await screen.findAllByText(/GHS 1250\.00/)).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Reporting period/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/1 of 2/)).toBeTruthy(); // 1 of the 2 records in scope has a recorded cost
-    expect(screen.getAllByText(/Not configured/i).length).toBeGreaterThan(0); // RPT-02/03 stay unconfigured
+    // RPT-03 and RPT-02 are printed now, from the same total and the same function the reports use:
+    // a cost per completed run, and the approved vehicle-day utilisation beside it.
+    expect(screen.getByText(/Cost per completed run/i)).toBeTruthy();
+    expect(screen.getAllByText(/Fleet utilisation/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Committed vehicle-days/i).length).toBeGreaterThan(0);
   }, 30000);
 });
 

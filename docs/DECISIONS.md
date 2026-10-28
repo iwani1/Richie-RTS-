@@ -3635,3 +3635,48 @@ selection; two more tests), `src/components/tms/FigureStrip.tsx` (new), `src/scr
 `src/screens/StaffLogistics.test.tsx` (new, 8 tests). `legacy.css` is unchanged at 28.2 KB because two
 screens still need it; it is deleted when they are clear.
 
+## D-137 - Q-29 closed: the cost report prints the two figures it used to decline (Phase 87)
+
+The cost report in Staff logistics ended with a warning box: "Cost per trip needs a definition for which
+costs belong to a trip, and fleet utilisation needs available hours per vehicle ... so no figure is
+shown here." The first half of that sentence had been untrue since Phase 28, when the owner approved
+both definitions (Q-29, D-78) and `financialReport` began computing cost per trip from them. The box
+was written when it was accurate and then left standing while the definitions were answered underneath
+it. A screen that says a decision is missing, after the decision was made, is worse than a screen with
+no figure: it tells the reader the product is waiting on them.
+
+**Decision 1: print both figures where the question is asked.** The report now ends with two named
+bands. **RPT-03 Cost per completed run** is the recorded total *above it on the same screen* divided by
+the runs the records say were completed in the period, with the runs, riders boarded and cost per rider
+beneath it, and the sentence that a run never worked carries no cost of its own. **RPT-02 Fleet
+utilisation** is committed vehicle-days over available vehicle-days, with committed, available, worked,
+workshop and idle days beside it.
+
+**Decision 2: no second arithmetic.** Neither figure is computed on the screen. Cost per run comes from
+`financialReport`, the function whose total is the same total the band above prints, and which already
+feeds the money report, the CSV and the printable sheet — so the screen cannot disagree with the
+document. Utilisation comes from `fleetReport`, the function the fleet dashboard prints. The point of
+D-78 was one definition in one place; writing a second division on a screen would have undone it.
+
+**Decision 3: the hours residue is answered no, in words.** Q-29's last open thread was "available hours
+per vehicle". Nothing in the program records an hour of a vehicle's time — there is no clock-in per bus,
+no telematics — so an hours-based utilisation would be a guess dressed as a measurement. The figures
+stay in days, and the screen says so, with the two consequences a reader would otherwise discover
+later: a bus sold for a day and never run counts as committed and not worked, and a retired vehicle is
+left out of every day because the date it left the fleet is not recorded.
+
+**Decision 4: utilisation is shown only to a role the server gives the fleet to.** Finance reads costs
+but not the runs the vehicle-days are counted from, so the utilisation band is gated on `fleet:read` and
+the cost band is not. The screen never draws a figure whose inputs were withheld from the reader.
+
+**Decision 5: absence stays explicit.** With no completed run the figure reads *Not available* with the
+reason underneath, never `GHS 0.00`; a rider who did not board is not counted in cost per rider, so a
+no-show does not make the riders who did travel look cheaper.
+
+**Consequence.** `src/screens/StaffLogistics.tsx` (two bands replacing the notice, both computed from
+existing functions), `src/screens/StaffLogistics.test.tsx` (+2 tests: no completed run says so; one
+completed run divides the total and prints utilisation), `src/Logistics.test.tsx` (the end-to-end
+assertion that both figures stay unconfigured became an assertion that both print),
+`docs/OPEN_QUESTIONS.md` (Q-29 closed), `docs/KPIS.md` (where each figure prints). No migration and no
+schema change: this was a screen declining to show what it already had.
+

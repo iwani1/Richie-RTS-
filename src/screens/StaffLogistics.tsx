@@ -2,6 +2,8 @@ import { useMemo, useState, type FormEvent } from "react";
 import type { IncidentAdvanceInput, WorkOrderAdvanceInput, CostInput, IncidentInput, WorkOrderInput } from "../tms/logistics";
 import { INCIDENT_TRANSITIONS, WORK_ORDER_TRANSITIONS } from "../tms/logistics";
 import { costReport } from "../tms/costs";
+import { fleetReport } from "../tms/fleetReport";
+import { financialReport } from "../tms/financialReport";
 import { formatAmount } from "../tms/money";
 import {
   INCIDENT_SEVERITIES,
@@ -61,6 +63,7 @@ const WORK_ORDER_TONE: Record<WorkOrderStatus, "info" | "warning" | "success" | 
 };
 
 const money = (amount: number, currency: string | null) => `${currency ?? ""} ${formatAmount(amount)}`.trim();
+const percent = (share: number | null) => (share === null ? "—" : `${Math.round(share * 100)}%`);
 
 export function StaffLogisticsPage() {
   const [tab, setTab] = useState<Tab>("incidents");
@@ -944,6 +947,13 @@ function CostsTab() {
   const [to, setTo] = useState(todayYmd());
   const validRange = from <= to;
   const report = validRange ? costReport(db, from, to) : null;
+  // RPT-03 and RPT-02 (Q-29, D-78). Neither is recomputed here: cost per run divides the same total
+  // the band above prints, from the same function the money report and the PDF use, and utilisation
+  // is the function the fleet dashboard prints. Two screens, one arithmetic. Utilisation is offered
+  // only to a role the server gives the fleet to, because finance's snapshot withholds the runs it
+  // is counted from.
+  const moneyReport = validRange ? financialReport(db, from, to) : null;
+  const fleet = validRange && allowed("fleet:read") ? fleetReport(db, from, to) : null;
 
   // Grouping is presentation only: every line is still listed in full below this summary.
   const byCategory = (report?.lines ?? []).reduce<Map<string, { count: number; amount: number }>>((acc, line) => {
@@ -1068,11 +1078,58 @@ function CostsTab() {
             )}
           </Band>
 
-          <Band label="RPT-03 Cost per trip and RPT-02 Fleet utilisation">
-            <Notice tone="warning" title="Not configured">
-              Cost per trip needs a definition for which costs belong to a trip, and fleet utilisation needs available hours per vehicle. Neither has been supplied (OPEN_QUESTIONS Q-29), so no figure is shown here. Total recorded cost is a different, narrower thing and is not a cost per trip.
-            </Notice>
+          <Band
+            label="RPT-03 Cost per completed run"
+            note="Recorded costs in this period ÷ the runs completed in it. The numerator is the total printed above, so this figure and that total cannot tell different stories."
+          >
+            {moneyReport && (
+              <>
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <p className="text-[34px] leading-none font-semibold tracking-[-0.04em] text-foreground tabular-nums">
+                    {moneyReport.costPerTrip === null ? "Not available" : money(moneyReport.costPerTrip, moneyReport.currencyCode)}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground">
+                    {moneyReport.completedTrips === 0
+                      ? "no run was completed in this period"
+                      : `per completed run · ${moneyReport.completedTrips} ${moneyReport.completedTrips === 1 ? "run" : "runs"}`}
+                  </p>
+                </div>
+                <div className="mt-4">
+                  <FigureStrip
+                    figures={[
+                      { label: "Runs completed", value: moneyReport.completedTrips },
+                      { label: "Riders boarded", value: moneyReport.passengersBoarded },
+                      { label: "Cost per rider boarded", value: moneyReport.costPerPassenger === null ? "—" : money(moneyReport.costPerPassenger, moneyReport.currencyCode) },
+                    ]}
+                  />
+                </div>
+                <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                  Divided by runs the records say were completed in the period, not by runs that were planned: a run that was never worked carries no cost of its own. Only riders recorded as boarded are counted, so a no-show does not make the remaining riders look more expensive. With no completed run there is nothing to divide by, and the figure says so rather than showing zero.
+                </p>
+              </>
+            )}
           </Band>
+
+          {fleet && (
+            <Band
+              label="RPT-02 Fleet utilisation"
+              note="Committed vehicle-days ÷ available vehicle-days: every day a run or a hire held a bus, over one day for each bus in service. This is the figure the fleet dashboard prints, counted by the same function."
+            >
+              <FigureStrip
+                figures={[
+                  { label: "Utilisation", value: percent(fleet.utilisation) },
+                  { label: "Committed vehicle-days", value: fleet.committedVehicleDays },
+                  { label: "Available vehicle-days", value: fleet.availableVehicleDays },
+                  { label: "Days worked", value: fleet.vehicleDays.worked },
+                  { label: "Days in the workshop", value: fleet.vehicleDays.workshop },
+                  { label: "Idle days", value: fleet.vehicleDays.idle },
+                ]}
+              />
+              <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                Counted in days, not hours: nothing in the program records an hour of a vehicle&apos;s time, so an hours-based figure would be a guess (Q-29). A bus that was sold for a day and never ran counts as committed and as not worked — the dashboard splits the two. Retired vehicles are left out of every day, because the date a vehicle left the fleet is not recorded, and the dashboard lists which ones and why.
+              </p>
+            </Band>
+          )}
         </>
       )}
     </div>

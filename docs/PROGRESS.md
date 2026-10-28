@@ -2034,3 +2034,21 @@ company's website, so its shape has to come from the tokens rather than from the
 `Settings`, a band of rules with a setup meter. `legacy.css` (28 KB) is deleted when the last one is
 clear.
 
+## Phase 87 - Q-29 closed: cost per run and fleet utilisation print (D-137)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| The stale refusal goes | Done (verified) | The cost report's "Not configured" notice claimed a definition was missing; it had been approved in Phase 28 and computed ever since. Two named bands replace it |
+| Cost per completed run (RPT-03) | Done (verified) | A 34px figure over "N runs", from `financialReport` — the same total the band above it prints, and the function behind the money report, the CSV and the PDF. Runs completed, riders boarded and cost per rider beneath it |
+| Fleet utilisation (RPT-02) | Done (verified) | Committed ÷ available vehicle-days from `fleetReport`, the function the fleet dashboard prints, with committed, available, worked, workshop and idle days beside it. Offered only to `fleet:read`, because finance's snapshot withholds the runs it is counted from |
+| The hours gap, answered rather than deferred | Done (verified) | No hour of a vehicle's time is recorded anywhere, so the figure stays a count of days and the screen says so, with the two consequences spelled out: a sold day that never ran counts as committed and not worked, and a retired vehicle is left out because its leaving date is not recorded |
+| Absence stays explicit | Done (verified) | No completed run reads "Not available" with the reason, never zero; a rider who did not board does not dilute cost per rider |
+| Q-29 closed | Done (verified) | `docs/OPEN_QUESTIONS.md` records both definitions as approved and printed, and the hours residue as answered no; `docs/KPIS.md` says where each figure prints |
+| Tests | Done (verified) | **1,386 passed, 28 skipped** (from 1,384): `StaffLogistics` +2 (no completed run says so; one completed run divides the total and prints utilisation), and the end-to-end logistics test now asserts both figures print instead of asserting they do not |
+| Gates | Pass | `tsc` clean, `eslint` clean, `next build` clean, no migration and no schema change |
+
+**Next.** The last two screens on the old stylesheet: `PublicEnquiry` (22) and `Settings` (14), then
+`legacy.css` (28 KB) is deleted. Two decisions still stand between the product and a working day and
+neither is a coding one: whether a document may be sent at all (no mail server), and how long a scanned
+file is kept.
+
