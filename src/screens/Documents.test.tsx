@@ -310,7 +310,7 @@ describe("the preview around the sheet (D-87)", () => {
     renderSheet(<Harness onClose={() => {}} />);
     expect(screen.getByRole("dialog", { name: "Print preview: Invoice INV-2026-0001" })).toBeTruthy();
     // Portalled to the body so the print stylesheet can remove everything else from the page.
-    expect(document.body.querySelector(".rts-print .rts-sheet")).toBeTruthy();
+    expect(document.body.querySelector("[data-print-overlay] [data-sheet]")).toBeTruthy();
     // The browser offers the document title as the file name when saving as a PDF.
     expect(document.title).toBe("Invoice INV-2026-0001");
   });
@@ -334,7 +334,7 @@ describe("the preview around the sheet (D-87)", () => {
     const db = world();
     renderSheet(<Harness onClose={() => {}} />, { ...db, settings: { ...db.settings, companyName: null } });
     const dialog = screen.getByRole("dialog", { name: /Print preview/i });
-    const toolbar = dialog.querySelector(".rts-print-bar") as HTMLElement;
+    const toolbar = dialog.querySelector("[data-print-bar]") as HTMLElement;
     expect(within(toolbar).getByText(/The company name is not set in Settings/i)).toBeTruthy();
     // The sheet itself carries the gap as a plain statement, not as advice.
     expect(screen.getByRole("article", { name: /Invoice/i }).textContent).toContain("Company name not set in Settings");

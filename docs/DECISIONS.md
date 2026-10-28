@@ -3392,3 +3392,50 @@ onPress, aria-live on the figure), `PageHeader` (asOf), `globals.css` (`@page`, 
 `OverviewScreen` (filter from a figure, rows that open, freshness line), `DriverPortal` (cards),
 `ClientPortal`/`StaffTransportReport` (class swap), `DesignGallery` (density switch and openable rows),
 `legacy.css` (one dead rule). Eleven new tests.
+
+## D-132 - One sheet, four documents: the paper vocabulary moves to the component layer
+
+**The problem.** The invoice, the credit note, the statement and the management report were four
+hand-built copies of one idea, written in `legacy.css` as forty-seven `.rts-sheet-*` rules. They agreed
+with each other because they had been copied carefully, not because anything held them together; the
+management report was already beginning to drift from the invoice it claims to match.
+
+**Decision 1: paper is a component, and paper is white.** `components/tms/Sheet` owns the vocabulary —
+`Sheet`, `SheetHeader`, `SheetMeta`, `SheetTable`, `SheetTotals`, `SheetRow`, `SheetWords`, `SheetNote`,
+`SheetSection`, `SheetFoot`, `SheetNotice` — and four documents now say only what they say, not how they
+look. The sheet carries its own tokens (`--paper`, `--paper-ink`, `--paper-muted`, `--paper-line`,
+`--paper-accent`, `--paper-warn`, `--paper-void`) rather than borrowing the screen's: a document is white
+with dark ink whatever the theme is, because the page in the preview and the page in the printer are the
+same object and a customer's invoice is not a dark-mode surface. Those values are chosen for print first
+and then checked on screen; on the screen the sheet sits as a lit page on the dark canvas.
+
+**Decision 2: number formatting is not a house style to be localised per document.** Money, counts and
+dates in a column are tabular and right-aligned by one exported class. A statement read by a customer's
+bookkeeper is a column of figures that must line up, not four documents that each decided.
+
+**Decision 3: the arithmetic still comes from the helpers.** The sheets format; they never add up.
+`invoiceBalance` produces the amount due, `customerStatement` produces every row and total, and the
+report's figures come from `printableReport`. This decision is the reason the paper, the screen and the
+reports cannot diverge — a printed total that is its own subtraction is how paper starts disagreeing
+with the register.
+
+**Decision 4: the preview is part of the component layer too.** `PrintPreview` moved to
+`components/tms/PrintPreview`: it portals to `document.body` so the printed page is the sheet and nothing
+else, sets the document title so "Save as PDF" names the file after the paper, keeps the keyboard
+behaviour every overlay shares (`useDialogFocus`), and prints the sentence about a missing company name
+when there is one. The preview marks its overlay and stage with `data-print-overlay` and
+`data-print-stage`; the print block hides every other child of `body`, so what prints is the sheet.
+
+**Decision 5: the dead half of the temporary stylesheet goes with it.** Retiring the sheets left 94 rule
+blocks and 141 selectors in `legacy.css` that named classes no file contains — leftovers from the light
+build, kept earlier because a block like `.rts-table .rts-num` had one live selector and was preserved
+whole. Every selector whose classes are all unused was removed, per selector rather than per block, and a
+check proves afterwards that every class still used in `src/` still has a rule. The file is 48.3 KB →
+36.9 KB.
+
+**Consequence.** `src/components/tms/Sheet.tsx` and `PrintPreview.tsx` (new), `src/screens/Documents.tsx`
+(569 → 330 lines, four documents, no legacy classes), `src/screens/PrintableReport.tsx` (no legacy
+classes), `src/app/globals.css` (paper tokens, print-overlay rules), `src/styles/legacy.css` (94 blocks
+and 141 selectors removed), `src/screens/Documents.test.tsx` (two class selectors replaced with the
+`data-` hooks). Fourteen of thirty screens are now clear of the old stylesheet; the compiled stylesheet
+is 92.5 KB, down from 101.8.

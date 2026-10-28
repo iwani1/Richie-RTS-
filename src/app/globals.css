@@ -132,6 +132,16 @@
   --color-info: var(--info);
   --color-warning: var(--warning);
   --color-sidebar: var(--sidebar);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-muted: var(--paper-muted);
+  --color-paper-line: var(--paper-line);
+  --color-paper-rule: var(--paper-rule);
+  --color-paper-accent: var(--paper-accent);
+  --color-paper-warn: var(--paper-warn);
+  --color-paper-warn-ink: var(--paper-warn-ink);
+  --color-paper-void: var(--paper-void);
+  --color-paper-void-ink: var(--paper-void-ink);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -204,6 +214,20 @@
   --warning-tint: color-mix(in oklab, #f0c27a 13%, transparent);
   --primary-tint: color-mix(in oklab, #7c88ff 14%, transparent);
   --neutral-tint: color-mix(in oklab, #9aa2b6 12%, transparent);
+
+  /* Paper. A document is white with dark ink whatever the screen's theme is — the sheet on the
+     preview and the sheet in the printer are the same object, and a customer's invoice is not a
+     dark-mode surface. Values chosen for print first, then checked on screen. */
+  --paper: #ffffff;
+  --paper-ink: #14161c;
+  --paper-muted: #4b5160;
+  --paper-line: #d6dae2;
+  --paper-rule: #e6e9ef;
+  --paper-accent: #2b36a8;
+  --paper-warn: #fdf3e3;
+  --paper-warn-ink: #7a4b05;
+  --paper-void: #fdecea;
+  --paper-void-ink: #96281f;
 
   --sidebar-foreground: #b6bdcc;
   --sidebar-accent: #161a24;
@@ -479,6 +503,22 @@
   html,
   body {
     background: #ffffff !important;
+  }
+
+  /* A print preview prints its sheet and nothing else: the app behind the overlay is not content. */
+  body > *:not([data-print-overlay]) {
+    display: none !important;
+  }
+  [data-print-overlay],
+  [data-print-stage] {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    overflow: visible !important;
+    max-height: none !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    backdrop-filter: none !important;
   }
 
   /* Chrome is not content: no rail, no bar, no toolbar, no buttons, no density switch. */

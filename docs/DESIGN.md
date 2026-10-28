@@ -378,6 +378,13 @@ components, in daylight, with the rail, the top bar, the toolbars and every butt
 repeat on each sheet and rows do not break across pages, because an invoice or a statement is the thing
 most likely to be printed and the thing least able to survive a dark palette.
 
+**Paper, as a material (D-132).** A sheet is its own surface: white, dark ink, its own tokens, its own
+hairlines, tabular figures in every money column. The invoice, the credit note, the statement and the
+management report are one vocabulary — `Sheet`, `SheetHeader`, `SheetMeta`, `SheetTable`, `SheetTotals`,
+`SheetWords`, `SheetNotice`, `SheetFoot` — so they cannot drift from each other, and the invoice and the
+statement screens reuse them when they are rebuilt. The preview portals to the body so the printed page is
+the sheet and nothing else.
+
 **Where to see it.** `/dashboard` is the board; `/design` is every component in every state, including
 the four states of the table. Both are sample data and say so. The live application at `/` is untouched
 by this pass and still writes real records.

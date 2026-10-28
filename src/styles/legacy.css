@@ -98,25 +98,12 @@ h1, h2, h3, h4 { text-wrap: balance; }
 
 ::selection { background: var(--rts-accent-line); color: var(--rts-ink); }
 
-/* thin, quiet scrollbars in the rail and in wide tables — never a chunky OS bar on a card */
-.rts-spine-nav,
-.rts-table-wrap,
-.rts-panel-body,
-.rts-palette-list { scrollbar-width: thin; scrollbar-color: var(--rts-line) transparent; }
+/* thin, .rts-palette-list { scrollbar-width: thin; scrollbar-color: var(--rts-line) transparent; }
 
-.rts-spine-nav::-webkit-scrollbar,
-.rts-table-wrap::-webkit-scrollbar,
-.rts-panel-body::-webkit-scrollbar,
 .rts-palette-list::-webkit-scrollbar { width: 8px; height: 8px; }
 
-.rts-spine-nav::-webkit-scrollbar-thumb,
-.rts-table-wrap::-webkit-scrollbar-thumb,
-.rts-panel-body::-webkit-scrollbar-thumb,
 .rts-palette-list::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: var(--rts-line); background-clip: content-box; }
 
-.rts-spine-nav::-webkit-scrollbar-track,
-.rts-table-wrap::-webkit-scrollbar-track,
-.rts-panel-body::-webkit-scrollbar-track,
 .rts-palette-list::-webkit-scrollbar-track { background: transparent; }
 
 :focus-visible {
@@ -166,11 +153,9 @@ h1, h2, h3, h4 { text-wrap: balance; }
   white-space: nowrap;
 }
 
-/* the signed-in operator, anchored at the top right; the sidebar keeps the full identity block */
-.rts-top-user { display: inline-flex; align-items: center; }
+/* the signed-in operator { display: inline-flex; align-items: center; }
 
-/* the organisation the desk belongs to, carried under the greeting */
-.rts-title-sub {
+/* the organisation the desk belongs to {
   display: block;
   margin-top: 4px;
   color: var(--rts-muted);
@@ -179,8 +164,6 @@ h1, h2, h3, h4 { text-wrap: balance; }
   font-weight: 500;
   letter-spacing: 0;
 }
-
-.rts-sheet-meta { display: flex; align-items: center; gap: 10px; margin-left: auto; padding-top: 2px; }
 
 .rts-stamp {
   flex: 0 0 auto;
@@ -199,8 +182,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 
 /* ---------- cards and bands -------------------------------------------------------------------- */
 
-.rts-card,
-.rts-band {
+.rts-card, .rts-band {
   display: block;
   margin: 0;
   padding: 0;
@@ -211,8 +193,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
   overflow: hidden;
 }
 
-.rts-band-label,
-.rts-card-head {
+.rts-band-label, .rts-card-head {
   position: static;
   display: flex;
   align-items: center;
@@ -222,8 +203,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
   background: var(--rts-card);
 }
 
-.rts-band-title,
-.rts-card-title {
+.rts-band-title, .rts-card-title {
   margin: 0;
   color: var(--rts-ink);
   font-family: var(--rts-display);
@@ -236,8 +216,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 /* title above its note; the card's action keeps the right edge */
 .rts-head-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
 
-.rts-band-note,
-.rts-card-desc {
+.rts-band-note, .rts-card-desc {
   margin: 0;
   max-width: 62ch;
   color: var(--rts-muted);
@@ -248,8 +227,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 }
 .rts-card-head > :last-child { margin-left: auto; }
 
-.rts-band-body,
-.rts-card-body { padding: 18px; min-width: 0; }
+.rts-band-body, .rts-card-body { padding: 18px; min-width: 0; }
 
 .rts-band-empty {
   margin: 0;
@@ -259,8 +237,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
   line-height: 1.55;
 }
 
-.rts-band + .rts-band,
-.rts-card + .rts-card { margin-top: 16px; }
+.rts-band + .rts-band, .rts-card + .rts-card { margin-top: 16px; }
 
 .rts-spread {
   display: grid;
@@ -272,10 +249,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 .rts-spread > * { min-width: 0; }
 .rts-spread > * + * { padding-left: 0; border-left: 0; }
 
-/* inside a card the table is flush: the card already supplies the edge */
-.rts-card-body--flush .rts-table-wrap,
-.rts-band-body .rts-table-wrap,
-.rts-table-card .rts-table-wrap {
+.rts-band-body .rts-table-wrap {
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -283,9 +257,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 
 /* A sortable header. The header is already small caps at 10px; the button inherits that entirely so
    a sortable column and a plain one sit on the same baseline, and only the arrow says which is
-   which. The hit area grows into the header's own padding, so the target is the whole cell rather
-   than the word — a 10px word is not something to ask anyone to hit. */
-.rts-table thead th .rts-sort {
+   which. The hit area grows into the header's own padding {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -303,32 +275,24 @@ h1, h2, h3, h4 { text-wrap: balance; }
 }
 
 /* Two stacked triangles mean "not sorted"; one means "sorted this way". Drawn with borders rather
-   than typed, so the arrow is never read out as a character and cannot shift the baseline. */
-.rts-sort-arrow {
+   than typed {
   position: relative;
   width: 7px;
   height: 11px;
   opacity: 0.5;
 }
 
-/* Sorted: one arrow, in the accent, pointing the way the rows now run. */
-.rts-sort-arrow[data-state="ascending"]::after,
-.rts-sort-arrow[data-state="descending"]::before { display: none; }
+/* Sorted: one arrow, in the accent { display: none; }
 
-/* a register sits inside a card, so the header band needs no shadow of its own */
-.rts-table-card thead th { background: var(--rts-card-2); }
+/* a register sits inside a card { background: var(--rts-card-2); }
 
 /* a register with no rows still shows its header, so the columns stay learnable */
 
 .rts-mono { font-family: var(--rts-mono); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
-.rts-table .rts-num,
-.rts-num { text-align: right; font-variant-numeric: tabular-nums; }
+.rts-table .rts-num, .rts-num { text-align: right; font-variant-numeric: tabular-nums; }
 .rts-table th.rts-num { text-align: right; }
 
-/* ---------- pills and lamps --------------------------------------------------------------------- */
-
-.rts-badge,
 .rts-flag {
   display: inline-flex;
   align-items: center;
@@ -344,7 +308,6 @@ h1, h2, h3, h4 { text-wrap: balance; }
   white-space: nowrap;
 }
 
-.rts-badge::before,
 .rts-flag::before {
   content: "";
   width: 6px;
@@ -354,17 +317,9 @@ h1, h2, h3, h4 { text-wrap: balance; }
   flex: 0 0 auto;
 }
 
-.rts-badge--success,
 .rts-flag--completed { background: var(--rts-green-soft); color: var(--rts-green-ink); }
-.rts-flag--planned::before,
-.rts-flag--dispatched::before,
-.rts-flag--in_progress::before { background: var(--rts-amber); }
-.rts-badge--warning,
-.rts-flag--planned,
-.rts-flag--dispatched,
-.rts-flag--in_progress,
-.rts-flag--in { background: var(--rts-amber-soft); color: var(--rts-amber-ink); }
-.rts-badge--error,
+.rts-flag--planned::before, .rts-flag--dispatched::before, .rts-flag--in_progress::before { background: var(--rts-amber); }
+.rts-flag--planned, .rts-flag--dispatched, .rts-flag--in_progress, .rts-flag--in { background: var(--rts-amber-soft); color: var(--rts-amber-ink); }
 .rts-flag--cancelled { background: var(--rts-red-soft); color: var(--rts-red-ink); }
 
 .rts-unset { color: var(--rts-muted); font-style: normal; }
@@ -426,9 +381,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 .rts-input:disabled { background: var(--rts-card-2); color: var(--rts-muted); cursor: not-allowed; }
 
 /* Password reveal. The field reserves room for the control so long values never slide under it; the
-   control is a 28px square inside the input's own border, so it reads as part of the field rather
-   than a second control beside it. */
-.rts-input-wrap { position: relative; display: block; }
+   control is a 28px square inside the input's own border { position: relative; display: block; }
 
 textarea.rts-input { min-height: 80px; resize: vertical; }
 
@@ -545,8 +498,7 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 
 .rts-palette-list { max-height: 46vh; overflow-y: auto; padding: 6px; }
 
-/* the brand half: a soft canvas wash, the three things the desk does, nothing else */
-.rts-auth-poster {
+/* the brand half: a soft canvas wash, the three things the desk does {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -557,8 +509,7 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 }
 .rts-auth-brand .rts-wordmark span { max-width: none; letter-spacing: 0.06em; font-size: 9.5px; margin-top: 2px; }
 
-/* a configuration error, shown exactly as the server wrote it */
-.rts-auth-config {
+/* a configuration error {
   margin: 10px 0 0;
   padding: 12px 13px;
   border: 1px solid var(--rts-line);
@@ -759,8 +710,7 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
   font-size: 12.5px;
 }
 
-.rts-report-row > span:nth-child(2),
-.rts-report-row > span:nth-child(3) { text-align: right; font-family: var(--rts-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rts-report-row > span:nth-child(2), .rts-report-row > span:nth-child(3) { text-align: right; font-family: var(--rts-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .rts-report-row--head {
   border-bottom: 1px solid var(--rts-line);
@@ -771,14 +721,11 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
   text-transform: uppercase;
 }
 
-.rts-report-row--head > span:nth-child(2),
-.rts-report-row--head > span:nth-child(3) { font-family: var(--rts-body); font-size: 10.5px; font-weight: 600; }
+.rts-report-row--head > span:nth-child(2), .rts-report-row--head > span:nth-child(3) { font-family: var(--rts-body); font-size: 10.5px; font-weight: 600; }
 
 .rts-report-row--total { border-bottom: 0; border-top: 1px solid var(--rts-line-2); margin-top: 4px; padding-top: 10px; color: var(--rts-ink); font-weight: 650; }
 
-/* ---------- legacy editorial pieces, re-skinned --------------------------------------------------------------- */
-
-.rts-lead { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+/* ---------- legacy editorial pieces { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
 
 .rts-kicker { margin: 0 0 8px; color: var(--rts-muted-2); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 
@@ -835,9 +782,7 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 /* service interval bar */
 .rts-interval { height: 6px; border-radius: 6px; background: var(--rts-line); overflow: hidden; }
 .rts-interval-fill { display: block; height: 100%; border-radius: 6px; background: var(--rts-green); }
-.rts-interval-fill--due,
-.rts-interval-fill--no_data,
-.rts-interval-fill--no_schedule { background: var(--rts-amber); }
+.rts-interval-fill--due, .rts-interval-fill--no_data, .rts-interval-fill--no_schedule { background: var(--rts-amber); }
 .rts-interval-fill--overdue { background: var(--rts-red); }
 .rts-interval-row { display: flex; align-items: center; gap: 10px; }
 
@@ -845,10 +790,7 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 
 
 /* ==========================================================================================================
-   The working surface — columns, the run sheet, the readiness ring, the checklist
-   ========================================================================================================== */
-
-.rts-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+   The working surface — columns, the run sheet, the readiness ring { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 .rts-stat-grid + .rts-spread { margin-top: 16px; }
 
@@ -877,10 +819,7 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 }
 
 @media (max-width: 1180px) {
-  .rts-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rts-spread { grid-template-columns: minmax(0, 1fr); }
-  .rts-timeline-head,
-  .rts-lane-row { grid-template-columns: 108px repeat(12, 1fr); }
 }
 
 /* Under 980px the sidebar becomes a drawer behind the Menu button. */
@@ -921,44 +860,21 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 }
 
 @media (max-width: 700px) {
-  .rts-stat-grid { grid-template-columns: minmax(0, 1fr); }
   .rts-rules { grid-template-columns: minmax(0, 1fr); }
-  .rts-quick { grid-template-columns: minmax(0, 1fr); }
   .rts-rule { flex-wrap: wrap; }
-  .rts-date { display: none; }
-  .rts-user strong, .rts-user small { display: none; }
-  .rts-band-label,
-  .rts-card-head { flex-wrap: wrap; }
+  .rts-band-label, .rts-card-head { flex-wrap: wrap; }
   .rts-band-note { max-width: none; }
   .rts-tabs { display: flex; width: 100%; }
   .rts-tab { flex: 1; text-align: center; }
   .rts-toolbar { gap: 8px; }
   .rts-toolbar > .rts-field { width: 100%; }
-  .rts-board-head { display: none; }
-  .rts-board-row { grid-template-columns: 64px minmax(0, 1fr); row-gap: 6px; }
-  .rts-board-row > *:nth-child(4),
-  .rts-board-row > *:nth-child(5) { grid-column: 2; }
   .rts-run { grid-template-columns: 56px minmax(0, 1fr); row-gap: 6px; padding: 12px 14px; }
-  .rts-runs-head { display: none; }
-  .rts-statusline--boxed { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .rts-filter-bar { padding: 11px 14px; }
-  .rts-search { max-width: none; }
   .rts-filter-bar-note { margin-left: 0; width: 100%; }
-  .rts-donut { gap: 14px; }
   .rts-run-time { grid-row: 1 / span 2; align-self: start; }
   .rts-run-route { grid-column: 2; }
   .rts-run-crew { grid-column: 2; flex-direction: row; flex-wrap: wrap; gap: 2px 12px; }
   .rts-run-state { grid-column: 2; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; justify-self: start; }
   .rts-report-row { grid-template-columns: minmax(0, 1fr) 50px 92px; }
-  .rts-timeline-head,
-  .rts-lane-row { grid-template-columns: 88px repeat(6, 1fr); }
-  .rts-timeline-head span:nth-child(n + 8),
-  .rts-lane-row .rts-lane { display: none; }
-  .rts-timeline-head { grid-template-columns: 88px repeat(6, 1fr); }
-  .rts-timeline-head span:nth-child(n + 8) { display: none; }
-  .rts-lane-row { grid-template-columns: minmax(0, 1fr); }
-  .rts-panel { width: 100%; }
-  .rts-auth-card { padding: 20px; }
 }
 
 /* ---------------------------------------------------------------- public enquiry form (WEB-01)
@@ -1067,9 +983,6 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .rts-busy-bar::after { animation: none; width: 100%; }
-  .rts-panel { animation: none; }
-  .rts-side { transition: none; }
   * { transition-duration: 0.01ms !important; }
 }
 
@@ -1130,8 +1043,7 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
   font-weight: 600;
 }
 
-.rts-ageing-row:last-child dt,
-.rts-ageing-row:last-child dd {
+.rts-ageing-row:last-child dt, .rts-ageing-row:last-child dd {
   font-size: 0.9375rem;
 }
 
@@ -1146,295 +1058,31 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
    - nothing on it is carried by colour alone: a voided document says "void" in words at the top;
    - in print, everything except the sheet is removed from the body, so there is no navigation, no
      toolbar, and no trailing blank page from a hidden application shell;
-   - figures sit in the monospaced face and line up on the right, so a column of amounts can be read
-     down without the eye drifting. */
-
-.rts-print {
+   - figures sit in the monospaced face and line up on the right {
   position: fixed;
   inset: 0;
   z-index: 95;
   overflow-y: auto;
   background: var(--rts-canvas);
 }
-.rts-print:focus { outline: none; }
-
-.rts-print-bar {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--rts-line);
-  background: var(--rts-card);
-}
-
-.rts-print-bar-text { min-width: 0; margin-right: auto; }
-.rts-print-bar-title {
-  margin: 0;
-  color: var(--rts-ink);
-  font-family: var(--rts-display);
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-.rts-print-bar-hint { max-width: 62ch; margin: 3px 0 0; color: var(--rts-muted); font-size: 12px; line-height: 1.5; }
-.rts-print-bar-actions { display: flex; gap: 8px; }
-
-.rts-print-stage { padding: 24px 16px 60px; }
-
-.rts-sheet {
-  width: 210mm;
-  max-width: 100%;
-  min-height: 297mm;
-  margin: 0 auto;
-  padding: 18mm 16mm 14mm;
-  border: 1px solid var(--rts-line);
-  border-top: 3px solid var(--rts-accent);
-  border-radius: 2px;
-  background: var(--rts-card);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 24px 48px -32px rgba(15, 23, 42, 0.35);
-  color: var(--rts-ink);
-  font-size: 12.5px;
-  line-height: 1.55;
-}
-
-.rts-sheet-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--rts-line);
-}
-
-.rts-sheet-issuer { max-width: 62%; }
-.rts-sheet-company {
-  margin: 0;
-  color: var(--rts-ink);
-  font-family: var(--rts-display);
-  font-size: 17px;
-  font-weight: 650;
-  letter-spacing: -0.015em;
-  line-height: 1.3;
-}
-/* A missing name is shown as a gap, not filled with a plausible-looking one. */
-.rts-sheet-company--missing { color: var(--rts-muted); font-style: italic; font-weight: 500; font-size: 14px; }
-
-.rts-sheet-doctype {
-  margin: 6px 0 0;
-  color: var(--rts-accent);
-  font-family: var(--rts-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.rts-sheet-id { text-align: right; }
-.rts-sheet-reference {
-  margin: 3px 0 2px;
-  color: var(--rts-ink);
-  font-family: var(--rts-mono);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-.rts-sheet-state { margin: 0; color: var(--rts-ink-2); font-size: 11.5px; }
-
-.rts-sheet-label {
-  margin: 0 0 3px;
-  color: var(--rts-muted);
-  font-family: var(--rts-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-.rts-sheet-value { margin: 0; color: var(--rts-ink); font-size: 12.5px; font-weight: 550; }
+/* A missing name is shown as a gap { color: var(--rts-muted); font-style: italic; font-weight: 500; font-size: 14px; }
 /* A qualifier under a sheet value: the buyer's address and tax number under "Billed to". Read on
-   paper, so it is darkened to stay above 4.5:1 on white (CUS-01). Not to be confused with
-   `.rts-sheet-note`, which is the block of notes at the foot of a sheet. */
-.rts-sheet-detail { margin: 2px 0 0; color: var(--rts-ink-2); font-size: 11.5px; line-height: 1.35; }
+   paper { margin: 2px 0 0; color: var(--rts-ink-2); font-size: 11.5px; line-height: 1.35; }
 
-.rts-sheet-void {
-  margin: 14px 0 0;
-  padding: 10px 12px;
-  border: 1px solid var(--rts-red-ink);
-  border-left-width: 3px;
-  border-radius: 2px;
-  background: var(--rts-red-soft);
-  color: var(--rts-red-ink);
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-.rts-sheet-meta {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  padding: 16px 0;
-}
-
-.rts-sheet-table { width: 100%; border-collapse: collapse; }
-.rts-sheet-table th {
-  padding: 0 0 7px;
-  border-bottom: 1px solid var(--rts-line);
-  color: var(--rts-ink-2);
-  font-family: var(--rts-mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-align: left;
-  text-transform: uppercase;
-}
-.rts-sheet-table td {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--rts-card-2);
-  vertical-align: top;
-}
-.rts-sheet-table th.rts-sheet-num,
-.rts-sheet-table td.rts-sheet-num {
-  padding-left: 12px;
-  font-family: var(--rts-mono);
-  font-size: 11.5px;
-  text-align: right;
-  white-space: nowrap;
-}
-
-/* The figures sit under the line table on the right, where a reader of invoices looks for them, and
-   the sentence that explains them sits directly beneath. */
-.rts-sheet-closing {
+/* The figures sit under the line table on the right, where a reader of invoices looks for them {
   display: grid;
   justify-items: end;
   gap: 10px;
   margin-top: 16px;
 }
 
-.rts-sheet-totals { width: min(100%, 340px); margin: 0; }
-.rts-sheet-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 4px 0;
-  font-size: 12px;
-}
-.rts-sheet-row dt { color: var(--rts-ink-2); }
-.rts-sheet-row dd { margin: 0; font-family: var(--rts-mono); font-size: 11.5px; text-align: right; white-space: nowrap; }
-
-.rts-sheet-row--total {
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--rts-line);
-  font-weight: 650;
-}
-.rts-sheet-row--total dt { color: var(--rts-ink); }
-.rts-sheet-row--total dd { font-size: 13px; font-weight: 650; }
-
-.rts-sheet-row--due {
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 2px solid var(--rts-ink);
-}
-.rts-sheet-row--due dt { color: var(--rts-ink); font-weight: 650; }
-.rts-sheet-row--due dd { font-size: 13px; font-weight: 650; }
-
-.rts-sheet-words { width: min(100%, 340px); margin: 0; color: var(--rts-ink-2); font-size: 12px; line-height: 1.6; }
-
 /* ---- the management report on paper (RPT-05, D-98) ---- */
 
-/* Eight figures: four across on A4, two across on a narrow screen. */
-.rts-sheet-figures {
+/* Eight figures: four across on A4 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px 16px;
   padding: 16px 0 4px;
-}
-.rts-sheet-fig { break-inside: avoid; }
-.rts-sheet-fig-value {
-  margin: 0;
-  color: var(--rts-ink);
-  font-family: var(--rts-mono);
-  font-size: 15px;
-  font-weight: 650;
-  line-height: 1.3;
-}
-.rts-sheet-fig-note { margin: 2px 0 0; color: var(--rts-ink-2); font-size: 10.5px; line-height: 1.45; }
-
-.rts-sheet-section { margin-top: 20px; break-inside: avoid; }
-.rts-sheet-section-title {
-  margin: 0 0 3px;
-  padding-top: 10px;
-  border-top: 1px solid var(--rts-line);
-  color: var(--rts-ink);
-  font-family: var(--rts-display);
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: -0.005em;
-}
-.rts-sheet-section-intro { margin: 0 0 8px; color: var(--rts-ink-2); font-size: 11px; line-height: 1.5; }
-.rts-sheet-empty { margin: 0 0 4px; color: var(--rts-ink-2); font-size: 11.5px; font-style: italic; }
-
-.rts-sheet-coverage { margin: 0; }
-.rts-sheet-coverage-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 5px 0;
-  border-bottom: 1px solid var(--rts-card-2);
-}
-.rts-sheet-coverage-row dt { color: var(--rts-ink); font-size: 11.5px; }
-.rts-sheet-coverage-note { display: block; color: var(--rts-muted); font-size: 10.5px; }
-.rts-sheet-coverage-row dd {
-  margin: 0;
-  color: var(--rts-ink);
-  font-family: var(--rts-mono);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.rts-sheet-state-line { margin-top: 14px; }
-.rts-sheet-note-list { margin: 4px 0 0; padding-left: 16px; }
-.rts-sheet-note-list li { margin-bottom: 4px; }
-.rts-sheet-note-list li:last-child { margin-bottom: 0; }
-
-.rts-sheet-note {
-  margin: 18px 0 0;
-  padding-top: 10px;
-  border-top: 1px solid var(--rts-card-2);
-  color: var(--rts-ink-2);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.rts-sheet-note .rts-sheet-label { display: inline; margin-right: 4px; }
-
-.rts-sheet-foot {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 26px;
-  padding-top: 10px;
-  border-top: 1px solid var(--rts-line);
-  color: var(--rts-muted);
-  font-family: var(--rts-mono);
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-@media (max-width: 820px) {
-  .rts-sheet { width: 100%; min-height: 0; padding: 24px 18px 22px; }
-  .rts-sheet-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .rts-sheet-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .rts-sheet-closing { justify-items: stretch; gap: 12px; }
-  .rts-sheet-totals,
-  .rts-sheet-words { width: 100%; }
-  .rts-sheet-issuer { max-width: 100%; }
-  .rts-sheet-id { text-align: left; }
 }
 
 @media print {
@@ -1442,33 +1090,9 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 
   html, body { background: var(--rts-card) !important; }
 
-  /* Everything that is not the sheet leaves the page: the shell, its navigation, the toolbar. */
-  body > *:not(.rts-print) { display: none !important; }
-  .rts-print { position: static; inset: auto; overflow: visible; background: var(--rts-card); }
-  .rts-print-bar { display: none !important; }
-  .rts-print-stage { padding: 0; }
+  /* Everything that is not the sheet leaves the page: the shell, its navigation { display: none !important; }
 
-  .rts-sheet {
-    width: auto;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    box-shadow: none;
-    font-size: 11.5px;
-  }
-
-  /* A long line table repeats its headings on the next page and never splits a row in half. */
-  .rts-sheet-table thead { display: table-header-group; }
-  .rts-sheet-table tr,
-  .rts-sheet-totals .rts-sheet-row { break-inside: avoid; }
-  .rts-sheet-foot { break-inside: avoid; }
-
-  /* The report runs to more than one page, so a section that fits is kept whole and a heading is
-     never left alone at the foot of a sheet. */
-  .rts-sheet-section { break-inside: avoid; }
-  .rts-sheet-section-title { break-after: avoid; }
-  .rts-sheet-figures { break-inside: avoid; }
+  /* The report runs to more than one page { break-inside: avoid; }
 }
 
 /* ---------- the seven vehicle states (FLT-02, D-109) --------------------------------------------------------------- */

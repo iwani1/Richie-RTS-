@@ -1948,3 +1948,19 @@ are untouched.
 `Expenses` (4), `Reports`, `Registers`, `Invoices`, `Contracts` and `Compliance` (3 each). The driver
 portal's incident form and the two sheet screens (Documents, PrintableReport) are the next three, and
 `legacy.css` is deleted when the last one is clean.
+
+## Phase 82 - One sheet, four documents: the paper vocabulary joins the component layer (D-132)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Paper is a component | Done (verified) | `components/tms/Sheet.tsx`: header, meta, table, totals, words, note, section, foot and notice, plus one tabular class for money columns. The invoice, credit note and statement are 330 lines where they were 569, and the management report lost its private copy of the same layout |
+| Paper is white, in a dark product | Done (verified) | Its own tokens (`--paper`, `--paper-ink`, `--paper-muted`, `--paper-line`, `--paper-accent`, `--paper-warn`, `--paper-void`): the page in the preview and the page in the printer are the same object, and a customer's invoice is not a dark-mode surface |
+| The preview joins the layer | Done (verified) | `components/tms/PrintPreview`: portal to `body`, document title set so "Save as PDF" names the file after the paper, the shared overlay keyboard behaviour, and the missing-company-name sentence. Marked `data-print-overlay` / `data-print-stage`; the print block hides every other child of `body` |
+| No arithmetic on paper | Done (verified) | The sheets format only: `invoiceBalance` for the amount due, `customerStatement` for every row and total, `printableReport` for the report. The 16 document tests pass unchanged apart from two selectors |
+| The dead half of the temporary stylesheet | Done (verified) | 94 rule blocks and 141 selectors named classes no file contains — retired per selector, not per block, so `.rts-table .rts-num` no longer survives on one live name. `legacy.css` 48.3 KB → 36.9 KB; a check proves every class still used in `src/` still has a rule |
+| Fourteen of thirty screens clear | Done (verified) | `Documents` and `PrintableReport` finished; 16 remain, largest first: `StaffBusing` (65), `StaffLogistics` (42), `FinanceHome` (25), `Invoices` (24), `PublicEnquiry` (23), `Settings` (16), `Reports` (16), `Vehicles` (14), `Statements` (13), `Expenses` (13), `Registers` (12), `Fleet` (10), `Contracts` (8), `FleetReadiness` (7), `Rentals` (6), `Compliance` (5) |
+| Gates | Pass | `tsc` clean, `eslint` clean, **1,368 tests passed, 28 skipped**, `next build` 60 s, compiled CSS **92,489** + 10,903 bytes (from 101,772) |
+
+**Next piece:** the money desk — `FinanceHome`, `Invoices`, `Statements` (62 legacy classes between them).
+`Invoices` and `Statements` can now use the sheet vocabulary rather than their own print layouts, which is
+exactly why the sheet family was taken first.

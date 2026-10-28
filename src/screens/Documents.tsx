@@ -1,11 +1,8 @@
 // The paper the office hands to a customer: an invoice, the credit note that corrects it, and the
 // statement of their whole account (FIN-02, D-86, D-87, D-90).
 //
-// This is a printable sheet, not a PDF service. The browser already has a print engine that knows the
-// page size, the margins and how to write a file, so the document needs no dependency, works with no
-// network, and prints exactly what the person checking it saw on screen. The overlay is a preview of
-// that sheet; the stylesheet removes the navigation, the buttons and every other screen from the
-// printed page.
+// The sheet itself is `components/tms/Sheet` — one A4 vocabulary, four documents, and the management
+// report on the same page. This file is what each document says, not how paper looks.
 //
 // The rules the paper keeps:
 //   * the amount due is the figure the shared balance helper produced (`creditNotes.ts`) — never a
@@ -15,104 +12,37 @@
 //   * nothing is invented. A company name that has not been set is named as missing, and the preview
 //     says where to set it — a plausible-looking placeholder is worse than an honest gap, because it
 //     is the one thing on the page a customer would read as fact.
-import { useEffect, useRef, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { invoiceBalance } from "../tms/creditNotes";
 import type { CustomerStatement, StatementRowKind } from "../tms/customerStatement";
 import { formatAmount, lineAmount } from "../tms/money";
 import type { CreditNote, Invoice } from "../tms/types";
 import { CREDIT_NOTE_STATUS_LABELS, INVOICE_STATUS_LABELS } from "../tms/types";
 import { useTms } from "../tms/useTms";
-import { Button, formatDate, todayYmd } from "../ui/primitives";
-import { useDialogFocus } from "../ui/useDialogFocus";
+import { formatDate, todayYmd } from "@/lib/format";
+import {
+  Sheet,
+  SheetFoot,
+  SheetHeader,
+  SheetMeta,
+  SheetMetaItem,
+  SheetNotice,
+  SheetNote,
+  SheetRow,
+  SheetSection,
+  SheetTable,
+  SheetTd,
+  SheetTh,
+  SheetTotals,
+  SheetWords,
+} from "@/components/tms/Sheet";
+
+export { PrintPreview } from "@/components/tms/PrintPreview";
 
 const money = (currency: string, amount: number) => `${currency} ${formatAmount(amount)}`;
 
-/**
- * The preview, and the only place the print command is triggered.
- *
- * Rendered into `document.body` so the print stylesheet can hide everything else by hiding the
- * body's other children; a sheet nested inside the application shell would drag the shell onto the
- * page with it. The document title is set to the document's own name while it is open, because that
- * is what the browser suggests as the file name in "Save as PDF".
- */
-export function PrintPreview({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
-  const { db } = useTms();
-  const root = useRef<HTMLDivElement>(null);
-  useDialogFocus(root, onClose);
-
-  // The preview only ever mounts from a click, so it is never part of a server render and the portal
-  // always has a document to attach to.
-  useEffect(() => {
-    const previous = document.title;
-    document.title = label;
-    return () => {
-      document.title = previous;
-    };
-  }, [label]);
-
-  return createPortal(
-    <div className="rts-print" role="dialog" aria-modal="true" aria-label={`Print preview: ${label}`} ref={root} tabIndex={-1}>
-      <div className="rts-print-bar">
-        <div className="rts-print-bar-text">
-          <p className="rts-print-bar-title">{label}</p>
-          <p className="rts-print-bar-hint">
-            Print this page, or choose “Save as PDF” in the print dialog to send it as a file.
-            {!db.settings.companyName && " The company name is not set in Settings, so this document carries no supplier name yet."}
-          </p>
-        </div>
-        <div className="rts-print-bar-actions">
-          <Button variant="primary" onClick={() => window.print()}>
-            Print or save as PDF
-          </Button>
-          <Button onClick={onClose}>Close</Button>
-        </div>
-      </div>
-      <div className="rts-print-stage">{children}</div>
-    </div>,
-    document.body,
-  );
-}
-
-/** The letterhead both documents share: who is billing, what the document is, and its number. */
-function SheetTop({
-  docType,
-  reference,
-  state,
-  companyName,
-  referenceLabel = "Reference",
-}: {
-  docType: string;
-  reference: string;
-  state: string;
-  companyName: string | null;
-  /** What the second block is: a document number, or the period a statement covers. */
-  referenceLabel?: string;
-}) {
-  return (
-    <header className="rts-sheet-top">
-      <div className="rts-sheet-issuer">
-        <p className={companyName ? "rts-sheet-company" : "rts-sheet-company rts-sheet-company--missing"}>
-          {companyName ?? "Company name not set in Settings"}
-        </p>
-        <p className="rts-sheet-doctype">{docType}</p>
-      </div>
-      <div className="rts-sheet-id">
-        <p className="rts-sheet-label">{referenceLabel}</p>
-        <p className="rts-sheet-reference">{reference}</p>
-        <p className="rts-sheet-state">{state}</p>
-      </div>
-    </header>
-  );
-}
-
-function SheetFoot({ reference }: { reference: string }) {
-  return (
-    <footer className="rts-sheet-foot">
-      <span>{reference}</span>
-      <span>Printed {formatDate(todayYmd())}</span>
-    </footer>
-  );
+/** The foot of every document: what this paper is, and the day it was printed. */
+function Foot({ reference }: { reference: string }) {
+  return <SheetFoot reference={reference} printed={`Printed ${formatDate(todayYmd())}`} />;
 }
 
 /** An issued invoice as the customer reads it, including what has been paid and credited since. */
@@ -125,8 +55,8 @@ export function InvoiceSheet({ invoice }: { invoice: Invoice }) {
   const isVoid = invoice.status === "void";
 
   return (
-    <article className="rts-sheet" aria-label={`Invoice ${invoice.reference}`}>
-      <SheetTop
+    <Sheet label={`Invoice ${invoice.reference}`}>
+      <SheetHeader
         docType="Invoice"
         reference={invoice.reference}
         state={INVOICE_STATUS_LABELS[invoice.status]}
@@ -134,132 +64,83 @@ export function InvoiceSheet({ invoice }: { invoice: Invoice }) {
       />
 
       {isVoid && (
-        <p className="rts-sheet-void">
+        <SheetNotice tone="void">
           <strong>This invoice is void and does not stand.</strong>{" "}
           {invoice.voidReason ? `Reason recorded: ${invoice.voidReason}.` : "No reason was recorded."}
-        </p>
+        </SheetNotice>
       )}
 
-      <div className="rts-sheet-meta">
-        <div>
-          <p className="rts-sheet-label">Billed to</p>
-          <p className="rts-sheet-value">{invoice.customerName}</p>
-          {/* The buyer's details as the invoice was issued (CUS-01): copied then, never re-read. */}
-          {invoice.buyerAddress && <p className="rts-sheet-detail">{invoice.buyerAddress}</p>}
-          {invoice.buyerTin && <p className="rts-sheet-detail">TIN {invoice.buyerTin}</p>}
-        </div>
-        <div>
-          <p className="rts-sheet-label">Issued</p>
-          <p className="rts-sheet-value">{formatDate(invoice.issuedOn)}</p>
-        </div>
-        <div>
-          <p className="rts-sheet-label">Payment due</p>
-          <p className="rts-sheet-value">{formatDate(invoice.dueOn)}</p>
-        </div>
-        {rental && (
-          <div>
-            <p className="rts-sheet-label">Hire</p>
-            <p className="rts-sheet-value">{rental.reference}</p>
-          </div>
-        )}
-      </div>
+      <SheetMeta>
+        <SheetMetaItem
+          label="Billed to"
+          value={invoice.customerName}
+          // The buyer's details as the invoice was issued (CUS-01): copied then, never re-read.
+          detail={
+            <>
+              {invoice.buyerAddress && <span className="block">{invoice.buyerAddress}</span>}
+              {invoice.buyerTin && <span className="block">TIN {invoice.buyerTin}</span>}
+            </>
+          }
+        />
+        <SheetMetaItem label="Issued" value={formatDate(invoice.issuedOn)} />
+        <SheetMetaItem label="Payment due" value={formatDate(invoice.dueOn)} />
+        {rental && <SheetMetaItem label="Hire" value={rental.reference} />}
+      </SheetMeta>
 
-      <table className="rts-sheet-table" aria-label="Line items">
-        <thead>
-          <tr>
-            <th scope="col">Description</th>
-            <th scope="col" className="rts-sheet-num">
-              Qty
-            </th>
-            <th scope="col" className="rts-sheet-num">
-              Unit price
-            </th>
-            <th scope="col" className="rts-sheet-num">
-              Amount
-            </th>
+      <SheetTable
+        label="Line items"
+        head={
+          <>
+            <SheetTh>Description</SheetTh>
+            <SheetTh num>Qty</SheetTh>
+            <SheetTh num>Unit price</SheetTh>
+            <SheetTh num>Amount</SheetTh>
+          </>
+        }
+      >
+        {invoice.lines.map((line) => (
+          <tr key={line.id}>
+            <SheetTd>{line.description}</SheetTd>
+            <SheetTd num>{line.quantity}</SheetTd>
+            <SheetTd num>{money(invoice.currencyCode, line.unitAmount)}</SheetTd>
+            <SheetTd num>{money(invoice.currencyCode, lineAmount(line.quantity, line.unitAmount))}</SheetTd>
           </tr>
-        </thead>
-        <tbody>
-          {invoice.lines.map((line) => (
-            <tr key={line.id}>
-              <td>{line.description}</td>
-              <td className="rts-sheet-num">{line.quantity}</td>
-              <td className="rts-sheet-num">{money(invoice.currencyCode, line.unitAmount)}</td>
-              <td className="rts-sheet-num">{money(invoice.currencyCode, lineAmount(line.quantity, line.unitAmount))}</td>
-            </tr>
+        ))}
+      </SheetTable>
+
+      <SheetTotals>
+        <SheetRow label="Subtotal" value={money(invoice.currencyCode, invoice.subtotal)} />
+        {invoice.taxLines.map((line) => (
+          <SheetRow key={line.name} label={`${line.name} at ${line.ratePercent}%`} value={money(invoice.currencyCode, line.amount)} />
+        ))}
+        {invoice.taxLines.length === 0 && <SheetRow label="Tax" value="Not charged" />}
+        <SheetRow label="Total" value={money(invoice.currencyCode, invoice.total)} emphasis="total" />
+        {!isVoid && balance.paid > 0 && <SheetRow label="Received" value={money(invoice.currencyCode, balance.paid)} />}
+        {!isVoid && balance.credited > 0 && (
+          <SheetRow label="Credited by credit note" value={money(invoice.currencyCode, balance.credited)} />
+        )}
+        {!isVoid &&
+          (balance.refundDue > 0 ? (
+            <SheetRow label="Refund due to the customer" value={money(invoice.currencyCode, balance.refundDue)} emphasis="due" />
+          ) : (
+            <SheetRow label="Amount due" value={money(invoice.currencyCode, balance.outstanding)} emphasis="due" />
           ))}
-        </tbody>
-      </table>
+      </SheetTotals>
 
-      <div className="rts-sheet-closing">
-        <dl className="rts-sheet-totals">
-          <div className="rts-sheet-row">
-            <dt>Subtotal</dt>
-            <dd>{money(invoice.currencyCode, invoice.subtotal)}</dd>
-          </div>
-          {invoice.taxLines.map((line) => (
-            <div key={line.name} className="rts-sheet-row">
-              <dt>
-                {line.name} at {line.ratePercent}%
-              </dt>
-              <dd>{money(invoice.currencyCode, line.amount)}</dd>
-            </div>
-          ))}
-          {invoice.taxLines.length === 0 && (
-            <div className="rts-sheet-row">
-              <dt>Tax</dt>
-              <dd>Not charged</dd>
-            </div>
-          )}
-          <div className="rts-sheet-row rts-sheet-row--total">
-            <dt>Total</dt>
-            <dd>{money(invoice.currencyCode, invoice.total)}</dd>
-          </div>
-          {!isVoid && balance.paid > 0 && (
-            <div className="rts-sheet-row">
-              <dt>Received</dt>
-              <dd>{money(invoice.currencyCode, balance.paid)}</dd>
-            </div>
-          )}
-          {!isVoid && balance.credited > 0 && (
-            <div className="rts-sheet-row">
-              <dt>Credited by credit note</dt>
-              <dd>{money(invoice.currencyCode, balance.credited)}</dd>
-            </div>
-          )}
-          {!isVoid &&
-            (balance.refundDue > 0 ? (
-              <div className="rts-sheet-row rts-sheet-row--due">
-                <dt>Refund due to the customer</dt>
-                <dd>{money(invoice.currencyCode, balance.refundDue)}</dd>
-              </div>
-            ) : (
-              <div className="rts-sheet-row rts-sheet-row--due">
-                <dt>Amount due</dt>
-                <dd>{money(invoice.currencyCode, balance.outstanding)}</dd>
-              </div>
-            ))}
-        </dl>
+      <SheetWords>
+        {isVoid
+          ? "A voided invoice keeps its number and stays on record; a corrected invoice carries the next number."
+          : balance.refundDue > 0
+            ? "Credit notes have taken this invoice below what the customer paid, so the difference shown is owed back to them."
+            : balance.outstanding > 0
+              ? `Please pay ${money(invoice.currencyCode, balance.outstanding)} by ${formatDate(invoice.dueOn)}.`
+              : "Nothing is owed on this invoice."}
+      </SheetWords>
 
-        <p className="rts-sheet-words">
-          {isVoid
-            ? "A voided invoice keeps its number and stays on record; a corrected invoice carries the next number."
-            : balance.refundDue > 0
-              ? "Credit notes have taken this invoice below what the customer paid, so the difference shown is owed back to them."
-              : balance.outstanding > 0
-                ? `Please pay ${money(invoice.currencyCode, balance.outstanding)} by ${formatDate(invoice.dueOn)}.`
-                : "Nothing is owed on this invoice."}
-        </p>
-      </div>
+      {invoice.notes && <SheetNote label="Note">{invoice.notes}</SheetNote>}
 
-      {invoice.notes && (
-        <p className="rts-sheet-note">
-          <span className="rts-sheet-label">Note</span> {invoice.notes}
-        </p>
-      )}
-
-      <SheetFoot reference={invoice.reference} />
-    </article>
+      <Foot reference={invoice.reference} />
+    </Sheet>
   );
 }
 
@@ -269,8 +150,8 @@ export function CreditNoteSheet({ note }: { note: CreditNote }) {
   const isVoid = note.status === "void";
 
   return (
-    <article className="rts-sheet" aria-label={`Credit note ${note.reference}`}>
-      <SheetTop
+    <Sheet label={`Credit note ${note.reference}`}>
+      <SheetHeader
         docType="Credit note"
         reference={note.reference}
         state={CREDIT_NOTE_STATUS_LABELS[note.status]}
@@ -278,88 +159,58 @@ export function CreditNoteSheet({ note }: { note: CreditNote }) {
       />
 
       {isVoid && (
-        <p className="rts-sheet-void">
+        <SheetNotice tone="void">
           <strong>This credit note is void and does not stand.</strong>{" "}
           {note.voidReason ? `Reason recorded: ${note.voidReason}.` : "No reason was recorded."} The amount below is back on{" "}
           {note.invoiceReference}.
-        </p>
+        </SheetNotice>
       )}
 
-      <div className="rts-sheet-meta">
-        <div>
-          <p className="rts-sheet-label">Credited to</p>
-          <p className="rts-sheet-value">{note.customerName}</p>
-        </div>
-        <div>
-          <p className="rts-sheet-label">Issued</p>
-          <p className="rts-sheet-value">{formatDate(note.issuedOn)}</p>
-        </div>
-        <div>
-          <p className="rts-sheet-label">Against invoice</p>
-          <p className="rts-sheet-value">{note.invoiceReference}</p>
-        </div>
-      </div>
+      <SheetMeta>
+        <SheetMetaItem label="Credited to" value={note.customerName} />
+        <SheetMetaItem label="Issued" value={formatDate(note.issuedOn)} />
+        <SheetMetaItem label="Against invoice" value={note.invoiceReference} />
+      </SheetMeta>
 
-      <table className="rts-sheet-table" aria-label="Credited lines">
-        <thead>
-          <tr>
-            <th scope="col">Description</th>
-            <th scope="col" className="rts-sheet-num">
-              Qty
-            </th>
-            <th scope="col" className="rts-sheet-num">
-              Unit price
-            </th>
-            <th scope="col" className="rts-sheet-num">
-              Amount
-            </th>
+      <SheetTable
+        label="Credited lines"
+        head={
+          <>
+            <SheetTh>Description</SheetTh>
+            <SheetTh num>Qty</SheetTh>
+            <SheetTh num>Unit price</SheetTh>
+            <SheetTh num>Amount</SheetTh>
+          </>
+        }
+      >
+        {note.lines.map((line) => (
+          <tr key={line.id}>
+            <SheetTd>{line.description}</SheetTd>
+            <SheetTd num>{line.quantity}</SheetTd>
+            <SheetTd num>{money(note.currencyCode, line.unitAmount)}</SheetTd>
+            <SheetTd num>{money(note.currencyCode, lineAmount(line.quantity, line.unitAmount))}</SheetTd>
           </tr>
-        </thead>
-        <tbody>
-          {note.lines.map((line) => (
-            <tr key={line.id}>
-              <td>{line.description}</td>
-              <td className="rts-sheet-num">{line.quantity}</td>
-              <td className="rts-sheet-num">{money(note.currencyCode, line.unitAmount)}</td>
-              <td className="rts-sheet-num">{money(note.currencyCode, lineAmount(line.quantity, line.unitAmount))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+        ))}
+      </SheetTable>
 
-      <div className="rts-sheet-closing">
-        <dl className="rts-sheet-totals">
-          <div className="rts-sheet-row">
-            <dt>Subtotal</dt>
-            <dd>{money(note.currencyCode, note.subtotal)}</dd>
-          </div>
-          {note.taxLines.map((line) => (
-            <div key={line.name} className="rts-sheet-row">
-              <dt>
-                {line.name} at {line.ratePercent}%
-              </dt>
-              <dd>{money(note.currencyCode, line.amount)}</dd>
-            </div>
-          ))}
-          <div className="rts-sheet-row rts-sheet-row--total">
-            <dt>Total credited</dt>
-            <dd>{money(note.currencyCode, note.total)}</dd>
-          </div>
-        </dl>
+      <SheetTotals>
+        <SheetRow label="Subtotal" value={money(note.currencyCode, note.subtotal)} />
+        {note.taxLines.map((line) => (
+          <SheetRow key={line.name} label={`${line.name} at ${line.ratePercent}%`} value={money(note.currencyCode, line.amount)} />
+        ))}
+        <SheetRow label="Total credited" value={money(note.currencyCode, note.total)} emphasis="total" />
+      </SheetTotals>
 
-        <p className="rts-sheet-words">
-          {isVoid
-            ? `This credit note is void, so nothing is taken off ${note.invoiceReference}.`
-            : `This credit note reduces the amount due on ${note.invoiceReference} by ${money(note.currencyCode, note.total)}. It is not a payment and it does not change any payment already recorded.`}
-        </p>
-      </div>
+      <SheetWords>
+        {isVoid
+          ? `This credit note is void, so nothing is taken off ${note.invoiceReference}.`
+          : `This credit note reduces the amount due on ${note.invoiceReference} by ${money(note.currencyCode, note.total)}. It is not a payment and it does not change any payment already recorded.`}
+      </SheetWords>
 
-      <p className="rts-sheet-note">
-        <span className="rts-sheet-label">Reason</span> {note.reason}
-      </p>
+      <SheetNote label="Reason">{note.reason}</SheetNote>
 
-      <SheetFoot reference={note.reference} />
-    </article>
+      <Foot reference={note.reference} />
+    </Sheet>
   );
 }
 
@@ -388,8 +239,8 @@ export function StatementSheet({ statement }: { statement: CustomerStatement }) 
   };
 
   return (
-    <article className="rts-sheet" aria-label={`Statement for ${statement.customerName}`}>
-      <SheetTop
+    <Sheet label={`Statement for ${statement.customerName}`}>
+      <SheetHeader
         docType="Statement of account"
         reference={period}
         referenceLabel="Period"
@@ -397,173 +248,133 @@ export function StatementSheet({ statement }: { statement: CustomerStatement }) 
         companyName={db.settings.companyName}
       />
 
-      <div className="rts-sheet-meta">
-        <div>
-          <p className="rts-sheet-label">Account of</p>
-          <p className="rts-sheet-value">{statement.customerName}</p>
-        </div>
-        <div>
-          <p className="rts-sheet-label">Period</p>
-          <p className="rts-sheet-value">{period}</p>
-        </div>
-        <div>
-          <p className="rts-sheet-label">Currency</p>
-          <p className="rts-sheet-value">{currency || "not set"}</p>
-        </div>
-      </div>
+      <SheetMeta className="sm:grid-cols-3">
+        <SheetMetaItem label="Account of" value={statement.customerName} />
+        <SheetMetaItem label="Period" value={period} />
+        <SheetMetaItem label="Currency" value={currency || "not set"} />
+      </SheetMeta>
 
-      <table className="rts-sheet-table" aria-label="Account activity">
-        <thead>
-          <tr>
-            <th scope="col">Date</th>
-            <th scope="col">What</th>
-            <th scope="col">Reference</th>
-            <th scope="col" className="rts-sheet-num">
-              Charged
-            </th>
-            <th scope="col" className="rts-sheet-num">
-              Paid or credited
-            </th>
-            <th scope="col" className="rts-sheet-num">
-              Balance
-            </th>
+      <SheetTable
+        label="Account activity"
+        head={
+          <>
+            <SheetTh>Date</SheetTh>
+            <SheetTh>What</SheetTh>
+            <SheetTh>Reference</SheetTh>
+            <SheetTh num>Charged</SheetTh>
+            <SheetTh num>Paid or credited</SheetTh>
+            <SheetTh num>Balance</SheetTh>
+          </>
+        }
+      >
+        <tr>
+          <SheetTd>{formatDate(statement.from)}</SheetTd>
+          <SheetTd colSpan={3}>Balance brought forward</SheetTd>
+          <SheetTd num />
+          <SheetTd num>{money(currency, statement.openingBalance)}</SheetTd>
+        </tr>
+        {statement.rows.map((row) => (
+          <tr key={`${row.kind}-${row.id}`}>
+            <SheetTd>{formatDate(row.date)}</SheetTd>
+            <SheetTd>
+              {kindLabel[row.kind]}
+              {row.kind === "creditNote" && row.description ? ` — ${row.description}` : ""}
+              {row.kind === "payment" && row.description ? ` — ${row.description.replace("Payment received — ", "")}` : ""}
+              {row.kind === "refund" && row.description ? ` — ${row.description.replace("Refund paid back — ", "")}` : ""}
+            </SheetTd>
+            <SheetTd mono>{row.reference}</SheetTd>
+            <SheetTd num>{row.debit > 0 ? money(currency, row.debit) : ""}</SheetTd>
+            <SheetTd num>{row.credit > 0 ? money(currency, row.credit) : ""}</SheetTd>
+            <SheetTd num>{money(currency, row.balance)}</SheetTd>
           </tr>
-        </thead>
-        <tbody>
+        ))}
+        {statement.rows.length === 0 && (
           <tr>
-            <td>{formatDate(statement.from)}</td>
-            <td colSpan={3}>Balance brought forward</td>
-            <td className="rts-sheet-num" />
-            <td className="rts-sheet-num">{money(currency, statement.openingBalance)}</td>
+            <SheetTd colSpan={6}>Nothing moved on this account in the period.</SheetTd>
           </tr>
-          {statement.rows.map((row) => (
-            <tr key={`${row.kind}-${row.id}`}>
-              <td>{formatDate(row.date)}</td>
-              <td>
-                {kindLabel[row.kind]}
-                {row.kind === "creditNote" && row.description ? ` — ${row.description}` : ""}
-                {row.kind === "payment" && row.description ? ` — ${row.description.replace("Payment received — ", "")}` : ""}
-                {row.kind === "refund" && row.description ? ` — ${row.description.replace("Refund paid back — ", "")}` : ""}
-              </td>
-              <td className="rts-mono">{row.reference}</td>
-              <td className="rts-sheet-num">{row.debit > 0 ? money(currency, row.debit) : ""}</td>
-              <td className="rts-sheet-num">{row.credit > 0 ? money(currency, row.credit) : ""}</td>
-              <td className="rts-sheet-num">{money(currency, row.balance)}</td>
-            </tr>
-          ))}
-          {statement.rows.length === 0 && (
-            <tr>
-              <td colSpan={6}>Nothing moved on this account in the period.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+        )}
+      </SheetTable>
 
-      <div className="rts-sheet-closing">
+      <SheetTotals>
         {/* The opening balance is stated once, in the table's own "brought forward" row above: a
             totals block that repeated it would ask the reader to decide which one was authoritative. */}
-        <dl className="rts-sheet-totals">
-          <div className="rts-sheet-row">
-            <dt>Invoiced in the period</dt>
-            <dd>{money(currency, statement.invoiced)}</dd>
-          </div>
-          <div className="rts-sheet-row">
-            <dt>Payments received</dt>
-            <dd>{money(currency, statement.received)}</dd>
-          </div>
-          <div className="rts-sheet-row">
-            <dt>Credit notes issued</dt>
-            <dd>{money(currency, statement.credited)}</dd>
-          </div>
-          {statement.refunded > 0 && (
-            <div className="rts-sheet-row">
-              {/* Stated as money that left the office, never netted off what the customer paid (D-92). */}
-              <dt>Refunds paid back</dt>
-              <dd>{money(currency, statement.refunded)}</dd>
-            </div>
-          )}
-          <div className="rts-sheet-row rts-sheet-row--due">
-            <dt>{statement.closingBalance < 0 ? "In credit — owed to the customer" : "Balance due"}</dt>
-            <dd>{money(currency, Math.abs(statement.closingBalance))}</dd>
-          </div>
-        </dl>
+        <SheetRow label="Invoiced in the period" value={money(currency, statement.invoiced)} />
+        <SheetRow label="Payments received" value={money(currency, statement.received)} />
+        <SheetRow label="Credit notes issued" value={money(currency, statement.credited)} />
+        {statement.refunded > 0 && (
+          // Stated as money that left the office, never netted off what the customer paid (D-92).
+          <SheetRow label="Refunds paid back" value={money(currency, statement.refunded)} />
+        )}
+        <SheetRow
+          label={statement.closingBalance < 0 ? "In credit — owed to the customer" : "Balance due"}
+          value={money(currency, Math.abs(statement.closingBalance))}
+          emphasis="due"
+        />
+      </SheetTotals>
 
-        <p className="rts-sheet-words">
-          {statement.closingBalance > 0
-            ? `This is a statement of account, not a demand for payment. It lists every invoice, payment and credit note on this account in the period. ${money(currency, statement.closingBalance)} was owed as at ${formatDate(statement.to)}.`
-            : statement.closingBalance < 0
-              ? `This account is in credit by ${money(currency, -statement.closingBalance)} as at ${formatDate(statement.to)}: more has been paid or credited than invoiced.`
-              : `Nothing is owed on this account as at ${formatDate(statement.to)}.`}
-        </p>
-      </div>
+      <SheetWords>
+        {statement.closingBalance > 0
+          ? `This is a statement of account, not a demand for payment. It lists every invoice, payment and credit note on this account in the period. ${money(currency, statement.closingBalance)} was owed as at ${formatDate(statement.to)}.`
+          : statement.closingBalance < 0
+            ? `This account is in credit by ${money(currency, -statement.closingBalance)} as at ${formatDate(statement.to)}: more has been paid or credited than invoiced.`
+            : `Nothing is owed on this account as at ${formatDate(statement.to)}.`}
+      </SheetWords>
 
       {statement.ageing.total > 0 && (
-        <section aria-label="How old the money is">
-          <p className="rts-sheet-label">Money still owed, by age at {formatDate(statement.to)}</p>
-          <table className="rts-sheet-table">
-            <thead>
-              <tr>
-                <th scope="col">Not yet due</th>
-                <th scope="col" className="rts-sheet-num">
-                  1–30 days late
-                </th>
-                <th scope="col" className="rts-sheet-num">
-                  31–60 days late
-                </th>
-                <th scope="col" className="rts-sheet-num">
-                  Over 60 days late
-                </th>
-                <th scope="col" className="rts-sheet-num">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>{money(currency, statement.ageing.notYetDue)}</td>
-                <td className="rts-sheet-num">{money(currency, statement.ageing.days1to30)}</td>
-                <td className="rts-sheet-num">{money(currency, statement.ageing.days31to60)}</td>
-                <td className="rts-sheet-num">{money(currency, statement.ageing.days61plus)}</td>
-                <td className="rts-sheet-num">{money(currency, statement.ageing.total)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
+        <SheetSection label="How old the money is" intro={`Money still owed, by age at ${formatDate(statement.to)}.`}>
+          <SheetTable
+            label="Ageing of the balance"
+            className="mt-2"
+            head={
+              <>
+                <SheetTh>Not yet due</SheetTh>
+                <SheetTh num>1–30 days late</SheetTh>
+                <SheetTh num>31–60 days late</SheetTh>
+                <SheetTh num>Over 60 days late</SheetTh>
+                <SheetTh num>Total</SheetTh>
+              </>
+            }
+          >
+            <tr>
+              <SheetTd>{money(currency, statement.ageing.notYetDue)}</SheetTd>
+              <SheetTd num>{money(currency, statement.ageing.days1to30)}</SheetTd>
+              <SheetTd num>{money(currency, statement.ageing.days31to60)}</SheetTd>
+              <SheetTd num>{money(currency, statement.ageing.days61plus)}</SheetTd>
+              <SheetTd num>{money(currency, statement.ageing.total)}</SheetTd>
+            </tr>
+          </SheetTable>
+        </SheetSection>
       )}
 
       {statement.openInvoices.length > 0 && (
-        <section aria-label="Invoices still owing">
-          <p className="rts-sheet-label">Invoices still owing</p>
-          <table className="rts-sheet-table">
-            <thead>
-              <tr>
-                <th scope="col">Invoice</th>
-                <th scope="col">Issued</th>
-                <th scope="col">Payment due</th>
-                <th scope="col" className="rts-sheet-num">
-                  Days late
-                </th>
-                <th scope="col" className="rts-sheet-num">
-                  Outstanding
-                </th>
+        <SheetSection label="Invoices still owing">
+          <SheetTable
+            label="Invoices still owing"
+            className="mt-2"
+            head={
+              <>
+                <SheetTh>Invoice</SheetTh>
+                <SheetTh>Issued</SheetTh>
+                <SheetTh>Payment due</SheetTh>
+                <SheetTh num>Days late</SheetTh>
+                <SheetTh num>Outstanding</SheetTh>
+              </>
+            }
+          >
+            {statement.openInvoices.map((row) => (
+              <tr key={row.invoiceId}>
+                <SheetTd mono>{row.reference}</SheetTd>
+                <SheetTd>{formatDate(row.issuedOn)}</SheetTd>
+                <SheetTd>{formatDate(row.dueOn)}</SheetTd>
+                <SheetTd num>{row.daysOverdue > 0 ? row.daysOverdue : "—"}</SheetTd>
+                <SheetTd num>{money(currency, row.outstanding)}</SheetTd>
               </tr>
-            </thead>
-            <tbody>
-              {statement.openInvoices.map((row) => (
-                <tr key={row.invoiceId}>
-                  <td className="rts-mono">{row.reference}</td>
-                  <td>{formatDate(row.issuedOn)}</td>
-                  <td>{formatDate(row.dueOn)}</td>
-                  <td className="rts-sheet-num">{row.daysOverdue > 0 ? row.daysOverdue : "—"}</td>
-                  <td className="rts-sheet-num">{money(currency, row.outstanding)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            ))}
+          </SheetTable>
+        </SheetSection>
       )}
 
-      <SheetFoot reference={`Statement — ${statement.customerName}`} />
-    </article>
+      <Foot reference={`Statement — ${statement.customerName}`} />
+    </Sheet>
   );
 }
