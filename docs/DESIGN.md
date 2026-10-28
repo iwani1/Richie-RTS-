@@ -251,9 +251,14 @@ screen scale, so what is approved on screen is what goes on the paper.
 ## 6a. A second pass, proposed and not yet applied
 
 `docs/ui-proposal/index.html` holds a review page — open it in a browser, no build needed — with three
-finished treatments of the same screen, called **Porcelain**, **Ink** and **Studio** for the sake of the
+finished treatments of two screens each, called **Porcelain**, **Ink** and **Studio** for the sake of the
 argument: warm white with layered depth; a near-black rail against a white work surface; and an entirely
-dark workspace with a lightened accent. The quieter first attempt is kept beside it as
+dark workspace with a lightened accent. The dashboard in each panel is a **bento board** — unequal cards
+on a 12-column grid (5-3-4, then 8-4, then 4-4-4), a figure with its delta and a sparkline inside the card,
+initials where a person is the subject, and a quiet action in every card header. That rhythm is the answer
+to the earlier critique that the surface was still flat: uniform cards in a row read as a form however
+carefully they are styled. Refused from the same references: a different colour per stat card (colour then
+stops meaning anything), gradient fills under charts, motion, and any card without a screen behind it. The quieter first attempt is kept beside it as
 `v1-daylight-2.html`. They are proposals: nothing in `src/` has been changed to produce them, and no
 dependency or font was added (the pages reuse the same Inter and IBM Plex Mono files the app already
 bundles). Every colour pair used is listed with its measured contrast on the page itself; none falls

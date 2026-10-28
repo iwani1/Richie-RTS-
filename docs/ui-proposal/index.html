@@ -90,6 +90,9 @@
     border: 1px solid #dddcd5; border-radius: 999px; padding: 2px 9px; color: #5b6478; background: #fff;
   }
   .panel-head span { font-size: 13.5px; color: #5b6478; }
+  .subhead { display: flex; align-items: baseline; gap: 10px; margin: 20px 0 8px; }
+  .subhead b { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #4453f0; font-weight: 650; }
+  .subhead span { font-size: 12.5px; color: #6a7285; }
   .frame {
     border: 1px solid #e2e2db; border-radius: 16px; overflow: hidden; background: #fff;
     box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 24px 48px -34px rgba(16,24,40,.35);
@@ -505,22 +508,167 @@
   }
   /* the primary button keeps white text on the darker indigo, not the lightened one */
   [data-dir="studio"] .btn.primary { background: #4453f0; border-color: #4b59f2; }
+
+  /* =========================================================================================
+     THE BOARD — bento grid. Cards of unequal size, big figures with deltas, sparklines inside
+     the card, avatars where a person is the subject. Same variables, so the skin switch re-tints it.
+     ========================================================================================= */
+  .board {
+    display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 14px; padding: 22px 26px 26px; background: var(--canvas);
+    grid-auto-rows: minmax(0, auto);
+  }
+  @media (max-width: 1100px) { .board { grid-template-columns: repeat(6, minmax(0,1fr)); } }
+
+  .bc {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
+    box-shadow: var(--card-shadow); padding: 18px; min-width: 0;
+    display: flex; flex-direction: column;
+  }
+  .bc.pad0 { padding: 0; }
+  .bc-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+  .bc-head h5 {
+    margin: 0; font-size: 12.5px; font-weight: 600; letter-spacing: -0.008em; color: var(--ink);
+  }
+  .bc-head p { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
+  .bc-head .more {
+    margin-left: auto; font-size: 11.5px; font-weight: 550; color: var(--accent);
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; background: var(--btn-bg);
+    box-shadow: var(--btn-shadow); white-space: nowrap;
+  }
+
+  .kpi {
+    font-size: 34px; line-height: 1; font-weight: 610; letter-spacing: -0.045em;
+    font-variant-numeric: tabular-nums; color: var(--ink);
+  }
+  .kpi small {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 400;
+    letter-spacing: 0.09em; color: var(--muted); margin-left: 6px; vertical-align: 8px;
+  }
+  .kpi-row { display: flex; align-items: flex-end; gap: 10px; }
+  .delta {
+    display: inline-flex; align-items: center; gap: 3px; border-radius: 999px;
+    padding: 2px 8px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+    background: var(--green-soft); color: var(--green-ink); margin-bottom: 4px;
+  }
+  .delta.flat { background: var(--quiet-soft); color: var(--quiet-ink); }
+  .delta.down { background: var(--red-soft); color: var(--red-ink); }
+  .cap { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); }
+
+  .spark { display: block; width: 100%; height: 46px; margin-top: 12px; }
+  .spark .area { fill: var(--accent-soft); opacity: .7; }
+  .spark .line { fill: none; stroke: var(--accent); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .spark .dot { fill: var(--accent); }
+  .spark .grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3; }
+
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 62px; margin-top: 14px; }
+  .bars i {
+    flex: 1; background: var(--accent-soft); border-radius: 4px 4px 2px 2px; min-height: 4px;
+    position: relative;
+  }
+  .bars i.hi { background: var(--accent); }
+  .bars-label { display: flex; gap: 6px; margin-top: 7px; }
+  .bars-label span {
+    flex: 1; text-align: center; font-family: "IBM Plex Mono", monospace;
+    font-size: 8.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+  }
+
+  .seg {
+    display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin: 14px 0 12px;
+    background: var(--quiet-soft);
+  }
+  .seg i { display: block; height: 100%; }
+  .legend { display: grid; gap: 7px; }
+  .legend div { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
+  .legend b { margin-left: auto; color: var(--ink); font-weight: 570; font-variant-numeric: tabular-nums; }
+  .legend .sw2 { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+
+  .rows { display: flex; flex-direction: column; }
+  .row2 {
+    display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center;
+    gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--row-line);
+  }
+  .row2:last-child { border-bottom: 0; padding-bottom: 0; }
+  .row2:first-child { padding-top: 2px; }
+  .row2 b { display: block; font-size: 12.5px; font-weight: 570; color: var(--ink); letter-spacing: -0.004em; }
+  .row2 span.s { display: block; margin-top: 1px; font-size: 11px; color: var(--muted); }
+  .row2 .amt { font-size: 12.5px; font-weight: 580; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+  .avl {
+    width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 10px; font-weight: 640; letter-spacing: -0.01em; flex: none;
+    background: var(--accent-soft); color: var(--accent-ink);
+    box-shadow: 0 0 0 2px var(--card);
+  }
+  .avl.g { background: var(--green-soft); color: var(--green-ink); }
+  .avl.a { background: var(--amber-soft); color: var(--amber-ink); }
+  .avl.q { background: var(--quiet-soft); color: var(--quiet-ink); }
+  .stack { display: flex; align-items: center; }
+  .stack .avl + .avl { margin-left: -8px; }
+  .stack .more2 {
+    margin-left: -8px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 9.5px; font-weight: 620; background: var(--quiet-soft); color: var(--quiet-ink);
+    box-shadow: 0 0 0 2px var(--card);
+  }
+
+  .day {
+    display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 12px; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--row-line);
+  }
+  .day:last-child { border-bottom: 0; }
+  .day time {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .day b { display: block; font-size: 12.5px; font-weight: 570; color: var(--ink); }
+  .day span.s { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  .week { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 6px; margin-top: 4px; }
+  .week div {
+    border: 1px solid var(--line); border-radius: 9px; padding: 7px 6px; text-align: center;
+    background: var(--input-bg);
+  }
+  .week span { display: block; font-family: "IBM Plex Mono", monospace; font-size: 8.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .week b { display: block; font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 3px; }
+  .week div.today { background: var(--accent-soft); border-color: var(--accent-soft); }
+  .week div.today b { color: var(--accent-ink); }
+  .week div.today span { color: var(--accent-ink); }
+
+  .span2 { grid-column: span 2; }
+  .span3 { grid-column: span 3; }
+  .span4 { grid-column: span 4; }
+  .span5 { grid-column: span 5; }
+  .span6 { grid-column: span 6; }
+  .span8 { grid-column: span 8; }
+  .span9 { grid-column: span 9; }
+  .span12 { grid-column: span 12; }
+  @media (max-width: 1100px) {
+    .span2, .span3, .span4 { grid-column: span 3; }
+    .span5, .span6, .span8, .span9 { grid-column: span 6; }
+    .span12 { grid-column: span 6; }
+  }
+
+  /* the bento table reuses .t but with a little more air */
+  .board .t td { height: 52px; }
 </style>
 </head>
 <body data-view="all">
 <div class="doc">
 
   <header class="mast">
-    <p class="kicker">Richie TMS · interface proposal v2 · not yet applied</p>
-    <h1>The same application, <em>made to feel expensive</em></h1>
-    <p class="lede">Three ways to give the workspace the finish you are asking for. All three keep the rules
-      the product already holds itself to — one accent, no gradients behind anything that carries meaning,
-      no glass, no motion, every pair above 5:1 contrast. What changes is <b>depth, weight and
-      contrast</b>: layered shadows, hairline edges, type that jumps between sizes instead of inching,
-      figures big enough to read across a desk.</p>
-    <p class="lede">Same screen, same records, same numbers in all three. Switch between them and tell me
-      which one you would be happy to open every morning — or say “take the rail from Ink, the cards from
-      Porcelain” and I will mix them.</p>
+    <p class="kicker">Richie TMS · interface proposal v3 · not yet applied</p>
+    <h1>A board, not a <em>stack of boxes</em></h1>
+    <p class="lede">You were right that the last version was still boring, and Dribbble shows exactly what
+      it was missing: <b>rhythm</b>. A premium screen is not uniform. Cards are different sizes and hold
+      different kinds of thing — a figure with a trend, a list of people, a bar of days, a table — and they
+      fit together like a board. Uniform white rectangles in a row will always read as a form, however
+      carefully they are styled.</p>
+    <p class="lede">So the dashboard below is a <b>bento board</b> built from the same pieces as before:
+      a large “today” card with the next departures, figures with a delta and a sparkline, a fleet bar that
+      splits 15/4/3, the register, the charges waiting for a second name, papers about to lapse, the week's
+      money, and who is on the road. Every card is a real screen of this product — nothing invented to fill
+      a grid.</p>
+    <p class="lede">Three skins of the same board. Pick one, or name a mixture.</p>
 
     <div class="switcher">
       <span class="lbl">Skin</span>
@@ -533,12 +681,220 @@
     </div>
   </header>
 
-  <h2><span class="num">01</span>Three finishes</h2>
-  <p class="why">Each panel is the real shape of a screen: the rail, the header, the figure strip, a register,
-    a record card and a bench of the six components the whole app is built from. The rows are illustrations
-    for this page — they are not records and they are not in the database.</p>
+  <h2><span class="num">01</span>Three finishes of one board</h2>
+  <p class="why">Each panel holds two screens: <b>the board</b> — the dashboard, where the bento rhythm does
+    the work — and <b>the register</b> — a list screen, where the same treatment has to stay calm. The rows
+    are illustrations for this page; they are not records and they are not in the database.</p>
 <div class="panel-head" style="margin-top:34px"><b>Porcelain</b><span class="tag">Layer and light</span><span>Warm off-white canvas, pure white records, hairline edges and a soft two-part shadow. The most traditional premium: quiet, bright, expensive-looking, and the easiest to read all day.</span></div>
 <section class="panel" data-dir="porcelain">
+      <div class="subhead"><b>The board</b><span>the screen the day opens on</span></div>
+      <div class="frame">
+      <div class="app">
+        <aside class="rail">
+          <div class="brand">
+            <div class="mark">R</div>
+            <div><b>Richie TMS</b><span>Transport Services</span></div>
+          </div>
+          <div class="grp">
+            <p>Service desk</p>
+            <div class="item on"><span class="ic"></span>Dashboard</div>
+            <div class="item"><span class="ic"></span>Money<span class="n">2</span></div>
+            <div class="item"><span class="ic"></span>Rentals<span class="n">3</span></div>
+            <div class="item"><span class="ic"></span>Invoices</div>
+            <div class="item"><span class="ic"></span>Busing<span class="n">4</span></div>
+            <div class="item"><span class="ic"></span>Dispatch<span class="n">1</span></div>
+          </div>
+          <div class="grp">
+            <p>Fleet &amp; clients</p>
+            <div class="item"><span class="ic"></span>Vehicles</div>
+            <div class="item"><span class="ic"></span>Compliance<span class="n">6</span></div>
+            <div class="item"><span class="ic"></span>Clients</div>
+            <div class="item"><span class="ic"></span>Contracts</div>
+          </div>
+          <div class="grp">
+            <p>Administration</p>
+            <div class="item"><span class="ic"></span>Settings</div>
+            <div class="item"><span class="ic"></span>Audit log</div>
+          </div>
+          <div class="rail-foot">
+            <div class="who">
+              <div class="av">AB</div>
+              <div><b>Ama Boateng</b><span>Operations</span></div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="work">
+          <div class="top">
+            <span class="crumb">Service desk &nbsp;/&nbsp; <b>Dashboard</b></span>
+            <div class="search">Search or jump to a screen<kbd>Ctrl K</kbd></div>
+            <div class="av-lg">AB</div>
+          </div>
+
+          <div class="board">
+            <!-- today -->
+            <section class="bc span5">
+              <div class="bc-head">
+                <div><h5>Today</h5><p>Tuesday 28 October · 06:12</p></div>
+                <span class="more">Run sheet</span>
+              </div>
+              <div class="kpi-row">
+                <span class="kpi">6<small>DEPARTURES</small></span>
+                <span class="delta"><span aria-hidden="true">▲</span>2 on time</span>
+              </div>
+              <div class="rows" style="margin-top:12px">
+                <div class="day">
+                  <time>06:30</time>
+                  <div><b>East Legon · Staff shuttle</b><span class="s">GT 4821-24 · 22 of 33 booked</span></div>
+                  <span class="chip go"><i></i>Leaves</span>
+                </div>
+                <div class="day">
+                  <time>07:15</time>
+                  <div><b>Airport · Corporate hire</b><span class="s">GR 5502-22 · Volta Star Logistics</span></div>
+                  <span class="chip wait"><i></i>No crew</span>
+                </div>
+                <div class="day">
+                  <time>08:00</time>
+                  <div><b>Tema · Staff shuttle</b><span class="s">GW 1194-23 · 31 of 33 booked</span></div>
+                  <span class="chip ok"><i></i>Ready</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- open value -->
+            <section class="bc span3">
+              <div class="bc-head"><div><h5>Open value</h5><p>quoted, not yet invoiced</p></div></div>
+              <div class="kpi-row">
+                <span class="kpi">11,450<small>GHS</small></span>
+                <span class="delta"><span aria-hidden="true">▲</span>18%</span>
+              </div>
+              <svg class="spark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="Seven day trend, rising">
+                <path class="area" d="M0 38 L28 33 L57 35 L86 26 L114 29 L143 18 L171 15 L200 7 L200 46 L0 46 Z" />
+                <path class="line" d="M0 38 L28 33 L57 35 L86 26 L114 29 L143 18 L171 15 L200 7" />
+                <circle class="dot" cx="200" cy="7" r="2.6" />
+              </svg>
+              <div class="bars-label"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+              <p class="cap">Seven quotations issued this week, against nine last week.</p>
+            </section>
+
+            <!-- fleet -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Fleet right now</h5><p>22 vehicles, read from the runs</p></div><span class="more">Readiness</span></div>
+              <div class="kpi-row"><span class="kpi">68<small>% WORKING</small></span></div>
+              <div class="seg" aria-hidden="true">
+                <i style="width:68%; background:#4453f0"></i>
+                <i style="width:18%; background:#c9cfec"></i>
+                <i style="width:14%; background:#e7b96a"></i>
+              </div>
+              <div class="legend">
+                <div><span class="sw2" style="background:#4453f0"></span>On the road or assigned<b>15</b></div>
+                <div><span class="sw2" style="background:#c9cfec"></span>Idle, ready<b>4</b></div>
+                <div><span class="sw2" style="background:#e7b96a"></span>In the workshop<b>3</b></div>
+              </div>
+              <p class="cap">Two of the three in the workshop are on today's run sheet.</p>
+            </section>
+
+            <!-- register -->
+            <section class="bc span8 pad0">
+              <div class="card-head">
+                <h4>All hires</h4><p>24 records</p>
+                <button class="btn" type="button">Filter</button>
+              </div>
+              <table class="t">
+                <thead>
+                  <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th class="num">Total</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="ref">RR-0004</td><td class="strong">Volta Star Logistics</td><td class="dim">02–04 Nov</td><td class="dim">Toyota Hiace · GT 4821-24</td><td><span class="chip ok"><i></i>Completed</span></td><td class="num">3,400.00</td></tr>
+                  <tr><td class="ref">RR-0005</td><td class="strong">Akosua Boateng</td><td class="dim">05 Nov</td><td class="dim">Nissan Urvan · GW 1194-23</td><td><span class="chip wait"><i></i>Waiting on you</span></td><td class="num">1,150.00</td></tr>
+                  <tr><td class="ref">RR-0006</td><td class="strong">Ministry of Roads</td><td class="dim">06–08 Nov</td><td class="dim">Toyota Coaster · GR 5502-22</td><td><span class="chip go"><i></i>Dispatched</span></td><td class="num">6,900.00</td></tr>
+                  <tr><td class="ref">RR-0007</td><td class="strong">Kofi Mensah</td><td class="dim">09 Nov</td><td class="dim">Hyundai Starex · GE 2201-25</td><td><span class="chip quiet"><i></i>Quoted</span></td><td class="num">980.00</td></tr>
+                </tbody>
+              </table>
+              <div class="card-foot">
+                <span><b>4</b> of <b>24</b> shown</span><span>Sorted by departure</span>
+                <span style="margin-left:auto">Totals exclude voided invoices</span>
+              </div>
+            </section>
+
+            <!-- charges -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Charges waiting for a name</h5><p>above the figure you set</p></div></div>
+              <div class="rows">
+                <div class="row2">
+                  <div class="avl a">AB</div>
+                  <div><b>Fuel · RR-0004</b><span class="s">Tank refilled before return</span></div>
+                  <span class="amt">400.00</span>
+                </div>
+                <div class="row2">
+                  <div class="avl a">KM</div>
+                  <div><b>Damaged seat cover · RR-0011</b><span class="s">Torn on return, photo filed</span></div>
+                  <span class="amt">250.00</span>
+                </div>
+              </div>
+              <p class="cap" style="margin-top:auto; padding-top:14px">Somebody other than the author signs. The invoice waits until then.</p>
+            </section>
+
+            <!-- papers -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Papers expiring</h5><p>within the lead time you set</p></div><span class="more">All 6</span></div>
+              <div class="rows">
+                <div class="row2">
+                  <div class="avl q">GT</div>
+                  <div><b>Insurance · GT 4821-24</b><span class="s">Renewal taken by Kofi, expected 02 Nov</span></div>
+                  <span class="chip stop"><i></i>4 days</span>
+                </div>
+                <div class="row2">
+                  <div class="avl q">KM</div>
+                  <div><b>Licence · Kojo Mensah</b><span class="s">Class D · medical certificate</span></div>
+                  <span class="chip wait"><i></i>12 days</span>
+                </div>
+                <div class="row2">
+                  <div class="avl q">GR</div>
+                  <div><b>Roadworthy · GR 5502-22</b><span class="s">Nobody has taken this renewal</span></div>
+                  <span class="chip wait"><i></i>19 days</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- money -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Money in</h5><p>last seven days, payments recorded</p></div></div>
+              <div class="kpi-row"><span class="kpi">8,240<small>GHS</small></span><span class="delta flat">▲ flat</span></div>
+              <div class="bars" aria-hidden="true">
+                <i style="height:38%"></i><i style="height:56%"></i><i style="height:31%"></i>
+                <i style="height:72%"></i><i style="height:48%"></i><i style="height:64%"></i><i class="hi" style="height:90%"></i>
+              </div>
+              <div class="bars-label"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+              <p class="cap">Nothing on Sunday, which is why the week is level.</p>
+            </section>
+
+            <!-- on the road -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>On the road now</h5><p>2 vehicles, 2 drivers</p></div><span class="more">Dispatch</span></div>
+              <div class="rows">
+                <div class="row2">
+                  <div class="avl g">KM</div>
+                  <div><b>Kojo Mensah · GT 4821-24</b><span class="s">East Legon, stop 3 of 7 · 06:41</span></div>
+                  <span class="chip go"><i></i>Moving</span>
+                </div>
+                <div class="row2">
+                  <div class="avl">AY</div>
+                  <div><b>Adjoa Yeboah · GW 1194-23</b><span class="s">Tema, arrived early · 07:02</span></div>
+                  <span class="chip ok"><i></i>Arrived</span>
+                </div>
+              </div>
+              <div class="stack" style="margin-top:auto; padding-top:14px">
+                <span class="avl">KM</span><span class="avl">AY</span><span class="avl">EK</span><span class="avl">SB</span>
+                <span class="more2">+3</span>
+                <span style="margin-left:10px; font-size:11.5px; color:var(--muted)">six drivers free today</span>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+      </div>
+      <div class="subhead"><b>The register</b><span>the same treatment on a list screen</span></div>
       <div class="frame">
       <div class="app">
         <aside class="rail">
@@ -699,6 +1055,214 @@
     </section>
 <div class="panel-head" style="margin-top:34px"><b>Ink</b><span class="tag">Contrast and confidence</span><span>A near-black rail against a white work surface, one bright accent used in small doses. This is the BoardUI / Linear posture — the chrome is dark so the records are the only thing that glows.</span></div>
 <section class="panel" data-dir="ink">
+      <div class="subhead"><b>The board</b><span>the screen the day opens on</span></div>
+      <div class="frame">
+      <div class="app">
+        <aside class="rail">
+          <div class="brand">
+            <div class="mark">R</div>
+            <div><b>Richie TMS</b><span>Transport Services</span></div>
+          </div>
+          <div class="grp">
+            <p>Service desk</p>
+            <div class="item on"><span class="ic"></span>Dashboard</div>
+            <div class="item"><span class="ic"></span>Money<span class="n">2</span></div>
+            <div class="item"><span class="ic"></span>Rentals<span class="n">3</span></div>
+            <div class="item"><span class="ic"></span>Invoices</div>
+            <div class="item"><span class="ic"></span>Busing<span class="n">4</span></div>
+            <div class="item"><span class="ic"></span>Dispatch<span class="n">1</span></div>
+          </div>
+          <div class="grp">
+            <p>Fleet &amp; clients</p>
+            <div class="item"><span class="ic"></span>Vehicles</div>
+            <div class="item"><span class="ic"></span>Compliance<span class="n">6</span></div>
+            <div class="item"><span class="ic"></span>Clients</div>
+            <div class="item"><span class="ic"></span>Contracts</div>
+          </div>
+          <div class="grp">
+            <p>Administration</p>
+            <div class="item"><span class="ic"></span>Settings</div>
+            <div class="item"><span class="ic"></span>Audit log</div>
+          </div>
+          <div class="rail-foot">
+            <div class="who">
+              <div class="av">AB</div>
+              <div><b>Ama Boateng</b><span>Operations</span></div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="work">
+          <div class="top">
+            <span class="crumb">Service desk &nbsp;/&nbsp; <b>Dashboard</b></span>
+            <div class="search">Search or jump to a screen<kbd>Ctrl K</kbd></div>
+            <div class="av-lg">AB</div>
+          </div>
+
+          <div class="board">
+            <!-- today -->
+            <section class="bc span5">
+              <div class="bc-head">
+                <div><h5>Today</h5><p>Tuesday 28 October · 06:12</p></div>
+                <span class="more">Run sheet</span>
+              </div>
+              <div class="kpi-row">
+                <span class="kpi">6<small>DEPARTURES</small></span>
+                <span class="delta"><span aria-hidden="true">▲</span>2 on time</span>
+              </div>
+              <div class="rows" style="margin-top:12px">
+                <div class="day">
+                  <time>06:30</time>
+                  <div><b>East Legon · Staff shuttle</b><span class="s">GT 4821-24 · 22 of 33 booked</span></div>
+                  <span class="chip go"><i></i>Leaves</span>
+                </div>
+                <div class="day">
+                  <time>07:15</time>
+                  <div><b>Airport · Corporate hire</b><span class="s">GR 5502-22 · Volta Star Logistics</span></div>
+                  <span class="chip wait"><i></i>No crew</span>
+                </div>
+                <div class="day">
+                  <time>08:00</time>
+                  <div><b>Tema · Staff shuttle</b><span class="s">GW 1194-23 · 31 of 33 booked</span></div>
+                  <span class="chip ok"><i></i>Ready</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- open value -->
+            <section class="bc span3">
+              <div class="bc-head"><div><h5>Open value</h5><p>quoted, not yet invoiced</p></div></div>
+              <div class="kpi-row">
+                <span class="kpi">11,450<small>GHS</small></span>
+                <span class="delta"><span aria-hidden="true">▲</span>18%</span>
+              </div>
+              <svg class="spark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="Seven day trend, rising">
+                <path class="area" d="M0 38 L28 33 L57 35 L86 26 L114 29 L143 18 L171 15 L200 7 L200 46 L0 46 Z" />
+                <path class="line" d="M0 38 L28 33 L57 35 L86 26 L114 29 L143 18 L171 15 L200 7" />
+                <circle class="dot" cx="200" cy="7" r="2.6" />
+              </svg>
+              <div class="bars-label"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+              <p class="cap">Seven quotations issued this week, against nine last week.</p>
+            </section>
+
+            <!-- fleet -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Fleet right now</h5><p>22 vehicles, read from the runs</p></div><span class="more">Readiness</span></div>
+              <div class="kpi-row"><span class="kpi">68<small>% WORKING</small></span></div>
+              <div class="seg" aria-hidden="true">
+                <i style="width:68%; background:#4453f0"></i>
+                <i style="width:18%; background:#c9cfec"></i>
+                <i style="width:14%; background:#e7b96a"></i>
+              </div>
+              <div class="legend">
+                <div><span class="sw2" style="background:#4453f0"></span>On the road or assigned<b>15</b></div>
+                <div><span class="sw2" style="background:#c9cfec"></span>Idle, ready<b>4</b></div>
+                <div><span class="sw2" style="background:#e7b96a"></span>In the workshop<b>3</b></div>
+              </div>
+              <p class="cap">Two of the three in the workshop are on today's run sheet.</p>
+            </section>
+
+            <!-- register -->
+            <section class="bc span8 pad0">
+              <div class="card-head">
+                <h4>All hires</h4><p>24 records</p>
+                <button class="btn" type="button">Filter</button>
+              </div>
+              <table class="t">
+                <thead>
+                  <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th class="num">Total</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="ref">RR-0004</td><td class="strong">Volta Star Logistics</td><td class="dim">02–04 Nov</td><td class="dim">Toyota Hiace · GT 4821-24</td><td><span class="chip ok"><i></i>Completed</span></td><td class="num">3,400.00</td></tr>
+                  <tr><td class="ref">RR-0005</td><td class="strong">Akosua Boateng</td><td class="dim">05 Nov</td><td class="dim">Nissan Urvan · GW 1194-23</td><td><span class="chip wait"><i></i>Waiting on you</span></td><td class="num">1,150.00</td></tr>
+                  <tr><td class="ref">RR-0006</td><td class="strong">Ministry of Roads</td><td class="dim">06–08 Nov</td><td class="dim">Toyota Coaster · GR 5502-22</td><td><span class="chip go"><i></i>Dispatched</span></td><td class="num">6,900.00</td></tr>
+                  <tr><td class="ref">RR-0007</td><td class="strong">Kofi Mensah</td><td class="dim">09 Nov</td><td class="dim">Hyundai Starex · GE 2201-25</td><td><span class="chip quiet"><i></i>Quoted</span></td><td class="num">980.00</td></tr>
+                </tbody>
+              </table>
+              <div class="card-foot">
+                <span><b>4</b> of <b>24</b> shown</span><span>Sorted by departure</span>
+                <span style="margin-left:auto">Totals exclude voided invoices</span>
+              </div>
+            </section>
+
+            <!-- charges -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Charges waiting for a name</h5><p>above the figure you set</p></div></div>
+              <div class="rows">
+                <div class="row2">
+                  <div class="avl a">AB</div>
+                  <div><b>Fuel · RR-0004</b><span class="s">Tank refilled before return</span></div>
+                  <span class="amt">400.00</span>
+                </div>
+                <div class="row2">
+                  <div class="avl a">KM</div>
+                  <div><b>Damaged seat cover · RR-0011</b><span class="s">Torn on return, photo filed</span></div>
+                  <span class="amt">250.00</span>
+                </div>
+              </div>
+              <p class="cap" style="margin-top:auto; padding-top:14px">Somebody other than the author signs. The invoice waits until then.</p>
+            </section>
+
+            <!-- papers -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Papers expiring</h5><p>within the lead time you set</p></div><span class="more">All 6</span></div>
+              <div class="rows">
+                <div class="row2">
+                  <div class="avl q">GT</div>
+                  <div><b>Insurance · GT 4821-24</b><span class="s">Renewal taken by Kofi, expected 02 Nov</span></div>
+                  <span class="chip stop"><i></i>4 days</span>
+                </div>
+                <div class="row2">
+                  <div class="avl q">KM</div>
+                  <div><b>Licence · Kojo Mensah</b><span class="s">Class D · medical certificate</span></div>
+                  <span class="chip wait"><i></i>12 days</span>
+                </div>
+                <div class="row2">
+                  <div class="avl q">GR</div>
+                  <div><b>Roadworthy · GR 5502-22</b><span class="s">Nobody has taken this renewal</span></div>
+                  <span class="chip wait"><i></i>19 days</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- money -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Money in</h5><p>last seven days, payments recorded</p></div></div>
+              <div class="kpi-row"><span class="kpi">8,240<small>GHS</small></span><span class="delta flat">▲ flat</span></div>
+              <div class="bars" aria-hidden="true">
+                <i style="height:38%"></i><i style="height:56%"></i><i style="height:31%"></i>
+                <i style="height:72%"></i><i style="height:48%"></i><i style="height:64%"></i><i class="hi" style="height:90%"></i>
+              </div>
+              <div class="bars-label"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+              <p class="cap">Nothing on Sunday, which is why the week is level.</p>
+            </section>
+
+            <!-- on the road -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>On the road now</h5><p>2 vehicles, 2 drivers</p></div><span class="more">Dispatch</span></div>
+              <div class="rows">
+                <div class="row2">
+                  <div class="avl g">KM</div>
+                  <div><b>Kojo Mensah · GT 4821-24</b><span class="s">East Legon, stop 3 of 7 · 06:41</span></div>
+                  <span class="chip go"><i></i>Moving</span>
+                </div>
+                <div class="row2">
+                  <div class="avl">AY</div>
+                  <div><b>Adjoa Yeboah · GW 1194-23</b><span class="s">Tema, arrived early · 07:02</span></div>
+                  <span class="chip ok"><i></i>Arrived</span>
+                </div>
+              </div>
+              <div class="stack" style="margin-top:auto; padding-top:14px">
+                <span class="avl">KM</span><span class="avl">AY</span><span class="avl">EK</span><span class="avl">SB</span>
+                <span class="more2">+3</span>
+                <span style="margin-left:10px; font-size:11.5px; color:var(--muted)">six drivers free today</span>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+      </div>
+      <div class="subhead"><b>The register</b><span>the same treatment on a list screen</span></div>
       <div class="frame">
       <div class="app">
         <aside class="rail">
@@ -859,6 +1423,214 @@
     </section>
 <div class="panel-head" style="margin-top:34px"><b>Studio</b><span class="tag">Dark, editorial</span><span>The whole workspace dark, with a lightened indigo for legibility. The most dramatic of the three; striking in a screenshot and the heaviest to live in for eight hours.</span></div>
 <section class="panel" data-dir="studio">
+      <div class="subhead"><b>The board</b><span>the screen the day opens on</span></div>
+      <div class="frame">
+      <div class="app">
+        <aside class="rail">
+          <div class="brand">
+            <div class="mark">R</div>
+            <div><b>Richie TMS</b><span>Transport Services</span></div>
+          </div>
+          <div class="grp">
+            <p>Service desk</p>
+            <div class="item on"><span class="ic"></span>Dashboard</div>
+            <div class="item"><span class="ic"></span>Money<span class="n">2</span></div>
+            <div class="item"><span class="ic"></span>Rentals<span class="n">3</span></div>
+            <div class="item"><span class="ic"></span>Invoices</div>
+            <div class="item"><span class="ic"></span>Busing<span class="n">4</span></div>
+            <div class="item"><span class="ic"></span>Dispatch<span class="n">1</span></div>
+          </div>
+          <div class="grp">
+            <p>Fleet &amp; clients</p>
+            <div class="item"><span class="ic"></span>Vehicles</div>
+            <div class="item"><span class="ic"></span>Compliance<span class="n">6</span></div>
+            <div class="item"><span class="ic"></span>Clients</div>
+            <div class="item"><span class="ic"></span>Contracts</div>
+          </div>
+          <div class="grp">
+            <p>Administration</p>
+            <div class="item"><span class="ic"></span>Settings</div>
+            <div class="item"><span class="ic"></span>Audit log</div>
+          </div>
+          <div class="rail-foot">
+            <div class="who">
+              <div class="av">AB</div>
+              <div><b>Ama Boateng</b><span>Operations</span></div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="work">
+          <div class="top">
+            <span class="crumb">Service desk &nbsp;/&nbsp; <b>Dashboard</b></span>
+            <div class="search">Search or jump to a screen<kbd>Ctrl K</kbd></div>
+            <div class="av-lg">AB</div>
+          </div>
+
+          <div class="board">
+            <!-- today -->
+            <section class="bc span5">
+              <div class="bc-head">
+                <div><h5>Today</h5><p>Tuesday 28 October · 06:12</p></div>
+                <span class="more">Run sheet</span>
+              </div>
+              <div class="kpi-row">
+                <span class="kpi">6<small>DEPARTURES</small></span>
+                <span class="delta"><span aria-hidden="true">▲</span>2 on time</span>
+              </div>
+              <div class="rows" style="margin-top:12px">
+                <div class="day">
+                  <time>06:30</time>
+                  <div><b>East Legon · Staff shuttle</b><span class="s">GT 4821-24 · 22 of 33 booked</span></div>
+                  <span class="chip go"><i></i>Leaves</span>
+                </div>
+                <div class="day">
+                  <time>07:15</time>
+                  <div><b>Airport · Corporate hire</b><span class="s">GR 5502-22 · Volta Star Logistics</span></div>
+                  <span class="chip wait"><i></i>No crew</span>
+                </div>
+                <div class="day">
+                  <time>08:00</time>
+                  <div><b>Tema · Staff shuttle</b><span class="s">GW 1194-23 · 31 of 33 booked</span></div>
+                  <span class="chip ok"><i></i>Ready</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- open value -->
+            <section class="bc span3">
+              <div class="bc-head"><div><h5>Open value</h5><p>quoted, not yet invoiced</p></div></div>
+              <div class="kpi-row">
+                <span class="kpi">11,450<small>GHS</small></span>
+                <span class="delta"><span aria-hidden="true">▲</span>18%</span>
+              </div>
+              <svg class="spark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="Seven day trend, rising">
+                <path class="area" d="M0 38 L28 33 L57 35 L86 26 L114 29 L143 18 L171 15 L200 7 L200 46 L0 46 Z" />
+                <path class="line" d="M0 38 L28 33 L57 35 L86 26 L114 29 L143 18 L171 15 L200 7" />
+                <circle class="dot" cx="200" cy="7" r="2.6" />
+              </svg>
+              <div class="bars-label"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+              <p class="cap">Seven quotations issued this week, against nine last week.</p>
+            </section>
+
+            <!-- fleet -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Fleet right now</h5><p>22 vehicles, read from the runs</p></div><span class="more">Readiness</span></div>
+              <div class="kpi-row"><span class="kpi">68<small>% WORKING</small></span></div>
+              <div class="seg" aria-hidden="true">
+                <i style="width:68%; background:#4453f0"></i>
+                <i style="width:18%; background:#c9cfec"></i>
+                <i style="width:14%; background:#e7b96a"></i>
+              </div>
+              <div class="legend">
+                <div><span class="sw2" style="background:#4453f0"></span>On the road or assigned<b>15</b></div>
+                <div><span class="sw2" style="background:#c9cfec"></span>Idle, ready<b>4</b></div>
+                <div><span class="sw2" style="background:#e7b96a"></span>In the workshop<b>3</b></div>
+              </div>
+              <p class="cap">Two of the three in the workshop are on today's run sheet.</p>
+            </section>
+
+            <!-- register -->
+            <section class="bc span8 pad0">
+              <div class="card-head">
+                <h4>All hires</h4><p>24 records</p>
+                <button class="btn" type="button">Filter</button>
+              </div>
+              <table class="t">
+                <thead>
+                  <tr><th>Reference</th><th>Customer</th><th>Dates</th><th>Vehicle</th><th>Status</th><th class="num">Total</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="ref">RR-0004</td><td class="strong">Volta Star Logistics</td><td class="dim">02–04 Nov</td><td class="dim">Toyota Hiace · GT 4821-24</td><td><span class="chip ok"><i></i>Completed</span></td><td class="num">3,400.00</td></tr>
+                  <tr><td class="ref">RR-0005</td><td class="strong">Akosua Boateng</td><td class="dim">05 Nov</td><td class="dim">Nissan Urvan · GW 1194-23</td><td><span class="chip wait"><i></i>Waiting on you</span></td><td class="num">1,150.00</td></tr>
+                  <tr><td class="ref">RR-0006</td><td class="strong">Ministry of Roads</td><td class="dim">06–08 Nov</td><td class="dim">Toyota Coaster · GR 5502-22</td><td><span class="chip go"><i></i>Dispatched</span></td><td class="num">6,900.00</td></tr>
+                  <tr><td class="ref">RR-0007</td><td class="strong">Kofi Mensah</td><td class="dim">09 Nov</td><td class="dim">Hyundai Starex · GE 2201-25</td><td><span class="chip quiet"><i></i>Quoted</span></td><td class="num">980.00</td></tr>
+                </tbody>
+              </table>
+              <div class="card-foot">
+                <span><b>4</b> of <b>24</b> shown</span><span>Sorted by departure</span>
+                <span style="margin-left:auto">Totals exclude voided invoices</span>
+              </div>
+            </section>
+
+            <!-- charges -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Charges waiting for a name</h5><p>above the figure you set</p></div></div>
+              <div class="rows">
+                <div class="row2">
+                  <div class="avl a">AB</div>
+                  <div><b>Fuel · RR-0004</b><span class="s">Tank refilled before return</span></div>
+                  <span class="amt">400.00</span>
+                </div>
+                <div class="row2">
+                  <div class="avl a">KM</div>
+                  <div><b>Damaged seat cover · RR-0011</b><span class="s">Torn on return, photo filed</span></div>
+                  <span class="amt">250.00</span>
+                </div>
+              </div>
+              <p class="cap" style="margin-top:auto; padding-top:14px">Somebody other than the author signs. The invoice waits until then.</p>
+            </section>
+
+            <!-- papers -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Papers expiring</h5><p>within the lead time you set</p></div><span class="more">All 6</span></div>
+              <div class="rows">
+                <div class="row2">
+                  <div class="avl q">GT</div>
+                  <div><b>Insurance · GT 4821-24</b><span class="s">Renewal taken by Kofi, expected 02 Nov</span></div>
+                  <span class="chip stop"><i></i>4 days</span>
+                </div>
+                <div class="row2">
+                  <div class="avl q">KM</div>
+                  <div><b>Licence · Kojo Mensah</b><span class="s">Class D · medical certificate</span></div>
+                  <span class="chip wait"><i></i>12 days</span>
+                </div>
+                <div class="row2">
+                  <div class="avl q">GR</div>
+                  <div><b>Roadworthy · GR 5502-22</b><span class="s">Nobody has taken this renewal</span></div>
+                  <span class="chip wait"><i></i>19 days</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- money -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>Money in</h5><p>last seven days, payments recorded</p></div></div>
+              <div class="kpi-row"><span class="kpi">8,240<small>GHS</small></span><span class="delta flat">▲ flat</span></div>
+              <div class="bars" aria-hidden="true">
+                <i style="height:38%"></i><i style="height:56%"></i><i style="height:31%"></i>
+                <i style="height:72%"></i><i style="height:48%"></i><i style="height:64%"></i><i class="hi" style="height:90%"></i>
+              </div>
+              <div class="bars-label"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+              <p class="cap">Nothing on Sunday, which is why the week is level.</p>
+            </section>
+
+            <!-- on the road -->
+            <section class="bc span4">
+              <div class="bc-head"><div><h5>On the road now</h5><p>2 vehicles, 2 drivers</p></div><span class="more">Dispatch</span></div>
+              <div class="rows">
+                <div class="row2">
+                  <div class="avl g">KM</div>
+                  <div><b>Kojo Mensah · GT 4821-24</b><span class="s">East Legon, stop 3 of 7 · 06:41</span></div>
+                  <span class="chip go"><i></i>Moving</span>
+                </div>
+                <div class="row2">
+                  <div class="avl">AY</div>
+                  <div><b>Adjoa Yeboah · GW 1194-23</b><span class="s">Tema, arrived early · 07:02</span></div>
+                  <span class="chip ok"><i></i>Arrived</span>
+                </div>
+              </div>
+              <div class="stack" style="margin-top:auto; padding-top:14px">
+                <span class="avl">KM</span><span class="avl">AY</span><span class="avl">EK</span><span class="avl">SB</span>
+                <span class="more2">+3</span>
+                <span style="margin-left:10px; font-size:11.5px; color:var(--muted)">six drivers free today</span>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+      </div>
+      <div class="subhead"><b>The register</b><span>the same treatment on a list screen</span></div>
       <div class="frame">
       <div class="app">
         <aside class="rail">
@@ -1026,7 +1798,77 @@
     midway between them any more — that single change is most of the difference between “flat” and
     “designed”.</p>
 
-  <h2><span class="num">02</span>What I would build, and in what order</h2>
+  <h2><span class="num">02</span>What was taken from Dribbble, and what was refused</h2>
+  <div class="two">
+    <div>
+      <ol class="dec" style="margin-top:4px">
+        <li style="padding-top:4px">
+          <div>
+            <b>Unequal cards on a 12-column grid.</b>
+            <p>A 5-3-4 top row, then 8-4, then 4-4-4. The eye gets a path instead of a queue, and the
+              important card can simply be the biggest one.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>A figure, a delta and a sparkline in one card.</b>
+            <p>34px number, a small pill saying what changed, and the seven-day shape underneath. It is the
+              single device that makes a dashboard look alive rather than printed.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>People are shown as people.</b>
+            <p>Initials in a tinted circle wherever a driver, a client or an author is the subject — in the
+              charge list, the expiring papers, who is on the road. A table of names is a spreadsheet; a list
+              with faces is an operations desk.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>Every card header carries its own action.</b>
+            <p>“Run sheet”, “Readiness”, “Dispatch”, “All 6” — a quiet button at the top right of the card
+              that goes where the card came from. Nothing on the board is a dead end.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+    <div>
+      <ol class="dec" style="margin-top:4px">
+        <li style="padding-top:4px">
+          <div>
+            <b>Refused: the rainbow of stat cards.</b>
+            <p>Much of Dribbble's admin work paints each figure pink, blue, yellow and green. It photographs
+              beautifully and destroys meaning: if every card is a colour, colour stops telling you anything.
+              Status keeps its tints; actions keep the one indigo.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>Refused: gradient fills on charts.</b>
+            <p>A soft fade under a line is a gradient. Here the area under the sparkline is one flat tint,
+              and the weekly bars are flat — no fade, no glow.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>Refused: motion and glass.</b>
+            <p>No counting numbers, no cards lifting on hover, no frosted panels. Depth comes from a hairline
+              edge and a wide, quiet shadow, and nowhere else.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>Refused: invented content to fill a grid.</b>
+            <p>No fake charts of “revenue vs target”. Every card is a screen that exists in this product, and
+              where the records cannot answer, the card says so in words.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <h2><span class="num">03</span>What I would build, and in what order</h2>
   <ol class="dec">
     <li>
       <div>
@@ -1045,9 +1887,9 @@
     </li>
     <li>
       <div>
-        <b>The frame, then the three screens you use most.</b>
-        <p>Rail, top bar, then dashboard, rentals and invoices. This is the step that changes how the
-          product feels on opening it.</p>
+        <b>The frame, then the board and the two busiest registers.</b>
+        <p>Rail, top bar, then the dashboard rebuilt in the bento rhythm above, then rentals and invoices.
+          This is the step that changes how the product feels on opening it.</p>
       </div>
     </li>
     <li>
@@ -1060,7 +1902,7 @@
     </li>
   </ol>
 
-  <h2><span class="num">03</span>Measured, not asserted</h2>
+  <h2><span class="num">04</span>Measured, not asserted</h2>
   <p class="why">Contrast is calculated, not eyeballed. Every pair below is from the actual values in the
     skins above; AA needs 4.5:1 for body text and 3:1 for a graphic.</p>
 
@@ -1102,7 +1944,7 @@
     </tbody>
   </table>
 
-  <h2><span class="num">04</span>The rules none of this breaks</h2>
+  <h2><span class="num">05</span>The rules none of this breaks</h2>
   <div class="two">
     <div>
       <ol class="dec" style="margin-top:4px">
