@@ -29,6 +29,30 @@ node --version      # v20.19.0 or higher
 psql --version      # psql (PostgreSQL) 15 or higher
 ```
 
+### On Fedora, which is what this build was developed on
+
+Two routes, both fine; the container is the one with fewer ways to go wrong.
+
+**Container (recommended).** Install Podman and use the `podman run` command in §5. Nothing else is
+needed beyond Node and npm:
+
+```bash
+sudo dnf install -y podman
+```
+
+**The packaged server.** `sudo dnf install -y postgresql-server postgresql-contrib`, then
+`sudo postgresql-setup --initdb` once and `sudo systemctl enable --now postgresql`. Create the user and
+database exactly as §5 says. One thing to know before you start: the packaged server normally
+authenticates **local TCP** connections by `ident` (whoever owns the connection's user name), not by
+password. If `npm run db:migrate` stops with `password authentication failed for user "richie"`, that is
+why — change the `127.0.0.1/32` and `::1/128` lines in `/var/lib/pgsql/data/pg_hba.conf` to
+`scram-sha-256`, run `sudo systemctl restart postgresql`, and try again. Also add `:Z` to a volume if you
+ever mount a host folder into Podman here, because SELinux will otherwise refuse the mount.
+
+Node: Fedora's own `nodejs` package is usually older than 20.19. Install Node 22 from
+[nodejs.org](https://nodejs.org/en/download) (the tarball plus a symlink is enough) or from the
+NodeSource repository, and check `node --version` before `npm ci`.
+
 ## 3. Install
 
 ```bash
