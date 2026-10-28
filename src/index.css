@@ -793,6 +793,62 @@ h1, h2, h3, h4 { text-wrap: balance; }
 .rts-table thead th:first-child { padding-left: 16px; }
 .rts-table thead th:last-child { padding-right: 16px; }
 
+/* A sortable header. The header is already small caps at 10px; the button inherits that entirely so
+   a sortable column and a plain one sit on the same baseline, and only the arrow says which is
+   which. The hit area grows into the header's own padding, so the target is the whole cell rather
+   than the word — a 10px word is not something to ask anyone to hit. */
+.rts-table thead th .rts-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: -10px -14px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.rts-table thead th .rts-sort:hover { color: var(--ink); background: #f2f4f8; }
+
+/* Two stacked triangles mean "not sorted"; one means "sorted this way". Drawn with borders rather
+   than typed, so the arrow is never read out as a character and cannot shift the baseline. */
+.rts-sort-arrow {
+  position: relative;
+  width: 7px;
+  height: 11px;
+  opacity: 0.5;
+}
+
+.rts-sort-arrow::before,
+.rts-sort-arrow::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+}
+
+.rts-sort-arrow::before { top: 0; border-bottom: 4px solid currentColor; }
+.rts-sort-arrow::after { bottom: 0; border-top: 4px solid currentColor; }
+
+/* Sorted: one arrow, in the accent, pointing the way the rows now run. */
+.rts-sort-arrow[data-state="ascending"]::after,
+.rts-sort-arrow[data-state="descending"]::before { display: none; }
+
+.rts-sort-arrow[data-state="ascending"],
+.rts-sort-arrow[data-state="descending"] { opacity: 1; color: var(--accent); }
+
+.rts-table thead th[aria-sort="ascending"],
+.rts-table thead th[aria-sort="descending"] { color: var(--ink); }
+
 .rts-table tbody td {
   padding: 13px 14px;
   border-bottom: 1px solid #f0f2f6;

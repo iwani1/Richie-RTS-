@@ -122,7 +122,8 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 | `src/pages/*` | Screens. `StaffBusing.tsx` holds Routes, Passengers, Trips, Bookings and Performance tabs |
 | `src/tms/csv.ts` | The one CSV writer (RPT-04, D-113): quoting, line breaks, and defusing text a spreadsheet would run as a formula (`=`, `+`, `-`, `@`) while leaving numbers alone. Every export in the program goes through it |
 | `src/ui/download.ts` | Handing a generated file to the browser: object URL, a named anchor, the URL released. Built in the browser from the already-narrowed payload, so nothing is uploaded or stored |
-| `src/ui/primitives.tsx` | Shared form, table, panel and notice components |
+| `src/ui/primitives.tsx` | Shared form, table, panel and notice components. A table's header sorts only when the column says how to read its value *and* the screen passes the sort with its callback |
+| `src/ui/tableSort.ts` | The order rules for a register (D-122): what the next click on a header means (ascending, descending, back to the screen's own order), how rows compare, and the hook a screen uses to hold the sort — in the screen, so an export built from the same rows cannot disagree with what is on screen |
 | `src/ui/CopyButton.tsx` | Copies a reference to the clipboard and says so in words (D-111): the Clipboard API, a selected-textarea fallback, and an honest failure line. Used by invoices, rentals, run cards and expense rows |
 | `src/docs/BriefDesk.tsx` | Read-only viewer for the source brief (kept per Integrity rule 6) |
 

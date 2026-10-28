@@ -38,6 +38,7 @@ sit behind authentication or client-side rendering, that is stated rather than i
 | **Footer Design** — footer.design | Footer gallery and "Editor's choice" set | Page endings should be *quiet* and *contextual*. Most entries are heavy marketing footers; the useful lesson was the opposite — do not put one inside an application screen. | Large multi-column footers inside authenticated screens. |
 | **Refero Styles** — styles.refero.design | Style library index with named directions (e.g. "serif analytics on warm paper", "editorial finance desk", "dense marketplace") | Editorial finance density (Ramp) and dense marketplace tables: compact rows, tabular figures, one accent. These survived into the final direction. | Dark *terminal* directions and cinematic styles were rejected as wrong for daylight and for printing. The shipped direction keeps the density lesson — compact rows, tabular figures, one accent — and drops the serif: the owner rejected the editorial build and chose the Daylight SaaS direction in §2a. |
 | **3D Icons** — 3dicons.co | Icon library index, collections, sample renders | Honest assessment: 1,500+ *illustrative* 3D renders (calendar, shield, clock, chart…). The set is playful and rounded. | Not used in the operational UI: 3D renders read as decoration beside a licence expiry. Where an empty state needed warmth (first run, no records yet), a single quiet line-art mark is used instead, drawn in CSS — no image weight, no style clash. |
+| **BoardUI** — boardui.com | The public component catalogue on the landing page: 85 components including 19 charts, a data table with filters, sort and pagination, a month calendar, an alerts feed, upload states and an auth card. Individual component pages render client-side, so the catalogue's own rendered samples were what I read | The **data table** is the one component this product needs and did not have: sortable columns with a visible state, filters living in the header rather than in a floating panel, pagination for long registers. Also worth noting: status as a soft pill inside a row, and a header row that stays put while the body scrolls | Most of the library: iridescent composer loaders, an orbiting glow, animated upload rings, "activity ring" health widgets, gradient charts and hover motion. Every one of those is decorative motion, gradient or 3D — the three things the owner ruled out — and none of them answers a question an office asks. The library is also a paid registry that would replace this application's primitives, not extend them |
 | **Glass UI** — glass.samasante.com | Landing page and API overview (`@samasante/liquid-glass`, DOM refraction) | Worth knowing it exists; refraction needs a busy background to be legible, which a paper-white ledger does not have. | Rejected: translucent cards over ruled tables reduce contrast and cost compositing. One deliberate translucency is used, for the command palette's scrim only. |
 
 **Limitation stated plainly:** Refero's individual product screens, and every gallery's full-resolution
@@ -56,7 +57,10 @@ What the research therefore changed, concretely:
 4. **Quiet ending.** No marketing footer; a single hairline with provenance and the audit note.
 5. **No 3D, no glass.** Both were inspected and rejected with reasons, not ignored. The page keeps
    that: no glass, no gradient, no glow, no shadow — depth is a rule and a flat block.
-6. **The direction is the owner's decision, recorded.** Three templates were built and shown
+6. **One column at a time, on registers that carry a sort.** BoardUI's data table was the only
+   component worth copying, and only the part that is behaviour rather than styling: a header that
+   sorts, shows which way, and puts the list back when clicked a third time (D-122).
+7. **The direction is the owner's decision, recorded.** Three templates were built and shown
    (`docs/templates/`); the owner rejected all of them and chose a fourth direction in words. §3
    compares the options and §8 states what the choice costs.
 
@@ -189,6 +193,14 @@ labels.
 the stylesheet re-skins every legacy `rts-*` class (`rts-band`, `rts-board`, `rts-meter`, `rts-steps`,
 `rts-lead`…), so no screen renders an off-palette colour or an editorial radius.
 
+**Sorting a register** — a sortable column is a button inside its own header, and the button inherits
+the header's 10px small caps so a sortable column and a plain one sit on the same baseline. Two
+stacked triangles (`aria-hidden`) mean "not sorted", one means "sorted this way" and it turns indigo;
+the state itself is spoken through `aria-sort` on the header cell, so the arrow is never the only
+carrier. The hit area grows into the cell's padding, because a 10px word is not a target. Three clicks
+at most: ascending, descending, then back to the order the screen itself chose. No motion, no
+animation on the arrow, nothing remembered between visits (D-122).
+
 **Copying a reference** — a small ghost button beside the number, its label "Copy" and then "Copied"
 for four seconds, with a hidden live region naming what was copied. No tint, no tick, no animation;
 the button holds a fixed width so a table cell does not shift while it changes word (D-111).
@@ -238,8 +250,12 @@ screen scale, so what is approved on screen is what goes on the paper.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1266 passed, 28 skipped** across 103 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1281 passed, 28 skipped** across 104 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
+- The sortable header is tested at both ends: the pure ordering rules (`tableSort.test.ts`, including
+  the tie that must not move and the third click that must restore) and the rendered control
+  (`primitives.test.tsx` for `aria-sort` and the button's presence, `Invoices.test.tsx` for the rows
+  actually changing order and staying inside the filter).
 - Every `rts-*` class used in `src/**/*.tsx` has a rule in `src/index.css` — checked by extracting the
   class names from the source and diffing them against the stylesheet. The only prefixes reported are
   `rts-badge--`, `rts-btn--` and similar, whose concrete variants all exist. Re-run while adding the

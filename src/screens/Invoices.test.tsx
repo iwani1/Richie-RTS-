@@ -190,6 +190,42 @@ describe("invoices and payments screen", () => {
   });
 });
 
+describe("sorting the register", () => {
+  /** Two invoices, so the order on screen is visible: one larger and older-numbered than the other. */
+  const twoInvoices = (): Database => {
+    const second: Invoice = { ...invoice, id: "i2", reference: "INV-2026-0002", customerName: "Zongo Coaches", total: 500, status: "issued", amountPaid: 0, billableEvent: "rental:r2:final" };
+    const db = base();
+    return { ...db, invoices: [invoice, second], payments: [] };
+  };
+
+  const references = () =>
+    screen
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0].textContent);
+
+  it("sorts by a column, reverses, and puts the screen's own order back", () => {
+    renderInvoices(twoInvoices());
+    // The screen's own order is newest reference first.
+    expect(references()).toEqual(["INV-2026-0002", "INV-2026-0001"]);
+    fireEvent.click(screen.getByRole("button", { name: "Sort by Total" }));
+    expect(references()).toEqual(["INV-2026-0002", "INV-2026-0001"]);
+    fireEvent.click(screen.getByRole("button", { name: "Sort by Total" }));
+    expect(references()).toEqual(["INV-2026-0001", "INV-2026-0002"]);
+    // A third click returns the list to how the screen had it, not to a stale alphabet.
+    fireEvent.click(screen.getByRole("button", { name: "Sort by Total" }));
+    expect(references()).toEqual(["INV-2026-0002", "INV-2026-0001"]);
+  });
+
+  it("keeps sorting inside the filter: a filtered list stays filtered when it is re-ordered", () => {
+    renderInvoices(twoInvoices());
+    fireEvent.change(screen.getByLabelText("Search invoices"), { target: { value: "zongo" } });
+    expect(references()).toEqual(["INV-2026-0002"]);
+    fireEvent.click(screen.getByRole("button", { name: "Sort by Customer" }));
+    expect(references()).toEqual(["INV-2026-0002"]);
+  });
+});
+
 describe("credit notes on the invoice screen (D-86)", () => {
   it("shows what was credited and reports the invoice as settled by credit rather than paid", () => {
     renderInvoices(credited());

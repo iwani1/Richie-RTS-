@@ -1763,3 +1763,27 @@ quotation, and puts a second signature on the ones that need one.
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **1266 passed, 28 skipped** (98 files
 passed, 5 skipped), coverage 85.78 / 76.58 / 82.94 / 89.4, `build` succeeds. No migration: every new
 field lives inside the quotation already stored on the rental (schema **36**).
+
+## Phase 72 - A register can be read in another order (interface, D-122)
+
+The office reads registers in whichever order its own logic chose. That is the right order to open on
+and the wrong order for the question being asked — "who owes the most", "what did fuel cost", "who
+touched this record" — so the only way to answer it was to read the list or export it into a
+spreadsheet. This phase makes a column header sortable, on the three registers where that question is
+asked out loud, and keeps the order where an export can see it.
+
+| Item | Status | Evidence |
+|---|---|---|
+| A sortable header, one column at a time | Done (verified) | Ascending, then descending, then back to the screen's own order ("sorts ascending first, reverses on the second click, and clears on the third") |
+| The state spoken, not just drawn | Done (verified) | `aria-sort` on the cell, `none` only where a sort exists, an `aria-hidden` arrow ("says which way the column is sorted, and clears on the third click", "does not claim a sort state on a column that cannot be sorted") |
+| Values sort as values | Done (verified) | Money as numbers, dates by their stored form, references with digit runs compared by number ("sorts numbers as numbers, not as text", "sorts text in reading order") |
+| Rows that tie do not move | Done (verified) | The screen's order is the tie-break ("keeps rows that tie in the order they arrived") |
+| The order belongs to the screen | Done (verified) | `useTableSort` holds it and the table only reports the click ("offers a button only on a column that says how to sort"); sorting never escapes the filter ("keeps sorting inside the filter") |
+| Three registers wired | Done (verified) | Invoices (every column but the action), rental requests, the audit log — where the sort is applied to all matches before the 500-row window |
+| Animation, glow, remembered state | **Not built, on purpose** | No transition on the arrow, no row movement, nothing stored between visits |
+| The other registers | **Not built, and said so** | A register adopts this by giving its columns a `sortValue` and calling the hook; the rest do not sort yet. Sorting inside a printed sheet is not offered |
+| Tests | Done (verified) | 15 new: 10 pure ordering rules (`tableSort.test.ts`), 3 rendered header states (`primitives.test.tsx`), 2 on the real invoice register — every existing suite green |
+
+Gates after this phase: `typecheck` clean, `lint` clean, `test` **1281 passed, 28 skipped** (99 files
+passed, 5 skipped), coverage 85.7 / 76.67 / 82.61 / 89.41, `build` succeeds. No schema change, no
+migration.

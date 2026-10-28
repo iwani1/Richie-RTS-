@@ -2939,3 +2939,50 @@ fields, live total and approval panel, the portal's total, discount and tax rows
 suite moves from 1,244 to 1,266. **Not built:** nothing sends a quotation to the customer, because there
 is no mail or SMS channel; no waiting or overtime rate is priced (still FIN-01), so a waiting charge is
 a handwritten line; and the tax lines are a record of what was charged, not a tax return.
+
+## D-122 - A register can be sorted, and the order belongs to the screen (interface)
+
+**The problem.** Every register here shows rows in the order its own logic chose: invoices newest
+reference first, the audit log newest entry first, rental requests the same. That is the right order to
+open on and the wrong order for the question people actually ask of a register — "who owes the most",
+"what did we spend on fuel", "who touched this record". The only way to answer it was to read the whole
+list, or to export it and sort in a spreadsheet, which is an odd thing to ask of a program that already
+knows the numbers.
+
+**Decision 1: the sort lives in the screen, not in the table.** The table draws the control and reports
+the click; the screen holds the state and hands the table the rows in order. It is more wiring than an
+array sorted inside the table, and it buys one thing that matters: anything the screen exports or prints
+is built from the same ordered rows, so a file cannot come out in a different order from the screen it
+came from. Where a screen deliberately exports something other than what is displayed — expenses export
+the whole period rather than the filtered rows, D-113 — the code says so where the export is written.
+
+**Decision 2: three states, not two.** Clicking a header sorts ascending; a second click reverses it; a
+third puts the screen back the way its own logic ordered it. Two states would have left no way back
+except reloading, and a descending "newest first" is not the same list as the screen's own newest-first
+(because it is sorted on the clicked column, not on the reference). Clicking a different column starts
+at ascending rather than inheriting the last direction: a click on "Total" should not arrive backwards
+because "Customer" happened to be.
+
+**Decision 3: the header says which way, in words a screen reader can hear.** `aria-sort` on the header
+cell, `none` only on columns that can actually be sorted — the attribute on a plain column invites a
+reader to try. The arrow is drawn with borders and hidden from assistive technology, because the state
+is already spoken; colour is not the only carrier, since one triangle rather than two also says it.
+
+**Decision 4: no remembered sort, no animation.** The sort is a way of looking at a list, not a
+preference: reopening a register should show the list everyone expects, not the last person's click. And
+nothing moves — no arrow transition, no row animation — because a table that shuffles itself is harder
+to read, and because the direction never asked for motion (D-121's sibling rule in the interface work).
+
+**Decision 5: three registers, not twenty.** Invoices, rental requests and the audit log carry a sort
+today. They are the ones where the question "in what order" is asked out loud. Any other register adopts
+it by giving its columns a value to sort by and calling the same hook; nothing else has to change.
+
+**Consequence.** `src/ui/tableSort.ts` (the rules, the ordering and the hook), `Column.sortValue` and the
+optional `sort` / `onSortChange` on `DataTable`, the header button and the arrow in `src/index.css`,
+three screens wired to it, and 15 new tests (`tableSort.test.ts`, the header block in
+`primitives.test.tsx`, and two in `Invoices.test.tsx` that sort the real register and then check the
+filter still holds). **Rejected from the reference:** animated and iridescent loaders, upload rings,
+activity widgets, gradient charts, hover motion, and importing the library itself — the same three
+things the owner ruled out (motion, gradients, 3D) dressed as a component registry. **Not built:**
+sorting inside a printed sheet, since a print is a document in its own order; and a saved view, which
+would need somewhere to keep it per user.

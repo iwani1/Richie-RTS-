@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { cn } from "../utils/cn";
 import { Icon } from "./icons";
+import { nextSort, sortOf, type TableSort } from "./tableSort";
 import { useDialogFocus } from "./useDialogFocus";
 import type { Tone } from "../tms/useTms";
 
@@ -239,20 +240,69 @@ export interface Column<T> {
   header: string;
   render: (row: T) => ReactNode;
   className?: string;
+  /** How to read one value for sorting. A column without this is not sortable. */
+  sortValue?: (row: T) => string | number;
 }
 
-export function DataTable<T>({ columns, rows, rowKey, emptyState }: { columns: Column<T>[]; rows: T[]; rowKey: (row: T) => string; emptyState: ReactNode }) {
+/**
+ * A table of rows.
+ *
+ * Sorting is opt-in and belongs to the screen: a column is sortable only when it says how to read
+ * its value *and* the screen passes the sort with the callback that changes it (`useTableSort` in
+ * `tableSort.ts` holds both). The table never sorts by itself, so the order on screen is the order
+ * the screen exports. The header keeps `aria-sort`, which is how a screen reader learns which column
+ * is in play and which way round; the arrow is decoration and is hidden from it, because the state
+ * is already spoken.
+ */
+export function DataTable<T>({
+  columns,
+  rows,
+  rowKey,
+  emptyState,
+  sort,
+  onSortChange,
+}: {
+  columns: Column<T>[];
+  rows: T[];
+  rowKey: (row: T) => string;
+  emptyState: ReactNode;
+  sort?: TableSort | null;
+  onSortChange?: (sort: TableSort | null) => void;
+}) {
   if (rows.length === 0) return <>{emptyState}</>;
   return (
     <div className="rts-table-wrap">
       <table className="rts-table">
         <thead>
           <tr>
-            {columns.map((c) => (
-              <th key={c.key} scope="col" className={c.className}>
-                {c.header}
-              </th>
-            ))}
+            {columns.map((c) => {
+              const sortable = Boolean(c.sortValue && onSortChange);
+              const state = sortable ? sortOf(sort, c.key) : null;
+              return (
+                <th
+                  key={c.key}
+                  scope="col"
+                  className={c.className}
+                  // Only a sortable column carries the attribute: `aria-sort="none"` on a column that
+                  // cannot be sorted invites a reader to try.
+                  {...(state ? { "aria-sort": state } : {})}
+                >
+                  {sortable && onSortChange ? (
+                    <button
+                      type="button"
+                      className="rts-sort"
+                      aria-label={`Sort by ${c.header}`}
+                      onClick={() => onSortChange(nextSort(sort ?? null, c.key))}
+                    >
+                      <span>{c.header}</span>
+                      <span className="rts-sort-arrow" data-state={state} aria-hidden="true" />
+                    </button>
+                  ) : (
+                    c.header
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>

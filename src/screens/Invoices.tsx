@@ -17,6 +17,7 @@ import type { CommandResult } from "../tms/service";
 import type { CreditNote, Invoice, InvoiceStatus, Payment, PaymentStatus, Refund } from "../tms/types";
 import { CREDIT_NOTE_STATUS_LABELS, INVOICE_STATUS_LABELS, PAYMENT_STATUS_LABELS, REFUND_STATUS_LABELS } from "../tms/types";
 import { useTms } from "../tms/useTms";
+import { useTableSort } from "../ui/tableSort";
 import { CreditNoteSheet, InvoiceSheet, PrintPreview } from "./Documents";
 import {
   Badge,
@@ -35,6 +36,7 @@ import {
   TextInput,
   formatDate,
   todayYmd,
+  type Column,
 } from "../ui/primitives";
 import { CopyButton } from "../ui/CopyButton";
 
@@ -134,6 +136,68 @@ export function InvoicesPage() {
   const settingsBlocked =
     db.settings.taxPosition === null || db.settings.invoiceDueDays === null || !db.settings.currencyCode;
 
+  // Sorting is here, in the screen, rather than inside the table: whatever order the office is
+  // looking at is the order any export or print built from these rows will use. The value a column
+  // sorts by is often not the text it shows — "Outstanding" prints a dash for a void invoice and a
+  // sentence for money owed back, and neither reads in order.
+  const invoiceColumns: Column<Invoice>[] = [
+    { key: "ref", header: "Invoice", sortValue: (invoice) => invoice.reference, render: (invoice) => <span className="rts-mono text-xs font-semibold">{invoice.reference}</span> },
+    { key: "customer", header: "Customer", sortValue: (invoice) => invoice.customerName, render: (invoice) => <span className="font-medium">{invoice.customerName}</span> },
+    { key: "issued", header: "Issued", sortValue: (invoice) => invoice.issuedOn, render: (invoice) => formatDate(invoice.issuedOn) },
+    { key: "due", header: "Due", sortValue: (invoice) => invoice.dueOn, render: (invoice) => formatDate(invoice.dueOn) },
+    { key: "total", header: "Total", className: "text-right rts-mono", sortValue: (invoice) => invoice.total, render: (invoice) => money(invoice.currencyCode, invoice.total) },
+    {
+      key: "credited",
+      header: "Credited",
+      className: "text-right rts-mono",
+      sortValue: (invoice) => balanceOf(invoice).credited,
+      // A dash rather than 0.00: nothing was taken off this invoice, and a column of zeroes
+      // reads as though something happened.
+      render: (invoice) => {
+        const credited = balanceOf(invoice).credited;
+        return credited > 0 ? money(invoice.currencyCode, credited) : <span className="text-stone-400">-</span>;
+      },
+    },
+    { key: "paid", header: "Paid", className: "text-right rts-mono", sortValue: (invoice) => balanceOf(invoice).paid, render: (invoice) => money(invoice.currencyCode, balanceOf(invoice).paid) },
+    {
+      key: "outstanding",
+      header: "Outstanding",
+      className: "text-right rts-mono",
+      sortValue: (invoice) => (invoice.status === "void" ? 0 : balanceOf(invoice).outstanding),
+      render: (invoice) => {
+        if (invoice.status === "void") return <span className="text-stone-400">-</span>;
+        const balance = balanceOf(invoice);
+        // Money owed back is stated on the row, not turned into a zero balance: the office has
+        // a refund to make, and a dash here would hide it (D-86).
+        if (balance.refundDue > 0) return <span className="text-amber-800">{money(invoice.currencyCode, balance.refundDue)} back</span>;
+        return money(invoice.currencyCode, balance.outstanding);
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortValue: (invoice) => INVOICE_STATUS_LABELS[invoice.status],
+      render: (invoice) => (
+        <span className="flex flex-wrap items-center gap-1">
+          <Badge tone={STATUS_TONE[invoice.status]}>{INVOICE_STATUS_LABELS[invoice.status]}</Badge>
+          {invoice.status !== "void" && balanceOf(invoice).settled && balanceOf(invoice).credited > 0 && <Badge tone="success">Settled by credit</Badge>}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      className: "text-right",
+      render: (invoice) => (
+        <Button variant="ghost" onClick={() => setSelectedId(invoice.id)} aria-label={`Open ${invoice.reference}`}>
+          Open
+        </Button>
+      ),
+    },
+  ];
+
+  const { rows: sortedRows, sort, onSortChange } = useTableSort(rows, invoiceColumns);
+
   if (selected) return <InvoiceDetail invoice={selected} onBack={() => setSelectedId(null)} />;
 
   return (
@@ -206,61 +270,12 @@ export function InvoicesPage() {
         }
       >
         <DataTable
-          rows={rows}
+          rows={sortedRows}
           rowKey={(invoice) => invoice.id}
           emptyState={<EmptyState title={db.invoices.length ? "No invoices match" : "No invoices yet"} body="Issue one from a completed rental to start the payment record." />}
-          columns={[
-            { key: "ref", header: "Invoice", render: (invoice) => <span className="rts-mono text-xs font-semibold">{invoice.reference}</span> },
-            { key: "customer", header: "Customer", render: (invoice) => <span className="font-medium">{invoice.customerName}</span> },
-            { key: "issued", header: "Issued", render: (invoice) => formatDate(invoice.issuedOn) },
-            { key: "due", header: "Due", render: (invoice) => formatDate(invoice.dueOn) },
-            { key: "total", header: "Total", className: "text-right rts-mono", render: (invoice) => money(invoice.currencyCode, invoice.total) },
-            {
-              key: "credited",
-              header: "Credited",
-              className: "text-right rts-mono",
-              // A dash rather than 0.00: nothing was taken off this invoice, and a column of zeroes
-              // reads as though something happened.
-              render: (invoice) => {
-                const credited = balanceOf(invoice).credited;
-                return credited > 0 ? money(invoice.currencyCode, credited) : <span className="text-stone-400">-</span>;
-              },
-            },
-            { key: "paid", header: "Paid", className: "text-right rts-mono", render: (invoice) => money(invoice.currencyCode, balanceOf(invoice).paid) },
-            {
-              key: "outstanding",
-              header: "Outstanding",
-              className: "text-right rts-mono",
-              render: (invoice) => {
-                if (invoice.status === "void") return <span className="text-stone-400">-</span>;
-                const balance = balanceOf(invoice);
-                // Money owed back is stated on the row, not turned into a zero balance: the office has
-                // a refund to make, and a dash here would hide it (D-86).
-                if (balance.refundDue > 0) return <span className="text-amber-800">{money(invoice.currencyCode, balance.refundDue)} back</span>;
-                return money(invoice.currencyCode, balance.outstanding);
-              },
-            },
-            {
-              key: "status",
-              header: "Status",
-              render: (invoice) => (
-                <span className="flex flex-wrap items-center gap-1">
-                  <Badge tone={STATUS_TONE[invoice.status]}>{INVOICE_STATUS_LABELS[invoice.status]}</Badge>
-                  {invoice.status !== "void" && balanceOf(invoice).settled && balanceOf(invoice).credited > 0 && <Badge tone="success">Settled by credit</Badge>}
-                </span>
-              ),
-            },
-            {
-              key: "actions",
-              header: "",
-              className: "text-right",
-              render: (invoice) => (
-                <Button variant="ghost" onClick={() => setSelectedId(invoice.id)} aria-label={`Open ${invoice.reference}`}>
-                  Open
-                </Button>
-              ),
-            },
-          ]}
+          columns={invoiceColumns}
+          sort={sort}
+          onSortChange={onSortChange}
         />
       </TableCard>
 

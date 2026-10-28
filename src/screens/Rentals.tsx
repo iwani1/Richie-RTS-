@@ -11,7 +11,8 @@ import { readinessReport } from "../tms/maintenance";
 import { useTms } from "../tms/useTms";
 import { PRICING_BASIS_LABELS, RENTAL_STATUS_LABELS, RENTAL_STATUSES, REQUEST_SOURCES, type Rental, type RentalStatus } from "../tms/types";
 import { CopyButton } from "../ui/CopyButton";
-import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, formatDateTime, todayYmd } from "../ui/primitives";
+import { Badge, Button, Card, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, TableCard, TextArea, TextInput, formatDate, formatDateTime, todayYmd, type Column } from "../ui/primitives";
+import { useTableSort } from "../ui/tableSort";
 import type { Route } from "../routes";
 
 type Errors = Record<string, string>;
@@ -112,6 +113,27 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db.rentals, query, statusFilter]);
 
+  // What each column sorts by is the value behind the words: a quotation is money, so it sorts as a
+  // number rather than as the string "GHS 3,450.00", and a request with no price yet sorts to the
+  // bottom of an ascending list instead of above a small one.
+  const rentalColumns: Column<Rental>[] = [
+    { key: "ref", header: "Reference", sortValue: (r) => r.reference, render: (r) => <span className="font-mono text-xs font-semibold text-stone-900">{r.reference}</span> },
+    { key: "cust", header: "Customer", sortValue: (r) => r.customerName, render: (r) => <span className="font-semibold text-stone-900">{r.customerName}</span> },
+    { key: "cat", header: "Category", sortValue: (r) => categoryName(r.vehicleCategoryId), render: (r) => categoryName(r.vehicleCategoryId) },
+    { key: "dates", header: "Dates", sortValue: (r) => r.startDate, render: (r) => <span className="whitespace-nowrap text-xs">{formatDate(r.startDate)} - {formatDate(r.endDate)}</span> },
+    {
+      key: "value",
+      header: "Quote",
+      className: "rts-num",
+      sortValue: (r) => r.quote?.total ?? -1,
+      render: (r) => (r.quote ? money(r.quote.total, r.quote.currencyCode) : <span className="text-stone-400">-</span>),
+    },
+    { key: "status", header: "Status", sortValue: (r) => RENTAL_STATUS_LABELS[r.status], render: (r) => <Badge tone={statusTone[r.status]}>{RENTAL_STATUS_LABELS[r.status]}</Badge> },
+    { key: "actions", header: "", className: "text-right", render: (r) => <Button variant="ghost" onClick={() => setSelectedId(r.id)}>Open</Button> },
+  ];
+
+  const { rows: sortedRows, sort, onSortChange } = useTableSort(rows, rentalColumns);
+
   if (selected) {
     return <RentalDetail rental={selected} onBack={() => setSelectedId(null)} />;
   }
@@ -148,18 +170,12 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
         }
       >
         <DataTable
-        rows={rows}
+        rows={sortedRows}
         rowKey={(r) => r.id}
         emptyState={<EmptyState title={db.rentals.length ? "No rentals match" : "No rental requests yet"} body="Create a request to begin the quotation and booking flow." />}
-        columns={[
-          { key: "ref", header: "Reference", render: (r) => <span className="font-mono text-xs font-semibold text-stone-900">{r.reference}</span> },
-          { key: "cust", header: "Customer", render: (r) => <span className="font-semibold text-stone-900">{r.customerName}</span> },
-          { key: "cat", header: "Category", render: (r) => categoryName(r.vehicleCategoryId) },
-          { key: "dates", header: "Dates", render: (r) => <span className="whitespace-nowrap text-xs">{formatDate(r.startDate)} - {formatDate(r.endDate)}</span> },
-          { key: "value", header: "Quote", className: "rts-num", render: (r) => (r.quote ? money(r.quote.subtotal, r.quote.currencyCode) : <span className="text-stone-400">-</span>) },
-          { key: "status", header: "Status", render: (r) => <Badge tone={statusTone[r.status]}>{RENTAL_STATUS_LABELS[r.status]}</Badge> },
-          { key: "actions", header: "", className: "text-right", render: (r) => <Button variant="ghost" onClick={() => setSelectedId(r.id)}>Open</Button> },
-        ]}
+        columns={rentalColumns}
+        sort={sort}
+        onSortChange={onSortChange}
         />
       </TableCard>
 
