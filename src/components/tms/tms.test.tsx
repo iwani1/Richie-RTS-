@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }));
 
@@ -22,6 +22,7 @@ import { ActivityFeed, relativeTime } from "@/components/tms/ActivityFeed";
 import { AppShell } from "@/components/tms/AppShell";
 import { BookingIntakeDialog } from "@/components/tms/BookingIntakeDialog";
 import { DataTable, type TmsColumn } from "@/components/tms/DataTable";
+import { FilterNote, FilterSelect, SearchField } from "@/components/tms/FilterBar";
 import { DesignGallery } from "@/components/tms/DesignGallery";
 import { GlidingTabs } from "@/components/tms/GlidingTabs";
 import { AppFrame } from "@/components/tms/AppFrame";
@@ -199,6 +200,24 @@ describe("DataTable", () => {
     expect(screen.queryByRole("table")).toBeNull();
   });
 
+  it("draws only the rows it is told to, and takes them from the sorted order", () => {
+    const four: Row[] = [
+      { id: "TRP-3", route: "c" },
+      { id: "TRP-1", route: "a" },
+      { id: "TRP-4", route: "d" },
+      { id: "TRP-2", route: "b" },
+    ];
+    render(<DataTable data={four} columns={COLUMNS} limit={2} />);
+    const drawn = () => screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent);
+    // The first two in the order given, because nothing has been sorted yet.
+    expect(drawn()).toEqual(["TRP-3", "TRP-1"]);
+
+    // Sorting applies to every row, and only then is the window taken — so the limit never hides
+    // the rows a sort was meant to bring to the top.
+    fireEvent.click(screen.getByRole("button", { name: "Trip" }));
+    expect(drawn()).toEqual(["TRP-1", "TRP-2"]);
+  });
+
   it("shows a failure and offers a retry that really calls back", () => {
     const onRetry = vi.fn();
     render(<DataTable data={[]} columns={COLUMNS} state="error" errorMessage="The list could not be read." onRetry={onRetry} />);
@@ -259,6 +278,23 @@ describe("PageHeader", () => {
     expect(onRangeChange).toHaveBeenCalledWith("week");
   });
 
+  it("works without a period, for a screen that has none, and takes its own actions", () => {
+    const onReload = vi.fn();
+    render(
+      <PageHeader
+        kicker="Governance"
+        title="Audit log"
+        subtitle="Append-only"
+        actions={<button onClick={onReload}>Reload</button>}
+      />,
+    );
+    expect(screen.getByText("Governance")).toBeTruthy();
+    // No empty segmented control is drawn for a screen that reports on no period.
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+    expect(onReload).toHaveBeenCalledTimes(1);
+  });
+
   it("only shows the primary action when the screen can act on it", () => {
     const onNewBooking = vi.fn();
     const { rerender } = render(<PageHeader title="Operations" subtitle="x" range="today" onRangeChange={vi.fn()} />);
@@ -266,6 +302,37 @@ describe("PageHeader", () => {
     rerender(<PageHeader title="Operations" subtitle="x" range="today" onRangeChange={vi.fn()} onNewBooking={onNewBooking} />);
     fireEvent.click(screen.getByRole("button", { name: /new booking/i }));
     expect(onNewBooking).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("FilterBar", () => {
+  function Harness() {
+    const [query, setQuery] = useState("");
+    const [entity, setEntity] = useState("all");
+    return (
+      <div>
+        <SearchField label="Search audit log" placeholder="Search" value={query} onChange={setQuery} />
+        <FilterSelect label="Filter by entity" value={entity} onChange={setEntity}>
+          <option value="all">All records</option>
+          <option value="rental">rental</option>
+        </FilterSelect>
+        <FilterNote>{query === "" ? "Nothing filtered" : `Searching for ${query}`}</FilterNote>
+        <p data-testid="state">{`${query}|${entity}`}</p>
+      </div>
+    );
+  }
+
+  it("names both controls and reports what they are doing", () => {
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("Search audit log"), { target: { value: "kofi" } });
+    fireEvent.change(screen.getByLabelText("Filter by entity"), { target: { value: "rental" } });
+    expect(screen.getByTestId("state").textContent).toBe("kofi|rental");
+    expect(screen.getByRole("status").textContent).toBe("Searching for kofi");
+  });
+
+  it("keeps the note quiet until something changes", () => {
+    render(<Harness />);
+    expect(screen.getByRole("status").textContent).toBe("Nothing filtered");
   });
 });
 

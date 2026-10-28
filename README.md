@@ -129,7 +129,7 @@ npm run user:password -- --email you@example.com   # set a password from the ter
 | Design system and app shell: dark by default, one amber accent, tokens in one file, shared components that take their data | Works at `/design`, which shows every component in every state. The operations overview at `/dashboard` is built from nothing else — **with sample data**, and it says so. Every working screen now reads the same dark palette inside the same frame; their layouts and tables are still the older ones and are being rebuilt one at a time |
 | Notifications (SMS or email), offline driver app, GPS tracking, card/mobile-money gateway, payroll | **Not built** — see `docs/PROGRESS.md` |
 
-1340 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
+1351 unit and UI tests plus integration tests against a real PostgreSQL; coverage thresholds are
 enforced by `npm run check`, and all three CI jobs (typecheck/lint/test/build, integration, HTTP
 end-to-end) run on every push. `npm test` reports the integration tests as *skipped* unless `TEST_DATABASE_URL`
 is set — they never silently pass.

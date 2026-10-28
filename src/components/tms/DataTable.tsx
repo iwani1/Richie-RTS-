@@ -41,6 +41,10 @@ export type DataTableState = "ready" | "loading" | "error";
  * a row under the pointer is the row being read, and the three states a query can be in — ready,
  * loading, failed — are part of the component so no screen can forget one. Sorting is handled by
  * TanStack; a column that sets `enableSorting: false` simply is not sortable.
+ *
+ * `limit` caps how many rows are drawn **after** sorting, not before: a log that shows its first
+ * five hundred entries unsorted would claim to be "oldest first" while hiding the oldest it was
+ * asked for. The screen says how many it is showing; this component only obeys.
  */
 export function DataTable<T extends RowData>({
   columns,
@@ -55,6 +59,7 @@ export function DataTable<T extends RowData>({
   maxHeight = "26rem",
   caption,
   initialSorting = [],
+  limit,
   className,
 }: {
   columns: TmsColumn<T>[];
@@ -70,6 +75,8 @@ export function DataTable<T extends RowData>({
   /** Spoken before the column headers, so a reader knows what the table is. */
   caption?: string;
   initialSorting?: SortingState;
+  /** Draw at most this many rows, taken from the sorted order. The screen reports the total. */
+  limit?: number;
   className?: string;
 }) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
@@ -131,7 +138,7 @@ export function DataTable<T extends RowData>({
               ))}
             </thead>
             <tbody>
-              {table.getRowModel().rows.map((row) => (
+              {(limit === undefined ? table.getRowModel().rows : table.getRowModel().rows.slice(0, limit)).map((row) => (
                 <tr key={row.id} className="border-b border-divider transition-colors last:border-b-0 hover:bg-row-hover">
                   {row.getAllCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-3 align-middle text-[13px] text-muted-foreground first:pl-4">

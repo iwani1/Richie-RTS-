@@ -297,13 +297,21 @@ The interface is being rebuilt on a standard stack rather than a bespoke stylesh
 
 **Converted so far:** the token layer, `src/ui/primitives.tsx` (so every screen that uses the shared
 Button/Field/Card/Band/TableCard/DataTable/Panel/Notice/Badge/Stat draws the new system at once), the
-application shell (rail, top bar, skip link, mobile sheet, jump-to-screen palette) and the dashboard,
-which is laid out as a board of unequal cards.
+application shell (rail, top bar, skip link, mobile sheet, jump-to-screen palette), the dashboard, which
+is laid out as a board of unequal cards, and — since Phase 78, the first of the working screens —
+**the audit log**, which is now built from `components/tms` alone.
 
-**Still on the old classes:** twenty-seven screens carry `rts-*` classes served from
-`src/styles/legacy.css`, marked temporary in the file itself. That file shrinks screen by screen and is
-deleted when the last one is converted; nothing new may be added to it. Until then these screens are
-consistent with each other but not yet with the new components.
+**Still on the old classes:** twenty-six working screens carry `rts-*` classes served from
+`src/styles/legacy.css`, marked temporary in the file itself. That file shrinks screen by screen (the
+audit log's `.rts-code` rule was the first to go) and is deleted when the last one is converted; nothing
+new may be added to it. Until then these screens are consistent with each other but not yet with the new
+components.
+
+**What a converted screen looks like.** The audit log is the reference: `PageHeader` with a kicker and
+no period (an append-only log has no "this week"), a strip of three counted figures, one `Panel`
+holding a `DataTable` with `SearchField` and `FilterSelect` in its toolbar, and a `TableFoot` that says
+how many of how many are drawn. Every colour, radius and easing comes from a token; the only class name
+in the file that is not a utility is `tms-mono`.
 
 ## 6c. The design-system pass: dark, one accent, components that take their data (D-124)
 
@@ -356,7 +364,7 @@ by this pass and still writes real records.
 
 ## 7. What was verified
 
-- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1340 passed, 28 skipped** across 106 files
+- `tsc --noEmit` and `eslint .` are clean; `npm test` is **1351 passed, 28 skipped** across 107 files
   (the skips are the database integration suites, which need a live server); `next build` compiles.
 - The sortable header is tested at both ends: the pure ordering rules (`tableSort.test.ts`, including
   the tie that must not move and the third click that must restore) and the rendered control

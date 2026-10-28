@@ -461,9 +461,7 @@ export function Stat({ label, value, caption }: { label: string; value: string |
 
 export { Separator, Dialog };
 
-export const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-export const formatDate = (ymd: string) => {
-  const d = new Date(`${ymd}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? ymd : d.toLocaleDateString(undefined, { dateStyle: "medium" });
-};
-export const todayYmd = () => new Date().toISOString().slice(0, 10);
+// The formatters moved to `@/lib/format` (Phase 78): a formatter is not a component, and the rebuilt
+// screens import it from there. Re-exported so the screens still on this layer keep compiling, and so
+// there is exactly one implementation of each.
+export { formatDate, formatDateTime, todayYmd } from "@/lib/format";

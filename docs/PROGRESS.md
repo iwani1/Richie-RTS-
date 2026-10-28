@@ -1880,3 +1880,17 @@ passed, 5 skipped), `build` succeeds. No schema change, no migration.
 | Tailwind pinned on both sides | Done (verified) | `tailwindcss` and `@tailwindcss/postcss` both exact at 4.3.3; build and stylesheet scan re-run |
 | Class detection limited to the product source | Done (verified) | Tailwind had been reading class names out of `docs/DECISIONS.md` and emitting a dark `.text-stone-500\/600`; `@source not` now excludes `docs/`, `README.md` and `audit/`. The compiled CSS contains no literal text colour and no light background |
 | Gates | Pass | `tsc` clean, `eslint` clean, **1,340 tests passed, 28 skipped** (unchanged: nothing under test was deleted), build 62 s, coverage 89.24 lines / 76.79 branches |
+
+## Phase 78 - The first working screen on the component layer: the audit log (D-128)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| `Audit.tsx` rebuilt | Done (verified) | `PageHeader` (kicker, no period), three counted figures, one `Panel` around the table, filters in the toolbar, `TableFoot` counting what is drawn. No `rts-*` class remains in the file |
+| Its first test | Done (verified) | `src/screens/Audit.test.tsx`, 7 tests: the rows and their order, the search, the record filter, "nothing matches", the 500-row window drawn *after* sorting, reload through the service, and the two counts (recorded vs in this snapshot) told apart |
+| Three gaps in the component layer closed | Done (verified) | `PageHeader` takes a kicker, its own actions, and no period; `DataTable` takes a `limit` applied to the sorted rows; `FilterBar.tsx` adds a named `SearchField`, `FilterSelect` and `FilterNote` |
+| Formatters moved out of the old layer | Done (verified) | `formatDateTime`, `formatDate`, `todayYmd` now live in `@/lib/format`; `src/ui/primitives.tsx` re-exports them so the other screens compile unchanged |
+| `legacy.css` shrinks | Started | `.rts-code` deleted — the first rule removed because a screen stopped needing it |
+| Gates | Pass | `tsc` clean, `eslint` clean, **1,351 tests passed, 28 skipped** (from 1,340), `next build` 62 s |
+
+**Still on the old classes:** twenty-six screens. Phase 78 changed no behaviour on the audit log and
+left every other screen exactly as it was.

@@ -3208,3 +3208,41 @@ contains no literal text colour at all — every colour comes through a token.
 fault added to P2-2). Gates after: `tsc` clean, `eslint` clean, 1,340 tests passed (28 skipped — the
 count is unchanged because nothing under test was deleted), build 62 s, coverage 89.24 / 76.79, and the
 compiled CSS scanned clean. **No screen, table or form changed.**
+
+## D-128 - The first working screen rebuilt on the component layer, and the three things it needed
+
+**The problem.** Phase 74 built a component layer and proved it on two review pages; Phase 75 put every
+screen on the dark palette. But the twenty-seven screens that record and read the company's work were
+still built from the older primitives and `legacy.css`. The audit log was chosen first because it is
+small, read-only, and the screen an owner is shown when they ask "who changed this?" — a fair test of
+the method with nothing at stake if the method is wrong.
+
+**What it took.** Three small pieces were missing from the layer, and none of them was invented for one
+screen:
+
+1. **A header without a period.** `PageHeader` demanded a reporting period, because the board it was
+   built for has one. An append-only log has no "this week" — every entry is the record — so the range
+   became optional and the header gained a `kicker` (the mono line the older screens all carry) and an
+   `actions` slot for the screen's own controls. A screen with no period draws no control to explain
+   away.
+2. **A row window that is honest.** The log draws at most 500 matches. That cap belongs to the table,
+   not to the screen, because it must be applied **after** sorting: sorting the newest 500 and calling
+   the result "oldest first" would hide exactly the entries the sort was asked to bring forward.
+   `DataTable` gained `limit`, applied to the sorted row model, and the screen prints "showing N of M".
+3. **A filter pair.** `SearchField` and `FilterSelect` name themselves for a screen reader, take their
+   caret from a Lucide icon rather than a colour baked into a data-URI, and are native controls — a
+   native select is keyboard- and phone-drivable without a library, which matters more now that the
+   unused shadcn `select` has been deleted (D-127).
+
+**Where the formatters live.** `formatDateTime`, `formatDate` and `todayYmd` moved out of
+`src/ui/primitives.tsx` into `@/lib/format`. A formatter is not a component, and a rebuilt screen should
+not have to reach into the layer it is being rebuilt away from. The old file re-exports them, so the
+twenty-six screens still on it compile unchanged and there is one implementation of each.
+
+**Consequence.** `src/components/tms/FilterBar.tsx` (new), `PageHeader` (kicker, actions, optional
+range), `DataTable` (`limit`), `src/lib/format.ts` (new), `src/screens/Audit.tsx` (rebuilt — no `rts-*`
+class remains in it), `src/screens/Audit.test.tsx` (new, 7 tests; the screen had none), `tms.test.tsx`
+(+4), and the deletion of `.rts-code` from `legacy.css`, the first rule to leave that file because a
+screen stopped needing it. The suite moves from 1,340 to 1,351. **No behaviour changed:** the same
+search, the same record filter, the same 500-row window, the same words, and the same rule that nothing
+on this screen writes.
