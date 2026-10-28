@@ -58,7 +58,7 @@ export function ReportsPage() {
         description={tab === "hire" ? "What was quoted, what was hired, what came in and what it cost." : "What the buses did: runs worked, riders carried, no-shows, empty seats and on-time performance."}
       />
       {tabs.length > 1 && (
-        <div role="tablist" aria-label="Report sections" className="rts-tabs">
+        <div role="tablist" aria-label="Report sections" className="mb-5 flex w-fit gap-1 rounded-lg border border-border bg-secondary p-1">
           {tabs.map((candidate) => (
             <button
               key={candidate.id}
@@ -66,7 +66,7 @@ export function ReportsPage() {
               role="tab"
               aria-selected={tab === candidate.id}
               onClick={() => setRequested(candidate.id)}
-              className="rts-tab"
+              className={`rounded-md px-3 py-1.5 text-[12px] transition-colors duration-150 ${tab === candidate.id ? "bg-card text-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               {candidate.label}
             </button>
@@ -162,7 +162,7 @@ function HireReport() {
                 emptyState={<EmptyState title="No cancellations" body="No rental was cancelled or declined in this period." />}
                 columns={[
                   { key: "reason", header: "Reason", render: (reason) => reason.reason },
-                  { key: "count", header: "Count", className: "text-right rts-mono", render: (reason) => reason.count },
+                  { key: "count", header: "Count", className: "text-right tms-num", render: (reason) => reason.count },
                 ]}
               />
             </TableCard>
@@ -171,19 +171,19 @@ function HireReport() {
               <ul className="space-y-2 text-sm text-foreground">
                 <li className="flex justify-between gap-4">
                   <span>Requests in the period without a quotation</span>
-                  <span className="rts-mono">{report.coverage.rentalsWithoutQuote}</span>
+                  <span className="tms-num">{report.coverage.rentalsWithoutQuote}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Confirmed rentals with no vehicle assigned</span>
-                  <span className="rts-mono">{report.coverage.rentalsWithoutVehicle}</span>
+                  <span className="tms-num">{report.coverage.rentalsWithoutVehicle}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Invoices with no currency</span>
-                  <span className="rts-mono">{report.coverage.invoicesWithoutCurrency}</span>
+                  <span className="tms-num">{report.coverage.invoicesWithoutCurrency}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Period</span>
-                  <span className="rts-mono">
+                  <span className="tms-num">
                     {formatDate(report.from)} – {formatDate(report.to)}
                   </span>
                 </li>
@@ -244,9 +244,9 @@ function HireReport() {
                   emptyState={<EmptyState title="Nothing invoiced" body="No invoice was issued in this period." />}
                   columns={[
                     { key: "customer", header: "Customer", render: (row) => row.customerName },
-                    { key: "invoiced", header: "Invoiced", className: "text-right rts-mono", render: (row) => money(moneyReport.currencyCode, row.invoiced) },
-                    { key: "paid", header: "Paid", className: "text-right rts-mono", render: (row) => money(moneyReport.currencyCode, row.paid) },
-                    { key: "outstanding", header: "Owed", className: "text-right rts-mono", render: (row) => money(moneyReport.currencyCode, row.outstanding) },
+                    { key: "invoiced", header: "Invoiced", className: "text-right tms-num", render: (row) => money(moneyReport.currencyCode, row.invoiced) },
+                    { key: "paid", header: "Paid", className: "text-right tms-num", render: (row) => money(moneyReport.currencyCode, row.paid) },
+                    { key: "outstanding", header: "Owed", className: "text-right tms-num", render: (row) => money(moneyReport.currencyCode, row.outstanding) },
                   ]}
                 />
               </TableCard>
@@ -258,8 +258,8 @@ function HireReport() {
                   emptyState={<EmptyState title="No costs recorded" body="Nothing was entered for this period. That is not the same as zero cost." />}
                   columns={[
                     { key: "category", header: "Category", render: (row) => row.category },
-                    { key: "lines", header: "Lines", className: "text-right rts-mono", render: (row) => row.lineCount },
-                    { key: "amount", header: "Amount", className: "text-right rts-mono", render: (row) => money(moneyReport.currencyCode, row.amount) },
+                    { key: "lines", header: "Lines", className: "text-right tms-num", render: (row) => row.lineCount },
+                    { key: "amount", header: "Amount", className: "text-right tms-num", render: (row) => money(moneyReport.currencyCode, row.amount) },
                   ]}
                 />
               </TableCard>
@@ -269,19 +269,19 @@ function HireReport() {
               <ul className="space-y-2 text-sm text-foreground">
                 <li className="flex justify-between gap-4">
                   <span>Uncategorised cost lines</span>
-                  <span className="rts-mono">{moneyReport.coverage.uncategorisedExpenseLines}</span>
+                  <span className="tms-num">{moneyReport.coverage.uncategorisedExpenseLines}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Invoices with no customer name</span>
-                  <span className="rts-mono">{moneyReport.coverage.invoicesWithoutCustomer}</span>
+                  <span className="tms-num">{moneyReport.coverage.invoicesWithoutCustomer}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Completed runs with no vehicle recorded</span>
-                  <span className="rts-mono">{moneyReport.coverage.completedTripsWithoutVehicle}</span>
+                  <span className="tms-num">{moneyReport.coverage.completedTripsWithoutVehicle}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Revenue by service</span>
-                  <span className="rts-mono">{moneyReport.revenueByService.map((row) => `${row.service}: ${money(moneyReport.currencyCode, row.invoiced)}`).join(" · ") || "nothing invoiced"}</span>
+                  <span className="tms-num">{moneyReport.revenueByService.map((row) => `${row.service}: ${money(moneyReport.currencyCode, row.invoiced)}`).join(" · ") || "nothing invoiced"}</span>
                 </li>
               </ul>
               <p className="mt-3 text-xs text-muted-foreground">

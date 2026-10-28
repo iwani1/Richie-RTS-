@@ -3,6 +3,7 @@ import { readinessReport, type OdometerInput, type ReadinessStatus } from "../tm
 import type { OdometerReading } from "../tms/types";
 import { useTms } from "../tms/useTms";
 import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { IntervalBar } from "../components/tms/IntervalBar";
 
 type Tab = "readiness" | "odometer";
 type Errors = Record<string, string>;
@@ -31,7 +32,7 @@ export function FleetReadinessPage() {
         title="Fleet readiness"
         description="Service intervals per vehicle category, odometer readings and due/overdue maintenance. Intervals are configured by management; nothing is scheduled by default."
       />
-      <div role="tablist" aria-label="Fleet readiness sections" className="rts-tabs">
+      <div role="tablist" aria-label="Fleet readiness sections" className="mb-5 flex w-fit gap-1 rounded-lg border border-border bg-secondary p-1">
         {(["readiness", "odometer"] as Tab[]).map((id) => (
           <button
             key={id}
@@ -39,7 +40,7 @@ export function FleetReadinessPage() {
             role="tab"
             aria-selected={tab === id}
             onClick={() => setTab(id)}
-            className="rts-tab"
+            className={`rounded-md px-3 py-1.5 text-[12px] transition-colors duration-150 ${tab === id ? "bg-card text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
             {id === "readiness" ? "Readiness" : "Odometer log"}
           </button>
@@ -101,11 +102,9 @@ function ReadinessTab() {
                       // numbers are set beside it, so the bar never carries information alone.
                       const used = basis.interval > 0 ? Math.min(100, Math.round((basis.consumed / basis.interval) * 100)) : 0;
                       return (
-                        <li key={basis.basis} className="rts-interval-row">
+                        <li key={basis.basis} className="flex flex-wrap items-center gap-2.5">
                           <span className="font-semibold">{basis.basis === "km" ? `${basis.consumed} / ${basis.interval} km` : `${basis.consumed} / ${basis.interval} days`}</span>
-                          <span className="rts-interval" aria-hidden="true">
-                            <span className={`rts-interval-fill rts-interval-fill--${row.status}`} style={{ width: `${used}%` }} />
-                          </span>
+                          <IntervalBar percent={used} tone={row.status === "overdue" ? "overdue" : row.status === "ok" ? "ok" : row.status === "due" ? "due" : "none"} />
                           {basis.dueDate ? <span className="text-muted-foreground"> due {formatDate(basis.dueDate)}</span> : null}
                           {basis.lead !== null ? <span className="text-muted-foreground"> · warn {basis.lead} {basis.basis === "km" ? "km" : "days"} before</span> : null}
                         </li>
@@ -192,7 +191,7 @@ function OdometerTab() {
         columns={[
           { key: "vehicle", header: "Vehicle", render: (reading) => db.vehicles.find((v) => v.id === reading.vehicleId)?.registration ?? "Unknown" },
           { key: "date", header: "Date", render: (reading) => formatDate(reading.readingDate) },
-          { key: "km", header: "Reading", className: "rts-num", render: (reading) => <span className="tabular-nums font-semibold">{reading.readingKm} km</span> },
+          { key: "km", header: "Reading", className: "text-right tms-num", render: (reading) => <span className="tabular-nums font-semibold">{reading.readingKm} km</span> },
           { key: "note", header: "Note", render: (reading) => reading.note || <span className="text-dim">-</span> },
           { key: "by", header: "Recorded by", render: (reading) => <span className="text-xs">{reading.createdBy}</span> },
           {

@@ -83,7 +83,7 @@ export function DriversPage() {
         toolbar={
           <>
             <SearchInput placeholder="Search name, phone, licence" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search drivers" />
-            <p className="rts-filter-bar-note" role="status">
+            <p className="text-[11px] text-muted-foreground" role="status">
               {db.drivers.filter((d) => d.status === "active").length} active · {db.drivers.filter((d) => d.status !== "active").length} inactive or suspended
             </p>
           </>
@@ -103,7 +103,7 @@ export function DriversPage() {
               <span className="flex flex-col">
                 <span className="font-mono text-xs">{d.licenceNumber}</span>
                 <span className="text-xs text-muted-foreground">
-                  {(d.licenceClasses ?? []).length > 0 ? `Class ${(d.licenceClasses ?? []).join(", ")}` : <em className="rts-unset">class not recorded</em>}
+                  {(d.licenceClasses ?? []).length > 0 ? `Class ${(d.licenceClasses ?? []).join(", ")}` : <em className="tms-unset">class not recorded</em>}
                 </span>
               </span>
             ),
@@ -115,7 +115,7 @@ export function DriversPage() {
               (d.qualifications ?? []).length > 0 ? (
                 <span className="text-xs text-foreground">{(d.qualifications ?? []).join(" · ")}</span>
               ) : (
-                <em className="rts-unset">none recorded</em>
+                <em className="tms-unset">none recorded</em>
               ),
           },
           {
@@ -291,13 +291,13 @@ export function ClientsPage() {
               <span className="flex flex-col">
                 <span className="font-semibold text-foreground">{c.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {c.reference ? <span className="rts-mono">{c.reference}</span> : <em className="rts-unset">no code</em>}
+                  {c.reference ? <span className="tms-num">{c.reference}</span> : <em className="tms-unset">no code</em>}
                   {" · "}
-                  {c.type ? CLIENT_TYPE_LABELS[c.type] : <em className="rts-unset">type not recorded</em>}
+                  {c.type ? CLIENT_TYPE_LABELS[c.type] : <em className="tms-unset">type not recorded</em>}
                 </span>
                 {(c.registrationNumber || c.registeredOn) && (
                   <span className="text-xs text-muted-foreground">
-                    {c.registrationNumber && <span className="rts-mono">Reg. {c.registrationNumber}</span>}
+                    {c.registrationNumber && <span className="tms-num">Reg. {c.registrationNumber}</span>}
                     {c.registrationNumber && c.registeredOn ? " · " : ""}
                     {c.registeredOn ? `registered ${formatDate(c.registeredOn)}` : ""}
                   </span>
@@ -333,10 +333,10 @@ export function ClientsPage() {
               c.billingAddress || c.tin ? (
                 <span className="flex flex-col text-xs">
                   {c.billingAddress && <span className="text-foreground">{c.billingAddress}</span>}
-                  {c.tin ? <span className="rts-mono text-muted-foreground">TIN {c.tin}</span> : <em className="rts-unset">no tax number</em>}
+                  {c.tin ? <span className="tms-num text-muted-foreground">TIN {c.tin}</span> : <em className="tms-unset">no tax number</em>}
                 </span>
               ) : (
-                <em className="rts-unset">not recorded</em>
+                <em className="tms-unset">not recorded</em>
               ),
           },
           {
@@ -468,7 +468,7 @@ function ClientHistory({ client, onClose }: { client: Client; onClose: () => voi
           {entries.map((entry) => (
             <li key={entry.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
               <p className="text-xs text-muted-foreground">
-                <span className="rts-mono">{formatDate(entry.at.slice(0, 10))}</span> · {entry.actorName}
+                <span className="tms-num">{formatDate(entry.at.slice(0, 10))}</span> · {entry.actorName}
               </p>
               <p className="text-sm text-foreground">{entry.summary}</p>
             </li>
@@ -540,7 +540,7 @@ function ClientBranches({ client, onClose }: { client: Client; onClose: () => vo
                     <span className="font-semibold text-foreground">{location.name}</span>
                     <Badge tone={location.status === "active" ? "success" : "neutral"}>{location.status === "active" ? "open" : "closed"}</Badge>
                   </div>
-                  <p className="text-sm text-foreground">{location.address || <em className="rts-unset">address not recorded</em>}</p>
+                  <p className="text-sm text-foreground">{location.address || <em className="tms-unset">address not recorded</em>}</p>
                   <p className="text-xs text-muted-foreground">
                     {location.contactName || "contact not recorded"}
                     {location.phone ? ` · ${location.phone}` : ""}

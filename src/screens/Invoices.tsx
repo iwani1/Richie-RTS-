@@ -141,15 +141,15 @@ export function InvoicesPage() {
   // sorts by is often not the text it shows — "Outstanding" prints a dash for a void invoice and a
   // sentence for money owed back, and neither reads in order.
   const invoiceColumns: Column<Invoice>[] = [
-    { key: "ref", header: "Invoice", sortValue: (invoice) => invoice.reference, render: (invoice) => <span className="rts-mono text-xs font-semibold">{invoice.reference}</span> },
+    { key: "ref", header: "Invoice", sortValue: (invoice) => invoice.reference, render: (invoice) => <span className="tms-num text-xs font-semibold">{invoice.reference}</span> },
     { key: "customer", header: "Customer", sortValue: (invoice) => invoice.customerName, render: (invoice) => <span className="font-medium">{invoice.customerName}</span> },
     { key: "issued", header: "Issued", sortValue: (invoice) => invoice.issuedOn, render: (invoice) => formatDate(invoice.issuedOn) },
     { key: "due", header: "Due", sortValue: (invoice) => invoice.dueOn, render: (invoice) => formatDate(invoice.dueOn) },
-    { key: "total", header: "Total", className: "text-right rts-mono", sortValue: (invoice) => invoice.total, render: (invoice) => money(invoice.currencyCode, invoice.total) },
+    { key: "total", header: "Total", className: "text-right tms-num", sortValue: (invoice) => invoice.total, render: (invoice) => money(invoice.currencyCode, invoice.total) },
     {
       key: "credited",
       header: "Credited",
-      className: "text-right rts-mono",
+      className: "text-right tms-num",
       sortValue: (invoice) => balanceOf(invoice).credited,
       // A dash rather than 0.00: nothing was taken off this invoice, and a column of zeroes
       // reads as though something happened.
@@ -158,11 +158,11 @@ export function InvoicesPage() {
         return credited > 0 ? money(invoice.currencyCode, credited) : <span className="text-dim">-</span>;
       },
     },
-    { key: "paid", header: "Paid", className: "text-right rts-mono", sortValue: (invoice) => balanceOf(invoice).paid, render: (invoice) => money(invoice.currencyCode, balanceOf(invoice).paid) },
+    { key: "paid", header: "Paid", className: "text-right tms-num", sortValue: (invoice) => balanceOf(invoice).paid, render: (invoice) => money(invoice.currencyCode, balanceOf(invoice).paid) },
     {
       key: "outstanding",
       header: "Outstanding",
-      className: "text-right rts-mono",
+      className: "text-right tms-num",
       sortValue: (invoice) => (invoice.status === "void" ? 0 : balanceOf(invoice).outstanding),
       render: (invoice) => {
         if (invoice.status === "void") return <span className="text-dim">-</span>;
@@ -263,7 +263,7 @@ export function InvoicesPage() {
                 </option>
               ))}
             </Select>
-            <p className="rts-filter-bar-note" role="status">
+            <p className="text-[11px] text-muted-foreground" role="status">
               {live.filter((invoice) => balanceOf(invoice).outstanding > 0).length} open · {billable.length} waiting to be invoiced
             </p>
           </>
@@ -344,7 +344,7 @@ function IssueInvoiceForm({
           </Select>
         </Field>
         {rental?.finalInvoice && (
-          <div className="rts-summary">
+          <div className="tms-summary">
             <p className="text-xs text-muted-foreground">Pre-tax amount from completion: {money(rental.finalInvoice.currencyCode, subtotal)}</p>
             <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
               {rental.finalInvoice.lines.map((line) => (
@@ -352,7 +352,7 @@ function IssueInvoiceForm({
                   <span>
                     {line.description} × {line.quantity}
                   </span>
-                  <span className="rts-mono">{money(rental.finalInvoice!.currencyCode, lineAmount(line.quantity, line.unitAmount))}</span>
+                  <span className="tms-num">{money(rental.finalInvoice!.currencyCode, lineAmount(line.quantity, line.unitAmount))}</span>
                 </li>
               ))}
             </ul>
@@ -530,9 +530,9 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             emptyState={<EmptyState title="No lines" body="This invoice has no line items." />}
             columns={[
               { key: "description", header: "Description", render: (line) => line.description },
-              { key: "quantity", header: "Qty", className: "text-right rts-mono", render: (line) => line.quantity },
-              { key: "unit", header: "Unit", className: "text-right rts-mono", render: (line) => money(invoice.currencyCode, line.unitAmount) },
-              { key: "amount", header: "Amount", className: "text-right rts-mono", render: (line) => money(invoice.currencyCode, lineAmount(line.quantity, line.unitAmount)) },
+              { key: "quantity", header: "Qty", className: "text-right tms-num", render: (line) => line.quantity },
+              { key: "unit", header: "Unit", className: "text-right tms-num", render: (line) => money(invoice.currencyCode, line.unitAmount) },
+              { key: "amount", header: "Amount", className: "text-right tms-num", render: (line) => money(invoice.currencyCode, lineAmount(line.quantity, line.unitAmount)) },
             ]}
           />
           {invoice.taxLines.length > 0 && (
@@ -542,7 +542,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
                   <span>
                     {line.name} at {line.ratePercent}%
                   </span>
-                  <span className="rts-mono">{money(invoice.currencyCode, line.amount)}</span>
+                  <span className="tms-num">{money(invoice.currencyCode, line.amount)}</span>
                 </li>
               ))}
             </ul>
@@ -555,13 +555,13 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             rowKey={(payment) => payment.id}
             emptyState={<EmptyState title="No payments yet" body="Payments recorded against this invoice appear here." />}
             columns={[
-              { key: "ref", header: "Payment", render: (payment) => <span className="rts-mono text-xs">{payment.reference}</span> },
+              { key: "ref", header: "Payment", render: (payment) => <span className="tms-num text-xs">{payment.reference}</span> },
               { key: "date", header: "Received", render: (payment) => formatDate(payment.paidOn) },
               { key: "method", header: "Method", render: (payment) => payment.method },
               {
                 key: "amount",
                 header: "Amount",
-                className: "text-right rts-mono",
+                className: "text-right tms-num",
                 render: (payment) => (
                   <span className={payment.voidedAt ? "text-muted-foreground line-through" : undefined}>{money(payment.currencyCode, payment.amount)}</span>
                 ),
@@ -610,7 +610,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
                 .filter((payment) => payment.voidedAt)
                 .map((payment) => (
                   <li key={payment.id}>
-                    <span className="rts-mono">{payment.reference}</span> cancelled: {payment.voidReason ?? "no reason recorded"} — it no longer counts
+                    <span className="tms-num">{payment.reference}</span> cancelled: {payment.voidReason ?? "no reason recorded"} — it no longer counts
                     towards what was received.
                   </li>
                 ))}
@@ -622,7 +622,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
                 .filter((payment) => payment.externalReference)
                 .map((payment) => (
                   <li key={payment.id}>
-                    <span className="rts-mono">{payment.reference}</span> external reference {payment.externalReference}
+                    <span className="tms-num">{payment.reference}</span> external reference {payment.externalReference}
                   </li>
                 ))}
             </ul>
@@ -642,7 +642,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
             rowKey={(note) => note.id}
             emptyState={<EmptyState title="No credit notes" body="Money taken back off this invoice appears here, with the reason recorded." />}
             columns={[
-              { key: "ref", header: "Credit note", render: (note) => <span className="rts-mono text-xs">{note.reference}</span> },
+              { key: "ref", header: "Credit note", render: (note) => <span className="tms-num text-xs">{note.reference}</span> },
               { key: "date", header: "Issued", render: (note) => formatDate(note.issuedOn) },
               {
                 key: "reason",
@@ -656,7 +656,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
                   </span>
                 ),
               },
-              { key: "amount", header: "Amount", className: "text-right rts-mono", render: (note) => money(note.currencyCode, note.total) },
+              { key: "amount", header: "Amount", className: "text-right tms-num", render: (note) => money(note.currencyCode, note.total) },
               { key: "status", header: "Status", render: (note) => <Badge tone={note.status === "void" ? "neutral" : "info"}>{CREDIT_NOTE_STATUS_LABELS[note.status]}</Badge> },
               {
                 key: "actions",
@@ -683,7 +683,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
                 .filter((note) => note.status === "void")
                 .map((note) => (
                   <li key={note.id}>
-                    <span className="rts-mono">{note.reference}</span> void: {note.voidReason ?? "no reason recorded"}
+                    <span className="tms-num">{note.reference}</span> void: {note.voidReason ?? "no reason recorded"}
                   </li>
                 ))}
             </ul>
@@ -708,7 +708,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
               />
             }
             columns={[
-              { key: "ref", header: "Refund", render: (refund) => <span className="rts-mono text-xs">{refund.reference}</span> },
+              { key: "ref", header: "Refund", render: (refund) => <span className="tms-num text-xs">{refund.reference}</span> },
               { key: "date", header: "Paid back", render: (refund) => formatDate(refund.paidOn) },
               { key: "method", header: "How", render: (refund) => <span className="text-xs text-foreground">{refund.method}</span> },
               {
@@ -721,7 +721,7 @@ function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => vo
                   </span>
                 ),
               },
-              { key: "amount", header: "Amount", className: "text-right rts-mono", render: (refund) => money(refund.currencyCode, refund.amount) },
+              { key: "amount", header: "Amount", className: "text-right tms-num", render: (refund) => money(refund.currencyCode, refund.amount) },
               { key: "status", header: "Status", render: (refund) => <Badge tone={refund.status === "void" ? "neutral" : "info"}>{REFUND_STATUS_LABELS[refund.status]}</Badge> },
               {
                 key: "actions",
@@ -1066,19 +1066,19 @@ function CreditNoteForm({
           <TextArea value={values.reason} onChange={(e) => setValues({ ...values, reason: e.target.value })} invalid={!!errors.reason} />
         </Field>
 
-        <div className="rts-summary">
+        <div className="tms-summary">
           <p className="text-xs text-muted-foreground">Credit note total: {money(invoice.currencyCode, total)}</p>
           <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
             <li className="flex justify-between gap-3">
               <span>Before tax</span>
-              <span className="rts-mono">{money(invoice.currencyCode, subtotal)}</span>
+              <span className="tms-num">{money(invoice.currencyCode, subtotal)}</span>
             </li>
             {invoice.taxLines.map((line) => (
               <li key={line.name} className="flex justify-between gap-3">
                 <span>
                   {line.name} at {line.ratePercent}% (the invoice&apos;s rate)
                 </span>
-                <span className="rts-mono">{money(invoice.currencyCode, fromMinor(percentOfMinor(toMinor(subtotal), line.ratePercent)))}</span>
+                <span className="tms-num">{money(invoice.currencyCode, fromMinor(percentOfMinor(toMinor(subtotal), line.ratePercent)))}</span>
               </li>
             ))}
           </ul>

@@ -256,9 +256,9 @@ export function ExpensesPage() {
                   />
                 }
                 columns={[
-                  { key: "ref", header: "Expense", render: (expense) => <span className="rts-mono text-xs font-semibold text-foreground">{expense.reference}</span> },
+                  { key: "ref", header: "Expense", render: (expense) => <span className="tms-num text-xs font-semibold text-foreground">{expense.reference}</span> },
                   { key: "date", header: "Spent", render: (expense) => formatDate(expense.incurredOn) },
-                  { key: "category", header: "Category", render: (expense) => expense.category || <em className="rts-unset">Uncategorised</em> },
+                  { key: "category", header: "Category", render: (expense) => expense.category || <em className="tms-unset">Uncategorised</em> },
                   {
                     key: "description",
                     header: "What for",
@@ -277,13 +277,13 @@ export function ExpensesPage() {
                       expense.receiptReference ? (
                         <span className="flex flex-col gap-1">
                           <span className="flex flex-wrap items-center gap-1">
-                            <span className="rts-mono text-xs">{expense.receiptReference}</span>
+                            <span className="tms-num text-xs">{expense.receiptReference}</span>
                             <CopyButton value={expense.receiptReference} what="receipt number" />
                           </span>
                           <span className="text-xs text-muted-foreground">{expense.receiptHeld ? "paper held" : "paper not held"}</span>
                         </span>
                       ) : (
-                        <em className="rts-unset">no number</em>
+                        <em className="tms-unset">no number</em>
                       ),
                   },
                   ...(mayReadScans
@@ -297,7 +297,7 @@ export function ExpensesPage() {
                               return (
                                 <span className="flex flex-col">
                                   <a
-                                    className="rts-link text-xs font-medium"
+                                    className="text-primary underline-offset-4 hover:underline text-xs font-medium"
                                     href={`/api/receipts/${scan.id}`}
                                     target="_blank"
                                     rel="noreferrer"
@@ -310,23 +310,23 @@ export function ExpensesPage() {
                               );
                             }
                             return expense.status === "void" ? (
-                              <em className="rts-unset">none</em>
+                              <em className="tms-unset">none</em>
                             ) : mayFileScans ? (
                               <Button variant="ghost" onClick={() => setFiling(expense)} aria-label={`File a scan for ${expense.reference}`}>
                                 File scan
                               </Button>
                             ) : (
-                              <em className="rts-unset">none</em>
+                              <em className="tms-unset">none</em>
                             );
                           },
                         },
                       ]
                     : []),
-                  { key: "method", header: "Method", render: (expense) => expense.method || <em className="rts-unset">not recorded</em> },
+                  { key: "method", header: "Method", render: (expense) => expense.method || <em className="tms-unset">not recorded</em> },
                   {
                     key: "amount",
                     header: "Amount",
-                    className: "text-right rts-mono",
+                    className: "text-right tms-num",
                     render: (expense) =>
                       expense.status === "void" ? (
                         <span className="text-muted-foreground line-through">{money(expense.currencyCode, expense.amount)}</span>
@@ -359,9 +359,9 @@ export function ExpensesPage() {
                 rowKey={(row) => row.name}
                 emptyState={<EmptyState title="Nothing to group" body="No live expense in this period." />}
                 columns={[
-                  { key: "category", header: "Category", render: (row) => (row.name === UNCATEGORISED ? <em className="rts-unset">Uncategorised</em> : row.name) },
-                  { key: "count", header: "Entries", className: "text-right rts-mono", render: (row) => row.count },
-                  { key: "amount", header: "Amount", className: "text-right rts-mono", render: (row) => money(currency, row.amount) },
+                  { key: "category", header: "Category", render: (row) => (row.name === UNCATEGORISED ? <em className="tms-unset">Uncategorised</em> : row.name) },
+                  { key: "count", header: "Entries", className: "text-right tms-num", render: (row) => row.count },
+                  { key: "amount", header: "Amount", className: "text-right tms-num", render: (row) => money(currency, row.amount) },
                 ]}
               />
             </TableCard>
@@ -618,7 +618,7 @@ function FileReceiptForm({
         >
           <input
             type="file"
-            className="rts-input"
+            className="w-full rounded-md border border-input bg-secondary px-3 py-2 text-[13px] text-foreground placeholder:text-dim focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
             accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
             aria-label="Receipt scan"
             onChange={(event) => {

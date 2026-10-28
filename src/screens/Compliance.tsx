@@ -113,9 +113,9 @@ export function CompliancePage() {
           }
           actions={
             leadDays === null ? (
-              <span className="rts-filter-bar-note">No lead time set: only lapsed papers appear here</span>
+              <span className="text-[11px] text-muted-foreground">No lead time set: only lapsed papers appear here</span>
             ) : (
-              <span className="rts-filter-bar-note">{`Within ${leadDays} day${leadDays === 1 ? "" : "s"}, as set in Settings`}</span>
+              <span className="text-[11px] text-muted-foreground">{`Within ${leadDays} day${leadDays === 1 ? "" : "s"}, as set in Settings`}</span>
             )
           }
         >
@@ -162,7 +162,7 @@ export function CompliancePage() {
                   entry.takenOn ? (
                     <span className="text-xs text-muted-foreground">{reminderLine(entry.takenOn)}</span>
                   ) : (
-                    <span className="text-xs rts-unset">Nobody has taken it on</span>
+                    <span className="text-xs tms-unset">Nobody has taken it on</span>
                   ),
               },
               {
@@ -204,7 +204,7 @@ export function CompliancePage() {
               <option value="expiring_soon">Expiring soon</option>
               <option value="valid">Valid</option>
             </Select>
-            <p className="rts-filter-bar-note" role="status">
+            <p className="text-[11px] text-muted-foreground" role="status">
               {leadDays === null ? "No reminder lead time set" : `Expiring soon means within ${leadDays} day${leadDays === 1 ? "" : "s"}`}
             </p>
           </>
@@ -227,7 +227,7 @@ export function CompliancePage() {
               const days = daysUntil(r.doc.expiryDate, today);
               if (days === null) return <span className="text-muted-foreground">unreadable date</span>;
               const label = days === 0 ? "expires today" : days > 0 ? `in ${days} day${days === 1 ? "" : "s"}` : `${Math.abs(days)} day${days === -1 ? "" : "s"} overdue`;
-              return <span className={`rts-mono ${days < 0 ? "text-red-700" : "text-muted-foreground"}`}>{label}</span>;
+              return <span className={`tms-num ${days < 0 ? "text-red-700" : "text-muted-foreground"}`}>{label}</span>;
             },
           },
           { key: "status", header: "Status", render: (r) => <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Badge> },

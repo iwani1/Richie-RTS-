@@ -15,6 +15,7 @@ import { csvFileName, downloadTextFile } from "../ui/download";
 import { formatAmount } from "../tms/money";
 import { useTms } from "../tms/useTms";
 import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Stat, TableCard, TextInput, formatDate, todayYmd } from "../ui/primitives";
+import { IntervalBar } from "../components/tms/IntervalBar";
 
 const STATE_TONE: Record<FleetState, "success" | "info" | "warning" | "error" | "neutral"> = {
   available: "success",
@@ -168,19 +169,17 @@ export function FleetPage() {
                 columns={[
                   { key: "bucket", header: "Bucket", render: (row) => <span className="font-semibold text-foreground">{row.label}</span> },
                   { key: "note", header: "What it means", render: (row) => <span className="text-xs text-muted-foreground">{row.note}</span> },
-                  { key: "days", header: "Vehicle-days", className: "rts-num", render: (row) => <span className="tabular-nums">{row.days}</span> },
+                  { key: "days", header: "Vehicle-days", className: "text-right tms-num", render: (row) => <span className="tabular-nums">{row.days}</span> },
                   {
                     key: "share",
                     header: "Share of days in the fleet",
                     render: (row) => {
                       const share = report.vehicleDays.inFleet > 0 ? row.days / report.vehicleDays.inFleet : 0;
                       return (
-                        <div className="rts-interval-row">
-                          <span className="text-xs tabular-nums">{percent(share)}</span>
+                        <div className="flex items-center gap-2.5">
+                          <span className="tms-num text-muted-foreground">{percent(share)}</span>
                           {/* Decorative: the same figure is set beside it, so the bar carries nothing alone. */}
-                          <span className="rts-interval" aria-hidden="true">
-                            <span className="rts-interval-fill" style={{ width: `${Math.min(100, Math.round(share * 100))}%` }} />
-                          </span>
+                          <IntervalBar percent={share * 100} />
                         </div>
                       );
                     },
@@ -222,12 +221,12 @@ export function FleetPage() {
                       </div>
                     ),
                   },
-                  { key: "infleet", header: "Days in fleet", className: "rts-num", render: (row) => <span className="tabular-nums">{row.inFleetDays}</span> },
-                  { key: "committed", header: "Committed", className: "rts-num", render: (row) => <span className="tabular-nums">{row.committedDays}</span> },
-                  { key: "worked", header: "Worked", className: "rts-num", render: (row) => <span className="tabular-nums">{row.workedDays}</span> },
-                  { key: "booked", header: "Booked", className: "rts-num", render: (row) => <span className="tabular-nums">{row.bookedDays}</span> },
-                  { key: "workshop", header: "Workshop", className: "rts-num", render: (row) => <span className="tabular-nums">{row.workshopDays}</span> },
-                  { key: "idle", header: "Idle", className: "rts-num", render: (row) => <span className="tabular-nums">{row.idleDays}</span> },
+                  { key: "infleet", header: "Days in fleet", className: "text-right tms-num", render: (row) => <span className="tabular-nums">{row.inFleetDays}</span> },
+                  { key: "committed", header: "Committed", className: "text-right tms-num", render: (row) => <span className="tabular-nums">{row.committedDays}</span> },
+                  { key: "worked", header: "Worked", className: "text-right tms-num", render: (row) => <span className="tabular-nums">{row.workedDays}</span> },
+                  { key: "booked", header: "Booked", className: "text-right tms-num", render: (row) => <span className="tabular-nums">{row.bookedDays}</span> },
+                  { key: "workshop", header: "Workshop", className: "text-right tms-num", render: (row) => <span className="tabular-nums">{row.workshopDays}</span> },
+                  { key: "idle", header: "Idle", className: "text-right tms-num", render: (row) => <span className="tabular-nums">{row.idleDays}</span> },
                   {
                     key: "last",
                     header: "Last worked",

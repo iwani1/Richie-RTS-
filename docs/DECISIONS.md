@@ -3486,3 +3486,43 @@ produces: 6 users, 6 clients, 5 branches, 4 contracts, 8 vehicles, 8 drivers, 23
 18 riders, 80 trips, 5 bookings, 7 rental requests, 2 invoices, 3 payments, 1 credit note, 1 refund, 9
 expenses, 2 incidents, 2 work orders, 13 odometer readings and an audit trail of the whole thing. It
 runs in about four seconds against an empty database.
+
+## D-134 - The money desk and the registers leave the old stylesheet; four screens still hold to it
+
+**The problem.** The component layer had twelve screens on it and eighteen on `legacy.css`, and the
+eighteen were not eighteen equal jobs. Most of them used the temporary stylesheet for four or five
+ideas — a numeric font for a figure, a muted word for what a record does not say, a bar for an
+interval, a hairline list for the bands of debt — while their layout, tables, buttons and empty states
+already came from the component layer. They were paying a stylesheet's whole cost for a handful of
+utilities.
+
+**Decision 1: the residue becomes utilities, not a component per screen.** `tms-num` (mono figures,
+sentence case, tabular), `tms-unset` (what the record does not say, in the muted floor colour, never
+italic) and `tms-summary` (a stated block inside a screen) now live in `globals.css` beside the other
+utilities. They replace `rts-mono`, `rts-unset` and `rts-summary` one for one, at the same sizes, so a
+sweep changes where a class is defined and nothing about what a person sees.
+
+**Decision 2: two repeating shapes become components.** `KeylineList` is the hairline list with one
+total row — the age of the debt on the finance home and on every customer statement, which had drifted
+into two hand-kept copies. `IntervalBar` is the service-interval bar, decorative by contract because
+every caller prints the same numbers beside it; the tone comes from the state the words already state.
+
+**Decision 3: the sweeps are per class, not per file.** A screen is clear of the old stylesheet when
+no class in it is defined there — not when it merely looks right. Twelve screens met that test this
+phase: `FinanceHome`, `Statements`, `Invoices`, `Contracts`, `Compliance`, `Reports`, `Vehicles`,
+`Registers`, `Expenses`, `Rentals`, `Fleet` and `FleetReadiness`. Where a class had no faithful
+equivalent (the tab strips, the receipt file input, the vehicle thumbnail) it was replaced with token
+utilities at the same meaning, not deleted in the hope that a default would do.
+
+**Decision 4: four screens are left, and they are the four that are genuinely different.**
+`StaffBusing` (62 classes) and `StaffLogistics` (40) are built around their own run cards, planning
+list and report table; `PublicEnquiry` (22) is a page outside the frame, because it is embedded on the
+company's website; `Settings` (14) is a band of rules with a setup meter. Each needs a shape the layer
+does not have yet, and inventing one per screen is how the layer stops being a layer. They come next,
+one at a time, with `legacy.css` deleted when the last is clear.
+
+**Consequence.** `src/components/tms/KeylineList.tsx` and `IntervalBar.tsx` (new), `src/app/globals.css`
+(three utilities), twelve screens edited, no behaviour changed — 1,368 tests pass untouched apart from
+the three `.rts-copy` selectors they already used. Twenty-six of thirty screens are now clear of the
+temporary stylesheet; the compiled CSS is 93,594 bytes, +1.1 KB on the last build because the utilities
+are new rules, and 36.9 KB of legacy rules are carrying four screens instead of eighteen.

@@ -125,7 +125,7 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
     {
       key: "value",
       header: "Quote",
-      className: "rts-num",
+      className: "tms-num text-right",
       sortValue: (r) => r.quote?.total ?? -1,
       render: (r) => (r.quote ? money(r.quote.total, r.quote.currencyCode) : <span className="text-dim">-</span>),
     },
@@ -164,7 +164,7 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
               <option value="all">All statuses</option>
               {RENTAL_STATUSES.map((s) => <option key={s} value={s}>{RENTAL_STATUS_LABELS[s]}</option>)}
             </Select>
-            <p className="rts-filter-bar-note" role="status">
+            <p className="text-[11px] text-muted-foreground" role="status">
               {db.rentals.filter((r) => r.status === "dispatched").length} on the road · {db.rentals.filter((r) => r.status === "completed").length} completed
             </p>
           </>
@@ -306,14 +306,20 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
       {rental.status === "declined" || rental.status === "cancelled" ? (
         <Notice tone="error" title={`This rental was ${RENTAL_STATUS_LABELS[rental.status].toLowerCase()}`} className="mb-4">{rental.resolutionReason}</Notice>
       ) : (
-        <ol className="rts-steps" aria-label="Rental progress">
+        <ol className="mb-5 flex flex-wrap gap-1.5" aria-label="Rental progress">
           {steps.map((step, i) => (
             <li
               key={step.key}
-              className={`rts-step${i < currentIndex ? " is-done" : ""}${i === currentIndex ? " is-current" : ""}`}
+              className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] ${
+                i === currentIndex
+                  ? "border-primary text-foreground"
+                  : i < currentIndex
+                    ? "border-border text-muted-foreground"
+                    : "border-divider text-dim"
+              }`}
               aria-current={i === currentIndex ? "step" : undefined}
             >
-              <span className="rts-step-index" aria-hidden="true">{i < currentIndex ? "\u2713" : i + 1}</span>
+              <span className="tms-num text-dim" aria-hidden="true">{i < currentIndex ? "\u2713" : i + 1}</span>
               <span>{step.label}</span>
             </li>
           ))}
@@ -511,7 +517,7 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
                   <li key={charge.id} className="rounded-sm bg-muted px-3 py-2">
                     <div className="flex justify-between gap-2 text-sm">
                       <span className="font-medium text-foreground">{charge.description}</span>
-                      <span className="rts-mono">{money(chargeAmount(charge), currency)}</span>
+                      <span className="tms-num">{money(chargeAmount(charge), currency)}</span>
                     </div>
                     <p className="mt-0.5 text-xs text-foreground">Reason given: {charge.reason}</p>
                     <p className="mt-0.5 text-[10px] text-muted-foreground">Added by {charge.addedByName} · {formatDateTime(charge.addedAt)}</p>

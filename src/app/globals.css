@@ -273,6 +273,30 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* A figure inside a sentence or a cell: money, a count, a time. Mono for alignment, but sentence
+     case and set at reading size — the uppercase caption style above is for labels, not numbers. */
+  .tms-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* What the record does not say. Never an empty cell, never a guess, never italic: the word is
+     information and reads like the rest of the row. */
+  .tms-unset {
+    color: var(--dim);
+    font-style: normal;
+  }
+
+  /* A stated block inside a screen: a final-invoice recap, a calculated note. Secondary surface,
+     one line, same radius as every other surface. */
+  .tms-summary {
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 10px 12px;
+  }
+
   /* Static card surface: 1px edge plus a 1px inset top highlight, no drop shadow. */
   .tms-surface {
     background: var(--card);

@@ -144,7 +144,7 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
               );
               if (counts.retired > 0) parts.push(`${counts.retired} retired`);
               return (
-                <p className="rts-filter-bar-note" role="status">
+                <p className="text-[11px] text-muted-foreground" role="status">
                   {parts.length > 0 ? `${parts.join(" · ")} of ${counts.total}` : "No vehicles registered"}
                 </p>
               );
@@ -161,7 +161,7 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
                 noPhoto ? `${noPhoto} with no photograph` : "",
               ].filter(Boolean);
               return parts.length > 0 ? (
-                <p className="rts-filter-bar-note rts-unset" role="status">
+                <p className="text-[11px] text-muted-foreground" role="status">
                   {parts.join(" · ")} of {gaps.total}
                 </p>
               ) : null;
@@ -186,12 +186,12 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
                 <img
                   src={`/api/vehicle-photo/${v.id}`}
                   alt={`${v.registration}`}
-                  className="rts-thumb"
+                  className="block h-10 w-14 rounded-sm object-cover"
                   width={56}
                   height={40}
                 />
               ) : (
-                <span className="text-xs rts-unset">none</span>
+                <span className="text-xs tms-unset">none</span>
               ),
           },
           { key: "reg", header: "Registration", render: (v) => <span className="font-mono text-xs font-semibold text-foreground">{v.registration}</span> },
@@ -206,7 +206,7 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
                 {vehicleDetailLine(v) ? (
                   <span className="block text-xs text-muted-foreground">{vehicleDetailLine(v)}</span>
                 ) : (
-                  <span className="block text-xs rts-unset">fuel and ownership not recorded</span>
+                  <span className="block text-xs tms-unset">fuel and ownership not recorded</span>
                 )}
               </>
             ),
@@ -216,7 +216,7 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
             header: "Usual driver",
             render: (v) => {
               const driver = usualDriverOf(db, v);
-              if (!driver) return <span className="text-xs rts-unset">not recorded</span>;
+              if (!driver) return <span className="text-xs tms-unset">not recorded</span>;
               return (
                 <span className="text-sm">
                   {driver.fullName}
@@ -225,7 +225,7 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
               );
             },
           },
-          { key: "seats", header: "Seats", className: "rts-num", render: (v) => v.seatCapacity },
+          { key: "seats", header: "Seats", className: "tms-num text-right", render: (v) => v.seatCapacity },
           {
             key: "state",
             header: "Today",
@@ -233,16 +233,16 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
             // with what the records show — that word, so nobody has to guess which one to believe.
             render: (v) => {
               const reading = fleetStateOf(db, v.id, today);
-              if (!reading) return <span className="text-xs rts-unset">not on the register</span>;
+              if (!reading) return <span className="text-xs tms-unset">not on the register</span>;
               const storedWord = BLOCKING_STATES.includes(reading.state) && reading.state !== v.status;
               return (
                 <span className="block">
                   <span className="flex items-center gap-2">
                     <Badge tone={stateTone[reading.state]}>{reading.label}</Badge>
-                    {reading.reference && <span className="rts-state-ref">{reading.reference}</span>}
+                    {reading.reference && <span className="tms-num text-dim">{reading.reference}</span>}
                   </span>
                   {storedWord && (
-                    <span className="mt-1 block text-xs rts-unset">register: {VEHICLE_STATUS_LABELS[v.status].toLowerCase()}</span>
+                    <span className="mt-1 block text-xs tms-unset">register: {VEHICLE_STATUS_LABELS[v.status].toLowerCase()}</span>
                   )}
                   {reading.conflict && <span className="mt-1 block text-xs text-amber-800">{reading.conflict}</span>}
                 </span>
@@ -276,12 +276,12 @@ export function VehiclesPage({ navigate }: { navigate: (route: Route) => void })
 
       {/* The brief asks for the rule behind each state, not only the label (FLT-02). A rule that lives
           only in the documentation is a rule nobody at the desk has read. */}
-      <details className="rts-state-rules">
+      <details className="mt-3 rounded-md border border-border bg-secondary px-3 py-2 text-[12px] text-muted-foreground">
         <summary>How each state is decided</summary>
-        <dl>
+        <dl className="mt-2 space-y-3">
           {FLEET_STATE_RULES.map((entry) => (
             <div key={entry.state}>
-              <dt>{FLEET_STATE_LABELS[entry.state]}</dt>
+              <dt className="font-medium text-foreground">{FLEET_STATE_LABELS[entry.state]}</dt>
               <dd>{entry.rule}</dd>
               <dd>
                 <strong>Leaves it:</strong> {entry.leaves}
@@ -525,7 +525,7 @@ function VehiclePhotoForm({ vehicle, onClose }: { vehicle: Vehicle; onClose: () 
           <img
             src={`/api/vehicle-photo/${vehicle.id}`}
             alt={`Photograph of ${vehicle.registration}`}
-            className="rts-photo"
+            className="block w-full rounded-md border border-border object-cover"
           />
           <figcaption className="mt-2 text-xs text-muted-foreground">
             {vehicle.photo.originalName} · {megabytes(vehicle.photo.byteSize)} · {vehiclePhotoLine(vehicle.photo)}
@@ -543,7 +543,7 @@ function VehiclePhotoForm({ vehicle, onClose }: { vehicle: Vehicle; onClose: () 
         >
           <input
             type="file"
-            className="rts-input"
+            className="w-full rounded-md border border-input bg-secondary px-3 py-2 text-[13px] text-foreground placeholder:text-dim focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
             accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
             aria-label="Vehicle photograph"
             onChange={(event) => {

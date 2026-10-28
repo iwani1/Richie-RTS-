@@ -1982,3 +1982,17 @@ exactly why the sheet family was taken first.
 `Reports` (16), `Vehicles` (14), `Statements` (13), `Expenses` (13), `Registers` (12), `Fleet` (10),
 `Contracts` (8), `FleetReadiness` (7), `Rentals` (6), `Compliance` (5). The money desk
 (`FinanceHome`, `Invoices`, `Statements`) is next, and `legacy.css` goes when the last one is clean.
+
+## Phase 84 - The money desk and the register screens join the layer (D-134)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| The residue becomes three utilities | Done (verified) | `tms-num`, `tms-unset`, `tms-summary` in `globals.css`, replacing `rts-mono`, `rts-unset` and `rts-summary` at the same sizes: a uniform that was defined in the temporary file is now defined in the token file |
+| Two shapes become components | Done (verified) | `KeylineList` (hairline rows with one total — the debt bands on the finance home and on every statement, previously two copies) and `IntervalBar` (the service-interval bar, decorative by contract, tone from the state the words already state) |
+| Twelve screens clear | Done (verified) | `FinanceHome`, `Statements`, `Invoices`, `Contracts`, `Compliance`, `Reports`, `Vehicles`, `Registers`, `Expenses`, `Rentals`, `Fleet`, `FleetReadiness` — cleared per class, not per glance: no class in them is defined in `legacy.css` |
+| Replacements that are not deletions | Done (verified) | The tab strips in `Reports` and `FleetReadiness` are token buttons with the selected state in words and surface, not a colour alone; the receipt and photograph file inputs keep their accessible names; the vehicle thumbnail keeps its fixed 56×40 box so a register of mixed photographs stays a register |
+| Four screens left, and why | Done (verified) | `StaffBusing` (62), `StaffLogistics` (40), `PublicEnquiry` (22, a page outside the frame because it is embedded on the company's website) and `Settings` (14, a band of rules with a setup meter) each need a shape the layer does not own yet; inventing one per screen is how a layer stops being one |
+| Gates | Pass | `tsc` clean, `eslint` clean, **1,368 tests passed, 28 skipped**, `next build` 17 s, compiled CSS 93,594 + 10,903 bytes, zero `rts-*` classes in twenty-six of thirty screens |
+
+**Next piece:** the last four screens. `StaffBusing` first — its run card has to become a row that
+opens, its planning list a panel, and its report table a `DataTable` — then `legacy.css` is deleted.

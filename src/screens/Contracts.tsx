@@ -173,7 +173,7 @@ export function ContractsPage() {
             />
           }
           columns={[
-            { key: "ref", header: "Contract", render: (row) => <span className="rts-mono text-xs font-semibold text-foreground">{row.contract.reference}</span> },
+            { key: "ref", header: "Contract", render: (row) => <span className="tms-num text-xs font-semibold text-foreground">{row.contract.reference}</span> },
             {
               key: "client",
               header: "Client",
@@ -449,20 +449,20 @@ function ContractDetail({ contract, onClosed, onEdit }: { contract: Contract; on
 
         {contract.serviceLevelTargets && (
           <div>
-            <p className="rts-label">Service-level targets</p>
+            <p className="tms-mono text-dim">Service-level targets</p>
             <p className="whitespace-pre-line text-sm text-foreground">{contract.serviceLevelTargets}</p>
           </div>
         )}
         {contract.notes && (
           <div>
-            <p className="rts-label">Notes</p>
+            <p className="tms-mono text-dim">Notes</p>
             <p className="whitespace-pre-line text-sm text-foreground">{contract.notes}</p>
           </div>
         )}
 
         {steps.length > 0 && allowed("contracts:advance") && (
           <div className="rounded-md border border-border p-3">
-            <p className="rts-label">What happens next</p>
+            <p className="tms-mono text-dim">What happens next</p>
             <TextInput
               placeholder="Reason (required to suspend, terminate or send back)"
               aria-label="Reason"
@@ -473,7 +473,7 @@ function ContractDetail({ contract, onClosed, onEdit }: { contract: Contract; on
               }}
             />
             {error && (
-              <p className="rts-error mt-2" role="alert">
+              <p className="text-[12px] text-danger mt-2" role="alert">
                 {error}
               </p>
             )}
@@ -492,11 +492,11 @@ function ContractDetail({ contract, onClosed, onEdit }: { contract: Contract; on
         )}
 
         <div>
-          <p className="rts-label">History</p>
+          <p className="tms-mono text-dim">History</p>
           <ol className="space-y-2">
             {contract.history.map((event, index) => (
               <li key={`${event.at}-${index}`} className="text-xs text-foreground">
-                <span className="rts-mono">{new Date(event.at).toLocaleString()}</span> · {event.actor} · {CONTRACT_STATUS_LABELS[event.from]} → {CONTRACT_STATUS_LABELS[event.to]}
+                <span className="tms-num">{new Date(event.at).toLocaleString()}</span> · {event.actor} · {CONTRACT_STATUS_LABELS[event.from]} → {CONTRACT_STATUS_LABELS[event.to]}
                 {event.note && <span className="text-muted-foreground"> — {event.note}</span>}
               </li>
             ))}
@@ -510,7 +510,7 @@ function ContractDetail({ contract, onClosed, onEdit }: { contract: Contract; on
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="rts-label">{label}</dt>
+      <dt className="tms-mono text-dim">{label}</dt>
       <dd className="text-foreground">{value}</dd>
     </div>
   );

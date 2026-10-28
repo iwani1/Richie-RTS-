@@ -38,6 +38,7 @@ import {
   formatDate,
   todayYmd,
 } from "../ui/primitives";
+import { KeylineList } from "../components/tms/KeylineList";
 
 const money = (currency: string, amount: number) => `${currency} ${formatAmount(Math.abs(amount))}`;
 
@@ -157,7 +158,7 @@ export function StatementsPage() {
                     <span className="flex items-center gap-2">
                       <button
                         type="button"
-                        className="rts-link font-medium"
+                        className="font-medium text-primary underline-offset-4 hover:underline"
                         onClick={() => setSelected(customer.name)}
                         aria-pressed={customer.name === customerName}
                       >
@@ -177,7 +178,7 @@ export function StatementsPage() {
               {
                 key: "owed",
                 header: "Owed",
-                className: "text-right rts-mono",
+                className: "text-right tms-num",
                 render: (customer) =>
                   customer.currencyCode ? (
                     <span className={customer.outstanding > 0 ? "font-medium" : "text-muted-foreground"}>
@@ -248,7 +249,7 @@ export function StatementsPage() {
                           <span className="flex flex-col">
                             <span className="flex items-center gap-2">
                               <Badge tone={KIND_TONE[row.kind]}>{KIND_LABEL[row.kind]}</Badge>
-                              <span className="rts-mono text-xs">{row.reference}</span>
+                              <span className="tms-num text-xs">{row.reference}</span>
                             </span>
                             <span className="text-xs text-muted-foreground">{row.description}</span>
                           </span>
@@ -257,19 +258,19 @@ export function StatementsPage() {
                       {
                         key: "charged",
                         header: "Charged",
-                        className: "text-right rts-mono",
+                        className: "text-right tms-num",
                         render: (row) => (row.debit > 0 ? money(currency, row.debit) : "—"),
                       },
                       {
                         key: "paid",
                         header: "Paid or credited",
-                        className: "text-right rts-mono",
+                        className: "text-right tms-num",
                         render: (row) => (row.credit > 0 ? money(currency, row.credit) : "—"),
                       },
                       {
                         key: "balance",
                         header: "Balance",
-                        className: "text-right rts-mono",
+                        className: "text-right tms-num",
                         render: (row) => money(currency, row.balance),
                       },
                     ]}
@@ -281,24 +282,21 @@ export function StatementsPage() {
                     title="How old the money is"
                     summary={statement.ageing.total > 0 ? `${money(currency, statement.ageing.total)} still owed` : "Nothing is owed"}
                   >
-                    <dl className="rts-ageing">
-                      {(
+                    <KeylineList
+                      rows={(
                         [
                           ["Not yet due", statement.ageing.notYetDue, "within the payment terms"],
                           ["1–30 days late", statement.ageing.days1to30, "worth a reminder"],
                           ["31–60 days late", statement.ageing.days31to60, "worth a call"],
                           ["Over 60 days late", statement.ageing.days61plus, "decide what to do"],
                         ] as const
-                      ).map(([label, amount, hint]) => (
-                        <div key={label} className="rts-ageing-row">
-                          <dt>
-                            <span className="rts-ageing-label">{label}</span>
-                            <span className="rts-ageing-hint">{hint}</span>
-                          </dt>
-                          <dd className="rts-mono">{amount > 0 ? money(currency, amount) : "—"}</dd>
-                        </div>
-                      ))}
-                    </dl>
+                      ).map(([label, amount, hint]) => ({
+                        key: label,
+                        label,
+                        hint,
+                        value: amount > 0 ? money(currency, amount) : "—",
+                      }))}
+                    />
                   </TableCard>
 
                   <TableCard
@@ -310,14 +308,14 @@ export function StatementsPage() {
                       rowKey={(row) => row.invoiceId}
                       emptyState={<EmptyState title="Nothing outstanding" body="Every invoice on this account is settled." />}
                       columns={[
-                        { key: "ref", header: "Invoice", render: (row) => <span className="rts-mono text-xs">{row.reference}</span> },
+                        { key: "ref", header: "Invoice", render: (row) => <span className="tms-num text-xs">{row.reference}</span> },
                         { key: "due", header: "Due", render: (row) => formatDate(row.dueOn) },
                         {
                           key: "late",
                           header: "Late",
                           render: (row) => (row.daysOverdue > 0 ? `${row.daysOverdue} days` : "Not yet due"),
                         },
-                        { key: "amount", header: "Outstanding", className: "text-right rts-mono", render: (row) => money(currency, row.outstanding) },
+                        { key: "amount", header: "Outstanding", className: "text-right tms-num", render: (row) => money(currency, row.outstanding) },
                       ]}
                     />
                   </TableCard>

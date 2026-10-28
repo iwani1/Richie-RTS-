@@ -17,6 +17,7 @@ import { useTms } from "../tms/useTms";
 import { PAYMENT_STATUS_LABELS } from "../tms/types";
 import { Badge, Button, DataTable, EmptyState, Field, Notice, PageHeader, Stat, TableCard, TextInput, formatDate, todayYmd } from "../ui/primitives";
 import type { Route } from "../routes";
+import { KeylineList } from "../components/tms/KeylineList";
 
 const money = (currency: string | null, amount: number) => (currency ? `${currency} ${formatAmount(amount)}` : "Not configured");
 const firstOfMonth = (today: string) => `${today.slice(0, 7)}-01`;
@@ -150,35 +151,26 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
               </Notice>
               {home.ageing.status === "ok" && (
                 <>
-                  <dl className="rts-ageing">
-                    {AGE_BUCKETS.map((bucket) => (
-                      <div key={bucket} className="rts-ageing-row">
-                        <dt>
-                          <span className="rts-ageing-label">{AGE_BUCKET_LABELS[bucket]}</span>
-                          <span className="rts-ageing-hint">
-                            {bucket === "notYetDue"
-                              ? "within the payment terms"
-                              : bucket === "days1to30"
-                                ? "worth a reminder"
-                                : bucket === "days31to60"
-                                  ? "worth a call"
-                                  : "decide what to do"}
-                          </span>
-                        </dt>
-                        <dd className="rts-mono">{home.ageing[bucket] > 0 ? money(currency, home.ageing[bucket]) : "—"}</dd>
-                      </div>
-                    ))}
-                    <div className="rts-ageing-row">
-                      <dt>
-                        <span className="rts-ageing-label rts-ageing-label--total">Total still owed</span>
-                        <span className="rts-ageing-hint">
-                          {home.ageing.openInvoices} open invoice{home.ageing.openInvoices === 1 ? "" : "s"} ·{" "}
-                          {home.ageing.customers.length} customer{home.ageing.customers.length === 1 ? "" : "s"}
-                        </span>
-                      </dt>
-                      <dd className="rts-mono">{money(currency, home.ageing.total)}</dd>
-                    </div>
-                  </dl>
+                  <KeylineList
+                    rows={AGE_BUCKETS.map((bucket) => ({
+                      key: bucket,
+                      label: AGE_BUCKET_LABELS[bucket],
+                      hint:
+                        bucket === "notYetDue"
+                          ? "within the payment terms"
+                          : bucket === "days1to30"
+                            ? "worth a reminder"
+                            : bucket === "days31to60"
+                              ? "worth a call"
+                              : "decide what to do",
+                      value: home.ageing[bucket] > 0 ? money(currency, home.ageing[bucket]) : "—",
+                    }))}
+                    total={{
+                      label: "Total still owed",
+                      hint: `${home.ageing.openInvoices} open invoice${home.ageing.openInvoices === 1 ? "" : "s"} · ${home.ageing.customers.length} customer${home.ageing.customers.length === 1 ? "" : "s"}`,
+                      value: money(currency, home.ageing.total),
+                    }}
+                  />
 
                   <div className="mt-5">
                     <DataTable
@@ -202,13 +194,13 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                         ...AGE_BUCKETS.slice(1).map((bucket) => ({
                           key: bucket,
                           header: AGE_BUCKET_LABELS[bucket],
-                          className: "text-right rts-mono",
+                          className: "text-right tms-num",
                           render: (row: (typeof home.ageing.customers)[number]) => (row[bucket] > 0 ? money(currency, row[bucket]) : "—"),
                         })),
                         {
                           key: "total",
                           header: "Owed",
-                          className: "text-right rts-mono",
+                          className: "text-right tms-num",
                           render: (row: (typeof home.ageing.customers)[number]) => money(currency, row.total),
                         },
                       ]}
@@ -233,7 +225,7 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                 emptyState={<EmptyState title="Nothing is overdue" body="No invoice is past its due date with money still owed." />}
                 columns={[
                   { key: "ref", header: "Invoice", render: (row) => <span className="font-mono text-xs font-semibold text-foreground">{row.reference}</span> },
-                  { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="rts-unset">no name recorded</em> },
+                  { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="tms-unset">no name recorded</em> },
                   { key: "due", header: "Due", render: (row) => formatDate(row.dueOn) },
                   {
                     key: "late",
@@ -241,7 +233,7 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                     // The number and the word: a colour never carries the state on its own.
                     render: (row) => <Badge tone={row.daysOverdue >= 30 ? "error" : "warning"}>{`${row.daysOverdue} day${row.daysOverdue === 1 ? "" : "s"}`}</Badge>,
                   },
-                  { key: "owed", header: "Still owed", className: "text-right rts-mono", render: (row) => money(currency, row.outstanding) },
+                  { key: "owed", header: "Still owed", className: "text-right tms-num", render: (row) => money(currency, row.outstanding) },
                 ]}
               />
             </TableCard>
@@ -254,13 +246,13 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                   emptyState={<EmptyState title="Every completed hire is billed" body="Nothing is waiting for an invoice." />}
                   columns={[
                     { key: "ref", header: "Hire", render: (row) => <span className="font-mono text-xs font-semibold text-foreground">{row.reference}</span> },
-                    { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="rts-unset">no name recorded</em> },
+                    { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="tms-unset">no name recorded</em> },
                     { key: "done", header: "Completed", render: (row) => formatDate(row.completedOn) },
                     {
                       key: "total",
                       header: "Recorded total",
-                      className: "text-right rts-mono",
-                      render: (row) => (row.finalTotal === null ? <em className="rts-unset">none recorded</em> : money(currency, row.finalTotal)),
+                      className: "text-right tms-num",
+                      render: (row) => (row.finalTotal === null ? <em className="tms-unset">none recorded</em> : money(currency, row.finalTotal)),
                     },
                   ]}
                 />
@@ -281,10 +273,10 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                   columns={[
                     { key: "ref", header: "Refund", render: (row) => <span className="font-mono text-xs font-semibold text-foreground">{row.reference}</span> },
                     { key: "invoice", header: "Against", render: (row) => <span className="font-mono text-xs">{row.invoiceReference}</span> },
-                    { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="rts-unset">no name recorded</em> },
+                    { key: "customer", header: "Customer", render: (row) => row.customerName || <em className="tms-unset">no name recorded</em> },
                     { key: "paid", header: "Paid back", render: (row) => formatDate(row.paidOn) },
                     { key: "reason", header: "Why", render: (row) => <span className="text-xs text-muted-foreground">{row.reason}</span> },
-                    { key: "amount", header: "Amount", className: "text-right rts-mono", render: (row) => money(currency, row.amount) },
+                    { key: "amount", header: "Amount", className: "text-right tms-num", render: (row) => money(currency, row.amount) },
                   ]}
                 />
               </TableCard>
@@ -307,7 +299,7 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                         </span>
                       ),
                     },
-                    { key: "amount", header: "Amount", className: "text-right rts-mono", render: (row) => money(currency, row.amount) },
+                    { key: "amount", header: "Amount", className: "text-right tms-num", render: (row) => money(currency, row.amount) },
                   ]}
                 />
               </TableCard>
@@ -321,9 +313,9 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                   emptyState={<EmptyState title="Nothing invoiced" body="No invoice was issued in this period." />}
                   columns={[
                     { key: "customer", header: "Customer", render: (row) => row.customerName },
-                    { key: "count", header: "Invoices", className: "text-right rts-mono", render: (row) => row.invoiceCount },
-                    { key: "invoiced", header: "Invoiced", className: "text-right rts-mono", render: (row) => money(currency, row.invoiced) },
-                    { key: "owed", header: "Owed", className: "text-right rts-mono", render: (row) => money(currency, row.outstanding) },
+                    { key: "count", header: "Invoices", className: "text-right tms-num", render: (row) => row.invoiceCount },
+                    { key: "invoiced", header: "Invoiced", className: "text-right tms-num", render: (row) => money(currency, row.invoiced) },
+                    { key: "owed", header: "Owed", className: "text-right tms-num", render: (row) => money(currency, row.outstanding) },
                   ]}
                 />
               </TableCard>
@@ -335,8 +327,8 @@ export function FinanceHomePage({ navigate }: { navigate: (route: Route) => void
                   emptyState={<EmptyState title="Nothing spent" body="No cost was recorded in this period." />}
                   columns={[
                     { key: "category", header: "Category", render: (row) => row.category },
-                    { key: "lines", header: "Lines", className: "text-right rts-mono", render: (row) => row.lineCount },
-                    { key: "amount", header: "Amount", className: "text-right rts-mono", render: (row) => money(currency, row.amount) },
+                    { key: "lines", header: "Lines", className: "text-right tms-num", render: (row) => row.lineCount },
+                    { key: "amount", header: "Amount", className: "text-right tms-num", render: (row) => money(currency, row.amount) },
                   ]}
                 />
               </TableCard>
