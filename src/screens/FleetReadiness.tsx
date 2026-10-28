@@ -4,6 +4,7 @@ import type { OdometerReading } from "../tms/types";
 import { useTms } from "../tms/useTms";
 import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, Select, Stat, TableCard, TextArea, TextInput, formatDate, todayYmd } from "../ui/primitives";
 import { IntervalBar } from "../components/tms/IntervalBar";
+import { SectionTabs } from "../components/tms/SectionTabs";
 
 type Tab = "readiness" | "odometer";
 type Errors = Record<string, string>;
@@ -32,20 +33,16 @@ export function FleetReadinessPage() {
         title="Fleet readiness"
         description="Service intervals per vehicle category, odometer readings and due/overdue maintenance. Intervals are configured by management; nothing is scheduled by default."
       />
-      <div role="tablist" aria-label="Fleet readiness sections" className="mb-5 flex w-fit gap-1 rounded-lg border border-border bg-secondary p-1">
-        {(["readiness", "odometer"] as Tab[]).map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
-            className={`rounded-md px-3 py-1.5 text-[12px] transition-colors duration-150 ${tab === id ? "bg-card text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            {id === "readiness" ? "Readiness" : "Odometer log"}
-          </button>
-        ))}
-      </div>
+      <SectionTabs
+        tabs={[
+          { id: "readiness", label: "Readiness" },
+          { id: "odometer", label: "Odometer log" },
+        ]}
+        value={tab}
+        onChange={setTab}
+        ariaLabel="Fleet readiness sections"
+        className="mb-5"
+      />
       {tab === "readiness" ? <ReadinessTab /> : <OdometerTab />}
     </div>
   );

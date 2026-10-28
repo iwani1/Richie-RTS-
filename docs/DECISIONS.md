@@ -3534,3 +3534,49 @@ one at a time, with `legacy.css` deleted when the last is clear.
 the three `.rts-copy` selectors they already used. Twenty-six of thirty screens are now clear of the
 temporary stylesheet; the compiled CSS is 93,594 bytes, +1.1 KB on the last build because the utilities
 are new rules, and 36.9 KB of legacy rules are carrying four screens instead of eighteen.
+
+## D-135 - The run sheet becomes a table, the desk becomes a landmark, and the strip becomes one component
+
+**The problem.** `StaffBusing` carried 62 class names from the temporary stylesheet — more than any
+other screen — and nearly all of them were on one tab. The run sheet drew each trip as an `<article>`
+in a four-column CSS grid: a time, a block of prose about the route, a crew line and a status flag,
+with every action the run allowed stacked beside it. It read well on a wide screen and badly on a
+narrow one, the columns were not sortable, the header did not stay while the list scrolled, and the
+screen ignored the row density every other register obeys. The dispatch desk beside it was an `<aside>`
+styled from the same file.
+
+**Decision 1: a run sheet is a table.** The day's runs are rows: departs, route (with reference,
+progress and any delay sentence), crew, state, and the next action. Sorting, the sticky header, the
+density preference, horizontal scroll on a narrow screen and the empty state come from the layer's
+`DataTable`, which is what a dispatcher's list should have had all along. Progress reads as a fraction
+of the route's own stops — `2/4 stops recorded` — because that is what the stop logs are.
+
+**Decision 2: a crew that cannot be found is a fault, not an absence.** The old cell printed `-` when
+a run named a vehicle id the register no longer held, which is indistinguishable from a blank. It now
+says *not on the vehicle register*, in the same muted styling the words `no vehicle` use. Three states,
+three sentences: nobody assigned, assigned and found, assigned and missing.
+
+**Decision 3: the desk stays a complementary landmark.** It is the aside to the run sheet, so it keeps
+`<aside aria-label="Dispatch desk">` — a reader can jump to it and a screen reader announces it by name.
+Its figures are the day's counts, its late list is the same `runningLate` the sheet uses, and its
+suggestion is still offered only to a role that can act on it, with the sentence in one run of text so
+it is read — and checked — as one sentence.
+
+**Decision 4: four hand-written copies of the same strip become one component.** `Reports`,
+`FleetReadiness`, `StaffBusing` and `StaffLogistics` each had their own tab markup; the first three are
+now `components/tms/SectionTabs`, a real tab list with one tab stop, arrow keys, Home and End, and
+`aria-selected` doing the work rather than a colour. `StaffLogistics` follows when it is rebuilt.
+
+**Decision 5: the stylesheet is pruned per block, and conservatively.** 79 rule blocks whose every
+class no longer appears in `src/` were removed — a block at a time, never splitting a selector list,
+and never touching a block that carries a comment in its head, because re-attaching comments around a
+half-removed rule is how a stylesheet ends up lying about itself. A script check proves afterwards that
+every `rts-*` class still used in `src/` still has a rule: 55 classes, none missing. `legacy.css` is
+36.9 KB → 28.2 KB, and the compiled stylesheet 93.6 KB → 86.9 KB.
+
+**Consequence.** `src/components/tms/SectionTabs.tsx` (new, with three tests), `src/screens/StaffBusing.tsx`
+(the strip, the run sheet and the planning aid rebuilt; every form and every other tab unchanged),
+`src/screens/Reports.tsx` and `src/screens/FleetReadiness.tsx` (the strip), `src/styles/legacy.css`
+(79 blocks), `src/screens/Busing.test.tsx` (+2 tests: the run sheet is a table with three crew states,
+and the strip is a real tab list). Three screens remain on the old stylesheet: `StaffLogistics` (42),
+`PublicEnquiry` (23) and `Settings` (16).

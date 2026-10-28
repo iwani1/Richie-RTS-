@@ -225,7 +225,6 @@ h1, h2, h3, h4 { text-wrap: balance; }
   line-height: 1.45;
   text-align: left;
 }
-.rts-card-head > :last-child { margin-left: auto; }
 
 .rts-band-body, .rts-card-body { padding: 18px; min-width: 0; }
 
@@ -293,37 +292,6 @@ h1, h2, h3, h4 { text-wrap: balance; }
 .rts-table .rts-num, .rts-num { text-align: right; font-variant-numeric: tabular-nums; }
 .rts-table th.rts-num { text-align: right; }
 
-.rts-flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border-radius: 20px;
-  background: var(--rts-card-2);
-  color: var(--rts-ink-2);
-  font-family: var(--rts-body);
-  font-size: 10.5px;
-  font-weight: 600;
-  line-height: 1.35;
-  white-space: nowrap;
-}
-
-.rts-flag::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  flex: 0 0 auto;
-}
-
-.rts-flag--completed { background: var(--rts-green-soft); color: var(--rts-green-ink); }
-.rts-flag--planned::before, .rts-flag--dispatched::before, .rts-flag--in_progress::before { background: var(--rts-amber); }
-.rts-flag--planned, .rts-flag--dispatched, .rts-flag--in_progress, .rts-flag--in { background: var(--rts-amber-soft); color: var(--rts-amber-ink); }
-.rts-flag--cancelled { background: var(--rts-red-soft); color: var(--rts-red-ink); }
-
-.rts-unset { color: var(--rts-muted); font-style: normal; }
-
 /* A vehicle's photograph (FLT-01, D-108). A fixed aspect box so a table of mixed photographs stays a
    table: the thumbnail is cropped to it rather than allowed to set the row height. */
 .rts-thumb {
@@ -334,27 +302,6 @@ h1, h2, h3, h4 { text-wrap: balance; }
   border: 1px solid var(--rts-line);
   border-radius: 2px;
   background: var(--rts-card);
-}
-
-.rts-photo {
-  display: block;
-  width: 100%;
-  max-height: 320px;
-  object-fit: contain;
-  border: 1px solid var(--rts-line);
-  border-radius: 2px;
-  background: var(--rts-card);
-}
-
-.rts-label {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--rts-ink-2);
-  font-family: var(--rts-body);
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
 }
 
 .rts-input {
@@ -394,7 +341,6 @@ select.rts-input {
 }
 
 select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
-.rts-error { display: block; margin-top: 4px; color: var(--rts-red-ink); font-size: 11px; font-weight: 500; line-height: 1.45; }
 
 /* A reference with a copy button beside it (D-111). The button holds a fixed width so a table cell
    does not jump when it reads "Copied", and the note underneath is announced rather than shown: the
@@ -412,22 +358,6 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
   white-space: nowrap;
   border: 0;
 }
-
-.rts-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--rts-accent);
-  font-family: var(--rts-body);
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.rts-link:hover { color: var(--rts-accent-hover); text-decoration: underline; text-underline-offset: 2px; }
 
 /* ---------- section tabs ------------------------------------------------------------------------------- */
 
@@ -528,55 +458,9 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 
 .rts-runs { display: flex; flex-direction: column; }
 
-.rts-run {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) minmax(150px, 210px) auto;
-  gap: 16px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--rts-card-2);
-  align-items: center;
-}
-
-.rts-run:last-child { border-bottom: 0; }
-.rts-run:hover { background: var(--rts-card); }
-
-.rts-run-time b {
-  display: block;
-  color: var(--rts-ink);
-  font-family: var(--rts-mono);
-  font-size: 13px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.rts-run-time span { display: block; margin-top: 2px; color: var(--rts-muted); font-family: var(--rts-mono); font-size: 10px; }
-
-.rts-run-route { margin: 0; color: var(--rts-ink); font-family: var(--rts-display); font-size: 13px; font-weight: 650; line-height: 1.35; }
-
-.rts-run-ref {
-  margin-left: 6px;
-  padding: 2px 5px;
-  border-radius: 5px;
-  background: var(--rts-card-2);
-  color: var(--rts-muted);
-  font-family: var(--rts-mono);
-  font-size: 10px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
 /* An ad hoc run is not an error, but it is an exception: the marker is a quiet amber, never the
    only thing that says so (the reason is in the run's title attribute and in the audit log). */
 .rts-run-ref--adhoc { background: var(--rts-amber-soft); color: var(--rts-amber-ink); }
-.rts-run-why { color: var(--rts-amber-ink); }
-
-.rts-run-meta { margin: 3px 0 0; color: var(--rts-muted); font-size: 11px; line-height: 1.45; }
-
-.rts-run-crew { display: flex; flex-direction: column; gap: 1px; margin: 0; min-width: 0; color: var(--rts-ink-2); font-size: 11.5px; line-height: 1.45; }
-.rts-run-crew span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.rts-run-state { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; justify-self: end; }
-.rts-run-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 
 /* the desk beside a list */
 .rts-desk {
@@ -586,8 +470,6 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
   background: var(--rts-card);
   box-shadow: var(--rts-shadow-card);
 }
-
-.rts-desk + * { margin-top: 16px; }
 
 .rts-desk-figure {
   margin: 0;
@@ -601,19 +483,6 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 }
 
 .rts-desk-figure span { display: block; margin-top: 3px; color: var(--rts-muted); font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; }
-
-.rts-desk-late {
-  margin: 14px 0 0;
-  padding: 8px 10px;
-  border-left: 2px solid var(--rts-amber);
-  background: var(--rts-amber-soft);
-  color: var(--rts-amber-ink);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.rts-desk-late span { display: block; margin-top: 2px; color: var(--rts-muted); font-weight: 400; }
 
 .rts-desk-head {
   margin: 18px 0 6px;
@@ -649,39 +518,6 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
    the reason each one works or cannot. No colour is used to say "good" or "bad" — the sentence does. */
 
 .rts-plan { padding: 12px 14px; border: 1px solid var(--rts-accent-line); border-radius: 12px; background: var(--rts-accent-soft); }
-
-.rts-plan-head { margin: 0; color: var(--rts-ink); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
-.rts-plan-window { margin-left: 6px; color: var(--rts-muted); font-family: var(--rts-mono); font-size: 10.5px; font-weight: 500; }
-
-.rts-plan-line { margin: 4px 0 0; color: var(--rts-ink); font-size: 12.5px; line-height: 1.5; }
-.rts-plan-meta { margin: 4px 0 0; color: var(--rts-muted); font-size: 11px; line-height: 1.5; }
-
-.rts-plan-list { margin: 10px 0 0; padding: 0; list-style: none; }
-
-.rts-plan-list li {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px solid var(--rts-accent-line);
-}
-
-.rts-plan-list li:first-child { border-top: 0; padding-top: 2px; }
-.rts-plan-pick { margin: 0; color: var(--rts-ink); font-size: 12px; font-weight: 600; }
-.rts-plan-no { color: var(--rts-red-ink); font-weight: 600; }
-.rts-plan-reason { margin: 2px 0 0; color: var(--rts-muted); font-size: 11px; line-height: 1.5; }
-.rts-plan-note { margin: 2px 0 0; color: var(--rts-amber-ink); font-size: 11px; line-height: 1.5; }
-
-.rts-plan-limits { margin-top: 10px; border-top: 1px solid var(--rts-accent-line); padding-top: 8px; }
-.rts-plan-limits summary { color: var(--rts-muted); font-size: 11px; font-weight: 600; cursor: pointer; }
-.rts-plan-limits ul { margin: 6px 0 0; padding-left: 16px; color: var(--rts-muted); font-size: 11px; line-height: 1.55; }
-.rts-plan-limits li { margin-bottom: 3px; }
-
-.rts-desk-wait { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.rts-desk-suggest { display: flex; align-items: center; gap: 6px; color: var(--rts-ink); font-size: 11px; }
-.rts-desk-suggest--none { color: var(--rts-muted); font-style: italic; }
-.rts-desk-suggest .rts-btn { padding: 1px 7px; font-size: 10.5px; }
 
 /* ---------- the cost report --------------------------------------------------------------------------------------- */
 
@@ -748,43 +584,8 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 /* rental state strip */
 .rts-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; padding: 0; list-style: none; counter-reset: step; }
 
-.rts-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--rts-line);
-  border-radius: 20px;
-  background: var(--rts-card);
-  color: var(--rts-muted);
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.rts-step-index {
-  display: grid;
-  place-items: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--rts-card-2);
-  color: var(--rts-muted);
-  font-family: var(--rts-mono);
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.rts-step.is-done { border-color: var(--rts-green-line); background: var(--rts-green-soft); color: var(--rts-green-ink); }
-.rts-step.is-done .rts-step-index { background: var(--rts-green-ink); color: var(--rts-accent-ink); }
-.rts-step.is-current { border-color: var(--rts-accent); background: var(--rts-accent-soft); color: var(--rts-accent); font-weight: 600; }
-.rts-step.is-current .rts-step-index { background: var(--rts-accent); color: var(--rts-accent-ink); }
-
 /* service interval bar */
 .rts-interval { height: 6px; border-radius: 6px; background: var(--rts-line); overflow: hidden; }
-.rts-interval-fill { display: block; height: 100%; border-radius: 6px; background: var(--rts-green); }
-.rts-interval-fill--due, .rts-interval-fill--no_data, .rts-interval-fill--no_schedule { background: var(--rts-amber); }
-.rts-interval-fill--overdue { background: var(--rts-red); }
-.rts-interval-row { display: flex; align-items: center; gap: 10px; }
 
 .rts-footnote { margin: 16px 0 0; max-width: 96ch; color: var(--rts-muted); font-size: 11px; line-height: 1.6; }
 
@@ -805,8 +606,6 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
 .rts-statusline--boxed .rts-statusline-cell span { font-size: 9.5px; letter-spacing: 0.01em; }
 
 .rts-filter-bar .rts-input { min-height: 34px; padding-top: 7px; padding-bottom: 7px; font-size: 12px; }
-.rts-filter-bar > .rts-field > .rts-label { display: none; }
-.rts-filter-bar-note { margin: 0 0 0 auto; color: var(--rts-muted); font-size: 11px; }
 
 /* ==========================================================================================================
    Responsive
@@ -868,12 +667,6 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
   .rts-tab { flex: 1; text-align: center; }
   .rts-toolbar { gap: 8px; }
   .rts-toolbar > .rts-field { width: 100%; }
-  .rts-run { grid-template-columns: 56px minmax(0, 1fr); row-gap: 6px; padding: 12px 14px; }
-  .rts-filter-bar-note { margin-left: 0; width: 100%; }
-  .rts-run-time { grid-row: 1 / span 2; align-self: start; }
-  .rts-run-route { grid-column: 2; }
-  .rts-run-crew { grid-column: 2; flex-direction: row; flex-wrap: wrap; gap: 2px 12px; }
-  .rts-run-state { grid-column: 2; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; justify-self: start; }
   .rts-report-row { grid-template-columns: minmax(0, 1fr) 50px 92px; }
 }
 
@@ -1006,48 +799,9 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
   margin: 0;
 }
 
-.rts-ageing-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--rts-line);
-}
-
-.rts-ageing-row:first-child { padding-top: 0; }
-.rts-ageing-row:last-child { border-bottom: 0; padding-bottom: 0; }
-
-.rts-ageing-label {
-  display: block;
-  font-size: 0.8125rem;
-  color: var(--rts-ink);
-}
-
-.rts-ageing-hint {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--rts-muted-2);
-}
-
-.rts-ageing-row dd {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--rts-ink);
-  white-space: nowrap;
-}
-
 /* The last row of the same list can be a total rather than another band (the finance home, D-91). It is
    separated by weight and a rule, not by a colour, so the figure still reads in greyscale. */
 .rts-ageing-label--total {
-  font-weight: 600;
-}
-
-.rts-ageing-row:last-child dt, .rts-ageing-row:last-child dd {
-  font-size: 0.9375rem;
-}
-
-.rts-ageing-row:last-child dd {
   font-weight: 600;
 }
 
@@ -1101,30 +855,4 @@ select.rts-input option { background: var(--rts-card); color: var(--rts-ink); }
   color: var(--rts-muted);
   font-family: var(--rts-mono);
   font-size: 11px;
-}
-
-.rts-state-rules {
-  margin-top: 12px;
-  border-top: 1px solid var(--rts-line);
-  padding-top: 10px;
-}
-.rts-state-rules summary {
-  color: var(--rts-muted);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.rts-state-rules dl {
-  margin: 8px 0 0;
-  font-size: 11px;
-  line-height: 1.55;
-}
-.rts-state-rules dt {
-  margin-top: 8px;
-  color: var(--rts-ink);
-  font-weight: 600;
-}
-.rts-state-rules dd {
-  margin: 2px 0 0;
-  color: var(--rts-muted);
 }

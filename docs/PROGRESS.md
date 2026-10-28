@@ -1996,3 +1996,22 @@ exactly why the sheet family was taken first.
 
 **Next piece:** the last four screens. `StaffBusing` first — its run card has to become a row that
 opens, its planning list a panel, and its report table a `DataTable` — then `legacy.css` is deleted.
+
+## Phase 85 - The run sheet is a table: StaffBusing joins the layer (D-135)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| The run sheet is a table | Done (verified) | Departs, route, crew, state and the next action as rows in the layer's `DataTable`: sortable, sticky header, the density preference, horizontal scroll on a narrow screen and an empty state that says where trips come from. The `04:xx` card grid and its nine `rts-run-*` rules are gone |
+| Progress from the records | Done (verified) | The route cell prints the fraction of the route's own stops that have been recorded, the correction count, a roster-change count and the ad hoc marker with its reason, and the delay sentence when the run is behind — the same `liveDelay`/`delayLine` the rest of the product reads |
+| A crew that cannot be found is a fault | Done (verified) | Three states and three sentences: `no vehicle` (nobody assigned), the registration (found), `not on the vehicle register` (an id the register no longer holds). The old cell printed a dash for both, which is how a dangling reference hides |
+| The desk, rebuilt and still a landmark | Done (verified) | `<aside aria-label="Dispatch desk">` around the layer's card: the day's four counts, the late-run list, the waiting-on-a-crew list with its suggestion and its one-press Assign, and the sentence about what a suggestion is not |
+| One strip, three screens | Done (verified) | `SectionTabs` is a real tab list (one tab stop, arrow keys that wrap, Home/End, `aria-selected`); `Reports`, `FleetReadiness` and `StaffBusing` use it, and it has three tests of its own |
+| The stylesheet, pruned per block | Done (verified) | 79 blocks whose every class is gone removed conservatively (never splitting a selector list, never touching a commented block); a script check proves all 55 classes still used in `src/` still have a rule. `legacy.css` 36.9 KB → 28.2 KB; compiled CSS 93,594 → 86,903 bytes |
+| Tests | Done (verified) | **1,371 passed, 28 skipped** (from 1,368): the run sheet is a table with the three crew states, the desk counts the day, the strip is a real tab list, and `SectionTabs` has its own three |
+| Gates | Pass | `tsc` clean, `eslint` clean, `next build` 15 s, compiled CSS 86,903 + 10,903 bytes, no `rts-*` class left in `StaffBusing` |
+
+**Still queued for "every part":** three screens on the old stylesheet — `StaffLogistics` (42),
+`PublicEnquiry` (23) and `Settings` (16). `StaffLogistics` next (incidents, work orders and the cost
+report), then `PublicEnquiry` (a page outside the app frame, embedded on the company's website), then
+`Settings`; `legacy.css` and its 28 KB are deleted when the last one is clear. `src/screens` coverage
+is 81.0% of lines and needs the forms' happy paths to reach the 85% the register asks for.

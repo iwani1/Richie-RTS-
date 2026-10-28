@@ -10,6 +10,7 @@ import { formatAmount } from "../tms/money";
 import { financialReport, financialReportCsv } from "../tms/financialReport";
 import { printableReport } from "../tms/printableReport";
 import { ReportPrintPreview } from "./PrintableReport";
+import { SectionTabs } from "../components/tms/SectionTabs";
 import { StaffTransportReport } from "./StaffTransportReport";
 import { rentalReport, rentalReportCsv } from "../tms/rentalReport";
 import { useTms } from "../tms/useTms";
@@ -58,20 +59,7 @@ export function ReportsPage() {
         description={tab === "hire" ? "What was quoted, what was hired, what came in and what it cost." : "What the buses did: runs worked, riders carried, no-shows, empty seats and on-time performance."}
       />
       {tabs.length > 1 && (
-        <div role="tablist" aria-label="Report sections" className="mb-5 flex w-fit gap-1 rounded-lg border border-border bg-secondary p-1">
-          {tabs.map((candidate) => (
-            <button
-              key={candidate.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === candidate.id}
-              onClick={() => setRequested(candidate.id)}
-              className={`rounded-md px-3 py-1.5 text-[12px] transition-colors duration-150 ${tab === candidate.id ? "bg-card text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              {candidate.label}
-            </button>
-          ))}
-        </div>
+        <SectionTabs tabs={tabs} value={tab} onChange={setRequested} ariaLabel="Report sections" className="mb-5" />
       )}
       {tab === "staff" ? <StaffTransportReport /> : <HireReport />}
     </div>

@@ -284,3 +284,60 @@ describe("copying a trip reference (D-111)", () => {
     expect(within(wrapper).getByRole("status").textContent).toBe("Trip reference TR-0001 copied.");
   });
 });
+
+describe("the run sheet", () => {
+  it("is a table of the day: departure, route, crew, state, and the one action left", () => {
+    const { db, dispatch } = world();
+    openTrips(db, dispatch);
+
+    const sheet = screen.getByRole("table", { name: /Run sheet/i });
+    // The reference, the departure time and the route all sit in the row, not in a card beside it.
+    expect(within(sheet).getByText("TR-0001")).toBeTruthy();
+    expect(within(sheet).getByText("06:00")).toBeTruthy();
+    expect(within(sheet).getByText("Estate run")).toBeTruthy();
+    // A run whose vehicle is not on the register says so rather than showing a dash.
+    expect(within(sheet).getByText("not on the vehicle register")).toBeTruthy();
+    expect(within(sheet).getByText("not on the driver register")).toBeTruthy();
+    // The state is a word; the colour only repeats it.
+    expect(within(sheet).getByText("Completed")).toBeTruthy();
+    // Progress is printed as a fraction of the route's stops, from the stop logs themselves.
+    expect(within(sheet).getByText(/2\/2 stops recorded/)).toBeTruthy();
+  });
+
+  it("counts the day on the desk, and says what is left to run", () => {
+    const { db, dispatch } = world({ status: "planned", stopLogs: [], boardings: [], completedAt: null });
+    openTrips(db, dispatch);
+
+    const desk = screen.getByRole("complementary", { name: "Dispatch desk" });
+    expect(within(desk).getByText("Planned")).toBeTruthy();
+    expect(within(desk).getByText("Every run on this date has a vehicle and a driver.")).toBeTruthy();
+  });
+});
+
+describe("the section strip", () => {
+  it("is one tab list, and the arrow keys walk it", () => {
+    const { db, dispatch } = world();
+    render(
+      <TmsContext.Provider value={makeTms(db, dispatch)}>
+        <StaffBusingPage />
+      </TmsContext.Provider>,
+    );
+
+    const strip = screen.getByRole("tablist", { name: /Staff busing sections/i });
+    expect(within(strip).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Routes",
+      "Passengers",
+      "Trips",
+      "Bookings",
+      "Performance",
+    ]);
+    // Only the open section is a tab stop; the others are reachable with the arrow keys.
+    expect(within(strip).getByRole("tab", { name: "Routes" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(strip).getByRole("tab", { name: "Trips" }).getAttribute("tabindex")).toBe("-1");
+
+    fireEvent.keyDown(within(strip).getByRole("tab", { name: "Routes" }), { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Passengers" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Passengers" }), { key: "End" });
+    expect(screen.getByRole("tab", { name: "Performance" }).getAttribute("aria-selected")).toBe("true");
+  });
+});

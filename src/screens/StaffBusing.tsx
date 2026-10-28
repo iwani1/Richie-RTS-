@@ -32,6 +32,11 @@ import {
 } from "../tms/types";
 import { CopyButton } from "../ui/CopyButton";
 import { Badge, Band, Button, DataTable, EmptyState, Field, Notice, PageHeader, Panel, SearchInput, Select, Stat, TableCard, TextArea, TextInput, formatDate, formatDateTime, todayYmd } from "../ui/primitives";
+import { SectionTabs } from "../components/tms/SectionTabs";
+// The layer's card surface. The `Panel` above is the dialog: two different things, two names.
+import { Panel as SurfacePanel } from "../components/tms/Panel";
+import { DataTable as TmsDataTable, type TmsColumn } from "../components/tms/DataTable";
+import { StatusBadge } from "../components/tms/StatusBadge";
 
 type Errors = Record<string, string>;
 type Tab = "routes" | "passengers" | "trips" | "bookings" | "performance";
@@ -43,6 +48,16 @@ const TABS: { id: Tab; label: string; permission: Permission }[] = [
   { id: "bookings", label: "Bookings", permission: "bookings:read" },
   { id: "performance", label: "Performance", permission: "kpis:read" },
 ];
+
+// The run states, in the vocabulary the rest of the product uses for a badge. The word is always
+// printed beside the colour, so the tone only reinforces what is already written.
+const TRIP_TONE: Record<TripStatus, "neutral" | "info" | "primary" | "success" | "danger"> = {
+  planned: "neutral",
+  dispatched: "info",
+  in_progress: "primary",
+  completed: "success",
+  cancelled: "danger",
+};
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const isoDaysFromToday = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
@@ -72,20 +87,13 @@ export function StaffBusingPage() {
         title="Staff busing"
         description="Recurring employee transport: routes and rosters, generated trips, dispatch, boarding records, booked seats and on-time performance."
       />
-      <div role="tablist" aria-label="Staff busing sections" className="rts-tabs">
-        {available.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setRequested(t.id)}
-            className="rts-tab"
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <SectionTabs
+        tabs={available.map((t) => ({ id: t.id, label: t.label }))}
+        value={tab}
+        onChange={setRequested}
+        ariaLabel="Staff busing sections"
+        className="mb-4"
+      />
       {tab === "routes" && <RoutesTab />}
       {tab === "passengers" && <PassengersTab />}
       {tab === "trips" && <TripsTab />}
@@ -603,8 +611,6 @@ function TripsTab() {
 
   const trips = db.trips.filter((t) => t.serviceDate === date).sort((a, b) => a.reference.localeCompare(b.reference));
   const routeOf = (routeId: string) => db.routes.find((r) => r.id === routeId);
-  const vehicleReg = (id: string | null) => db.vehicles.find((v) => v.id === id)?.registration ?? "-";
-  const driverName = (id: string | null) => db.drivers.find((d) => d.id === id)?.fullName ?? "-";
   const report = async (pending: Promise<CommandResult> | CommandResult) => {
     const result = await pending;
     setFlash({ tone: result.ok ? "success" : "error", message: result.message });
@@ -666,9 +672,98 @@ function TripsTab() {
   const nextToLeave = trips.find((t) => t.status === "planned" || t.status === "dispatched");
   const startOf = (t: Trip) => routeOf(t.routeId)?.stops[0]?.scheduledTime ?? "";
 
+  // The run sheet is a table because that is what a dispatcher reads it as: times down one column,
+  // then who is on the run, then what state it is in, then the one thing to do about it.
+  const columns: TmsColumn<Trip>[] = [
+    {
+      id: "departs",
+      header: "Departs",
+      accessorFn: (t) => startOf(t) || "99:99",
+      cell: ({ row }) => {
+        const t = row.original;
+        const route = routeOf(t.routeId);
+        return (
+          <span className="flex flex-col">
+            <span className="tms-num text-[13px] font-semibold text-foreground">{startOf(t) || "—"}</span>
+            <span className="tms-num text-dim">{route?.stops[route.stops.length - 1]?.scheduledTime ?? ""}</span>
+          </span>
+        );
+      },
+    },
+    {
+      id: "route",
+      header: "Route",
+      accessorFn: (t) => routeOf(t.routeId)?.name ?? "",
+      cell: ({ row }) => {
+        const t = row.original;
+        const route = routeOf(t.routeId);
+        const late = liveDelay(t);
+        return (
+          <span className="flex max-w-[46ch] flex-col gap-0.5">
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[13px] font-medium text-foreground">{route?.name ?? "Unknown route"}</span>
+              <span className="rounded-[5px] bg-muted px-1.5 py-0.5 font-mono text-[10.5px] whitespace-nowrap text-muted-foreground">
+                {t.reference}
+              </span>
+              {/* DSP-03: an out-of-schedule run says so, and says why, on the sheet itself. */}
+              {t.origin === "adhoc" && (
+                <span className="rounded-[5px] bg-warning-tint px-1.5 py-0.5 text-[10.5px] font-medium whitespace-nowrap text-warning">
+                  ad hoc
+                </span>
+              )}
+            </span>
+            <span className="text-[11.5px] text-muted-foreground">
+              {route?.reference ?? "—"} · {route ? `${t.stopLogs.length}/${route.stops.length} stops recorded` : "route missing"}
+              {t.corrections.length > 0 && ` · ${t.corrections.length} correction${t.corrections.length === 1 ? "" : "s"}`}
+              {t.rosterChanges.length > 0 && ` · roster changed ${t.rosterChanges.length}×`}
+              {t.origin === "adhoc" && t.originReason && ` · ${t.originReason}`}
+            </span>
+            {/* D-105: the sentence, not a badge. A dispatcher reads it out to the client. */}
+            {late && <span className="text-[11.5px] font-medium text-warning">{delayLine(late)}</span>}
+          </span>
+        );
+      },
+    },
+    {
+      id: "crew",
+      header: "Crew",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const t = row.original;
+        // Three states, not two: nobody assigned, assigned and on the register, assigned to something
+        // the register does not hold. The last one is a real fault and reads as one rather than
+        // looking like an empty cell.
+        const vehicle = t.vehicleId ? db.vehicles.find((v) => v.id === t.vehicleId)?.registration ?? null : null;
+        const driver = t.driverId ? db.drivers.find((d) => d.id === t.driverId)?.fullName ?? null : null;
+        return (
+          <span className="flex flex-col gap-0.5">
+            <span className={vehicle ? "text-[12.5px] text-foreground" : "tms-unset text-[12.5px]"}>
+              {vehicle ?? (t.vehicleId ? "not on the vehicle register" : "no vehicle")}
+            </span>
+            <span className={driver ? "text-[12px] text-muted-foreground" : "tms-unset text-[12px]"}>
+              {driver ?? (t.driverId ? "not on the driver register" : "no driver")}
+            </span>
+          </span>
+        );
+      },
+    },
+    {
+      id: "state",
+      header: "State",
+      accessorKey: "status",
+      cell: ({ row }) => <StatusBadge tone={TRIP_TONE[row.original.status]}>{TRIP_STATUS_LABELS[row.original.status]}</StatusBadge>,
+    },
+    {
+      id: "actions",
+      header: "Action",
+      enableSorting: false,
+      cell: ({ row }) => actions(row.original),
+    },
+  ];
+
   return (
-    <div>
-      <div className="rts-toolbar">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-2">
         <Field label="Service date">
           <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
@@ -678,157 +773,114 @@ function TripsTab() {
             Add an ad hoc run
           </Button>
         )}
-        <p className="rts-toolbar-note">
+        <p className="ml-auto text-[11px] text-muted-foreground" role="status">
           {trips.length} run{trips.length === 1 ? "" : "s"} on {formatDate(date)}
           {trips.length > 0 && ` · first at ${startOf(trips[0]) || "—"}`}
         </p>
       </div>
 
-      <div className="rts-spread">
-        <section className="rts-card" aria-labelledby="run-sheet-heading">
-          <div className="rts-card-head">
-            <div className="rts-head-text">
-              <h3 id="run-sheet-heading" className="rts-card-title">Run sheet</h3>
-              <p className="rts-card-desc">In departure order. The next action on each run sits beside it.</p>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+        <SurfacePanel
+          kicker="Run sheet"
+          title="In departure order"
+          description="Every run for the service date. The next action on each run sits beside it."
+          action={<span className="tms-mono text-dim">{formatDate(date)}</span>}
+        >
+          <TmsDataTable
+            columns={columns}
+            data={trips}
+            caption="Run sheet: departure, route, crew, progress, state and the next action"
+            maxHeight="34rem"
+            initialSorting={[{ id: "departs", desc: false }]}
+            emptyTitle="No trips on this date"
+            emptyBody="Generate trips from a route on the Routes tab. Nothing is scheduled automatically. If a bus is needed outside the schedule, add an ad hoc run."
+          />
+        </SurfacePanel>
+
+        {/* A complementary landmark, because the desk is the aside to the run sheet: a reader can
+            jump to it, and a screen reader announces it by name rather than as another region. */}
+        <aside aria-label="Dispatch desk" className="self-start">
+        <SurfacePanel
+          kicker="Dispatch desk"
+          title={nextToLeave ? `${startOf(nextToLeave) || "—"} next to leave` : "Nothing left to run"}
+          description={nextToLeave ? undefined : "Every run on this date has left or been cancelled."}
+        >
+          <div className="space-y-3 px-4 pb-4">
+            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-control border border-border bg-border">
+              {[
+                { label: "Planned", value: byStatus("planned") },
+                { label: "On the road", value: byStatus("dispatched") },
+                { label: "Running", value: byStatus("in_progress") },
+                { label: "Finished", value: byStatus("completed") },
+              ].map((figure) => (
+                <div key={figure.label} className="bg-card px-3 py-2.5">
+                  <dt className="tms-mono text-muted-foreground">{figure.label}</dt>
+                  <dd className="mt-1 text-[20px] leading-none font-semibold text-foreground tabular-nums">{figure.value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            {/* D-105: the desk's own count, because "how many are running late" is the question a
+                supervisor asks at 07:30, not something to answer by reading every row. */}
+            {runningLate(trips).length > 0 && (
+              <Notice tone="warning" title={`${runningLate(trips).length} run${runningLate(trips).length === 1 ? "" : "s"} behind schedule`}>
+                {runningLate(trips).map((t) => t.reference).join(" · ")}
+              </Notice>
+            )}
+
+            <div>
+              <h3 className="tms-mono text-muted-foreground">Waiting on a crew</h3>
+              {unassigned.length === 0 ? (
+                <p className="mt-2 text-[12.5px] text-muted-foreground">Every run on this date has a vehicle and a driver.</p>
+              ) : (
+                <ul className="mt-2 divide-y divide-divider border-y border-divider">
+                  {unassigned.map((t) => {
+                    const plan = plans.get(t.id);
+                    const suggestion = plan?.workable[0];
+                    return (
+                      <li key={t.id} className="py-2.5">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="tms-num text-foreground">{startOf(t) || "No time"}</span>
+                          <span className="text-[11px] text-dim">
+                            {t.vehicleId ? "no driver" : t.driverId ? "no vehicle" : "no vehicle, no driver"}
+                          </span>
+                        </div>
+                        {/* The aid's own sentence, so the desk says who to send rather than only what
+                            is missing. Nothing is assigned without the operator's press, and the
+                            suggestion is offered only to a role that can act on it. */}
+                        {allowed("trips:assign") &&
+                          (suggestion ? (
+                            <div className="mt-1.5 flex items-center justify-between gap-2">
+                              {/* One sentence in one run of text: a screen reader reads it as a
+                                  sentence, and it can be checked as one. */}
+                              <span className="text-[12px] text-muted-foreground">
+                                Send {suggestion.vehicleLabel} + {suggestion.driverLabel}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                onClick={() => assignFromPlan(t.id, suggestion)}
+                                aria-label={`Assign ${suggestion.vehicleLabel} and ${suggestion.driverLabel} to ${t.reference}`}
+                              >
+                                Assign
+                              </Button>
+                            </div>
+                          ) : plan ? (
+                            <p className="mt-1 text-[12px] text-dim">Nobody free to send</p>
+                          ) : null)}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
-            <span className="rts-stamp">{trips.length} run{trips.length === 1 ? "" : "s"} · {formatDate(date)}</span>
-          </div>
 
-          {trips.length === 0 ? (
-            <div className="rts-card-body">
-              <EmptyState
-                title="No trips on this date"
-                body="Generate trips from a route on the Routes tab. Nothing is scheduled automatically. If a bus is needed outside the schedule, add an ad hoc run."
-              />
-            </div>
-          ) : (
-            <div className="rts-runs">
-              {trips.map((t) => {
-                const route = routeOf(t.routeId);
-                return (
-                  <article className="rts-run" key={t.id}>
-                    <div className="rts-run-time">
-                      <b>{startOf(t) || "—"}</b>
-                      <span>{route ? route.stops[route.stops.length - 1]?.scheduledTime : ""}</span>
-                    </div>
-                    <div>
-                      <p className="rts-run-route">
-                        {route?.name ?? "Unknown route"} <span className="rts-run-ref">{t.reference}</span>
-                      </p>
-                      <p className="rts-run-meta">
-                        {route?.reference ?? "—"} · {route ? `${t.stopLogs.length}/${route.stops.length} stops recorded` : "route missing"}
-                        {t.corrections.length > 0 && (
-                          <span className="rts-run-ref"> · {t.corrections.length} correction{t.corrections.length === 1 ? "" : "s"}</span>
-                        )}
-                        {t.rosterChanges.length > 0 && (
-                          <span className="rts-run-ref"> · roster changed {t.rosterChanges.length}×</span>
-                        )}
-                        {/* DSP-03: an out-of-schedule run says so, and says why, on the sheet itself. */}
-                        {t.origin === "adhoc" && (
-                          <>
-                            <span className="rts-run-ref rts-run-ref--adhoc">{" "}ad hoc</span>
-                            {t.originReason && <span className="rts-run-why"> · {t.originReason}</span>}
-                          </>
-                        )}
-                      </p>
-                      <p className="rts-run-crew">
-                        <span>{t.vehicleId ? vehicleReg(t.vehicleId) : <em className="rts-unset">no vehicle</em>}</span>
-                        <span>{t.driverId ? driverName(t.driverId) : <em className="rts-unset">no driver</em>}</span>
-                      </p>
-                      {/* D-105: the sentence, not a badge. A dispatcher reads it out to the client. */}
-                      {liveDelay(t) && <p className="rts-run-late">{delayLine(liveDelay(t)!)}</p>}
-                    </div>
-                    <div className="rts-run-state">
-                      <span className={`rts-flag rts-flag--${t.status}`}>{TRIP_STATUS_LABELS[t.status]}</span>
-                      <div className="rts-run-actions">{actions(t)}</div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <aside className="rts-desk" aria-label="Dispatch desk">
-          <p className="rts-kicker">Dispatch desk</p>
-          <p className="rts-desk-figure">
-            {nextToLeave ? startOf(nextToLeave) || "—" : "—"}
-            <span>{nextToLeave ? "next to leave" : "nothing left to run"}</span>
-          </p>
-
-          <div className="rts-statusline" style={{ marginTop: 14 }}>
-            <span className="rts-statusline-cell">
-              <b>{byStatus("planned")}</b>
-              <span>planned</span>
-            </span>
-            <span className="rts-statusline-cell">
-              <b>{byStatus("dispatched")}</b>
-              <span>on the road</span>
-            </span>
-            <span className="rts-statusline-cell">
-              <b>{byStatus("in_progress")}</b>
-              <span>running</span>
-            </span>
-            <span className="rts-statusline-cell">
-              <b>{byStatus("completed")}</b>
-              <span>finished</span>
-            </span>
-          </div>
-
-          {/* D-105: the desk's own count, because "how many are running late" is the question a
-              supervisor asks at 07:30, not something to answer by reading every row. */}
-          {runningLate(trips).length > 0 && (
-            <p className="rts-desk-late">
-              {runningLate(trips).length} run{runningLate(trips).length === 1 ? "" : "s"} behind schedule
-              <span>{runningLate(trips).map((t) => t.reference).join(" · ")}</span>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              A run can only be dispatched once a vehicle and a driver are assigned. Both lists come from the registers —
+              nothing is assumed by the system. A suggestion is the pairing the rules would accept, best first; the choice
+              stays with you.
             </p>
-          )}
-
-          <p className="rts-desk-head">Waiting on a crew</p>
-          {unassigned.length === 0 ? (
-            <p className="rts-band-empty">Every run on this date has a vehicle and a driver.</p>
-          ) : (
-            <ul className="rts-desk-list">
-              {unassigned.map((t) => {
-                const plan = plans.get(t.id);
-                const suggestion = plan?.workable[0];
-                return (
-                  <li key={t.id}>
-                    {/* Times and the missing part only: the run sheet already carries the reference,
-                        and repeating it here would make an operator read the same line twice. */}
-                    <span>{startOf(t) || "No time"}</span>
-                    <span className="rts-desk-wait">
-                      {t.vehicleId ? "no driver" : t.driverId ? "no vehicle" : "no vehicle, no driver"}
-                      {/* The aid's own sentence, so the desk says who to send rather than only what
-                          is missing. Nothing is assigned without the operator's press. */}
-                      {/* Offered only to the role that can act on it: a suggestion a reader cannot
-                          take is a line of text pretending to be an action. */}
-                      {!allowed("trips:assign") ? null : suggestion ? (
-                        <span className="rts-desk-suggest">
-                          Send {suggestion.vehicleLabel} + {suggestion.driverLabel}
-                          <Button
-                            variant="ghost"
-                            onClick={() => assignFromPlan(t.id, suggestion)}
-                            aria-label={`Assign ${suggestion.vehicleLabel} and ${suggestion.driverLabel} to ${t.reference}`}
-                          >
-                            Assign
-                          </Button>
-                        </span>
-                      ) : (
-                        plan && <span className="rts-desk-suggest rts-desk-suggest--none">Nobody free to send</span>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          <p className="rts-desk-note">
-            A run can only be dispatched once a vehicle and a driver are assigned. Both lists come from
-            the registers — nothing is assumed by the system. A suggestion is the pairing the rules
-            would accept, best first; the choice stays with you.
-          </p>
+          </div>
+        </SurfacePanel>
         </aside>
       </div>
 
@@ -1022,30 +1074,40 @@ function AdhocForm({
 function PlanSuggestions({ plan, onPick }: { plan: RunPlan; onPick: (candidate: PlanCandidate) => void }) {
   const shortlist = plan.workable.slice(0, PLAN_SHORTLIST);
   return (
-    <section className="rts-plan" aria-label="Planning aid">
-      <p className="rts-plan-head">
-        Who can take this run <span className="rts-plan-window">{plan.window}</span>
-      </p>
-      <p className="rts-plan-line">{plan.headline}</p>
-      <p className="rts-plan-meta">
-        {plan.needs.riders} to carry ({plan.needs.roster} on the roster
-        {plan.needs.booked > 0 ? `, ${plan.needs.booked} booked seat${plan.needs.booked === 1 ? "" : "s"}` : ""}) ·{" "}
-        {plan.workable.length} of {plan.examined} vehicle-and-driver pairs can take it
-      </p>
+    <section className="rounded-control border border-border bg-secondary" aria-label="Planning aid">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-divider px-3 py-2">
+        <p className="text-[12.5px] font-medium text-foreground">
+          Who can take this run <span className="tms-num ml-1 text-muted-foreground">{plan.window}</span>
+        </p>
+        <span className="tms-mono text-dim">{plan.workable.length} of {plan.examined} pairs</span>
+      </div>
+
+      <div className="space-y-1 px-3 pt-2">
+        <p className="text-[12.5px] text-foreground">{plan.headline}</p>
+        <p className="text-[11.5px] text-muted-foreground">
+          {plan.needs.riders} to carry ({plan.needs.roster} on the roster
+          {plan.needs.booked > 0 ? `, ${plan.needs.booked} booked seat${plan.needs.booked === 1 ? "" : "s"}` : ""}) ·{" "}
+          {plan.workable.length} of {plan.examined} vehicle-and-driver pairs can take it
+        </p>
+      </div>
 
       {shortlist.length > 0 && (
-        <ul className="rts-plan-list">
+        <ul className="mt-2 divide-y divide-divider border-t border-divider">
           {shortlist.map((candidate) => (
-            <li key={`${candidate.vehicleId}:${candidate.driverId}`}>
+            <li key={`${candidate.vehicleId}:${candidate.driverId}`} className="flex items-start justify-between gap-3 px-3 py-2.5">
               <div className="min-w-0">
-                <p className="rts-plan-pick">
+                <p className="text-[12.5px] font-medium text-foreground">
                   {candidate.vehicleLabel} with {candidate.driverLabel}
                 </p>
                 {candidate.reasons.map((reason) => (
-                  <p key={reason} className="rts-plan-reason">{reason}</p>
+                  <p key={reason} className="text-[11.5px] leading-relaxed text-muted-foreground">
+                    {reason}
+                  </p>
                 ))}
                 {candidate.notes.map((note) => (
-                  <p key={note} className="rts-plan-note">Worth reading: {note}</p>
+                  <p key={note} className="text-[11.5px] leading-relaxed text-dim">
+                    Worth reading: {note}
+                  </p>
                 ))}
               </div>
               <Button variant="ghost" onClick={() => onPick(candidate)} aria-label={`Use ${candidate.vehicleLabel} with ${candidate.driverLabel}`}>
@@ -1057,25 +1119,25 @@ function PlanSuggestions({ plan, onPick }: { plan: RunPlan; onPick: (candidate: 
       )}
 
       {plan.workable.length === 0 && plan.refusals.length > 0 && (
-        <ul className="rts-plan-list">
+        <ul className="mt-2 divide-y divide-divider border-t border-divider">
           {plan.refusals.map((refusal) => (
-            <li key={`${refusal.vehicleId}:${refusal.driverId}`}>
-              <div className="min-w-0">
-                <p className="rts-plan-pick">
-                  {refusal.vehicleLabel} with {refusal.driverLabel} <span className="rts-plan-no">cannot</span>
+            <li key={`${refusal.vehicleId}:${refusal.driverId}`} className="px-3 py-2.5">
+              <p className="text-[12.5px] text-muted-foreground">
+                From the archive: {refusal.vehicleLabel} with {refusal.driverLabel} — <b className="font-medium text-foreground">cannot</b> take it
+              </p>
+              {refusal.reasons.map((reason) => (
+                <p key={reason} className="text-[11.5px] leading-relaxed text-muted-foreground">
+                  {reason}
                 </p>
-                {refusal.reasons.map((reason) => (
-                  <p key={reason} className="rts-plan-reason">{reason}</p>
-                ))}
-              </div>
+              ))}
             </li>
           ))}
         </ul>
       )}
 
-      <details className="rts-plan-limits">
-        <summary>What this aid cannot see</summary>
-        <ul>
+      <details className="border-t border-divider px-3 py-2">
+        <summary className="cursor-pointer text-[11.5px] text-muted-foreground">What this aid cannot see</summary>
+        <ul className="mt-1.5 space-y-1 text-[11.5px] leading-relaxed text-muted-foreground">
           {PLANNING_LIMITS.map((limit) => (
             <li key={limit}>{limit}</li>
           ))}
@@ -1409,7 +1471,7 @@ function CorrectForm({
 
         {trip.corrections.length > 0 && (
           <div className="rounded-sm border border-border p-3">
-            <p className="rts-kicker">Already corrected on this run</p>
+            <p className="tms-mono text-muted-foreground">Already corrected on this run</p>
             <ul className="mt-2 space-y-1 text-xs">
               {trip.corrections.map((correction) => (
                 <li key={correction.id}>
@@ -1519,7 +1581,7 @@ function BookingsTab() {
 
   return (
     <div>
-      <div className="rts-toolbar">
+      <div className="mb-4 flex flex-wrap items-end gap-2">
         <Field label="Service date">
           <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
@@ -1529,7 +1591,7 @@ function BookingsTab() {
             Request a seat
           </Button>
         )}
-        <p className="rts-toolbar-note">
+        <p className="ml-auto text-[11px] text-muted-foreground">
           {trips.length} run{trips.length === 1 ? "" : "s"} on {formatDate(date)} · {live} live booking{live === 1 ? "" : "s"} · seats count the roster and the bookings together
         </p>
       </div>
