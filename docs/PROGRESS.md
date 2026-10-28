@@ -2,7 +2,7 @@
 
 Status values: Not Started / In Progress / Done (verified) / Done (authored) / Blocked. "Done (verified)" means automated tests covering the item passed in the most recent session (`npm test`), and the production build succeeded (`npm run build`).
 
-## Feature register - all 72 IDs (§13.6)
+## Feature register - all 78 IDs (§13.6)
 
 The brief numbers its requirements; this is the table that tracks them, one row per ID, in brief
 order. The detailed evidence and the criteria behind each status are in
@@ -98,7 +98,7 @@ brief) · **Not built** · **Deferred** (belongs to Phase 2/3 and has not been s
 | RPT-05 | 3 | PDF reports. | Met | `src/tms/printableReport.ts` + `src/screens/PrintableReport.tsx` (Phase 49, D-98): the management report as an A4 document — company and period in the head, eight figures each with the sentence that qualifies it, then revenue by customer, revenue by service, costs by category, money in and back out, why rentals were lost, fleet utilisation and the per-unit costs, followed by the coverage counts and the definitions a reader would otherwise assume. Every value is **the report's own number formatted, never a second addition**, and it prints through the browser's own engine to paper or to PDF (the sheet the invoice and statement already use, D-87). **Withheld, not zero:** with no company currency set every amount is "Not stated" and the page says why; an empty table says so; a backwards period prints no report at all. **A PDF file is produced by the print dialog, not stored or emailed** — there is no PDF library and no second rendering engine in the build. Tests: 10 domain (`printableReport.test.ts`), 3 screen (`Reports.test.tsx`). |
 | GPS-01 | 2 | Provider interface; last reported location with timestamp; clear distinction between live, stale and simulated locations; never fabricate… | Deferred | Phase 2, hardware-gated. No provider interface and no "Not configured" label exists, because there is no tracking screen. |
 
-**72 IDs: 34 met, 26 partial, 0 not built, 12 deferred** (by phase: 1A 24 - 13 met / 11 partial; 1B 25 - 16 met / 9 partial; 1C 6 - 3 met / 3 partial; 2 10 - 3 partial / 7 deferred; 3 7 - 2 met / 5 deferred; the register above is the count). The brief carried 78 requirement IDs when this register was opened and 72 after later IDs were merged into their neighbours; the tally follows the rows, and every row is a row that exists. Phases 1C and 1A are complete in this build.
+**78 IDs: 39 met, 26 partial, 0 not built, 13 deferred** (by phase: 1A 29 - 18 met / 11 partial; 1B 25 - 16 met / 9 partial; 1C 6 - 3 met / 3 partial; 2 11 - 3 partial / 8 deferred; 3 7 - 2 met / 5 deferred; the register above is the count). The brief carried more requirement IDs than the register rows: where two IDs described one piece of work they share a single row, so this tally follows the rows that exist and is kept correct against them by the audit in `docs/AUDIT.md`.
 
 ## Phase 0 - Inspect and plan (approved)
 
@@ -1813,6 +1813,7 @@ Gates after this phase: `typecheck` clean, `lint` clean, `test` **1305 passed, 2
 passed, 5 skipped), coverage 85.64 / 76.6 / 82.44 / 89.35, `build` succeeds. Schema **37**; no migration,
 because every new field lives on the rental record.
 
+
 ## Phase 74 - The design system, and one board built only from it (interface, D-124)
 
 The screens were built one at a time and each has its own idea of a card. This phase builds the pieces
@@ -1859,3 +1860,13 @@ feel built rather than assembled.
 
 Gates after this phase: `typecheck` clean, `lint` clean, `test` **1340 passed, 28 skipped** (101 files
 passed, 5 skipped), `build` succeeds. No schema change, no migration.
+
+## Phase 76 - The whole-system audit (D-126)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Audit of the product as it stands at `5aed55e` | Done (verified) | `docs/AUDIT.md`: correctness, authorisation, security headers, database integrity, coverage, dependency risk, dead code, documentation accuracy and live behaviour, each with the command that reproduces it. **No P1 finding.** |
+| Feature-register tally | Fixed | The table held 78 rows (39 Met / 26 Partial / 0 not built / 13 Deferred); the heading and the tally line said 72 / 34 / 26 / 12, and `docs/STATUS.md` said 14 deferred. All three now agree with the table, and D-126 makes the table the only count. |
+| Database-suite count in the setup guide | Fixed | "14 tests, 4 files" became 28 tests in 5 files. |
+| Dead weight | Reported, not removed | Ten `components/ui` files have no importer; `recharts` and `cmdk` are unused (`tw-animate-css` is used by `globals.css` and was wrongly suspected). Left in place for the owner to decide — see `docs/AUDIT.md` P2-2. |
+| Gates at the audit | Pass | `tsc` clean, `eslint .` clean, 1,340 tests passed (28 skipped), `next build` 42 s, `npm audit` 0 vulnerabilities, database suite 28/28 against PostgreSQL 18.4. |

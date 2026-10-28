@@ -366,7 +366,7 @@ a repair.
 npm run typecheck        # tsc --noEmit
 npm run lint             # eslint
 npm test                 # 1340 unit and component tests
-npm run test:integration # against a real database; needs TEST_DATABASE_URL (14 tests, 4 files)
+npm run test:integration # against a real database; needs TEST_DATABASE_URL (28 tests, 5 files)
 npm run build            # production build
 ```
 

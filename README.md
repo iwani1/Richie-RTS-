@@ -155,6 +155,7 @@ the session/password decision (D-51).
 | `richie-tms-standing-brief.md` | the standing brief: how this project is built (authoritative) |
 | `docs/ARCHITECTURE.md` | modules, request flow, known limits |
 | `docs/PROGRESS.md` | what is done, what is blocked, and the evidence for each claim |
+| `docs/AUDIT.md` | the whole-system audit: what was checked, what was found, and how to repeat it |
 | `docs/REAL_DATA_TRIAL.md` | the two-hour checklist to run before the first real working day |
 | `docs/PERMISSIONS.md` | role × permission matrix and own-record scope |
 | `docs/DATA_PROTECTION.md` | personal data held, and what is not yet safe |

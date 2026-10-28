@@ -165,10 +165,13 @@ full paragraph — for example it tracks a driver's licence expiry, but not a li
 **Whole features absent** (none in Phase 1A–1C). Every brief requirement in the three delivered phases
 is now built at least in part; what remains is the deferred Phase 2/3 work below.
 
-**Deferred to Phase 2/3** (14 IDs): SMS and email, in-app notifications, GPS tracking, two-factor
-sign-in, offline driver mode, boarding codes/OTP, payment gateway, payroll and driver allowances,
-receipts on expenses. These need a provider, hardware or a decision the owner has not made, so they
-are recorded rather than half-built.
+**Deferred to Phase 2/3** (13 IDs): two-factor sign-in, boarding codes/OTP, offline driver mode, trip
+updates (a live map or ETA needs positions nothing records), the payment gateway, payment
+reconciliation, driver allowances and payroll, cost analytics for maintenance, the interface for a
+later routing service, the notification service, the SMS adapter, the email adapter and the GPS
+provider interface. These need a provider, hardware or a decision the owner has not made, so they
+are recorded rather than half-built. The count is the number of *Deferred* rows in the register in
+`docs/PROGRESS.md`, checked against the table rather than the prose.
 
 **Blocked by a missing provider**: email invitations and self-service password reset. An
 administrator creates accounts and resets passwords; there is no mail server, so nothing pretends to

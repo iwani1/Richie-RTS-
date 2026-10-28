@@ -3143,3 +3143,34 @@ rebuilt on the dark surface, with the brand half as a statement), `globals.css` 
 screens' own layouts, tables and forms are still the pre-migration ones; they read the new palette but
 have not been rebuilt on the new components, which continues screen by screen. No screen gained a
 feature, a fact or a figure in this pass.
+
+## D-126 - The register table is the count, and an audit reads it against itself
+
+**The problem.** The whole-system audit of 28 October 2026 found that `docs/PROGRESS.md` claimed the
+feature register held "72 IDs: 34 met, 26 partial, 12 deferred" while the table beneath the sentence
+held 78 rows, 39 of them Met and 13 Deferred. `docs/STATUS.md` said 14 deferred, and the setup guide
+advertised the database suite as 14 tests in 4 files when it was 28 in 5. Every number was written by
+hand at the time it was true and never re-derived, so the documents disagreed with the product and with
+each other. The owner reads those documents to decide what is left to buy and build; a tally that is
+five rows wrong is a business error, not a typo.
+
+**Decision 1: derived numbers are computed from the table, never maintained beside it.** The count of
+Met, Partial and Deferred rows — in total and per phase — is read from the register table itself. When a
+row changes status, the prose line is recomputed at the same time. A number that cannot be re-derived
+from the table does not go in the document.
+
+**Decision 2: the audit is a first-class artefact, and it is written down.** `docs/AUDIT.md` records the
+commit audited, what could not be reached from this workspace (a real browser, the office machine, any
+provider that is not installed), the findings with evidence, and the commands that reproduce them. Each
+further audit appends to that file rather than living in a chat message.
+
+**Decision 3: findings are not silently fixed when the fix is the owner's to choose.** Unused
+components (`alert`, `avatar`, `command`, `dropdown-menu`, `popover`, `select`, `skeleton`, `tabs`,
+`textarea`, `tooltip`) and the unused `recharts` and `cmdk` packages are reported and left in place,
+because keeping the library's shelf is a legitimate preference and deleting it is the owner's call.
+
+**Consequence.** `docs/AUDIT.md` (new), the tally line and heading in `docs/PROGRESS.md`, the deferred
+section of `docs/STATUS.md`, the database-suite line in `docs/SETUP_AND_DEPLOYMENT.md`, and this
+decision. No product code changed in the audit: the tree at `5aed55e` passed every gate, and the audit's
+own contribution is a corrected record. Counts: register 78 (39 Met / 26 Partial / 0 not built / 13
+Deferred); suite 1,340 tests; database suite 28 tests in 5 files.
