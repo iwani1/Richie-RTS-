@@ -15,6 +15,12 @@
 // an invoice with the configured tax, two payments that settle it, that the reload shows the same
 // records, and that a cross-origin write is refused.
 
+// This file is a module, not a global script: it declares its state at the top level, and a second
+// copy of the checkout inside this one (easy to do by accident when trying a branch) would otherwise
+// put two sets of `BASE`, `EMAIL`, `PASSWORD` and the rest into the same global scope and fail the
+// production build with TS6200. One `export` gives this file its own scope, which is all it takes.
+export {};
+
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const EMAIL = process.env.E2E_EMAIL ?? "admin@example.test";
 const PASSWORD = process.env.E2E_PASSWORD ?? "e2e-password-2026";

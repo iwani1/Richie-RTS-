@@ -254,6 +254,17 @@ PostgreSQL, so they load on a checkout with no `.env` at all: `npm ci && npm run
 <http://localhost:3000/dashboard>. They are labelled as sample data on screen. Everything else is the
 working application and needs the database below.
 
+**If `npm run build` fails with `TS6200: Definitions of the following identifiers conflict`.** The
+message names a file inside a folder like `Richie-RTS-/scripts/e2e-workflow-c.ts` — a second copy of
+this checkout sitting inside the first one, which happens when `git clone` is run from the project
+folder instead of beside it. TypeScript reads `**/*.ts` from the project root, so it compiles both
+copies. **Delete the inner folder** (`rm -rf Richie-RTS-`) and build again; the file is a module and
+cannot collide with itself, but a nested checkout also doubles every compiled path and confuses
+Next's lockfile detection. A checkout of the same project inside the project is never wanted.
+
+If `npm start` then says *Could not find a production build*, it is because the build failed above
+and `.next` was never written — fix the build, not the start command.
+
 **Reaching the app from another machine over plain HTTP.** The session cookie is `Secure` in
 production, so a browser will not store it over `http://` — sign-in appears to succeed and returns
 you to the sign-in screen. Browsers exempt `localhost` only. Either put TLS in front (§11), or reach
