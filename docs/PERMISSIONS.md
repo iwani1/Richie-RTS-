@@ -75,6 +75,7 @@ D-60). Hiding a control is a convenience, never the control.
 | rentals:quote | x | x | x | | |
 | rentals:confirm | x | | x | | |
 | rentals:accept | x | x | x | | own |
+| rentals:approve | x | x | x | | |
 | rentals:dispatch | x | x | | | |
 | rentals:complete | x | x | | | |
 | rentals:cancel | x | x | | | |
@@ -84,7 +85,11 @@ D-60). Hiding a control is a convenience, never the control.
 | audit:read | x | x | | | |
 | backup:export / import | x | | | | |
 
-Rental separation of duties: operations runs the request/dispatch/completion steps; finance issues quotations and records deposits (confirm). `rentals:accept` is deliberately wide — the three office roles that talk to a customer about a quotation all need it, and a client contact holds it narrowed to its own account — because recording that somebody said yes is not a decision about money. Issuing the quotation and recording the deposit stay where they were. Administrators can do everything.
+Rental separation of duties: operations runs the request/dispatch/completion steps; finance issues quotations and records deposits (confirm). `rentals:accept` is deliberately wide — the three office roles that talk to a customer about a quotation all need it, and a client contact holds it narrowed to its own account — because recording that somebody said yes is not a decision about money. Issuing the quotation and recording the deposit stay where they were. **A second signature on a
+price** (`rentals:approve`, RNT-04, D-121) is held by the three office roles, because the check is
+that somebody other than the author looked at the figure: it is refused inside the service when the
+actor is the person who wrote the quotation, whatever their role. A client contact never holds it —
+who signs off inside the office is not the customer's business. Administrators can do everything.
 
 **The vehicle's photograph (FLT-01, D-108).** No new permission: filing, replacing and removing a
 photograph are `vehicles:update`, and opening one is `vehicles:read` — so a driver, a client contact and

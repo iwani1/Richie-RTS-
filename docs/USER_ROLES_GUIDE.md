@@ -27,6 +27,12 @@ is no other company in the database.
 - **Quotations** are prepared by finance or an administrator and confirmed by finance. Operations can
   prepare a quotation but not confirm it — the person who dispatches the vehicle is not the person who
   takes the money.
+- **A price above the figure the company sets needs two people.** Above that figure a quotation cannot be
+  agreed or paid for until somebody else has signed it off, and the person who wrote it is never that
+  somebody else. Operations, finance and an administrator can all sign; the record keeps who signed, when,
+  for which total, and any note they left. The figure itself is set in **Settings → Rentals → Second
+  signature above**; left blank means the company has not asked for one, and the rental screen says so in
+  those words rather than implying the price has been checked.
 - **A customer's yes to a quotation** is recorded by anyone in the office who took the call (operations,
   finance or an administrator), or by the customer itself in the portal on its own request. It records
   what was agreed and through which channel; it takes no money and confirms nothing. Agreeing to a
@@ -62,8 +68,8 @@ entry — records are archived by status, never removed.
 
 1. Open the application. While no account exists it asks for the first administrator: give the owner's name, email and a password of at least the configured minimum.
 2. **Settings** — set the company name, currency, vehicle categories, payment methods, deposit
-   percentage, quotation validity in hours, the terms printed on every quotation and the on-time
-   threshold. Everything left blank stays blank, and the
+   percentage, quotation validity in hours, the terms printed on every quotation, the figure above which
+   a quotation needs a second signature, and the on-time threshold. Everything left blank stays blank, and the
    feature that needs it stays blocked.
 3. **Users** — add the operations and finance accounts, then the drivers and client contacts.
 4. **Fleet** — add vehicles and drivers (or import them from CSV in **Vehicles → Import**).
@@ -82,6 +88,11 @@ them, dispatch and complete them; create routes and stops; generate trips; assig
 drivers; create and manage passengers; report incidents, advance them, record costs; create work
 orders, advance them, record costs; record compliance documents; draft a client's agreement, approve
 it, suspend it or end it with a reason; read the audit log.
+
+**Also signs off prices:** above the figure the company sets, a quotation of somebody else's needs a
+second name before the customer can be answered or the deposit taken. You can give it — the total, the
+discount and its reason, and the tax are on the card before the button — but never on a quotation you
+wrote yourself, and the record keeps who signed and when.
 
 **Also sees, but cannot change:** the **Expenses** screen. Fuel, tolls and permits are part of what a run
 costs, so operations reads them; entering or voiding that spending is the finance officer's job, and
@@ -118,6 +129,11 @@ money work starts: money in and out for a period, who is late paying and by how 
 hires nobody has invoiced yet, and payments still to verify or reconcile. The "Margin" figure appears
 only when both sides of the period are complete (an invoice and a cost line in the period, and no
 completed hire left unbilled); when it says "Not available", the reason under it says what is missing.
+
+**Signing off a price:** a quotation above the company's figure needs two names, and finance is usually
+the second. The card shows what you are signing — lines, the reduction and its reason, each tax line,
+the total and the deposit taken from it — and the button is refused if you wrote the quotation yourself.
+A quotation that has expired has nothing to sign until it is renewed.
 
 **Cannot:** see the employee roster, staff phone numbers, vehicle or driver documents, accounts, or
 the audit log. This is not a display choice: those collections are removed from the data the finance
@@ -240,8 +256,9 @@ request a seat on a run for one of their own company's people, and cancel a seat
 agreement (the screen states the service and the term, not the money), staff phone numbers, invoices or
 payments; cannot draft, approve or end a contract; cannot
 confirm a rental or record a deposit (that step belongs to finance). It **can** accept the quotation
-on its own request — the figure, the deposit and the date the price holds are printed before the button
-— which records an answer and moves no money; cannot **confirm** a booked
+on its own request — the total, the reduction, the tax, the deposit and the date the price holds are
+printed before the button — which records an answer and moves no money, and it cannot accept one while
+the office is still signing the price off; cannot **confirm** a booked
 seat (the office confirms it once the seats are counted) and cannot book a seat for another company.
 
 ---

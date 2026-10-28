@@ -251,6 +251,12 @@ export interface RentalSettings {
    * this build invents: until it is set, quotations cannot be issued, and the screen says so.
    */
   quotationTerms: string;
+  /**
+   * The figure at or above which a quotation needs a second signature (RNT-04, D-121), in the billing
+   * currency. Null means the company has not asked for one — and that is what the screens say, rather
+   * than pretending every price is checked by two people.
+   */
+  quotationApprovalAbove: number | null;
 }
 
 // Compliance document types (Q-16). Admin-defined, same pattern as VehicleCategory/Shift:
@@ -400,16 +406,43 @@ export interface QuoteLine {
   unitAmount: number; // major currency units
 }
 
+/**
+ * Who signed a price off (RNT-04, D-121).
+ *
+ * The record answers the two questions a dispute asks: was a second person involved, and who were
+ * they. It copies the total that was approved, so a later revision cannot borrow this signature.
+ */
+export interface QuoteApproval {
+  at: string;
+  byActorId: string | null;
+  byName: string;
+  note: string;
+  /** The figure agreed, as it stood when the approval was given. */
+  total: number;
+}
+
 export interface Quote {
   currencyCode: string;
   pricingBasis: PricingBasis;
   lines: QuoteLine[];
+  /** The lines added up, before any discount and before tax. */
   subtotal: number;
+  /** A reduction agreed before the document went out, with the reason written on it (D-121). */
+  discountAmount: number;
+  discountReason: string;
+  /** Tax on the discounted subtotal, at the rates in force when the quotation was issued (D-121). */
+  taxLines: TaxLine[];
+  /** What the customer owes: `subtotal` less the discount, plus tax. */
+  total: number;
   depositPercent: number;
   depositRequired: number;
   validUntil: string; // YYYY-MM-DD
   quotedAt: string;
   quotedBy: string;
+  /** Who wrote the quotation, so a second signature can be told from the first (D-121). "" before. */
+  quotedById: string;
+  /** The second signature, or null while nobody has given one (D-121). */
+  approval: QuoteApproval | null;
   /**
    * The quotation's own number, QUO-0001 (RNT-04, D-117), and which revision it is: 1 on the first
    * issue, 2 on the first renewal. A customer quoting a number back to the office names one document;
@@ -966,12 +999,20 @@ export interface InvoiceLine {
   unitAmount: number; // major currency units, before tax
 }
 
-/** A tax line captured at issue time, so a later rate change never rewrites an issued invoice. */
-export interface InvoiceTaxLine {
+/**
+ * A tax line captured at issue time, so a later rate change never rewrites an issued document.
+ *
+ * One shape serves the invoice and the quotation (RNT-04, D-121): a quotation that names a levy the
+ * invoice later computes differently is exactly the argument this snapshot exists to prevent.
+ */
+export interface TaxLine {
   name: string;
   ratePercent: number;
   amount: number;
 }
+
+/** The invoice's name for it. Kept so the money documents did not have to be renamed. */
+export type InvoiceTaxLine = TaxLine;
 
 export interface Invoice {
   id: string;
@@ -1410,7 +1451,7 @@ export interface Booking {
   updatedAt: string;
 }
 
-export const SCHEMA_VERSION = 35;
+export const SCHEMA_VERSION = 36;
 
 /**
  * Every schema version this build can still read.
@@ -1420,7 +1461,7 @@ export const SCHEMA_VERSION = 35;
  * `SCHEMA_VERSION`; forgetting it makes the application refuse its own backup, which is how the
  * "clean round-trip of its own backup" test caught this list going stale at 15.
  */
-export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36] as const;
 
 export interface Database {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -1452,7 +1493,7 @@ export interface Database {
 }
 
 export function emptyRentalSettings(): RentalSettings {
-  return { pricingBasis: null, depositPercent: null, quotationValidityHours: null, driversAlwaysIncluded: null, paymentMethods: [], requotePolicy: null, quotationTerms: "" };
+  return { pricingBasis: null, depositPercent: null, quotationValidityHours: null, driversAlwaysIncluded: null, paymentMethods: [], requotePolicy: null, quotationTerms: "", quotationApprovalAbove: null };
 }
 
 export function emptyDatabase(): Database {
@@ -1512,12 +1553,29 @@ export function emptyDatabase(): Database {
  */
 function legacyQuote(quote: Quote): Quote {
   const raw = quote as Partial<Quote>;
+  const taxLines = Array.isArray(raw.taxLines)
+    ? raw.taxLines.filter((line): line is TaxLine => typeof line === "object" && line !== null && typeof line.name === "string")
+    : [];
+  const subtotal = typeof raw.subtotal === "number" ? raw.subtotal : 0;
+  const discountAmount = typeof raw.discountAmount === "number" ? raw.discountAmount : 0;
+  const taxTotal = taxLines.reduce((sum, line) => sum + (typeof line.amount === "number" ? line.amount : 0), 0);
   return {
     ...quote,
     number: typeof raw.number === "string" ? raw.number : "",
     revision: Number.isInteger(raw.revision) ? (raw.revision as number) : 1,
     terms: typeof raw.terms === "string" ? raw.terms : "",
     driverIncluded: raw.driverIncluded === true,
+    // A quotation written before schema 36 carried no discount and no tax lines, so its total is its
+    // subtotal: that is what the document said, and adding a levy nobody charged would be inventing
+    // one (D-121).
+    discountAmount,
+    discountReason: typeof raw.discountReason === "string" ? raw.discountReason : "",
+    taxLines,
+    total: typeof raw.total === "number" ? raw.total : subtotal - discountAmount + taxTotal,
+    // Nobody is recorded as having written or approved an older quotation, and a made-up name on a
+    // signature is worse than an empty one.
+    quotedById: typeof raw.quotedById === "string" ? raw.quotedById : "",
+    approval: raw.approval && typeof raw.approval.at === "string" ? (raw.approval as QuoteApproval) : null,
   };
 }
 

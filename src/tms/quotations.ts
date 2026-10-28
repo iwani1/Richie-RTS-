@@ -16,7 +16,8 @@
 //
 // Nothing here decides a price or sends anything: it shapes the document, and the command in
 // `service.ts` writes it.
-import type { Quote } from "./types";
+import { formatAmount, fromMinor, parseAmount, percentOf, percentOfMinor, toMinor } from "./money";
+import type { Quote, TaxLine, TaxPosition } from "./types";
 
 /** How long a quotation may hold, in hours: a day to a year. Outside that it is a typo. */
 export const VALIDITY_HOURS_MIN = 24;
@@ -93,4 +94,139 @@ export function validityProblem(hours: number | null): string | null {
   if (!Number.isInteger(hours) || hours < VALIDITY_HOURS_MIN || hours > VALIDITY_HOURS_MAX)
     return `Quotation validity must be a whole number of hours from ${VALIDITY_HOURS_MIN} to ${VALIDITY_HOURS_MAX}.`;
   return null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The figures under the lines, and the second signature (RNT-04, D-121).
+//
+// A quotation used to be the line items added up and nothing else: no reduction for the client who
+// haggled, no levy, no signature. The invoice beside it had all three, so the sheet the customer
+// agreed to and the document they were billed on could differ by more than rounding — and nobody at
+// the office could say who had approved a large price.
+//
+// Four rules, each one a way the two documents drift apart:
+//
+//   * **One arithmetic.** The discount comes off the lines; tax is charged on what is left; the total
+//     is the sum of those three, computed in whole pesewas (money.ts) exactly as the invoice does.
+//   * **A reduction is declared, not hidden.** A discount is an amount with a reason beside it, and it
+//     may not exceed the price — a negative total is a typing mistake, not an offer.
+//   * **The rates are copied.** The tax lines a quotation prints are the rates in force when it was
+//     issued, kept on the document. A later rate change must not rewrite a price somebody agreed to.
+//   * **A second signature is a policy, and an empty policy is not a signature.** Who signs off a price
+//     is the company's decision: until they set the figure at or above which it must happen, the
+//     screens say no approval is required rather than pretending every price is checked by two people.
+
+/** The figures a quotation carries, once the lines are known. */
+export interface QuoteFigures {
+  discountAmount: number;
+  taxLines: TaxLine[];
+  /** Lines less the discount, plus tax. What the customer owes. */
+  total: number;
+  /** The deposit: the configured share of the total, not of the untaxed lines. */
+  depositRequired: number;
+}
+
+export interface QuoteFigureInput {
+  subtotal: number;
+  /** Decimal text from the form; blank means no discount. */
+  discountAmount: string;
+  discountReason: string;
+  taxPosition: TaxPosition | null;
+  taxLines: { name: string; ratePercent: number }[];
+  depositPercent: number;
+}
+
+export function readQuoteFigures(input: QuoteFigureInput): { errors: Record<string, string>; figures: QuoteFigures } {
+  const errors: Record<string, string> = {};
+  const parsed = input.discountAmount.trim() === "" ? { amount: 0, problem: null } : parseAmount(input.discountAmount);
+  const discount = parsed.amount;
+  if (parsed.problem === "too-many-decimals") errors.discountAmount = "Use at most two decimal places: amounts are in pesewas.";
+  else if (parsed.problem === "too-large") errors.discountAmount = "That amount looks wrong. Check the figure.";
+  else if (parsed.problem) errors.discountAmount = "Enter the discount as an amount of 0 or more, or leave it blank.";
+  const reason = input.discountReason.trim();
+  if (!errors.discountAmount && discount > 0 && !reason) errors.discountReason = "Give a reason for the discount.";
+  if (!errors.discountAmount && discount > 0 && toMinor(discount) > toMinor(input.subtotal)) {
+    errors.discountAmount = "The discount is larger than the price, so the total would be negative.";
+  }
+
+  const discountedMinor = toMinor(input.subtotal) - toMinor(discount);
+  const taxLines: TaxLine[] =
+    input.taxPosition === "registered"
+      ? input.taxLines.map((line) => ({
+          name: line.name,
+          ratePercent: line.ratePercent,
+          // Each rate is applied once to the discounted subtotal and rounded once, half-up, exactly as
+          // the invoice does, so the two documents agree to the pesewa.
+          amount: fromMinor(percentOfMinor(discountedMinor, line.ratePercent)),
+        }))
+      : [];
+  const totalMinor = discountedMinor + taxLines.reduce((sum, line) => sum + toMinor(line.amount), 0);
+  const total = fromMinor(totalMinor);
+  return {
+    errors,
+    figures: {
+      discountAmount: discount,
+      taxLines,
+      total,
+      // A deposit is a share of what the customer actually pays, so it follows the total: charging tax
+      // on the price but taking the deposit off the untaxed lines would leave the two figures disagreeing
+      // about what 25% means.
+      depositRequired: percentOf(total, input.depositPercent),
+    },
+  };
+}
+
+/**
+ * Whether this quotation must carry a second signature — and the sentence that says so.
+ *
+ * Returns null when no approval is required, which includes the case where the company has not set a
+ * threshold: an unset policy is "nobody has asked for this", not "everything is approved".
+ */
+export function approvalRequiredAt(total: number, threshold: number | null): boolean {
+  return threshold !== null && Number.isFinite(threshold) && toMinor(total) >= toMinor(threshold);
+}
+
+/** True when the price on record has been signed off by a second person. */
+export function quotationIsApproved(quote: Quote): boolean {
+  return quote.approval !== null && typeof quote.approval.at === "string";
+}
+
+/** True when the approval on record belongs to the figure and revision on the quotation now. */
+export function approvalIsCurrent(quote: Quote): boolean {
+  const approval = quote.approval;
+  return approval !== null && toMinor(approval.total) === toMinor(quote.total);
+}
+
+/**
+ * Why this person cannot sign this quotation off, in words, or null when they can.
+ *
+ * The rule is four eyes: the person who wrote the price is not the person who approves it. A name is
+ * compared as a fallback for quotations written before the author's account was recorded, because a
+ * control that silently passes on old records is not a control.
+ */
+export function approvalProblem(quote: Quote, approverId: string | null, approverName: string): string | null {
+  if (approvalIsCurrent(quote)) {
+    const who = quote.approval!.byName;
+    return `This quotation was already approved by ${who} on ${quote.approval!.at.slice(0, 10)}.`;
+  }
+  const sameAccount = quote.quotedById !== "" && approverId !== null && quote.quotedById === approverId;
+  const sameName = quote.quotedById === "" && quote.quotedBy.trim().toLowerCase() === approverName.trim().toLowerCase();
+  if (sameAccount || sameName) {
+    return "The person who wrote this quotation cannot also approve it. Somebody else has to sign it off.";
+  }
+  return null;
+}
+
+/** The sentence a screen prints about the signature, or null when there is nothing to say. */
+export function approvalLine(quote: Quote, threshold: number | null): string | null {
+  if (approvalIsCurrent(quote)) {
+    const approval = quote.approval!;
+    const note = approval.note ? ` "${approval.note}"` : "";
+    return `Approved by ${approval.byName} on ${approval.at.slice(0, 10)}.${note}`;
+  }
+  if (quote.approval) return `The approval on record was for ${quote.currencyCode} ${formatAmount(quote.approval.total)}, which is not the figure on this revision. It has to be signed off again.`;
+  if (approvalRequiredAt(quote.total, threshold)) {
+    return `A second signature is required: this price is at or above ${quote.currencyCode} ${formatAmount(threshold!)}.`;
+  }
+  return threshold === null ? "No approval is required: the company has not set a figure that needs one." : null;
 }

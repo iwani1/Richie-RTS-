@@ -400,7 +400,16 @@ export function ClientPortalPage() {
                   render: (r: Rental) =>
                     r.quote ? (
                       <span>
-                        <span className="font-medium">{money(r.quote.currencyCode, r.quote.subtotal)}</span>
+                        {/* D-121: the customer reads the figure they will be asked to pay, not the
+                            sum of the lines with the tax and the discount left to be discovered later. */}
+                        <span className="font-medium">{money(r.quote.currencyCode, r.quote.total)}</span>
+                        {(r.quote.discountAmount > 0 || r.quote.taxLines.length > 0) && (
+                          <span className="block text-[11px] text-stone-600">
+                            {r.quote.discountAmount > 0 ? `${money(r.quote.currencyCode, r.quote.discountAmount)} discount` : ""}
+                            {r.quote.discountAmount > 0 && r.quote.taxLines.length > 0 ? " · " : ""}
+                            {r.quote.taxLines.map((line) => `${line.name} ${money(r.quote!.currencyCode, line.amount)}`).join(" · ")}
+                          </span>
+                        )}
                         {/* D-117: the number the customer can quote back, and how long the price holds. */}
                         {quotationIsNumbered(r.quote) && (
                           <span className="block font-mono text-[11px] text-stone-600">
@@ -420,7 +429,7 @@ export function ClientPortalPage() {
                   key: "answer",
                   header: "",
                   render: (r: Rental) => {
-                    const problems = canAcceptQuotation(r, nowIso);
+                    const problems = canAcceptQuotation(r, nowIso, db.settings.rental.quotationApprovalAbove);
                     const open = Object.keys(problems).length === 0;
                     if (!allowed("rentals:accept") || !open) return null;
                     return (
@@ -501,8 +510,21 @@ function AcceptQuotation({
           <dd className="text-stone-800">{rental.purpose}</dd>
           <dt className="text-stone-500">Dates</dt>
           <dd className="text-stone-800">{formatDate(rental.startDate)} – {formatDate(rental.endDate)}</dd>
+          {/* D-121: the figure the customer is agreeing to, which is the total after discount and tax. */}
           <dt className="text-stone-500">Total</dt>
-          <dd className="font-semibold text-stone-900">{money(quote.currencyCode, quote.subtotal)}</dd>
+          <dd className="font-semibold text-stone-900">{money(quote.currencyCode, quote.total)}</dd>
+          {quote.discountAmount > 0 && (
+            <>
+              <dt className="text-stone-500">Discount</dt>
+              <dd className="text-stone-800">{money(quote.currencyCode, quote.discountAmount)}</dd>
+            </>
+          )}
+          {quote.taxLines.map((line) => (
+            <span key={line.name} className="contents">
+              <dt className="text-stone-500">{line.name} at {line.ratePercent}%</dt>
+              <dd className="text-stone-800">{money(quote.currencyCode, line.amount)}</dd>
+            </span>
+          ))}
           <dt className="text-stone-500">Deposit</dt>
           <dd className="text-stone-800">{money(quote.currencyCode, quote.depositRequired)} ({quote.depositPercent}%)</dd>
           <dt className="text-stone-500">Held until</dt>

@@ -283,6 +283,22 @@ export function SettingsPage() {
           <Field label="Deposit (% of quotation)" error={errors["rental.depositPercent"]}>
             <TextInput type="number" min={0} max={100} step="0.01" value={draft.rental.depositPercent ?? ""} onChange={(e) => update({ rental: { ...draft.rental, depositPercent: e.target.value === "" ? null : Number(e.target.value) } })} disabled={!editable} placeholder="Not set" invalid={!!errors["rental.depositPercent"]} />
           </Field>
+          <Field
+            label="Second signature above"
+            hint={draft.currencyCode ? `In ${draft.currencyCode}. A quotation at or above this figure needs approving by somebody other than its author. Blank means no approval is required.` : "A quotation at or above this figure needs approving by somebody other than its author. Blank means no approval is required."}
+            error={errors["rental.quotationApprovalAbove"]}
+          >
+            <TextInput
+              type="number"
+              min={0}
+              step="0.01"
+              value={draft.rental.quotationApprovalAbove ?? ""}
+              onChange={(e) => update({ rental: { ...draft.rental, quotationApprovalAbove: e.target.value === "" ? null : Number(e.target.value) } })}
+              disabled={!editable}
+              placeholder="No approval required"
+              invalid={!!errors["rental.quotationApprovalAbove"]}
+            />
+          </Field>
           <Field label="Quotation validity (hours)" hint="How long a price holds, counted from the minute the quotation is issued. 168 is one week." error={errors["rental.quotationValidityHours"]}>
             <TextInput type="number" min={24} max={8760} step={1} value={draft.rental.quotationValidityHours ?? ""} onChange={(e) => update({ rental: { ...draft.rental, quotationValidityHours: e.target.value === "" ? null : Number(e.target.value) } })} disabled={!editable} placeholder="Not set" invalid={!!errors["rental.quotationValidityHours"]} />
           </Field>

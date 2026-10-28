@@ -9,11 +9,11 @@ import { overdueServiceFor } from "./maintenance";
 import { can, type Permission } from "./permissions";
 import { describeProblems, inspectBackup } from "./backupGuard";
 import { MIN_PASSWORD_LENGTH } from "./crypto";
-import { MAX_AMOUNT, formatAmount, isPercentWithTwoDecimals, linesTotal, parseAmount, parseQuantity, percentOf, toMinor } from "./money";
+import { MAX_AMOUNT, formatAmount, isPercentWithTwoDecimals, linesTotal, parseAmount, parseQuantity, toMinor } from "./money";
 import { allocateReference } from "./references";
 import { readVehicleDetail } from "./vehicles";
 import { buildAcceptance, canAcceptQuotation } from "./acceptance";
-import { QUOTATION_TERMS_LIMIT, quotationIsLive, validityEndsAt, validityProblem } from "./quotations";
+import { approvalIsCurrent, approvalProblem, approvalRequiredAt, QUOTATION_TERMS_LIMIT, quotationIsLive, readQuoteFigures, validityEndsAt, validityProblem } from "./quotations";
 import { readRun, runLine } from "./run";
 import { ACTIVE_RENTAL_STATUSES, canEditRequest, canMoveRental, nextTriageStep, TRIAGE_STATUSES } from "./rentalWorkflow";
 
@@ -180,6 +180,12 @@ export interface QuoteLineInput {
 
 export interface QuoteInput {
   lines: QuoteLineInput[];
+  /**
+   * A reduction agreed before the document goes out, and why (RNT-04, D-121). Both optional: most
+   * quotations carry no discount, and an empty one is not the same as a discount of nothing.
+   */
+  discountAmount?: string;
+  discountReason?: string;
 }
 
 export interface DepositInput {
@@ -220,6 +226,7 @@ export type Command =
   | { type: "quote_rental"; id: string; input: QuoteInput }
   | { type: "requote_rental"; id: string; input: QuoteInput }
   | { type: "accept_quotation"; id: string; note: string }
+  | { type: "approve_quotation"; id: string; note: string }
   | { type: "confirm_rental"; id: string; input: DepositInput }
   | { type: "assign_rental"; id: string; input: AssignmentInput }
   | { type: "start_rental"; id: string; odometerKm?: string }
@@ -619,6 +626,9 @@ export function validateSettings(db: Database, input: Settings) {
     // RNT-04 (D-117): the terms are the company's words, trimmed and kept as typed. No default is
     // supplied anywhere, and quoting stays blocked until somebody writes them.
     quotationTerms: (rentalIn.quotationTerms ?? "").trim(),
+    // RNT-04 (D-121): the figure at or above which a quotation needs a second signature. Null is a
+    // real answer — nobody has asked for one — and the screens say so rather than implying cover.
+    quotationApprovalAbove: rentalIn.quotationApprovalAbove ?? null,
   };
   if (rental.pricingBasis !== null && !PRICING_BASES.includes(rental.pricingBasis)) errors["rental.pricingBasis"] = "Invalid pricing basis.";
   // A percentage is computed in integer basis points (money.ts), so it may not carry more precision
@@ -634,6 +644,14 @@ export function validateSettings(db: Database, input: Settings) {
   if (rental.quotationValidityHours !== null && validityError) errors["rental.quotationValidityHours"] = validityError;
   if (rental.quotationTerms.length > QUOTATION_TERMS_LIMIT)
     errors["rental.quotationTerms"] = `Keep the terms under ${QUOTATION_TERMS_LIMIT} characters.`;
+  if (
+    rental.quotationApprovalAbove !== null &&
+    (!Number.isFinite(rental.quotationApprovalAbove) ||
+      rental.quotationApprovalAbove < 0 ||
+      rental.quotationApprovalAbove > MAX_AMOUNT ||
+      Math.abs(rental.quotationApprovalAbove * 100 - Math.round(rental.quotationApprovalAbove * 100)) > 1e-9)
+  )
+    errors["rental.quotationApprovalAbove"] = "Enter an amount of 0 or more, with at most two decimal places, or leave it blank.";
   const seenMethod = new Set<string>();
   for (const m of rental.paymentMethods) {
     if (seenMethod.has(norm(m))) errors["rental.paymentMethods"] = "Duplicate payment method.";
@@ -987,16 +1005,35 @@ function buildQuote(
   const validityHours = db.settings.rental.quotationValidityHours!;
   // A renewal keeps the number it was issued under; a first issue draws the next one in the series.
   const allocated = previous ? null : allocateReference(db, "quotation", now.slice(0, 4));
+  // The figures under the lines (RNT-04, D-121): the reduction, tax on what is left, the total, and
+  // the deposit as a share of what the customer actually pays.
+  const adjustments = readQuoteFigures({
+    subtotal,
+    discountAmount: input.discountAmount ?? "",
+    discountReason: input.discountReason ?? "",
+    taxPosition: db.settings.taxPosition,
+    taxLines: db.settings.taxLines,
+    depositPercent,
+  });
+  if (Object.keys(adjustments.errors).length) return fail("Please correct the quotation figures.", adjustments.errors);
   const quote: Quote = {
     currencyCode: db.settings.currencyCode!,
     pricingBasis: db.settings.rental.pricingBasis!,
     lines,
     subtotal,
+    discountAmount: adjustments.figures.discountAmount,
+    discountReason: input.discountReason?.trim() ?? "",
+    taxLines: adjustments.figures.taxLines,
+    total: adjustments.figures.total,
     depositPercent,
-    depositRequired: percentOf(subtotal, depositPercent),
+    depositRequired: adjustments.figures.depositRequired,
     validUntil: validityEndsAt(now, validityHours),
     quotedAt: now,
     quotedBy: actor.fullName,
+    quotedById: actor.id,
+    // A new document starts unsigned: a renewal is a new figure, and the signature belonged to the old
+    // one (D-121). The same rule the acceptance follows.
+    approval: null,
     number: previous ? previous.number : allocated!.reference,
     revision: previous ? previous.revision + 1 : 1,
     terms: db.settings.rental.quotationTerms.trim(),
@@ -1004,6 +1041,14 @@ function buildQuote(
     driverIncluded: db.settings.rental.driversAlwaysIncluded ?? rental.driverRequired,
   };
   return { ok: true, quote, counters: allocated ? allocated.counters : db.referenceCounters };
+}
+
+/** The working behind a quotation's total, in the words the audit trail keeps (D-121). */
+function quoteBreakdown(quote: Quote): string {
+  const parts: string[] = [];
+  if (quote.discountAmount > 0) parts.push(`lines ${formatAmount(quote.subtotal)} less ${formatAmount(quote.discountAmount)} discount`);
+  if (quote.taxLines.length > 0) parts.push(quote.taxLines.map((line) => `${line.name} ${line.ratePercent}% ${formatAmount(line.amount)}`).join(", "));
+  return parts.length ? ` [${parts.join("; ")}]` : "";
 }
 
 export function isDatabaseShape(value: unknown): value is Database {
@@ -1448,7 +1493,9 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         action: "rentals:quote",
         entity: "rental",
         entityId: updated.id,
-        summary: `${updated.reference} quoted as ${quote.number} (revision ${quote.revision}): ${quote.currencyCode} ${quote.subtotal.toFixed(2)} (deposit ${quote.currencyCode} ${quote.depositRequired.toFixed(2)}), valid until ${quote.validUntil}.`,
+        // The total leads, because that is the figure the customer was given; the working behind it
+        // follows only when there is any (D-121).
+        summary: `${updated.reference} quoted as ${quote.number} (revision ${quote.revision}): ${quote.currencyCode} ${formatAmount(quote.total)}${quoteBreakdown(quote)} (deposit ${quote.currencyCode} ${formatAmount(quote.depositRequired)}), valid until ${quote.validUntil}.`,
       }, now);
       return { ok: true, db: next, message: `Quotation ${quote.number} issued for ${updated.reference}.` };
     }
@@ -1487,7 +1534,7 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         action: "rentals:requote",
         entity: "rental",
         entityId: updated.id,
-        summary: `${updated.reference} quotation ${quote.number} renewed in place (revision ${currentRevision}): ${quote.currencyCode} ${quote.subtotal.toFixed(2)}, valid until ${quote.validUntil}. Prior quotation retained.`,
+        summary: `${updated.reference} quotation ${quote.number} renewed in place (revision ${currentRevision}): ${quote.currencyCode} ${formatAmount(quote.total)}${quoteBreakdown(quote)}, valid until ${quote.validUntil}. Prior quotation retained.`,
       }, now);
       return { ok: true, db: next, message: `Quotation ${quote.number} renewed for ${updated.reference} as revision ${currentRevision}; prior quotation retained.` };
     }
@@ -1512,8 +1559,10 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
         return fail("This request is not on your account.");
       }
 
-      const problems = canAcceptQuotation(existing, now);
-      if (Object.keys(problems).length) return fail(problems.status ?? problems.quote ?? problems.acceptance ?? "This quotation cannot be accepted.", problems);
+      // The second signature is part of whether a price can be answered at all (D-121): an unsigned
+      // quotation is refused here with the same sentence the portal shows, so the two agree.
+      const problems = canAcceptQuotation(existing, now, db.settings.rental.quotationApprovalAbove);
+      if (Object.keys(problems).length) return fail(problems.status ?? problems.quote ?? problems.approval ?? problems.acceptance ?? "This quotation cannot be accepted.", problems);
 
       const acceptance = buildAcceptance(
         existing,
@@ -1539,6 +1588,35 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       };
     }
 
+    // A second signature on a price (RNT-04, D-121).
+    //
+    // The company sets the figure at or above which this is needed. The rule is four eyes: whoever
+    // wrote the quotation cannot be the one who signs it off, which is stated here rather than left to
+    // people remembering. The approval copies the total it was given for, so a renewal cannot borrow it.
+    case "approve_quotation": {
+      const denied = authorise(actor, "rentals:approve");
+      if (denied) return denied;
+      if (!actor) return fail("Sign in is required.");
+      const existing = db.rentals.find((rental) => rental.id === command.id);
+      if (!existing) return fail("Rental not found.");
+      const quote = existing.quote;
+      if (!quote) return fail("There is no quotation on this rental to approve.");
+      if (!["quoted", "accepted"].includes(existing.status))
+        return fail(`A quotation can only be approved while it is out, and this request is ${RENTAL_STATUS_LABELS[existing.status].toLowerCase()}.`);
+      if (!quotationIsLive(quote, now)) return fail("This quotation has expired, so there is nothing to sign off. Renew it first.");
+      const problem = approvalProblem(quote, actor.id, actor.fullName);
+      if (problem) return fail(problem);
+      const approval = { at: now, byActorId: actor.id, byName: actor.fullName, note: command.note.trim(), total: quote.total };
+      const updated: Rental = { ...existing, quote: { ...quote, approval }, updatedAt: now };
+      const next = audit({ ...db, rentals: db.rentals.map((rental) => (rental.id === updated.id ? updated : rental)) }, actor, {
+        action: "rentals:approve",
+        entity: "rental",
+        entityId: updated.id,
+        summary: `${updated.reference} quotation ${quote.number} approved by ${actor.fullName}: ${quote.currencyCode} ${formatAmount(quote.total)}.${approval.note ? ` "${approval.note}"` : ""}`,
+      }, now);
+      return { ok: true, db: next, message: `Quotation ${quote.number} approved.` };
+    }
+
     case "confirm_rental": {
       const denied = authorise(actor, "rentals:confirm");
       if (denied) return denied;
@@ -1547,6 +1625,10 @@ export function execute(db: Database, actor: Actor | null, command: Command, now
       if (!canMoveRental(existing.status, "confirmed")) return fail(`A rental cannot be confirmed from status "${RENTAL_STATUS_LABELS[existing.status]}".`);
       if (!existing.quote) return fail("This rental has no quotation to confirm.");
       if (!quotationIsLive(existing.quote, now)) return fail("The quotation has expired. Issue a new quotation before confirming.");
+      // The deposit is what confirms a hire, so it is the last moment to catch an unsigned price.
+      if (approvalRequiredAt(existing.quote.total, db.settings.rental.quotationApprovalAbove) && !approvalIsCurrent(existing.quote)) {
+        return fail("This quotation needs a second signature before the deposit can be recorded. Somebody other than its author has to approve it first.");
+      }
       const errors: Errors = {};
       const parsed = parseAmount(command.input.amount ?? "");
       const method = command.input.method.trim();

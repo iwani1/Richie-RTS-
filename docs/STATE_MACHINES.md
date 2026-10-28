@@ -45,16 +45,27 @@ service-interval rules beside it.
 
 | From | To | Actor permission | Preconditions |
 |---|---|---|---|
-| draft | quoted | rentals:quote | quoting settings configured (currency, pricing basis, deposit %, validity, >=1 payment method); >=1 valid line item |
-| draft | cancelled | rentals:cancel | reason required |
-| quoted | confirmed | rentals:confirm | quote not expired; deposit >= required; known payment method |
+| draft / submitted / under_review / awaiting_quotation | quoted | rentals:quote | quoting settings configured (currency, pricing basis, deposit %, validity, >=1 payment method); >=1 valid line item |
+| draft / submitted / under_review / awaiting_quotation | cancelled | rentals:cancel | reason required |
+| submitted / under_review / awaiting_quotation | the next triage stage | rentals:update | one step at a time; no skip, no step back (RNT-02, D-120) |
+| quoted | accepted | rentals:accept | quote not expired; a current second signature where the company's figure requires one (RNT-04, D-121) |
+| quoted / accepted | confirmed | rentals:confirm | quote not expired; a current second signature where required; deposit >= required; known payment method |
 | quoted | declined | rentals:quote | reason required |
-| quoted | cancelled | rentals:cancel | reason required |
-| confirmed | in_progress | rentals:dispatch | vehicle assigned; driver assigned if required |
-| confirmed | cancelled | rentals:cancel | reason required |
-| in_progress | completed | rentals:complete | >=1 valid final-invoice line item |
-| in_progress | cancelled | rentals:cancel | reason required |
+| quoted / accepted / confirmed | cancelled | rentals:cancel | reason required |
+| confirmed | dispatched | rentals:dispatch | vehicle assigned; driver assigned if required; the odometer as it leaves |
+| dispatched | completed | rentals:complete | >=1 valid final-invoice line item |
 | completed / declined / cancelled | (none) | - | terminal |
+
+The triage stages are not a queue of their own: a request may be priced from any of them, which is how
+a small job skips the review without the review being fake. `dispatched` replaced `in_progress` in
+schema 35 (D-120).
+
+**The second signature (RNT-04, D-121).** `approve_quotation` is not a transition: it changes no status,
+it writes an approval onto the quotation — who, when, which total, and an optional note. It is required
+only when the quotation's total is at or above `settings.rental.quotationApprovalAbove`, and `null` there
+means the company has not asked for one. It is refused for the quotation's own author, for an expired
+quotation and for one that is not out; it belongs to one figure, so a renewal clears it and an approval
+whose total no longer matches the quotation is not current.
 
 An expired quote can be renewed in place without changing rental status only when
 `settings.rental.requotePolicy = revise_in_place`. The old quote snapshot is appended to

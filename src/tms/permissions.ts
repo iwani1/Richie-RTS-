@@ -25,6 +25,9 @@ export const PERMISSIONS = [
   // taking the deposit: a customer agreeing to a price and the office banking the money are different
   // acts, and a client contact may do the first and never the second.
   "rentals:accept",
+  // Signing a price off (RNT-04, D-121). Deliberately separate from rentals:quote: the whole point of
+  // a second signature is that the person who wrote the price is not the one who approves it.
+  "rentals:approve",
   "rentals:confirm",
   "rentals:dispatch",
   "rentals:complete",
@@ -137,6 +140,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "rentals:update",
     "rentals:quote",
     "rentals:accept",
+    "rentals:approve",
     "rentals:dispatch",
     "rentals:complete",
     "rentals:cancel",
@@ -197,6 +201,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "rentals:read",
     "rentals:quote",
     "rentals:accept",
+    "rentals:approve",
     "rentals:confirm",
     "routes:read",
     "trips:read",

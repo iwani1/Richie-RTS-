@@ -238,7 +238,7 @@ function rentalReady(): { db: Database; admin: Actor; ops: Actor; finance: Actor
   const catId = db.settings.vehicleCategories[0].id;
   const r = execute(db, admin, {
     type: "update_settings",
-    input: { ...db.settings, currencyCode: "GHS", rental: { quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 25, quotationValidityHours: 168, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer", "Mobile money"], requotePolicy: null } },
+    input: { ...db.settings, currencyCode: "GHS", rental: { quotationTerms: "Prices are firm for the validity period.", pricingBasis: "per_day", depositPercent: 25, quotationValidityHours: 168, driversAlwaysIncluded: null, paymentMethods: ["Bank transfer", "Mobile money"], requotePolicy: null, quotationApprovalAbove: null } },
   }, NOW);
   if (!r.ok) throw new Error(r.message);
   db = r.db;
@@ -975,7 +975,7 @@ describe("a customer accepting a quotation (RNT-05, D-116)", () => {
 
   it("leaves an older backup with no acceptance, rather than inventing one", () => {
     // Schema 31 is readable: a record written before acceptance existed loads with none.
-    expect(SCHEMA_VERSION).toBe(35);
+    expect(SCHEMA_VERSION).toBe(36);
   });
 });
 
@@ -1037,7 +1037,7 @@ describe("a quotation as a document (RNT-04, D-117)", () => {
     expect(w.db.rentals[0].quote?.terms).toBe(TERMS);
     const changed = execute(w.db, w.admin, {
       type: "update_settings",
-      input: { ...w.db.settings, rental: { ...w.db.settings.rental, quotationTerms: "Half the price is due before the hire." } },
+      input: { ...w.db.settings, rental: { ...w.db.settings.rental, quotationTerms: "Half the price is due before the hire.", quotationApprovalAbove: null } },
     }, NOW);
     if (!changed.ok) throw new Error(changed.message);
     const created = execute(changed.db, w.admin, requestInput(w.catId, "2026-04-01", "2026-04-02"), NOW);
@@ -1053,7 +1053,7 @@ describe("a quotation as a document (RNT-04, D-117)", () => {
     const w = rentalReady();
     const cleared = execute(w.db, w.admin, {
       type: "update_settings",
-      input: { ...w.db.settings, rental: { ...w.db.settings.rental, quotationTerms: "" } },
+      input: { ...w.db.settings, rental: { ...w.db.settings.rental, quotationTerms: "", quotationApprovalAbove: null } },
     }, NOW);
     if (!cleared.ok) throw new Error(cleared.message);
     const created = execute(cleared.db, w.admin, requestInput(w.catId, "2026-03-01", "2026-03-03"), NOW);
@@ -1457,5 +1457,159 @@ describe("the pipeline a request goes through (RNT-02, D-120)", () => {
     // A status this build cannot read falls back to Draft rather than leaving a hire in no list at all.
     const unknown = migrate({ ...legacy, rentals: dispatched.db.rentals.map((rental) => ({ ...rental, status: "ghosted" })) });
     expect(unknown!.rentals[0].status).toBe("draft");
+  });
+});
+
+describe("a quotation carries its figures and its signature (RNT-04, D-121)", () => {
+  /** A request, ready to be quoted, with the company registered for tax and an approval threshold. */
+  function ready(threshold: number | null = null) {
+    const base = rentalReady();
+    const settings = execute(base.db, base.admin, {
+      type: "update_settings",
+      input: {
+        ...base.db.settings,
+        taxPosition: "registered",
+        taxLines: [{ id: "", name: "VAT", ratePercent: 15 }],
+        rental: { ...base.db.settings.rental, quotationApprovalAbove: threshold },
+      },
+    }, NOW);
+    if (!settings.ok) throw new Error(settings.message);
+    const created = execute(settings.db, base.admin, requestInput(base.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    return { ...base, db: created.db, id: created.db.rentals[0].id };
+  }
+
+  const quoteIt = (w: { db: Database; admin: Actor; id: string }, input: { lines: { description: string; quantity: string; unitAmount: string }[]; discountAmount?: string; discountReason?: string }) =>
+    execute(w.db, w.admin, { type: "quote_rental", id: w.id, input }, NOW);
+
+  it("puts the tax and the discount on the document, and the deposit on what the customer pays", () => {
+    const w = ready();
+    const result = quoteIt(w, {
+      lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1000" }],
+      discountAmount: "200",
+      discountReason: "Repeat customer",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const quote = result.db.rentals[0].quote!;
+    expect(quote.subtotal).toBe(2000);
+    expect(quote.discountAmount).toBe(200);
+    expect(quote.discountReason).toBe("Repeat customer");
+    // 1,800 at 15% is 270, so the customer owes 2,070 and the deposit is 25% of that.
+    expect(quote.taxLines).toEqual([{ name: "VAT", ratePercent: 15, amount: 270 }]);
+    expect(quote.total).toBe(2070);
+    expect(quote.depositRequired).toBe(517.5);
+    // The figure the customer sees leads the audit trail, with the working behind it, so the office can
+    // trace what it said and how it got there.
+    expect(result.db.audit[0].summary).toBe(
+      "RR-0001 quoted as QUO-0001 (revision 1): GHS 2070.00 [lines 2000.00 less 200.00 discount; VAT 15% 270.00] (deposit GHS 517.50), valid until 2026-01-08T00:00:00.000Z.",
+    );
+  });
+
+  it("refuses a discount with no reason, and a discount bigger than the price", () => {
+    const w = ready();
+    const noReason = quoteIt(w, { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }], discountAmount: "100" });
+    expect(noReason.ok).toBe(false);
+    if (!noReason.ok) expect(noReason.errors.discountReason).toBe("Give a reason for the discount.");
+    const tooBig = quoteIt(w, { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }], discountAmount: "1500", discountReason: "Goodwill" });
+    expect(tooBig.ok).toBe(false);
+    if (!tooBig.ok) expect(tooBig.errors.discountAmount).toContain("larger than the price");
+    expect(w.db.rentals[0].quote).toBeNull();
+  });
+
+  it("charges no tax when the company has not said it is registered", () => {
+    const base = rentalReady();
+    const created = execute(base.db, base.admin, requestInput(base.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const quoted = execute(created.db, base.admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "1000" }] } }, NOW);
+    expect(quoted.ok).toBe(true);
+    if (quoted.ok) {
+      expect(quoted.db.rentals[0].quote?.taxLines).toEqual([]);
+      expect(quoted.db.rentals[0].quote?.total).toBe(1000);
+    }
+  });
+
+  it("needs a second signature above the threshold, and refuses the author's own", () => {
+    const w = ready(1500);
+    const quoted = quoteIt(w, { lines: [{ description: "Hire", quantity: "1", unitAmount: "2000" }] });
+    if (!quoted.ok) throw new Error(quoted.message);
+    const quotedDb = quoted.db;
+
+    // The author cannot sign it off, whatever their role.
+    const own = execute(quotedDb, w.admin, { type: "approve_quotation", id: w.id, note: "" }, NOW);
+    expect(own.ok).toBe(false);
+    if (!own.ok) expect(own.message).toMatch(/cannot also approve it/);
+
+    // Nor can the deposit be taken, nor the customer's yes recorded, while the price is unsigned.
+    const early = execute(quotedDb, w.finance, { type: "confirm_rental", id: w.id, input: { amount: "575", method: "Bank transfer", reference: "" } }, NOW);
+    expect(early.ok).toBe(false);
+    if (!early.ok) expect(early.message).toContain("needs a second signature before the deposit can be recorded");
+    const accepted = execute(quotedDb, w.finance, { type: "accept_quotation", id: w.id, note: "" }, NOW);
+    expect(accepted.ok).toBe(false);
+    // The same sentence the customer's portal shows: they do not need to know who signs what inside.
+    if (!accepted.ok) expect(accepted.message).toBe("The office is still checking this price, so it cannot be accepted yet. Call them if it is urgent.");
+
+    // Somebody else signs it, and the record says who and for how much.
+    const approved = execute(quotedDb, w.finance, { type: "approve_quotation", id: w.id, note: "Rate checked" }, NOW);
+    expect(approved.ok).toBe(true);
+    if (!approved.ok) return;
+    expect(approved.db.rentals[0].quote?.approval).toMatchObject({ byName: "Fin", byActorId: w.finance.id, note: "Rate checked", total: 2300 });
+    expect(approved.db.audit[0].summary).toBe('RR-0001 quotation QUO-0001 approved by Fin: GHS 2300.00. "Rate checked"');
+
+    // Approving it twice is refused, naming the first.
+    const again = execute(approved.db, w.admin, { type: "approve_quotation", id: w.id, note: "" }, NOW);
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.message).toBe("This quotation was already approved by Fin on 2026-01-01.");
+
+    // With the signature in place the deposit can be taken.
+    const confirmed = execute(approved.db, w.finance, { type: "confirm_rental", id: w.id, input: { amount: "575", method: "Bank transfer", reference: "SLIP-1" } }, NOW);
+    expect(confirmed.ok).toBe(true);
+  });
+
+  it("asks for nothing when the company has set no threshold", () => {
+    const w = ready(null);
+    const quoted = quoteIt(w, { lines: [{ description: "Hire", quantity: "1", unitAmount: "9000" }] });
+    if (!quoted.ok) throw new Error(quoted.message);
+    const confirmed = execute(quoted.db, w.finance, { type: "confirm_rental", id: w.id, input: { amount: "2587.50", method: "Bank transfer", reference: "" } }, NOW);
+    expect(confirmed.ok).toBe(true);
+  });
+
+  it("does not carry a signature onto a renewal", () => {
+    const base = ready(1000);
+    const settings = execute(base.db, base.admin, { type: "update_settings", input: { ...base.db.settings, rental: { ...base.db.settings.rental, requotePolicy: "revise_in_place" } } }, NOW);
+    if (!settings.ok) throw new Error(settings.message);
+    const created = execute(settings.db, base.admin, requestInput(base.catId, "2026-03-01", "2026-03-03"), NOW);
+    if (!created.ok) throw new Error(created.message);
+    const id = created.db.rentals[0].id;
+    const quoted = execute(created.db, base.admin, { type: "quote_rental", id, input: { lines: [{ description: "Hire", quantity: "1", unitAmount: "2000" }] } }, NOW);
+    if (!quoted.ok) throw new Error(quoted.message);
+    const approved = execute(quoted.db, base.finance, { type: "approve_quotation", id, note: "" }, NOW);
+    if (!approved.ok) throw new Error(approved.message);
+    expect(approved.db.rentals[0].quote?.approval).not.toBeNull();
+
+    // Long after the price stopped holding, the quotation is renewed: a new figure is a new document.
+    const renewed = execute(approved.db, base.admin, { type: "requote_rental", id, input: { lines: [{ description: "Hire revised", quantity: "1", unitAmount: "3000" }] } }, "2026-02-10T00:00:00.000Z");
+    expect(renewed.ok).toBe(true);
+    if (!renewed.ok) return;
+    expect(renewed.db.rentals[0].quote?.revision).toBe(2);
+    expect(renewed.db.rentals[0].quote?.approval).toBeNull();
+    const blocked = execute(renewed.db, base.finance, { type: "confirm_rental", id, input: { amount: "862.50", method: "Bank transfer", reference: "" } }, "2026-02-10T00:00:00.000Z");
+    expect(blocked.ok).toBe(false);
+  });
+
+  it("refuses to approve a quotation that has expired, or one that is not out", () => {
+    const w = ready(1000);
+    const quoted = quoteIt(w, { lines: [{ description: "Hire", quantity: "1", unitAmount: "2000" }] });
+    if (!quoted.ok) throw new Error(quoted.message);
+    const late = execute(quoted.db, w.finance, { type: "approve_quotation", id: w.id, note: "" }, "2026-02-10T00:00:00.000Z");
+    expect(late.ok).toBe(false);
+    if (!late.ok) expect(late.message).toBe("This quotation has expired, so there is nothing to sign off. Renew it first.");
+
+    const draft = execute(quoted.db, w.admin, { type: "create_rental", input: requestInput(w.catId, "2026-04-01", "2026-04-02").input }, NOW);
+    if (!draft.ok) throw new Error(draft.message);
+    const noQuote = execute(draft.db, w.finance, { type: "approve_quotation", id: draft.db.rentals[1].id, note: "" }, NOW);
+    expect(noQuote.ok).toBe(false);
+    if (!noQuote.ok) expect(noQuote.message).toBe("There is no quotation on this rental to approve.");
   });
 });

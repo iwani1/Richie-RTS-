@@ -116,10 +116,17 @@ describe("Bus rentals end-to-end (jsdom)", () => {
     setField(/Line 1 description/i, "3 days hire", within(dialog));
     setField(/^Qty/i, "3", within(dialog));
     setField(/Unit amount/i, "1000", within(dialog));
+    // A reduction with its reason (RNT-04, D-121). The form shows the total the customer will read.
+    setField(/Discount \(optional\)/i, "100", within(dialog));
+    setField(/Reason for the discount/i, "Repeat customer", within(dialog));
+    await waitFor(() => expect(within(dialog).getByText(/GHS 2,900\.00/)).toBeTruthy());
     fireEvent.click(within(dialog).getByRole("button", { name: /Issue quotation/i }));
     await screen.findByText(/Quotation issued/i);
-    // deposit 25% of 3000 = 750
-    await waitFor(() => expect(screen.getByText(/Deposit \(25%\)/i)).toBeTruthy());
+    // The document carries the reduction, the total and the deposit taken from that total.
+    await waitFor(() => expect(screen.getByText(/Less discount: Repeat customer/i)).toBeTruthy());
+    expect(screen.getByText(/Deposit \(25%\)/i)).toBeTruthy();
+    // No threshold is set, and the screen says so rather than implying a second signature exists.
+    expect(screen.getByText(/No approval is required: the company has not set a figure that needs one/i)).toBeTruthy();
 
     // Confirm with deposit.
     fireEvent.click(screen.getByRole("button", { name: /Record deposit & confirm/i }));

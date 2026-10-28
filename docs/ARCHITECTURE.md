@@ -65,7 +65,7 @@ default. `docs/DESIGN.md` is the record; this is the summary a developer needs.
 
 | Path | Responsibility |
 |---|---|
-| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 35` (the migration number and the snapshot version are counted separately: six phases shipped without a new migration — FLT-01, whose fleet facts and photograph live inside each vehicle's record; FLT-03, whose renewal acknowledgements are a collection in the snapshot; and FLT-05, whose standing cost is one field in `settings`), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–35) |
+| `src/tms/types.ts` | Domain types, `SCHEMA_VERSION = 36` (the migration number and the snapshot version are counted separately: seven phases shipped without a new migration — FLT-01, whose fleet facts and photograph live inside each vehicle's record; FLT-03, whose renewal acknowledgements are a collection in the snapshot; FLT-05, whose standing cost is one field in `settings`; and RNT-04's quotation figures and signature, which live inside the quotation already stored on the rental), `emptyDatabase()`, `migrate()` (accepts `READABLE_SCHEMA_VERSIONS`, 1–36) |
 | `src/tms/commandTypes.ts` | Every command name `/api/commands` accepts. The compiler and a test hold it to the modules that define commands (D-89) |
 | `src/tms/permissions.ts` | `resource:action` permissions, the role matrix, and `isOwnScoped` / `isRecordBound` |
 | `src/tms/scope.ts` | Own-record access: `actorLink`, `scopedView`, `mayReportOnVehicle`, `mayReportOnRun`, `confinedClientId`, `confinedPassengerId`. Confines `driver`, `client_contact` and `passenger` to their one linked record. Fails closed |

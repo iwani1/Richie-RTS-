@@ -52,6 +52,7 @@ const envelope = z.object({
 // before a transaction opens, and so the mapping is visible in one place (docs/PERMISSIONS.md).
 const PERMISSION_FOR: Record<string, Parameters<typeof can>[1]> = {
   update_settings: "settings:update",
+  approve_quotation: "rentals:approve",
   issue_rental_invoice: "invoices:issue",
   void_invoice: "invoices:void",
   issue_credit_note: "credits:issue",

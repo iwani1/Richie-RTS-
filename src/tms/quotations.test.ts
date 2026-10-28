@@ -4,7 +4,14 @@
 // minute; what a quotation is called; and that nothing about the terms is invented by this build.
 import { describe, expect, it } from "vitest";
 import {
+  approvalIsCurrent,
+  approvalLine,
+  approvalProblem,
+  approvalRequiredAt,
   QUOTATION_TERMS_LIMIT,
+  quotationIsApproved,
+  readQuoteFigures,
+  type QuoteFigureInput,
   quotationHeading,
   quotationIsLive,
   quotationIsNumbered,
@@ -20,11 +27,17 @@ const quote = (overrides: Partial<Quote> = {}): Quote => ({
   pricingBasis: "per_day",
   lines: [{ id: "l1", description: "Two days hire", quantity: 2, unitAmount: 2000 }],
   subtotal: 4000,
+  discountAmount: 0,
+  discountReason: "",
+  taxLines: [],
+  total: 4000,
   depositPercent: 25,
   depositRequired: 1000,
   validUntil: "2026-06-15T09:00:00.000Z",
   quotedAt: "2026-06-08T09:00:00.000Z",
   quotedBy: "Finance",
+  quotedById: "",
+  approval: null,
   number: "QUO-0001",
   revision: 1,
   terms: "Prices are firm for the validity period.",
@@ -99,7 +112,7 @@ describe("older backups (schema 32)", () => {
       schemaVersion: 31,
       settings: {
         ...emptyDatabase().settings,
-        rental: { pricingBasis: "per_day", depositPercent: 20, quotationValidityDays: 7, driversAlwaysIncluded: null, paymentMethods: ["Cash"], requotePolicy: null },
+        rental: { pricingBasis: "per_day", depositPercent: 20, quotationValidityDays: 7, driversAlwaysIncluded: null, paymentMethods: ["Cash"], requotePolicy: null, quotationApprovalAbove: null },
       },
     };
     const migrated = migrate(legacy)!;
@@ -134,11 +147,17 @@ describe("older backups (schema 32)", () => {
         pricingBasis: "per_day",
         lines: [{ id: "l1", description: "Hire", quantity: 2, unitAmount: 1000 }],
         subtotal: 2000,
+        discountAmount: 0,
+        discountReason: "",
+        taxLines: [],
+        total: 2000,
         depositPercent: 20,
         depositRequired: 400,
         validUntil: "2026-06-15",
         quotedAt: "2026-06-08T10:00:00.000Z",
         quotedBy: "Finance",
+        quotedById: "",
+        approval: null,
       },
       quoteHistory: [],
       acceptance: null,
@@ -161,5 +180,197 @@ describe("older backups (schema 32)", () => {
     expect(rental.quote?.terms).toBe("");
     // The request said a driver was required; the quotation written before the field existed takes it.
     expect(rental.quote?.driverIncluded).toBe(false);
+  });
+});
+
+describe("the figures under the lines (RNT-04, D-121)", () => {
+  const figures = (overrides: Partial<QuoteFigureInput> = {}) =>
+    readQuoteFigures({
+      subtotal: 3000,
+      discountAmount: "",
+      discountReason: "",
+      taxPosition: "not_registered",
+      taxLines: [],
+      depositPercent: 25,
+      ...overrides,
+    });
+
+  it("adds nothing the company has not stated", () => {
+    const { errors, figures: out } = figures();
+    expect(errors).toEqual({});
+    expect(out).toEqual({ discountAmount: 0, taxLines: [], total: 3000, depositRequired: 750 });
+  });
+
+  it("takes the reduction off the lines before charging tax on what is left", () => {
+    const { errors, figures: out } = figures({
+      discountAmount: "500",
+      discountReason: "Repeat customer",
+      taxPosition: "registered",
+      taxLines: [{ name: "VAT", ratePercent: 15 }],
+    });
+    expect(errors).toEqual({});
+    expect(out.discountAmount).toBe(500);
+    // 2,500 at 15% is 375, so the customer pays 2,875 and the deposit is 25% of that, not of 3,000.
+    expect(out.taxLines).toEqual([{ name: "VAT", ratePercent: 15, amount: 375 }]);
+    expect(out.total).toBe(2875);
+    expect(out.depositRequired).toBe(718.75);
+  });
+
+  it("pays a half-pesewa tie up, not down", () => {
+    // 15% of 15.90 is 2.385 → 2.39; the total is 18.29 and 25% of that is 4.57 (4.5725 rounded).
+    const { figures: out } = figures({ subtotal: 15.9, taxPosition: "registered", taxLines: [{ name: "VAT", ratePercent: 15 }] });
+    expect(out.taxLines[0].amount).toBe(2.39);
+    expect(out.total).toBe(18.29);
+    expect(out.depositRequired).toBe(4.57);
+  });
+
+  it("refuses a reduction with no reason, and one bigger than the price", () => {
+    expect(figures({ discountAmount: "100" }).errors.discountReason).toBe("Give a reason for the discount.");
+    const tooBig = figures({ discountAmount: "3100", discountReason: "Goodwill" });
+    expect(tooBig.errors.discountAmount).toBe("The discount is larger than the price, so the total would be negative.");
+    // A discount exactly equal to the price is a free hire: the total is nought, not negative.
+    const free = figures({ discountAmount: "3000", discountReason: "Goodwill" });
+    expect(free.errors).toEqual({});
+    expect(free.figures.total).toBe(0);
+    expect(free.figures.depositRequired).toBe(0);
+  });
+
+  it("reads the discount as decimal text, exactly", () => {
+    expect(figures({ discountAmount: "0.005", discountReason: "x" }).errors.discountAmount).toBe("Use at most two decimal places: amounts are in pesewas.");
+    expect(figures({ discountAmount: "-50", discountReason: "x" }).errors.discountAmount).toBe("Enter the discount as an amount of 0 or more, or leave it blank.");
+    expect(figures({ discountAmount: "lots", discountReason: "x" }).errors.discountAmount).toBe("Enter the discount as an amount of 0 or more, or leave it blank.");
+  });
+
+  it("charges no tax when the company is not registered, whatever the rate list says", () => {
+    const { figures: out } = figures({ taxPosition: "not_registered", taxLines: [{ name: "VAT", ratePercent: 15 }] });
+    expect(out.taxLines).toEqual([]);
+    expect(out.total).toBe(3000);
+  });
+
+  it("charges no tax when nobody has stated the position at all", () => {
+    const { figures: out } = figures({ taxPosition: null, taxLines: [{ name: "VAT", ratePercent: 15 }] });
+    expect(out.taxLines).toEqual([]);
+    expect(out.total).toBe(3000);
+  });
+
+  it("keeps several levies apart and adds each to the total", () => {
+    const { figures: out } = figures({
+      taxPosition: "registered",
+      taxLines: [
+        { name: "VAT", ratePercent: 15 },
+        { name: "NHIL", ratePercent: 2.5 },
+      ],
+    });
+    expect(out.taxLines.map((line) => line.amount)).toEqual([450, 75]);
+    expect(out.total).toBe(3525);
+  });
+});
+
+describe("the second signature on a price (RNT-04, D-121)", () => {
+  const approved = (overrides: Partial<Quote> = {}): Quote => ({
+    ...quote(),
+    approval: { at: "2026-06-09T09:00:00.000Z", byActorId: "u2", byName: "Ops", note: "", total: 4000 },
+    ...overrides,
+  });
+
+  it("asks for a signature only at or above the figure the company set", () => {
+    expect(approvalRequiredAt(4000, 5000)).toBe(false);
+    expect(approvalRequiredAt(5000, 5000)).toBe(true);
+    expect(approvalRequiredAt(5000.01, 5000)).toBe(true);
+    // No figure set means nobody has asked: the program does not invent a policy.
+    expect(approvalRequiredAt(1_000_000, null)).toBe(false);
+  });
+
+  it("does not let the author sign their own price off", () => {
+    const mine = quote({ quotedById: "u1", quotedBy: "Finance" });
+    expect(approvalProblem(mine, "u1", "Finance")).toBe(
+      "The person who wrote this quotation cannot also approve it. Somebody else has to sign it off.",
+    );
+    expect(approvalProblem(mine, "u2", "Ops")).toBeNull();
+  });
+
+  it("falls back to the name for a quotation written before the author's account was recorded", () => {
+    const old = quote({ quotedById: "", quotedBy: "Finance" });
+    expect(approvalProblem(old, "u9", "Finance")).toMatch(/cannot also approve it/);
+    expect(approvalProblem(old, "u9", "Ops")).toBeNull();
+  });
+
+  it("refuses a second signature on the same figure, and names the first", () => {
+    expect(approvalProblem(approved(), "u9", "Admin")).toBe("This quotation was already approved by Ops on 2026-06-09.");
+    expect(quotationIsApproved(approved())).toBe(true);
+    expect(approvalIsCurrent(approved())).toBe(true);
+  });
+
+  it("says when a signature belongs to a different figure", () => {
+    const renewed = approved({ total: 4600 });
+    expect(approvalIsCurrent(renewed)).toBe(false);
+    expect(approvalLine(renewed, 5000)).toMatch(/was for GHS 4000\.00, which is not the figure on this revision/);
+    // …and it may be given again, by somebody other than the author.
+    expect(approvalProblem(renewed, "u9", "Admin")).toBeNull();
+  });
+
+  it("prints whether a signature is needed, given, or not asked for at all", () => {
+    expect(approvalLine(quote(), null)).toBe("No approval is required: the company has not set a figure that needs one.");
+    expect(approvalLine(quote(), 5000)).toBeNull();
+    expect(approvalLine({ ...quote(), total: 6000 }, 5000)).toBe("A second signature is required: this price is at or above GHS 5000.00.");
+    expect(approvalLine(approved({ approval: { at: "2026-06-09T09:00:00.000Z", byActorId: "u2", byName: "Ops", note: "Checked the rate.", total: 4000 } }), 5000)).toBe(
+      'Approved by Ops on 2026-06-09. "Checked the rate."',
+    );
+  });
+});
+
+describe("a quotation written before the figures existed (schema 36)", () => {
+  it("keeps what it said: its total is its subtotal, and nobody is named as its author", () => {
+    const legacy = { ...quote(), discountAmount: undefined, discountReason: undefined, taxLines: undefined, total: undefined, quotedById: undefined, approval: undefined };
+    const base = {
+      schemaVersion: 35,
+      users: [],
+      vehicles: [],
+      drivers: [],
+      clients: [],
+      audit: [],
+      settings: {},
+      invoices: [],
+      payments: [],
+    };
+    const rental = {
+      id: "r1",
+      reference: "RR-0001",
+      clientId: null,
+      customerName: "Acme Ltd",
+      customerPhone: "",
+      customerEmail: "",
+      purpose: "",
+      pickupLocation: "Accra",
+      dropoffLocation: "Tema",
+      startDate: "2026-06-10",
+      endDate: "2026-06-11",
+      passengers: 4,
+      vehicleCategoryId: "cat",
+      driverRequired: false,
+      notes: "",
+      status: "quoted",
+      quote: legacy,
+      quoteHistory: [],
+      acceptance: null,
+      run: null,
+      plan: null,
+      assignedVehicleId: null,
+      assignedDriverId: null,
+      deposit: null,
+      finalInvoice: null,
+      resolutionReason: null,
+      createdAt: "2026-06-08T10:00:00.000Z",
+      updatedAt: "2026-06-08T10:00:00.000Z",
+    };
+    const migrated = migrate({ ...base, schemaVersion: 35, rentals: [rental] })!;
+    const stored = migrated.rentals[0].quote!;
+    expect(stored.subtotal).toBe(4000);
+    expect(stored.total).toBe(4000);
+    expect(stored.discountAmount).toBe(0);
+    expect(stored.taxLines).toEqual([]);
+    expect(stored.quotedById).toBe("");
+    expect(stored.approval).toBeNull();
+    expect(SCHEMA_VERSION).toBe(36);
   });
 });

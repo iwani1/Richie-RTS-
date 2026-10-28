@@ -409,11 +409,33 @@ erDiagram
     text currency_code
     text pricing_basis
     numeric subtotal
+    numeric discount_amount
+    text discount_reason
+    numeric tax_total
+    numeric total
     numeric deposit_percent
     numeric deposit_required
     date valid_until
     timestamptz quoted_at
     text quoted_by
+  }
+  RENTAL_QUOTE ||--o{ RENTAL_QUOTE_TAX : taxes
+  RENTAL_QUOTE ||--o| QUOTE_APPROVAL : signed_off
+  RENTAL_QUOTE_TAX {
+    uuid id PK
+    uuid quote_id FK
+    text name
+    numeric rate_percent
+    numeric amount
+  }
+  QUOTE_APPROVAL {
+    uuid id PK
+    uuid quote_id FK
+    uuid approved_by FK
+    text approved_by_name
+    timestamptz approved_at
+    numeric total_approved
+    text note
   }
 ```
 
@@ -421,6 +443,14 @@ erDiagram
 `quotation` scope and shared by every revision of the same document, so `QUO-0001` revision 2 is the
 second version of one sheet, not a second sheet. `terms` are copied onto each revision as the company's
 terms stood when it was issued.
+
+`subtotal`, `discount_amount`, `tax_total` and `total` are the working behind one figure, in whole
+pesewas: `total = subtotal − discount_amount + tax_total`, and `deposit_required` is the company's
+percentage of `total` (D-121). `discount_reason` is required whenever `discount_amount` is above zero.
+`RENTAL_QUOTE_TAX` is one row per rate, copied from the company's settings at issue — a snapshot, not a
+reference, because a rate that changes next month must not rewrite a quotation already given out.
+`QUOTE_APPROVAL` is at most one per revision, and its `total_approved` is the point of it: an approval
+that does not match the revision's own total was given to a different figure and no longer counts.
 
 Unique `(rental_id, revision_number)` and unique `reference`; quote and line snapshots are immutable. The initial
 quote is revision 1; each permitted renewal creates revision N+1 and keeps the previous

@@ -69,6 +69,7 @@ async function world(): Promise<{ adminId: string; vehicleId: string; settings: 
         rental: {
           ...setup.settings.rental,
           quotationTerms: "Prices are firm for the validity period.",
+      quotationApprovalAbove: null,
           pricingBasis: "per_day",
           depositPercent: 20,
           quotationValidityHours: 336,

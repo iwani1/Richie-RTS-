@@ -2879,3 +2879,63 @@ remembers to press a button. That is the test each stage had to pass.
   `Rentals.test.tsx`) — the suite moves from 1,225 to 1,244. **Not built:** a "dispatched, not yet
   started" state distinct from the hire itself, because the departure time already records that
   moment; and nothing messages the customer at any stage — there is no channel to message them on.
+
+## D-121 - A quotation states what the customer pays, and above a figure somebody else signs it (RNT-04)
+
+**The problem.** A quotation carried lines, a deposit and its terms, and then stopped: no tax and no
+discount, so the number the customer agreed to was not the number the invoice asked for — VAT appeared
+for the first time a week later, on a different document, worked out by whoever raised the invoice. And
+a price of any size left the building on one person's word, with nothing in the record to say anybody
+else had looked at it.
+
+**Decision 1: the tax is on the quotation, frozen when it is issued.** A quotation now carries its own
+tax lines, copied from the company's settings at the moment it is issued, exactly as invoices already
+did. One shape does both jobs (`TaxLine`), because a quotation and the invoice that follows it must
+agree field for field or the two documents will drift. Tax appears only when the company has said it is
+registered; an unregistered company's quotations are tax-free, not zero-rated by accident.
+
+**Decision 2: the reduction is an amount with a reason, not a percentage.** The office records what it
+took off and why, and the reason is required whenever the figure is above zero, because a discount
+nobody can explain is the first thing an audit asks about. A percentage would have to be re-applied
+whenever the lines changed and can land a pesewa away from what the customer was told; the amount
+agreed is the amount on the paper. A reduction larger than the lines is refused.
+
+**Decision 3: the total is the figure, and the deposit is a share of it.** `total = lines − discount +
+tax`, computed in whole pesewas with the same single rounding rule invoices use. The deposit percentage
+now applies to that total rather than to the untaxed lines: a customer paying a quarter up front pays a
+quarter of what they owe, not a quarter of a smaller number the office then has to correct.
+
+**Decision 4: above a figure the company sets, a second person signs it off.** `quotationApprovalAbove`
+in settings; `null` means the company has not asked for a second signature, and every screen says so in
+those words rather than implying that everything is approved. Three rules make the signature mean
+something:
+
+- **not the author's own.** The person who wrote the quotation cannot approve it, whatever their role —
+  otherwise the check is a keystroke;
+- **tied to the figure.** The approval records who signed, when, the total they signed and an optional
+  note. A renewal clears it, and an approval whose total no longer matches the quotation is not current;
+- **only while it is out.** An expired quotation cannot be signed (renew it first), and one that has not
+  been issued has nothing to sign.
+
+While a signature is outstanding the customer's yes cannot be recorded and the deposit cannot be taken,
+from the office or from the portal. Both refuse with the customer's sentence — "the office is still
+checking this price" — because a customer does not need to know who signs what inside.
+
+**Decision 5: the audit trail leads with the total.** The entry names the figure the customer was given
+and, when there is any working, the lines, the reduction and each tax line behind it. A price is only
+traceable if the record shows how it was reached.
+
+**Decision 6: schema 36, and no migration.** Everything new lives inside the quotation already stored on
+the rental, so older records read as what they were: a quotation with no discount, no tax and no
+signature. Bumping the readable versions is enough.
+
+**Consequence.** `src/tms/types.ts` (`TaxLine`, `InvoiceTaxLine` as its alias, `QuoteApproval`, five new
+`Quote` fields, `quotationApprovalAbove`, schema **36**), `src/tms/quotations.ts` (`readQuoteFigures`,
+`approvalRequiredAt`, `approvalIsCurrent`, `approvalProblem`, `approvalLine`), `src/tms/service.ts`
+(`quote_rental` taking a discount, the `approve_quotation` command, the two gates, a validated settings
+field), `src/tms/acceptance.ts` (the unsigned-price refusal the portal and the service share),
+permission `rentals:approve` for administrator, operations and finance, the rentals screen's discount
+fields, live total and approval panel, the portal's total, discount and tax rows, and 22 new tests — the
+suite moves from 1,244 to 1,266. **Not built:** nothing sends a quotation to the customer, because there
+is no mail or SMS channel; no waiting or overtime rate is priced (still FIN-01), so a waiting charge is
+a handwritten line; and the tax lines are a record of what was charged, not a tax return.

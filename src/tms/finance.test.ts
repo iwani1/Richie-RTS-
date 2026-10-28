@@ -86,7 +86,7 @@ function completedRental(overrides: Record<string, unknown> = {}): World {
   w.rentalId = w.db.rentals[0].id;
   const id = w.rentalId;
   step(w, "ops", { type: "quote_rental", id, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } });
-  step(w, "admin", { type: "confirm_rental", id, input: { amount: "600", method: "Bank transfer", reference: "SLIP-1" } });
+  step(w, "admin", { type: "confirm_rental", id, input: { amount: w.db.rentals[0].quote!.depositRequired.toFixed(2), method: "Bank transfer", reference: "SLIP-1" } });
   step(w, "ops", { type: "assign_rental", id, input: { vehicleId: w.db.vehicles[0].id, driverId: "" } });
   step(w, "ops", { type: "start_rental", id });
   step(w, "ops", {
@@ -471,6 +471,7 @@ describe("money arithmetic on real documents (audit D-04)", () => {
         rental: {
           ...emptyRentalSettings(),
           quotationTerms: "Prices are firm for the validity period.",
+      quotationApprovalAbove: null,
           pricingBasis: "per_day",
           depositPercent,
           quotationValidityHours: 336,
@@ -520,10 +521,13 @@ describe("money arithmetic on real documents (audit D-04)", () => {
     expect(issued.total).toBe(18.29);
   });
 
-  it("puts the deposit on a half-pesewa tie up in the quotation", () => {
+  it("puts the deposit on a half-pesewa tie up in the quotation, taken from the taxed total", () => {
     const w = tieRental([{ id: "", name: "VAT", ratePercent: 15 }], 25);
-    // 25% of 15.90 is 3.975 → 3.98 (the float helper gave 3.97 for the 8.54-style cases).
-    expect(w.db.rentals[0].quote?.depositRequired).toBe(3.98);
+    // Since D-121 the quotation carries its tax, and the deposit is that percentage of what the
+    // customer actually pays: 25% of 18.29 is 4.5725 → 4.57, half-up on the pesewa.
+    expect(w.db.rentals[0].quote?.taxLines[0].amount).toBe(2.39);
+    expect(w.db.rentals[0].quote?.total).toBe(18.29);
+    expect(w.db.rentals[0].quote?.depositRequired).toBe(4.57);
   });
 
   it("settles an invoice exactly, with no residual pesewa claimed as outstanding", () => {

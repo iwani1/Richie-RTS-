@@ -44,6 +44,7 @@ function world(currencyCode: string | null = "GHS"): Database {
       rental: {
         ...emptyRentalSettings(),
         quotationTerms: "Prices are firm for the validity period.",
+      quotationApprovalAbove: null,
         pricingBasis: "per_day",
         depositPercent: 0,
         quotationValidityHours: 720,

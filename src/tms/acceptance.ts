@@ -20,6 +20,7 @@
 import { formatAmount } from "./money";
 import { quotationIsLive } from "./quotations";
 import { PRE_QUOTE_STATUSES } from "./rentalWorkflow";
+import { approvalIsCurrent, approvalRequiredAt } from "./quotations";
 import type { Rental, RentalAcceptance } from "./types";
 
 /** How long a note on an acceptance may be. A sentence, not a paragraph. */
@@ -81,7 +82,7 @@ export interface AcceptanceProblems {
  * The same check runs in the service and on the screen: the screen hides the button, the service
  * refuses the command, and neither is the control on its own (the rule D-60 set out).
  */
-export function canAcceptQuotation(rental: Rental, now: string): AcceptanceProblems {
+export function canAcceptQuotation(rental: Rental, now: string, approvalThreshold: number | null = null): AcceptanceProblems {
   const problems: AcceptanceProblems = {};
   if (PRE_QUOTE_STATUSES.includes(rental.status)) {
     problems.status = "No quotation has been issued yet, so there is nothing to accept.";
@@ -99,6 +100,12 @@ export function canAcceptQuotation(rental: Rental, now: string): AcceptanceProbl
   if (!rental.quote) problems.quote = "There is no quotation on this rental to accept.";
   else if (!quotationIsLive(rental.quote, now)) {
     problems.quote = `The quotation expired on ${ymd(rental.quote.validUntil)}. Issue a new one before the customer accepts.`;
+  }
+  // A price the company has not finished checking is not one to put in front of a customer as agreed
+  // (RNT-04, D-121). The words are the customer's, not the office's: they do not need to know who
+  // signs what internally, only that the figure is not ready to accept yet.
+  if (rental.quote && !problems.quote && approvalRequiredAt(rental.quote.total, approvalThreshold) && !approvalIsCurrent(rental.quote)) {
+    problems.approval = "The office is still checking this price, so it cannot be accepted yet. Call them if it is urgent.";
   }
   if (Object.keys(problems).length === 0 && acceptanceIsCurrent(rental)) {
     problems.acceptance = `This quotation was already accepted on ${rental.acceptance!.at.slice(0, 10)} by ${rental.acceptance!.byName}.`;

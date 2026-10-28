@@ -270,11 +270,14 @@ async function main() {
   ok(rental.plan?.stops?.[0] === "Nkawkaw", "the request keeps the stop on the way");
   ok(rental.plan?.source === "phone", "the request says how it came in");
 
-  // 7. Quotation: 2 days at 1,500 = 3,000 with a 20% deposit required.
+  // 7. Quotation: 2 days at 1,500 = 3,000, plus 15% VAT = 3,450, with a 20% deposit on that.
   const byRental = (database: any) => database.rentals.find((candidate: any) => candidate.id === rentalId);
   db = await command("quote_rental", { id: rentalId, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } });
   ok(byRental(db).quote?.subtotal === 3000, "quotation subtotal is GHS 3,000");
-  ok(byRental(db).quote?.depositRequired === 600, "deposit required is 20% (GHS 600)");
+  // RNT-04, D-121: the tax is on the document the customer reads, not only on the invoice afterwards.
+  ok(byRental(db).quote?.taxLines?.[0]?.amount === 450, "quotation carries GHS 450 of VAT");
+  ok(byRental(db).quote?.total === 3450, "quotation total is GHS 3,450");
+  ok(byRental(db).quote?.depositRequired === 690, "deposit required is 20% of the total (GHS 690)");
   // RNT-04, D-117: the quotation is a numbered document with its own terms and an hour it stops holding.
   ok(/^QUO-\d{4,}$/.test(byRental(db).quote?.number ?? ""), `quotation numbered ${byRental(db).quote?.number}`);
   ok(byRental(db).quote?.revision === 1, "first issue is revision 1");
@@ -285,7 +288,7 @@ async function main() {
   );
 
   // 8. The deposit is taken and the rental confirmed.
-  db = await command("confirm_rental", { id: rentalId, input: { amount: "600", method: "Cash", reference: "DEP-1" } });
+  db = await command("confirm_rental", { id: rentalId, input: { amount: "690", method: "Cash", reference: "DEP-1" } });
   ok(byRental(db).status === "confirmed", "rental confirmed after the deposit");
 
   // 9-11. Assignment, start and completion.

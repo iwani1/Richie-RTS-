@@ -324,7 +324,8 @@ describe("the invoice carries the buyer's details (CUS-01)", () => {
     w.rentalId = w.db.rentals[0].id;
     const id = w.rentalId;
     step(w, "ops", { type: "quote_rental", id, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } });
-    step(w, "admin", { type: "confirm_rental", id, input: { amount: "600", method: "Bank transfer", reference: "SLIP-1" } });
+    // The deposit the quotation asks for: a share of what the customer pays, tax included (D-121).
+    step(w, "admin", { type: "confirm_rental", id, input: { amount: w.db.rentals[0].quote!.depositRequired.toFixed(2), method: "Bank transfer", reference: "SLIP-1" } });
     step(w, "ops", { type: "assign_rental", id, input: { vehicleId: w.db.vehicles[0].id, driverId: "" } });
     step(w, "ops", { type: "start_rental", id });
     step(w, "ops", { type: "complete_rental", id, input: { lines: [{ description: "Two days hire", quantity: "2", unitAmount: "1500" }] } });
@@ -380,7 +381,7 @@ describe("the invoice carries the buyer's details (CUS-01)", () => {
     const id = w.db.rentals[0].id;
     w.rentalId = id;
     step(w, "ops", { type: "quote_rental", id, input: { lines: [{ description: "One day hire", quantity: "1", unitAmount: "800" }] } });
-    step(w, "admin", { type: "confirm_rental", id, input: { amount: "160", method: "Cash", reference: "" } });
+    step(w, "admin", { type: "confirm_rental", id, input: { amount: w.db.rentals[0].quote!.depositRequired.toFixed(2), method: "Cash", reference: "" } });
     step(w, "ops", { type: "assign_rental", id, input: { vehicleId: w.db.vehicles[0].id, driverId: "" } });
     step(w, "ops", { type: "start_rental", id });
     step(w, "ops", { type: "complete_rental", id, input: { lines: [{ description: "One day hire", quantity: "1", unitAmount: "800" }] } });

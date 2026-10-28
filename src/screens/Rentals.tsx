@@ -1,9 +1,10 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { formatAmount, fromMinor, lineAmount, linesTotalFromText, percentOf, toMinor } from "../tms/money";
+import { readQuoteFigures } from "../tms/quotations";
 import { rentalQuotingReady, type AssignmentInput, type CompleteRentalInput, type DepositInput, type QuoteInput, type QuoteLineInput, type RentalRequestInput } from "../tms/service";
 import { balanceLine, damageLine, distanceLine, rentalBalance, runLine, toLocalInput } from "../tms/run";
 import { acceptanceLine, acceptanceStateOf, canAcceptQuotation } from "../tms/acceptance";
-import { quotationHeading, quotationIsNumbered, validityLine } from "../tms/quotations";
+import { approvalLine, approvalProblem, approvalRequiredAt, approvalIsCurrent, quotationHeading, quotationIsNumbered, validityLine } from "../tms/quotations";
 import { MAX_STOPS, planLine, SOURCE_LABELS, sourceLabel, stopsLine, tripContactLine } from "../tms/request";
 import { awaitingPrice, canEditRequest, isActiveRental, nextTriageStep, TRIAGE_ACTIONS } from "../tms/rentalWorkflow";
 import { readinessReport } from "../tms/maintenance";
@@ -185,11 +186,12 @@ export function RentalsPage({ navigate }: { navigate: (route: Route) => void }) 
 }
 
 function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }) {
-  const { db, allowed, dispatch, setFlash } = useTms();
-  const [panel, setPanel] = useState<"edit" | "quote" | "requote" | "accept" | "confirm" | "assign" | "complete" | "decline" | "cancel" | null>(null);
+  const { db, allowed, dispatch, setFlash, actor } = useTms();
+  const [panel, setPanel] = useState<"edit" | "quote" | "requote" | "accept" | "approve" | "confirm" | "assign" | "complete" | "decline" | "cancel" | null>(null);
   // D-116: the note the office writes when a customer agreed by phone. Held here so one panel does
   // not need a second component for a single field.
   const [acceptNote, setAcceptNote] = useState("");
+  const [approveNote, setApproveNote] = useState("");
 
   const categoryName = db.settings.vehicleCategories.find((c) => c.id === rental.vehicleCategoryId)?.name ?? "Unknown";
   const vehicle = db.vehicles.find((v) => v.id === rental.assignedVehicleId);
@@ -225,13 +227,22 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
     }
     if (allowed("rentals:quote")) actions.push(<Button key="quote" variant="primary" onClick={() => setPanel("quote")}>Issue quotation</Button>);
   }
+  // A price that needs a second signature, offered to somebody who is allowed to give one and is not
+  // the person who wrote it (D-121). The service refuses it again; this is the screen's half of the rule.
+  if (rental.quote && (rental.status === "quoted" || rental.status === "accepted") && allowed("rentals:approve")) {
+    const needsSignature =
+      approvalRequiredAt(rental.quote.total, db.settings.rental.quotationApprovalAbove) && !approvalIsCurrent(rental.quote);
+    if (needsSignature && approvalProblem(rental.quote, actor?.id ?? null, actor?.fullName ?? "") === null && !expired) {
+      actions.push(<Button key="approve" onClick={() => { setApproveNote(""); setPanel("approve"); }}>Approve quotation</Button>);
+    }
+  }
   if (rental.status === "quoted" || rental.status === "accepted") {
     if (expired && db.settings.rental.requotePolicy === "revise_in_place" && allowed("rentals:quote"))
       actions.push(<Button key="requote" variant="primary" onClick={() => setPanel("requote")}>Renew quotation</Button>);
     // RNT-05, D-116: most customers agree on the phone, so the office can write the yes down. The
     // button appears only when the quotation can actually be accepted — unless the customer has
     // already accepted it, in which case there is nothing left to record.
-    const acceptanceProblems = canAcceptQuotation(rental, nowIso);
+    const acceptanceProblems = canAcceptQuotation(rental, nowIso, db.settings.rental.quotationApprovalAbove);
     if (allowed("rentals:accept") && Object.keys(acceptanceProblems).length === 0)
       actions.push(<Button key="accept" onClick={() => { setAcceptNote(""); setPanel("accept"); }}>Record customer acceptance</Button>);
     if (allowed("rentals:confirm")) actions.push(<Button key="confirm" variant="primary" disabled={expired} title={expired ? "Quotation expired" : undefined} onClick={() => setPanel("confirm")}>Record deposit & confirm</Button>);
@@ -350,7 +361,16 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
               </table>
               <dl className="mt-3 space-y-1 border-t border-stone-200 pt-2 text-sm">
                 <div className="flex justify-between"><dt className="text-stone-500">Pricing basis</dt><dd>{PRICING_BASIS_LABELS[rental.quote.pricingBasis]}</dd></div>
-                <div className="flex justify-between font-semibold"><dt>Subtotal</dt><dd>{money(rental.quote.subtotal, rental.quote.currencyCode)}</dd></div>
+                <div className="flex justify-between"><dt className="text-stone-500">Lines</dt><dd>{money(rental.quote.subtotal, rental.quote.currencyCode)}</dd></div>
+                {/* D-121: the reduction and the levy, named on the document rather than folded into a
+                    total the customer cannot check. */}
+                {rental.quote.discountAmount > 0 && (
+                  <div className="flex justify-between"><dt className="text-stone-500">Less discount{rental.quote.discountReason ? `: ${rental.quote.discountReason}` : ""}</dt><dd>-{money(rental.quote.discountAmount, rental.quote.currencyCode)}</dd></div>
+                )}
+                {rental.quote.taxLines.map((line) => (
+                  <div key={line.name} className="flex justify-between"><dt className="text-stone-500">{line.name} at {line.ratePercent}%</dt><dd>{money(line.amount, rental.quote!.currencyCode)}</dd></div>
+                ))}
+                <div className="flex justify-between font-semibold"><dt>Total</dt><dd>{money(rental.quote.total, rental.quote.currencyCode)}</dd></div>
                 <div className="flex justify-between"><dt className="text-stone-500">Deposit ({rental.quote.depositPercent}%)</dt><dd>{money(rental.quote.depositRequired, rental.quote.currencyCode)}</dd></div>
                 <div className="flex justify-between"><dt className="text-stone-500">Driver included</dt><dd>{rental.quote.driverIncluded ? "Yes" : "No"}</dd></div>
                 <div className="flex justify-between"><dt className="text-stone-500">Valid until</dt><dd className={expired ? "text-red-700" : ""}>{formatDateTime(rental.quote.validUntil)}</dd></div>
@@ -370,7 +390,13 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
                   <p className="whitespace-pre-line text-xs text-stone-700">{rental.quote.terms}</p>
                 </div>
               )}
-              <p className="mt-2 text-[11px] text-stone-400">No tax lines are applied; VAT/levy treatment is an open question (Q-14).</p>
+              {/* D-121: the second signature, in the office's words — including when nobody has asked
+                  for one, which is a different statement from "approved". */}
+              {approvalLine(rental.quote, db.settings.rental.quotationApprovalAbove) && (
+                <p className={`mt-2 text-xs ${approvalIsCurrent(rental.quote) ? "text-stone-700" : "text-amber-800"}`}>
+                  {approvalLine(rental.quote, db.settings.rental.quotationApprovalAbove)}
+                </p>
+              )}
               {rental.quoteHistory.length > 0 && (
                 <div className="mt-4 border-t border-stone-200 pt-3">
                   <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Previous quotations retained</h3>
@@ -452,8 +478,8 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
       </div>
 
       {panel === "edit" && <RequestForm title={`Edit ${rental.reference}`} initial={toRequestInput(rental)} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "update_rental", id: rental.id, input }))} />}
-      {panel === "quote" && <QuoteForm title={`Quote ${rental.reference}`} depositPercent={db.settings.rental.depositPercent} currency={db.settings.currencyCode} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "quote_rental", id: rental.id, input }))} />}
-      {panel === "requote" && <QuoteForm title={`Renew quotation ${rental.reference}`} requoteMode depositPercent={db.settings.rental.depositPercent} currency={db.settings.currencyCode} initialLines={rental.quote?.lines.map((line) => ({ id: line.id, description: line.description, quantity: String(line.quantity), unitAmount: String(line.unitAmount) }))} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "requote_rental", id: rental.id, input }))} />}
+      {panel === "quote" && <QuoteForm title={`Quote ${rental.reference}`} depositPercent={db.settings.rental.depositPercent} currency={db.settings.currencyCode} taxPosition={db.settings.taxPosition} taxLines={db.settings.taxLines} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "quote_rental", id: rental.id, input }))} />}
+      {panel === "requote" && <QuoteForm title={`Renew quotation ${rental.reference}`} requoteMode depositPercent={db.settings.rental.depositPercent} currency={db.settings.currencyCode} taxPosition={db.settings.taxPosition} taxLines={db.settings.taxLines} initialLines={rental.quote?.lines.map((line) => ({ id: line.id, description: line.description, quantity: String(line.quantity), unitAmount: String(line.unitAmount) }))} onClose={() => setPanel(null)} onSubmit={(input) => run(dispatch({ type: "requote_rental", id: rental.id, input }))} />}
       {panel === "complete" && (
         <CompleteForm
           rental={rental}
@@ -485,6 +511,22 @@ function RentalDetail({ rental, onBack }: { rental: Rental; onBack: () => void }
               <Button variant="primary" onClick={() => void run(dispatch({ type: "accept_quotation", id: rental.id, note: acceptNote }))}>
                 Record acceptance
               </Button>
+            </div>
+          </div>
+        </Panel>
+      )}
+      {panel === "approve" && (
+        <Panel title={`Approve quotation ${rental.quote?.number ?? ""}`} description="A second signature on this price. It is recorded with your name and the figure you approved, and it does not change anything else." onClose={() => setPanel(null)}>
+          <div className="space-y-4">
+            <p className="text-sm text-stone-800">
+              {rental.quote ? `${money(rental.quote.total, rental.quote.currencyCode)} for ${rental.reference}, quoted by ${rental.quote.quotedBy}.` : ""}
+            </p>
+            <Field label="Note (optional)" hint="Why it was approved, if there is anything worth saying at the time.">
+              <TextArea value={approveNote} onChange={(event) => setApproveNote(event.target.value)} rows={3} />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setPanel(null)}>Cancel</Button>
+              <Button variant="primary" onClick={() => void run(dispatch({ type: "approve_quotation", id: rental.id, note: approveNote }))}>Approve quotation</Button>
             </div>
           </div>
         </Panel>
@@ -701,16 +743,83 @@ function CompleteForm({
   );
 }
 
-function QuoteForm({ title, depositPercent, currency, requoteMode, initialLines, onClose, onSubmit }: { title: string; depositPercent?: number | null; currency: string | null; requoteMode?: boolean; initialLines?: QuoteLineInput[]; onClose: () => void; onSubmit: (input: QuoteInput) => Errors | Promise<Errors> }) {
+function QuoteForm({
+  title,
+  depositPercent,
+  currency,
+  requoteMode,
+  initialLines,
+  taxPosition,
+  taxLines,
+  onClose,
+  onSubmit,
+}: {
+  title: string;
+  depositPercent?: number | null;
+  currency: string | null;
+  requoteMode?: boolean;
+  initialLines?: QuoteLineInput[];
+  /** The company's tax position and rates, so the preview is the figure the quotation will carry. */
+  taxPosition: "registered" | "not_registered" | null;
+  taxLines: { name: string; ratePercent: number }[];
+  onClose: () => void;
+  onSubmit: (input: QuoteInput) => Errors | Promise<Errors>;
+}) {
   const [lines, setLines] = useState<QuoteLineInput[]>(initialLines && initialLines.length ? initialLines : [{ description: "", quantity: "1", unitAmount: "" }]);
+  const [discountAmount, setDiscountAmount] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const subtotal = linesTotalFromText(lines);
+  // The same arithmetic the command runs (quotations.ts), so what the office sees here is what the
+  // customer will read on the document — including the tax the quotation will carry (D-121).
+  const preview = readQuoteFigures({
+    subtotal,
+    discountAmount,
+    discountReason,
+    taxPosition: taxPosition ?? null,
+    taxLines,
+    depositPercent: depositPercent ?? 0,
+  });
   return (
     <Panel title={title} description={requoteMode ? "Update the line items for a new validity period. The prior quotation will be retained in history." : "Enter the quotation line items. Rates are entered here, not assumed by the system."} onClose={onClose}>
-      <form onSubmit={async (e) => { e.preventDefault(); setErrors((await onSubmit({ lines })) ?? {}); }} className="space-y-4">
-        {requoteMode && <Notice tone="warning">This creates a new quotation revision; the prior amounts, deposit requirement and expiry date remain in the history.</Notice>}
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setErrors((await onSubmit({ lines, discountAmount, discountReason })) ?? {});
+        }}
+        className="space-y-4"
+      >
+        {requoteMode && <Notice tone="warning">This creates a new quotation revision; the prior amounts, deposit requirement and expiry date remain in the history. Any approval has to be given again, because the figure has changed.</Notice>}
         <LineItemsEditor lines={lines} setLines={setLines} errors={errors} currency={currency} />
-        {depositPercent !== null && depositPercent !== undefined && <Notice tone="info">Deposit at {depositPercent}% will be {money(percentOf(subtotal, depositPercent), currency)}.</Notice>}
+        <div className="rounded-sm border border-stone-200 p-3">
+          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500">Reduction</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Discount (optional)" hint={currency ? `In ${currency}` : "Set the currency in Settings"} error={errors.discountAmount}>
+              <TextInput inputMode="decimal" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} invalid={!!errors.discountAmount} />
+            </Field>
+            {discountAmount.trim() !== "" && (
+              <Field label="Reason for the discount" error={errors.discountReason}>
+                <TextInput value={discountReason} onChange={(e) => setDiscountReason(e.target.value)} invalid={!!errors.discountReason} />
+              </Field>
+            )}
+          </div>
+        </div>
+        <dl className="space-y-1 border-t border-stone-200 pt-2 text-sm">
+          <div className="flex justify-between"><dt className="text-stone-500">Lines</dt><dd>{money(subtotal, currency)}</dd></div>
+          {preview.figures.discountAmount > 0 && (
+            <div className="flex justify-between"><dt className="text-stone-500">Less discount</dt><dd>-{money(preview.figures.discountAmount, currency)}</dd></div>
+          )}
+          {preview.figures.taxLines.map((line) => (
+            <div key={line.name} className="flex justify-between"><dt className="text-stone-500">{line.name} at {line.ratePercent}%</dt><dd>{money(line.amount, currency)}</dd></div>
+          ))}
+          <div className="flex justify-between font-semibold"><dt>Total</dt><dd>{money(preview.figures.total, currency)}</dd></div>
+          {depositPercent !== null && depositPercent !== undefined && (
+            <div className="flex justify-between"><dt className="text-stone-500">Deposit at {depositPercent}%</dt><dd>{money(percentOf(preview.figures.total, depositPercent), currency)}</dd></div>
+          )}
+        </dl>
+        {taxPosition !== "registered" && (
+          <p className="text-xs text-stone-600">No tax is added to this quotation: the company is not recorded as VAT registered.</p>
+        )}
         <div className="flex justify-end gap-2 pt-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary">{requoteMode ? "Issue revised quotation" : "Issue quotation"}</Button></div>
       </form>
     </Panel>
