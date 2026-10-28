@@ -1,7 +1,42 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { PASSWORD_MIN_LENGTH } from "../tms/service";
 import { useTms } from "../tms/useTms";
 import { Button, Field, Notice, PasswordInput, TextInput } from "../ui/primitives";
+
+/**
+ * Enter submits the form.
+ *
+ * Both pages below are real `<form>`s with a real submit button, so a browser is supposed to do this
+ * on its own — and on a desktop it does. It is handled here as well because it does not everywhere:
+ * an embedded webview, or anything that puts its own key handler around a field, swallows the
+ * implicit submission, and the sign-in screen is the first thing anybody uses. Typing an address,
+ * typing a password and pressing Enter is the whole of signing in; a control that has to be found
+ * with the pointer first is a worse screen.
+ *
+ * Four rules, because each is a way this goes wrong:
+ *
+ *   * **`preventDefault` on the key press**, not just calling the submit handler. Otherwise the
+ *     browser's own implicit submission fires as well and the sign-in is attempted twice.
+ *   * **The fields are asked first** (`reportValidity`). The message then appears where the mistake
+ *     is, instead of the request travelling to the server to be refused.
+ *   * **A guard while a request is in flight.** The button is disabled during a sign-in, but a key
+ *     press is not the button, so a second Enter (or a held one, repeating) would bypass it.
+ *   * **Shift+Enter and a text area are left alone.** A note keeps its line breaks; Enter inside one
+ *     is text, not a command.
+ */
+function enterSubmits(submit: () => void, busy: boolean) {
+  return (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    const target = event.target as HTMLElement;
+    // A button already has its own click, and a textarea is allowed to contain newlines.
+    if (target.tagName === "TEXTAREA" || target.isContentEditable || target.tagName === "BUTTON") return;
+    event.preventDefault();
+    if (busy) return;
+    // The same question the browser would have asked before submitting: a blank or malformed field
+    // is reported where it is, rather than sent to the server to be refused.
+    if (event.currentTarget.reportValidity()) submit();
+  };
+}
 
 function AuthFrame({ eyebrow, title, intro, children }: { eyebrow: string; title: string; intro: string; children: React.ReactNode }) {
   return (
@@ -95,8 +130,9 @@ export function SetupPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    if (busy) return;
     setMessage(null);
     if (values.password !== values.confirm) {
       setErrors({ confirm: "Passwords do not match." });
@@ -117,7 +153,7 @@ export function SetupPage() {
       title="Create the first administrator"
       intro="No user accounts exist yet. This account will own system settings and user management. It is created once, here, and cannot be created again over the web."
     >
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} onKeyDown={enterSubmits(() => void submit(), busy)} className="space-y-4">
         {message && <Notice tone="error">{message}</Notice>}
         <Field label="Full name" error={errors.fullName}>
           <TextInput value={values.fullName} onChange={(e) => setValues({ ...values, fullName: e.target.value })} invalid={!!errors.fullName} autoComplete="name" required />
@@ -146,8 +182,9 @@ export function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError(await signIn(email, password));
     setBusy(false);
@@ -155,7 +192,7 @@ export function SignInPage() {
 
   return (
     <AuthFrame eyebrow="Access" title="Sign in" intro="Use the account an administrator created for you.">
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} onKeyDown={enterSubmits(() => void submit(), busy)} className="space-y-4">
         {error && <Notice tone="error">{error}</Notice>}
         <Field label="Email">
           <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />

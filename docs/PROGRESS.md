@@ -2070,3 +2070,15 @@ file is kept.
 component layer. What is left in the product is not a screen: two decisions (whether a document may be
 sent, and how long a scanned file is kept) and the working-day trial on the live database.
 
+## Phase 89 - Enter signs in (D-139)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| The reported fault | Fixed (verified) | The sign-in form was a real form with a real submit button, so a desktop browser submitted it and anything that swallows implicit submission (an embedded webview, a key-intercepting wrapper) did not. Enter is now handled by the screen itself, so it behaves the same everywhere |
+| One code path | Fixed (verified) | The button's submit and the key press call the same function; the "busy" guard is the same state the disabled button reads, so a second Enter or a held key cannot send a second sign-in |
+| Validation is not lost | Fixed (verified) | Cancelling the native submission would have skipped the browser's own checks, so the handler asks `reportValidity()` first: an empty or malformed field is reported where it is, and nothing travels |
+| Shift+Enter and text areas | Fixed (verified) | Left as a line break and as text, so the rule survives being copied onto a form with notes |
+| The first-run form too | Fixed (verified) | Same handler on the create-the-first-administrator form: it is the same screen and the same expectation |
+| Tests | Done (verified) | **1,392 passed, 28 skipped** (from 1,386): a new `src/screens/Auth.test.tsx` with 6 tests — Enter in the password field, Enter in the email field, three presses sending one attempt, Shift+Enter doing nothing, a blank form not being sent, and the server's refusal staying on the screen |
+| Gates | Pass | `tsc` clean, `eslint` clean, `next build` 15.1 s, no styling change |
+

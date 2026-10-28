@@ -3723,3 +3723,39 @@ temporariness is how a codebase teaches the next reader something untrue.
 (one exclusion removed with the file it excluded), three screen tests (the copy button's live region
 found by its parent). Compiled CSS: one file, 82,841 bytes, down from 86,933 + 10,903.
 
+## D-139 - Enter signs in (Phase 89)
+
+Reported from use: on the sign-in screen, typing an address and a password and pressing Enter did
+nothing; the button had to be clicked.
+
+The screen was not missing a form. It is a real `<form onSubmit>` with a real `<button type="submit">`,
+which is exactly what a browser is supposed to submit implicitly when Enter is pressed in a text field —
+and on a desktop browser it does. The fragile part is everything between: an embedded webview, a
+keyboard-interception layer, or a wrapper that puts its own handler around a field can swallow the
+implicit submission and leave a form that looks right and does not answer the key. Since the sign-in
+screen is the first thing anybody touches, "usually works" is not good enough for it.
+
+**Decision: handle Enter here as well, and do it in the four places it can go wrong.**
+
+- **`preventDefault` on the key press**, then call the same submit the button calls. Without that, a
+  browser that *does* submit implicitly would submit twice — one hidden request for every sign-in.
+- **The fields are asked first** (`form.reportValidity()`). The message then appears on the empty or
+  malformed field, which is what the `required` and `type="email"` attributes were already doing, so
+  cancelling the native submission does not lose the validation.
+- **A guard while a request is in flight**, read from the same `busy` the disabled button reads. A key
+  press is not the button, so a second Enter — or a held key repeating — would otherwise bypass the
+  disabled state.
+- **Shift+Enter and a text area are left alone.** Shift+Enter is a line break, and Enter inside a
+  `<textarea>` is text, not a command. The sign-in screen has neither today; the rule is stated so the
+  next form that does is not surprised.
+
+The same handler is on the first-run administrator form, because it is the same screen family and the
+same expectation: the person setting the product up is typing three fields and pressing Enter.
+
+**Consequence.** `src/screens/Auth.tsx` (one shared `enterSubmits` handler, both forms; both submit
+functions take an optional event so the button and the key press run the identical code path),
+`src/screens/Auth.test.tsx` (new, 6 tests: Enter in the password field, Enter in the email field,
+three presses sending one attempt, Shift+Enter doing nothing, an empty form not being sent, and a
+refusal from the server staying on the screen). No other screen changed: every other form in the
+product is a dialog with its own submit button, where the browser's behaviour was never in question.
+
