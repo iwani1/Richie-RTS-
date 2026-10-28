@@ -5,7 +5,10 @@
 // sign-in, so the history below answers "when did this account sign in", not "from where".
 import { useEffect, useState, type FormEvent } from "react";
 import { useTms } from "../tms/useTms";
-import { Button, Card, Field, Notice, PageHeader, PasswordInput, TextInput, formatDateTime } from "../ui/primitives";
+import { Button, Field, Notice, PasswordInput, TextInput } from "../ui/primitives";
+import { formatDateTime } from "@/lib/format";
+import { PageHeader } from "@/components/tms/PageHeader";
+import { Panel } from "@/components/tms/Panel";
 
 interface SignIn {
   at: string;
@@ -41,13 +44,14 @@ export function ProfilePage() {
   return (
     <div>
       <PageHeader
-        eyebrow="My account"
+        kicker="My account"
         title="Your details and sign-in history"
-        description="Change your own name, email address and password. Another person's details are changed in Users, which needs an administrator."
+        subtitle="Change your own name, email address and password. Another person's details are changed in Users, which needs an administrator."
+        className="mb-4"
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Your details" description="Your email address is how you sign in and how the company reaches you.">
+        <Panel title="Your details" description="Your email address is how you sign in and how the company reaches you." bodyClassName="px-4 pb-4">
           <DetailsForm
             key={`${currentUser?.id ?? "none"}:${currentUser?.fullName ?? ""}:${currentUser?.email ?? ""}`}
             fullName={currentUser?.fullName ?? ""}
@@ -55,17 +59,18 @@ export function ProfilePage() {
             roleLabel={roleLabel}
             onSaved={refresh}
           />
-        </Card>
+        </Panel>
 
-        <Card title="Change your password" description="You need your current password. Other devices signed in to this account are signed out when it changes.">
+        <Panel title="Change your password" description="You need your current password. Other devices signed in to this account are signed out when it changes." bodyClassName="px-4 pb-4">
           <PasswordForm onChanged={() => setFlash({ tone: "success", message: "Your password was changed. Other devices will need to sign in again." })} />
-        </Card>
+        </Panel>
       </div>
 
       <div className="mt-4">
-        <Card
+        <Panel
           title="Recent sign-ins"
           description="The last ten times this account signed in. Recorded as part of the audit trail, which is append-only."
+          bodyClassName="px-4 pb-4"
         >
           {historyError && <Notice tone="warning">{historyError}</Notice>}
           {!historyError && signIns === null && <p className="text-sm text-muted-foreground">Reading your sign-in history…</p>}
@@ -77,7 +82,7 @@ export function ProfilePage() {
               <ol className="divide-y divide-divider">
                 {signIns.map((entry) => (
                   <li key={entry.at} className="flex items-baseline justify-between gap-4 py-2 text-sm">
-                    <span className="rts-mono text-foreground">{formatDateTime(entry.at)}</span>
+                    <span className="tms-mono text-foreground">{formatDateTime(entry.at)}</span>
                     <span className="text-xs text-muted-foreground">{entry.at === signIns[0].at ? "most recent" : ""}</span>
                   </li>
                 ))}
@@ -89,7 +94,7 @@ export function ProfilePage() {
               </p>
             </>
           )}
-        </Card>
+        </Panel>
       </div>
     </div>
   );
@@ -140,7 +145,7 @@ function DetailsForm({
         <TextInput type="email" value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} invalid={!!errors.email} autoComplete="email" />
       </Field>
       <Field label="Role" hint="Only an administrator can change this.">
-        <p className="rts-mono text-sm capitalize text-foreground">{roleLabel}</p>
+        <p className="tms-mono text-foreground capitalize">{roleLabel}</p>
       </Field>
       <div className="flex justify-end">
         <Button type="submit" variant="primary" disabled={busy}>

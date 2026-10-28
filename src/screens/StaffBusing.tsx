@@ -300,7 +300,7 @@ function RouteForm({ route, onClose }: { route: BusRoute | null; onClose: () => 
           <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Operating days</span>
           <div className="flex flex-wrap gap-2">
             {DAY_LABELS.map((label, d) => (
-              <label key={label} className="flex items-center gap-1 rounded-sm border border-[color:var(--rts-line-strong)] bg-[var(--rts-paper-2)] px-2 py-1 text-xs">
+              <label key={label} className="flex items-center gap-1 rounded-sm border border-border bg-muted/50 px-2 py-1 text-xs">
                 <input
                   type="checkbox"
                   checked={values.weekdays.includes(d)}
@@ -333,7 +333,7 @@ function RouteForm({ route, onClose }: { route: BusRoute | null; onClose: () => 
           {errors.stops && <Notice tone="error" className="mb-2">{errors.stops}</Notice>}
           <ol className="space-y-2">
             {values.stops.map((s, i) => (
-              <li key={s.id ?? `new-${i}`} className="space-y-2 rounded-sm border border-[color:var(--rts-line)] bg-[var(--rts-paper-2)] p-2">
+              <li key={s.id ?? `new-${i}`} className="space-y-2 rounded-sm border border-border bg-muted/50 p-2">
                 <div className="grid gap-2 sm:grid-cols-[1fr_120px_auto]">
                   <Field label={`Stop ${i + 1} name`} error={errors[`stops.${i}.name`]}>
                     <TextInput value={s.name} onChange={(e) => setStop(i, { name: e.target.value })} disabled={locked} invalid={!!errors[`stops.${i}.name`]} />

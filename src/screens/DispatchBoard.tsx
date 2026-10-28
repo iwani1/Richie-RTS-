@@ -56,13 +56,13 @@ export function DispatchBoardPage({ navigate }: { navigate?: (route: Route) => v
 
   const pilots = (list: BoardCandidate[], empty: string) =>
     list.length === 0 ? (
-      <p className="rts-band-empty">{empty}</p>
+      <p className="py-1 text-[12px] leading-relaxed text-muted-foreground">{empty}</p>
     ) : (
-      <ul className="rts-desk-list">
+      <ul className="m-0 list-none p-0">
         {list.map((candidate) => (
-          <li key={candidate.id}>
+          <li key={candidate.id} className="flex items-baseline justify-between gap-3 border-b border-divider py-2 text-[13px] last:border-b-0">
             <span>{candidate.label}</span>
-            <span className="rts-desk-wait">{candidate.note}</span>
+            <span className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">{candidate.note}</span>
           </li>
         ))}
       </ul>
@@ -81,7 +81,7 @@ export function DispatchBoardPage({ navigate }: { navigate?: (route: Route) => v
         }
       />
 
-      <div className="rts-toolbar">
+      <div className="mb-4 flex flex-wrap items-end gap-2.5 rounded-card border border-border bg-card px-3.5 py-3">
         <Field label="Service date">
           <TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         </Field>

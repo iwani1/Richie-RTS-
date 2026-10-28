@@ -1894,3 +1894,18 @@ passed, 5 skipped), `build` succeeds. No schema change, no migration.
 
 **Still on the old classes:** twenty-six screens. Phase 78 changed no behaviour on the audit log and
 left every other screen exactly as it was.
+
+## Phase 79 - The temporary stylesheet cut down to what the screens still ask for (D-129)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Dead CSS removed | Done (verified) | 284 of 553 rule blocks named no class used in `src/`; `legacy.css` is 85.7 KB → 48.6 KB, and the compiled stylesheet 137 KB → 98 KB. Two templated class families (`rts-flag--`, `rts-interval-fill--`) were protected by name, and a check confirms every class still used has a rule |
+| Four more screens clear of legacy classes | Done (verified) | Profile (also moved to the `components/tms` header and panels), Users, the trip-stop form and the dispatch board. Nine of thirty screens are now class-clean |
+| Two undefined CSS variables | Fixed | `dashboards`' `--rts-line-strong` and `--rts-paper-2` in `StaffBusing.tsx` were never defined; the chips drew `currentColor` borders and no background. Tokens now |
+| Backup and restore, proven | Done (verified) | `npm run db:backup` → a fresh database → `db:migrate` (22) → `npm run db:restore`; row counts match, and the restored copy accepts the original password ("Signed in") |
+| Gates | Pass | `tsc` clean, `eslint` clean, **1,351 tests passed, 28 skipped**, `next build` 61 s, compiled CSS carries no literal text colour and no light background |
+
+**Still to do for a finished product:** twenty-one of thirty screens still name an `rts-` class and have
+not been rebuilt on `components/tms` (Documents 123, StaffBusing 65, StaffLogistics 42, PrintableReport
+37, FinanceHome 25, Invoices 24, PublicEnquiry 23 are the largest). None of them is broken; each is a
+rebuild, not a fix.

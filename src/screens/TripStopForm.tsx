@@ -68,9 +68,9 @@ export function TripStopForm({
     >
       {/* RTE-01: what the driver should be looking at, and a link to it. The form is opened at the
           stop, so this is a check that they are at the right one before anyone is marked as no-show. */}
-      <div className="mb-4 rounded-sm border border-[color:var(--rts-line)] bg-[var(--rts-paper-2)] px-3 py-2">
+      <div className="mb-4 rounded-sm border border-border bg-muted/50 px-3 py-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">This stop</p>
-        <p className="text-sm text-foreground">{stopDetailLine(stop) || <em className="rts-unset">no directions recorded</em>}</p>
+        <p className="text-sm text-foreground">{stopDetailLine(stop) || <em className="text-muted-foreground not-italic">no directions recorded</em>}</p>
         {stopMapLink(stop) && (
           <a className="text-xs underline" href={stopMapLink(stop)!} target="_blank" rel="noreferrer">
             Open in maps
@@ -84,7 +84,7 @@ export function TripStopForm({
           <ul className="mt-1 space-y-1 text-sm">
             {trip.rosterChanges.map((change) => (
               <li key={change.id}>
-                <span className="rts-mono text-xs text-muted-foreground">{formatDateTime(change.at)}</span> · {change.summary}{" "}
+                <span className="tms-mono text-muted-foreground">{formatDateTime(change.at)}</span> · {change.summary}{" "}
                 <span className="text-xs text-muted-foreground">({change.by})</span>
               </li>
             ))}

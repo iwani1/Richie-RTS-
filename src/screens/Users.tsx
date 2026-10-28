@@ -243,7 +243,7 @@ function UserForm({ title, initial, currentUserId, withPassword, onClose, onSubm
             </Field>
             {/* Not wrapped in Field: Field renders a <label>, and a label inside a label gives the
                 checkbox a name nobody can predict. */}
-            <div className="rts-field">
+            <div className="block">
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -253,12 +253,12 @@ function UserForm({ title, initial, currentUserId, withPassword, onClose, onSubm
                 />
                 <span>Primary contact for the linked client</span>
               </label>
-              <span className="rts-hint">
+              <span className="mt-1 block text-[11px] text-muted-foreground">
                 {values.clientId
                   ? "The person we ring first about this client's bookings. Marking this account primary takes the mark off any other contact account for the same client."
                   : "Pick a client first."}
               </span>
-              {errors.primaryContact && <span className="rts-error" role="alert">{errors.primaryContact}</span>}
+              {errors.primaryContact && <span className="mt-1 block text-[11px] font-medium text-destructive" role="alert">{errors.primaryContact}</span>}
             </div>
           </>
         )}

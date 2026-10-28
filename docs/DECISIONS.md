@@ -3246,3 +3246,41 @@ class remains in it), `src/screens/Audit.test.tsx` (new, 7 tests; the screen had
 screen stopped needing it. The suite moves from 1,340 to 1,351. **No behaviour changed:** the same
 search, the same record filter, the same 500-row window, the same words, and the same rule that nothing
 on this screen writes.
+
+## D-129 - The temporary stylesheet now says only what the screens still ask for
+
+**The problem.** `legacy.css` was written for the light "Daylight" build. Three phases later most of the
+markup it described is gone: the application shell, the first-run and sign-in screens, the stat cards,
+the palette and the bands were all rebuilt on `components/tms`. Their rules stayed behind. A count
+against `src/` found **284 of its 553 rule blocks naming classes no file mentions** — 44 % of a
+temporary file that every page ships, describing a product that no longer exists.
+
+**Decision 1: the stylesheet is measured against the source, not edited by taste.** Every block whose
+selectors name only classes that appear nowhere in `src/**` was removed, block by block, keeping
+`@media`, `:root` and any rule with one live selector. Two class *families* are built in templates rather
+than written out — `rts-flag--${tripStatus}` and `rts-interval-fill--${status}` — so every member of
+those two families was treated as used even though no file names one. This is the difference between a
+sweep and a guess: the script that did it also proves, afterwards, that every class still used in a
+screen still has a rule.
+
+**Decision 2: classes that are used get a token before their rule goes.** Five screens carried a handful
+of legacy classes each (the audit log in the previous phase, then Profile, Users, the trip-stop form and
+the dispatch board). Each was replaced with the token utility it stood for — `rts-mono` → `tms-mono`,
+`rts-hint` → a muted 11px line, `rts-toolbar` → the same card-and-border it drew — and Profile's header
+and cards moved to the `components/tms` versions. Only then was the rule deleted.
+
+**Decision 3: a bug found by the sweep is fixed, not preserved.** `StaffBusing.tsx` styled two chips with
+`var(--rts-line-strong)` and `var(--rts-paper-2)`. Neither variable is defined anywhere in the file, in
+`:root` or in the build — they never were. The borders were falling back to `currentColor` and the
+backgrounds to transparent, which is why those chips looked unlike every other chip. They are tokens now.
+
+**A note on what "ready for production" means here.** The screens are on the dark token palette and the
+same frame; what remains is the deeper per-screen rebuild on `components/tms` (twenty-one screens still
+name an `rts-` class, Documents and StaffBusing most of all). That work changes how a screen is built,
+not whether it works — which is why it can proceed a screen at a time with the product live.
+
+**Consequence.** `src/styles/legacy.css` (553 → 269 rule blocks; 85.7 KB → 48.6 KB; 372 → 88 distinct
+class names), the compiled stylesheet (137 KB → 98 KB), `src/screens/{Profile,Users,TripStopForm,
+DispatchBoard}.tsx` (no `rts-` class remains), `src/screens/StaffBusing.tsx` (two undefined variables
+replaced with tokens). No behaviour changed: 1,351 tests still pass, and the suite was written against
+what the screens do, not what they are painted with.
